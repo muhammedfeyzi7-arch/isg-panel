@@ -1,0 +1,572 @@
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useApp } from '../../store/AppContext';
+import Modal from '../../components/base/Modal';
+import type { Ekipman, EkipmanStatus } from '../../types';
+
+const EKIPMAN_TURLERI = [
+  'İş Makinesi', 'Kaldırma Ekipmanı', 'Basınçlı Kap', 'Elektrikli Ekipman',
+  'İskele / Platform', 'Koruyucu Donanım', 'Yangın Söndürücü', 'İlk Yardım Kiti',
+  'Ölçüm Aleti', 'El Aleti', 'Diğer',
+];
+
+const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: string; icon: string }> = {
+  'Uygun': { label: 'Uygun', color: '#34D399', bg: 'rgba(52,211,153,0.12)', icon: 'ri-checkbox-circle-line' },
+  'Uygun Değil': { label: 'Uygun Değil', color: '#F87171', bg: 'rgba(248,113,113,0.12)', icon: 'ri-close-circle-line' },
+  'Bakımda': { label: 'Bakımda', color: '#FBBF24', bg: 'rgba(251,191,36,0.12)', icon: 'ri-time-line' },
+  'Hurda': { label: 'Hurda', color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-delete-bin-line' },
+};
+
+const defaultForm: Omit<Ekipman, 'id' | 'olusturmaTarihi'> = {
+  ad: '',
+  tur: '',
+  firmaId: '',
+  bulunduguAlan: '',
+  seriNo: '',
+  marka: '',
+  model: '',
+  sonKontrolTarihi: '',
+  sonrakiKontrolTarihi: '',
+  durum: 'Uygun',
+  aciklama: '',
+  belgeMevcut: false,
+  dosyaAdi: '',
+  dosyaBoyutu: 0,
+  dosyaTipi: '',
+  dosyaVeri: '',
+  notlar: '',
+};
+
+function getDaysUntil(dateStr: string): number {
+  if (!dateStr) return 999;
+  const diff = new Date(dateStr).getTime() - Date.now();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+export default function EkipmanlarPage() {
+  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, getEkipmanFile, addToast, quickCreate, setQuickCreate } = useApp();
+
+  const [search, setSearch] = useState('');
+  const [firmaFilter, setFirmaFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState<Omit<Ekipman, 'id' | 'olusturmaTarihi'>>(defaultForm);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (quickCreate === 'ekipmanlar') {
+      setEditId(null);
+      setForm(defaultForm);
+      setShowModal(true);
+      setQuickCreate(null);
+    }
+  }, [quickCreate, setQuickCreate]);
+
+  const filtered = useMemo(() => {
+    return ekipmanlar.filter(e => {
+      if (e.silinmis) return false;
+      const firma = firmalar.find(f => f.id === e.firmaId);
+      const q = search.toLowerCase();
+      const matchSearch = !q ||
+        e.ad.toLowerCase().includes(q) ||
+        e.tur.toLowerCase().includes(q) ||
+        e.seriNo.toLowerCase().includes(q) ||
+        (firma?.ad.toLowerCase().includes(q) ?? false);
+      const matchFirma = !firmaFilter || e.firmaId === firmaFilter;
+      const matchStatus = !statusFilter || e.durum === statusFilter;
+      return matchSearch && matchFirma && matchStatus;
+    });
+  }, [ekipmanlar, firmalar, search, firmaFilter, statusFilter]);
+
+  const aktifEkipmanlar = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
+  const stats = useMemo(() => {
+    const total = aktifEkipmanlar.length;
+    const uygun = aktifEkipmanlar.filter(e => e.durum === 'Uygun').length;
+    const uygunDegil = aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length;
+    const yaklasan = aktifEkipmanlar.filter(e => {
+      const days = getDaysUntil(e.sonrakiKontrolTarihi);
+      return days >= 0 && days <= 30;
+    }).length;
+    return { total, uygun, uygunDegil, yaklasan };
+  }, [aktifEkipmanlar]);
+
+  const openAdd = () => {
+    setEditId(null);
+    setForm(defaultForm);
+    setShowModal(true);
+  };
+
+  const openEdit = (ekipman: Ekipman) => {
+    setEditId(ekipman.id);
+    setForm({
+      ad: ekipman.ad, tur: ekipman.tur, firmaId: ekipman.firmaId,
+      bulunduguAlan: ekipman.bulunduguAlan, seriNo: ekipman.seriNo,
+      marka: ekipman.marka, model: ekipman.model,
+      sonKontrolTarihi: ekipman.sonKontrolTarihi, sonrakiKontrolTarihi: ekipman.sonrakiKontrolTarihi,
+      durum: ekipman.durum, aciklama: ekipman.aciklama, belgeMevcut: ekipman.belgeMevcut,
+      dosyaAdi: ekipman.dosyaAdi || '', dosyaBoyutu: ekipman.dosyaBoyutu || 0,
+      dosyaTipi: ekipman.dosyaTipi || '', dosyaVeri: '', notlar: ekipman.notlar,
+    });
+    setShowModal(true);
+  };
+
+  const handleFileChange = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const veri = e.target?.result as string;
+      setForm(prev => ({ ...prev, dosyaAdi: file.name, dosyaBoyutu: file.size, dosyaTipi: file.type, dosyaVeri: veri }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileDownload = (ekipman: Ekipman) => {
+    const veri = getEkipmanFile(ekipman.id);
+    if (!veri) { addToast('Bu ekipman için yüklenmiş belge bulunamadı.', 'error'); return; }
+    const link = document.createElement('a');
+    link.href = veri;
+    link.download = ekipman.dosyaAdi || 'ekipman-belgesi';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast(`"${ekipman.dosyaAdi}" indiriliyor...`, 'success');
+  };
+
+  const handleSave = () => {
+    if (!form.ad.trim()) { addToast('Ekipman adı zorunludur.', 'error'); return; }
+    if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
+    if (!form.tur) { addToast('Ekipman türü zorunludur.', 'error'); return; }
+
+    if (editId) {
+      updateEkipman(editId, form);
+      addToast('Ekipman başarıyla güncellendi.', 'success');
+    } else {
+      addEkipman(form);
+      addToast('Ekipman başarıyla eklendi.', 'success');
+    }
+    setShowModal(false);
+  };
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    deleteEkipman(deleteId);
+    addToast('Ekipman silindi.', 'success');
+    setDeleteId(null);
+  };
+
+  // inputStyle replaced by .isg-input CSS class
+
+  return (
+    <div className="space-y-5">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Ekipman Kontrolleri</h2>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Ekipman kayıtlarını ve kontrol durumlarını yönetin</p>
+        </div>
+        <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
+          <i className="ri-add-line text-base" />
+          Ekipman Ekle
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Toplam Ekipman', value: stats.total, icon: 'ri-tools-line', color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
+          { label: 'Uygun', value: stats.uygun, icon: 'ri-checkbox-circle-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)' },
+          { label: 'Uygun Değil', value: stats.uygunDegil, icon: 'ri-close-circle-line', color: '#F87171', bg: 'rgba(248,113,113,0.1)' },
+          { label: 'Yaklaşan Kontrol', value: stats.yaklasan, icon: 'ri-time-line', color: '#FBBF24', bg: 'rgba(251,191,36,0.1)' },
+        ].map(s => (
+          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4">
+            <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
+              <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="isg-card rounded-xl p-4 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Ekipman adı, tür veya seri no ara..."
+            className="isg-input pl-9"
+          />
+        </div>
+        <select
+          value={firmaFilter}
+          onChange={e => setFirmaFilter(e.target.value)}
+          className="isg-input"
+          style={{ width: 'auto', minWidth: '180px' }}
+        >
+          <option value="">Tüm Firmalar</option>
+          {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="isg-input"
+          style={{ width: 'auto', minWidth: '160px' }}
+        >
+          <option value="">Tüm Durumlar</option>
+          {Object.keys(STATUS_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        {(search || firmaFilter || statusFilter) && (
+          <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); }} className="btn-secondary whitespace-nowrap">
+            <i className="ri-filter-off-line" /> Temizle
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="isg-card rounded-xl overflow-hidden">
+        {filtered.length === 0 ? (
+          <div className="py-20 text-center">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
+              <i className="ri-tools-line text-3xl" style={{ color: '#3B82F6' }} />
+            </div>
+            <p className="font-semibold text-slate-400 text-base">Ekipman kaydı bulunamadı</p>
+            <p className="text-sm mt-2" style={{ color: '#475569' }}>Yeni ekipman eklemek için "Ekipman Ekle" butonunu kullanın</p>
+            <button onClick={openAdd} className="btn-primary mt-5">
+              <i className="ri-add-line" /> Ekipman Ekle
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table-premium w-full">
+              <thead>
+                <tr>
+                  <th>Ekipman Adı</th>
+                  <th>Tür</th>
+                  <th>Firma</th>
+                  <th>Bulunduğu Alan</th>
+                  <th>Seri No</th>
+                  <th>Son Kontrol</th>
+                  <th>Sonraki Kontrol</th>
+                  <th>Durum</th>
+                  <th>İşlemler</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(ekipman => {
+                  const firma = firmalar.find(f => f.id === ekipman.firmaId);
+                  const sc = STATUS_CONFIG[ekipman.durum];
+                  const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
+                  const isUrgent = days >= 0 && days <= 30;
+                  const isOverdue = days < 0;
+                  return (
+                    <tr key={ekipman.id}>
+                      <td>
+                        <div>
+                          <p className="font-semibold text-slate-200 text-sm">{ekipman.ad}</p>
+                          {ekipman.marka && <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{ekipman.marka} {ekipman.model}</p>}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="text-sm text-slate-400">{ekipman.tur || '—'}</span>
+                      </td>
+                      <td>
+                        <span className="text-sm text-slate-300">{firma?.ad || '—'}</span>
+                      </td>
+                      <td>
+                        <span className="text-sm text-slate-400">{ekipman.bulunduguAlan || '—'}</span>
+                      </td>
+                      <td>
+                        <span className="text-xs font-mono text-slate-500">{ekipman.seriNo || '—'}</span>
+                      </td>
+                      <td>
+                        <span className="text-sm text-slate-400">
+                          {ekipman.sonKontrolTarihi ? new Date(ekipman.sonKontrolTarihi).toLocaleDateString('tr-TR') : '—'}
+                        </span>
+                      </td>
+                      <td>
+                        <div>
+                          <span className={`text-sm ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : 'text-slate-400'}`}>
+                            {ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : '—'}
+                          </span>
+                          {isOverdue && <p className="text-[10px] text-red-500 mt-0.5">Gecikmiş!</p>}
+                          {isUrgent && !isOverdue && <p className="text-[10px] text-yellow-500 mt-0.5">{days} gün kaldı</p>}
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap"
+                          style={{ background: sc.bg, color: sc.color }}
+                        >
+                          <i className={sc.icon} />
+                          {sc.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          {ekipman.dosyaAdi && (
+                            <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Belgeyi İndir"><i className="ri-download-2-line text-sm" /></button>
+                          )}
+                          <button onClick={() => openEdit(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>
+                          <button onClick={() => setDeleteId(ekipman.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Add/Edit Modal */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editId ? 'Ekipman Düzenle' : 'Yeni Ekipman Ekle'}
+        size="lg"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Ekipman Adı */}
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Ekipman Adı *</label>
+            <input
+              value={form.ad}
+              onChange={e => setForm(p => ({ ...p, ad: e.target.value }))}
+              placeholder="Örn: Forklift, Kompresör, Yangın Söndürücü..."
+              className="isg-input"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          {/* Ekipman Türü */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Ekipman Türü *</label>
+            <select
+              value={form.tur}
+              onChange={e => setForm(p => ({ ...p, tur: e.target.value }))}
+              className="isg-input cursor-pointer"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+            >
+              <option value="">Tür Seçin</option>
+              {EKIPMAN_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+
+          {/* Firma */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Firma *</label>
+            <select
+              value={form.firmaId}
+              onChange={e => setForm(p => ({ ...p, firmaId: e.target.value }))}
+              className="isg-input cursor-pointer"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+            >
+              <option value="">Firma Seçin</option>
+              {firmalar.filter(f => f.durum === 'Aktif').map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+            </select>
+          </div>
+
+          {/* Bulunduğu Alan */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Bulunduğu Alan</label>
+            <input
+              value={form.bulunduguAlan}
+              onChange={e => setForm(p => ({ ...p, bulunduguAlan: e.target.value }))}
+              placeholder="Depo, Üretim Alanı, Ofis..."
+              className="isg-input"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          {/* Seri No */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Seri Numarası</label>
+            <input
+              value={form.seriNo}
+              onChange={e => setForm(p => ({ ...p, seriNo: e.target.value }))}
+              placeholder="SN-001234"
+              className="isg-input"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          {/* Marka */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Marka</label>
+            <input
+              value={form.marka}
+              onChange={e => setForm(p => ({ ...p, marka: e.target.value }))}
+              placeholder="Toyota, Bosch, Atlas Copco..."
+              className="isg-input"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          {/* Model */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Model</label>
+            <input
+              value={form.model}
+              onChange={e => setForm(p => ({ ...p, model: e.target.value }))}
+              placeholder="Model adı veya kodu"
+              className="isg-input"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          {/* Son Kontrol Tarihi */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Son Kontrol Tarihi</label>
+            <input
+              type="date"
+              value={form.sonKontrolTarihi}
+              onChange={e => setForm(p => ({ ...p, sonKontrolTarihi: e.target.value }))}
+              className="isg-input"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          {/* Sonraki Kontrol Tarihi */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Sonraki Kontrol Tarihi</label>
+            <input
+              type="date"
+              value={form.sonrakiKontrolTarihi}
+              onChange={e => setForm(p => ({ ...p, sonrakiKontrolTarihi: e.target.value }))}
+              className="isg-input"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          {/* Durum */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Durum</label>
+            <select
+              value={form.durum}
+              onChange={e => setForm(p => ({ ...p, durum: e.target.value as Ekipman['durum'] }))}
+              className="isg-input cursor-pointer"
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
+            >
+              {Object.keys(STATUS_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Belge */}
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Belge Mevcut mu?</label>
+            <div className="flex items-center gap-4 mt-2">
+              {[true, false].map(v => (
+                <label key={String(v)} className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={form.belgeMevcut === v} onChange={() => setForm(p => ({ ...p, belgeMevcut: v, ...(v === false ? { dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '' } : {}) }))} className="cursor-pointer" style={{ accentColor: '#3B82F6' }} />
+                  <span className="text-sm text-slate-300">{v ? 'Evet' : 'Hayır'}</span>
+                </label>
+              ))}
+            </div>
+            {form.belgeMevcut && (
+              <div className="mt-3">
+                <div
+                  className="rounded-xl p-4 text-center cursor-pointer transition-all duration-200"
+                  style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
+                  onClick={() => fileRef.current?.click()}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; e.currentTarget.style.background = 'rgba(59,130,246,0.04)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
+                >
+                  {form.dosyaAdi ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.12)' }}>
+                        <i className="ri-file-check-line text-lg" style={{ color: '#10B981' }} />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-slate-200">{form.dosyaAdi}</p>
+                        <p className="text-xs" style={{ color: '#475569' }}>{form.dosyaBoyutu ? `${(form.dosyaBoyutu / 1024).toFixed(1)} KB` : ''} — Değiştirmek için tıklayın</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <i className="ri-upload-cloud-2-line text-2xl mb-1.5" style={{ color: '#334155' }} />
+                      <p className="text-sm font-medium text-slate-400">Belgeyi sürükleyin veya tıklayın</p>
+                      <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG • Maks. 5MB</p>
+                    </>
+                  )}
+                </div>
+                <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={e => handleFileChange(e.target.files?.[0])} />
+              </div>
+            )}
+          </div>
+
+          {/* Açıklama */}
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Açıklama</label>
+            <textarea
+              value={form.aciklama}
+              onChange={e => setForm(p => ({ ...p, aciklama: e.target.value }))}
+              placeholder="Ekipman hakkında açıklama veya notlar..."
+              rows={3}
+              maxLength={500}
+              className="isg-input" style={{ resize: 'vertical' }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 mt-5 pt-4" style={{ borderTop: '1px solid var(--border-main)' }}>
+          <button
+            onClick={() => setShowModal(false)}
+            className="btn-secondary whitespace-nowrap"
+          >
+            İptal
+          </button>
+          <button
+            onClick={handleSave}
+            className="btn-primary whitespace-nowrap"
+          >
+            <i className={editId ? 'ri-save-line' : 'ri-add-line'} />
+            {editId ? 'Güncelle' : 'Ekle'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Delete Confirm */}
+      <Modal
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Ekipmanı Sil"
+        size="sm"
+      >
+        <div className="text-center py-4">
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}
+          >
+            <i className="ri-delete-bin-line text-2xl text-red-400" />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu ekipmanı silmek istediğinizden emin misiniz?</p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
+        </div>
+        <div className="flex justify-center gap-3 mt-4">
+          <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
+          <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
+        </div>
+      </Modal>
+    </div>
+  );
+}

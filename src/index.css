@@ -1,0 +1,591 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Variables (Dark Mode Default) ─────────────── */
+:root {
+  --bg-app: #080C14;
+  --bg-card: rgba(15, 24, 40, 0.7);
+  --bg-card-solid: #0F1828;
+  --bg-card-elevated: rgba(20, 30, 50, 0.8);
+  --bg-header: rgba(8,12,20,0.92);
+  --bg-sidebar: #060A12;
+  --bg-input: rgba(255,255,255,0.04);
+  --bg-hover: rgba(255,255,255,0.05);
+  --bg-row-hover: rgba(59,130,246,0.04);
+  --bg-item: rgba(255,255,255,0.03);
+  --bg-item-border: rgba(255,255,255,0.05);
+  --text-primary: #E2E8F0;
+  --text-secondary: #94A3B8;
+  --text-muted: #475569;
+  --text-faint: #334155;
+  --border-main: rgba(255,255,255,0.07);
+  --border-subtle: rgba(255,255,255,0.05);
+  --border-input: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.1);
+  --scrollbar-thumb: rgba(255,255,255,0.08);
+  --table-head-bg: rgba(0,0,0,0.25);
+  --table-border: rgba(255,255,255,0.07);
+  --table-row-border: rgba(255,255,255,0.04);
+  --select-bg: #0F1828;
+  --modal-bg: rgba(11,16,27,0.98);
+  --modal-border: rgba(255,255,255,0.1);
+  --chart-tooltip-bg: rgba(10,15,25,0.97);
+  --chart-tooltip-border: rgba(255,255,255,0.1);
+  --chart-grid: rgba(255,255,255,0.04);
+  --chart-axis: #334155;
+  --chart-tick: #475569;
+}
+
+/* ── Light Mode Overrides ───────────────────────────── */
+.light-mode {
+  --bg-app: #F1F5F9;
+  --bg-card: rgba(255,255,255,0.92);
+  --bg-card-solid: #FFFFFF;
+  --bg-card-elevated: rgba(255,255,255,0.98);
+  --bg-header: rgba(255,255,255,0.96);
+  --bg-sidebar: #1A2540;
+  --bg-input: rgba(15,23,42,0.05);
+  --bg-hover: rgba(15,23,42,0.04);
+  --bg-row-hover: rgba(59,130,246,0.05);
+  --bg-item: rgba(15,23,42,0.03);
+  --bg-item-border: rgba(15,23,42,0.08);
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #64748B;
+  --text-faint: #94A3B8;
+  --border-main: rgba(15,23,42,0.1);
+  --border-subtle: rgba(15,23,42,0.07);
+  --border-input: rgba(15,23,42,0.12);
+  --border-strong: rgba(15,23,42,0.15);
+  --scrollbar-thumb: rgba(15,23,42,0.12);
+  --table-head-bg: rgba(15,23,42,0.05);
+  --table-border: rgba(15,23,42,0.1);
+  --table-row-border: rgba(15,23,42,0.05);
+  --select-bg: #FFFFFF;
+  --modal-bg: rgba(255,255,255,0.99);
+  --modal-border: rgba(15,23,42,0.12);
+  --chart-tooltip-bg: rgba(255,255,255,0.99);
+  --chart-tooltip-border: rgba(15,23,42,0.12);
+  --chart-grid: rgba(15,23,42,0.06);
+  --chart-axis: #CBD5E1;
+  --chart-tick: #64748B;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  background-color: var(--bg-app);
+  transition: background-color 0.3s ease;
+}
+
+body {
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+select option {
+  background-color: var(--select-bg);
+  color: var(--text-primary);
+}
+
+/* ── Premium Scrollbar ─────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.3); }
+
+/* ── Animations ─────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+  50% { box-shadow: 0 0 20px 4px rgba(59,130,246,0.15); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+.animate-slide-in { animation: slide-in-right 0.3s ease-out; }
+.animate-slide-up { animation: slide-up 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+/* ── ISG Card — main container card ─────────────── */
+.isg-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-main);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.isg-card-solid {
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-main);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* ── Glass Card (legacy + new) ──────────────────── */
+.glass-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-main);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.glass-card-elevated {
+  background: var(--bg-card-elevated);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* ── Premium Input ──────────────────────────────── */
+.input-premium {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 10px;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  font-size: 14px;
+  padding: 10px 14px;
+  width: 100%;
+  outline: none;
+}
+.input-premium:focus {
+  background: rgba(59,130,246,0.06);
+  border-color: rgba(59,130,246,0.5);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+}
+.input-premium::placeholder { color: var(--text-muted); opacity: 0.7; }
+
+/* ISG Input — for pages using inline inputStyle objects */
+.isg-input {
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border-input) !important;
+  border-radius: 10px;
+  color: var(--text-primary) !important;
+  outline: none;
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+.isg-input:focus {
+  border-color: rgba(59,130,246,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+}
+.isg-input::placeholder { color: var(--text-muted); opacity: 0.6; }
+.isg-input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Buttons ────────────────────────────────────── */
+.btn-primary {
+  background: linear-gradient(135deg, #3B82F6, #6366F1);
+  border: 1px solid rgba(99,102,241,0.3);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 10px;
+  padding: 9px 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(99,102,241,0.35); }
+.btn-primary:hover::after { opacity: 1; }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 14px;
+  border-radius: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-main); }
+
+.btn-danger {
+  background: linear-gradient(135deg, #EF4444, #DC2626);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 10px;
+  padding: 9px 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(239,68,68,0.3); }
+
+/* ── Table ──────────────────────────────────────── */
+.table-premium thead tr {
+  background: var(--table-head-bg);
+  border-bottom: 1px solid var(--table-border);
+}
+.table-premium thead th {
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.table-premium tbody tr {
+  border-bottom: 1px solid var(--table-row-border);
+  transition: background 0.15s ease;
+}
+.table-premium tbody tr:hover { background: var(--bg-row-hover); }
+.table-premium tbody tr:last-child { border-bottom: none; }
+.table-premium tbody td { padding: 13px 16px; color: var(--text-primary); }
+
+/* ── Light Mode Text Overrides ─────────────────── */
+.light-mode .text-white { color: var(--text-primary) !important; }
+.light-mode .text-slate-100 { color: var(--text-primary) !important; }
+.light-mode .text-slate-200 { color: var(--text-primary) !important; }
+.light-mode .text-slate-300 { color: var(--text-secondary) !important; }
+.light-mode .text-slate-400 { color: var(--text-muted) !important; }
+.light-mode .text-slate-500 { color: var(--text-muted) !important; }
+.light-mode .text-slate-600 { color: var(--text-muted) !important; }
+
+/* Light mode: table cell text */
+.light-mode .table-premium tbody td { color: var(--text-primary); }
+.light-mode .table-premium tbody td p,
+.light-mode .table-premium tbody td span:not([class*="badge"]):not([class*="px-"]) { color: inherit; }
+
+/* Light mode: override remaining inline dark backgrounds */
+.light-mode .isg-card,
+.light-mode .glass-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-main) !important;
+}
+
+/* Light mode: all inputs / selects / textareas with inline style overrides */
+.light-mode input[style],
+.light-mode select[style],
+.light-mode textarea[style] {
+  background: var(--bg-input) !important;
+  border-color: var(--border-input) !important;
+  color: var(--text-primary) !important;
+}
+.light-mode input[style]::placeholder,
+.light-mode textarea[style]::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.6;
+}
+.light-mode input[style]:focus,
+.light-mode select[style]:focus,
+.light-mode textarea[style]:focus {
+  border-color: rgba(59,130,246,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.08) !important;
+}
+
+/* Light mode: date input color scheme */
+.light-mode input[type="date"] { color-scheme: light; }
+
+/* ── Sidebar active gradient ─────────────────────── */
+.sidebar-active {
+  background: linear-gradient(135deg, rgba(59,130,246,0.18), rgba(99,102,241,0.08));
+  border: 1px solid rgba(59,130,246,0.2);
+  color: #93C5FD;
+}
+.sidebar-hover {
+  transition: all 0.18s ease;
+}
+.sidebar-hover:hover {
+  background: rgba(255,255,255,0.05);
+  color: #E2E8F0;
+  transform: translateX(2px);
+}
+
+/* ── Stat card hover ─────────────────────────────── */
+.stat-card {
+  transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+}
+
+/* ── Glow effects ────────────────────────────────── */
+.glow-blue { box-shadow: 0 0 30px rgba(59,130,246,0.15); }
+.glow-green { box-shadow: 0 0 30px rgba(16,185,129,0.15); }
+.glow-amber { box-shadow: 0 0 30px rgba(245,158,11,0.15); }
+.glow-red { box-shadow: 0 0 30px rgba(239,68,68,0.15); }
+
+/* ── Page entry animation ────────────────────────── */
+.page-enter { animation: fade-in 0.35s ease-out; }
+
+/* ── Chart theme support ─────────────────────────── */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--chart-grid) !important;
+}
+.recharts-xAxis .recharts-cartesian-axis-line,
+.recharts-yAxis .recharts-cartesian-axis-line {
+  stroke: var(--chart-axis) !important;
+}
+.recharts-xAxis .recharts-cartesian-axis-tick-value,
+.recharts-yAxis .recharts-cartesian-axis-tick-value {
+  fill: var(--chart-tick) !important;
+}
+.recharts-legend-item-text {
+  color: var(--text-muted) !important;
+}
+
+/* ── Chart Tooltip Theme ─────────────────────────── */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: var(--chart-tooltip-bg) !important;
+  border: 1px solid var(--chart-tooltip-border) !important;
+  border-radius: 12px !important;
+  color: var(--text-primary) !important;
+}
+.recharts-default-tooltip .recharts-tooltip-label,
+.recharts-default-tooltip .recharts-tooltip-item {
+  color: var(--text-primary) !important;
+}
+
+/* ── Light mode: override common dark rgba backgrounds ─────── */
+/* Card/Container dark backgrounds */
+.light-mode div[style*="rgba(15,24,40"],
+.light-mode div[style*="rgba(15, 24, 40"] {
+  background: var(--bg-card) !important;
+  border-color: var(--border-main) !important;
+}
+
+/* Item rows: rgba(255,255,255,0.03) and rgba(255,255,255,0.04) */
+.light-mode div[style*="255,255,255,0.03"],
+.light-mode div[style*="255,255,255,0.04"] {
+  background: var(--bg-item) !important;
+  border-color: var(--bg-item-border) !important;
+}
+
+/* Tab switcher backgrounds */
+.light-mode div[style*="rgba(0,0,0,0.3)"],
+.light-mode div[style*="rgba(0,0,0,0.25)"] {
+  background: var(--bg-input) !important;
+  border-color: var(--border-main) !important;
+}
+
+/* Notification/dropdown dark panels */
+.light-mode div[style*="rgba(10,15,25"],
+.light-mode div[style*="rgba(11,16,27"] {
+  background: var(--bg-card-solid) !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* Progress bar track */
+.light-mode div[style*="rgba(255,255,255,0.06)"] {
+  background: rgba(15,23,42,0.08) !important;
+}
+.light-mode div[style*="rgba(255,255,255,0.08)"] {
+  background: rgba(15,23,42,0.1) !important;
+}
+
+/* Border-only elements (vertical dividers) */
+.light-mode div[style*="rgba(255,255,255,0.06)"][style*="background"] {
+  background: rgba(15,23,42,0.08) !important;
+}
+
+/* Textarea in modals */
+.light-mode textarea {
+  background: var(--bg-input) !important;
+  border-color: var(--border-input) !important;
+  color: var(--text-primary) !important;
+}
+.light-mode textarea::placeholder { color: var(--text-muted) !important; opacity: 0.6; }
+
+/* Date input color scheme for light mode */
+.light-mode input[type="date"],
+.light-mode input[type="time"] {
+  color-scheme: light;
+}
+
+/* File upload areas */
+.light-mode div[style*="dashed"] {
+  border-color: rgba(15,23,42,0.2) !important;
+  background: rgba(15,23,42,0.02) !important;
+}
+
+/* ── Light mode: main content area text overrides ── */
+/* text-white in main content (not sidebar which stays dark) */
+.light-mode main .text-white { color: var(--text-primary) !important; }
+.light-mode main h1.text-white,
+.light-mode main h2.text-white,
+.light-mode main h3.text-white { color: var(--text-primary) !important; }
+
+/* ── isg-input improvements ── */
+/* textarea support */
+textarea.isg-input {
+  resize: vertical;
+  min-height: 80px;
+}
+/* select cursor */
+select.isg-input { cursor: pointer; }
+/* date input light mode color scheme */
+.light-mode input.isg-input[type="date"],
+.light-mode input.isg-input[type="time"],
+.light-mode input[type="date"],
+.light-mode input[type="time"] { color-scheme: light; }
+
+/* ── Label utility class ── */
+.form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Table cell truncation ── */
+.table-premium tbody td .cell-truncate {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Modal improvements ── */
+/* Ensure modal content scrolls properly on small screens */
+@media (max-height: 700px) {
+  .animate-slide-up.flex.flex-col {
+    max-height: 95vh;
+  }
+}
+
+/* ── Responsive table improvements ── */
+.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Filter bar improvements ── */
+.filter-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border-main);
+  border-radius: 16px;
+  padding: 12px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  transition: background 0.3s ease;
+}
+
+/* ── Badge improvements ── */
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Stat card text in light mode ── */
+.light-mode .text-2xl.font-bold.text-white,
+.light-mode p.text-2xl.font-bold { color: var(--text-primary) !important; }
+
+/* ── Glass card in light mode with text ── */
+.light-mode .glass-card p.text-sm,
+.light-mode .glass-card p.text-xs,
+.light-mode .glass-card span.text-sm { color: var(--text-secondary); }
+
+/* ── Consistent onFocus border via CSS only (no JS needed) ── */
+.isg-input:focus,
+input.isg-input:focus,
+select.isg-input:focus,
+textarea.isg-input:focus {
+  border-color: rgba(59,130,246,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.08) !important;
+  background: rgba(59,130,246,0.05) !important;
+}
+
+/* ── Page section spacing ── */
+.page-section { margin-bottom: 20px; }
+.page-section:last-child { margin-bottom: 0; }
+
+/* ── Empty state improvements ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+}
+
+/* ── isg-input width auto fix for select elements ── */
+select.isg-input { width: auto; }
+
+/* ── Light mode: strong inline-bg overrides for dark cards ── */
+/* catches remaining rgba(15,24,40,...) inline bg patterns */
+.light-mode [style*="rgba(15,24,40,0.7)"],
+.light-mode [style*="rgba(15, 24, 40, 0.7)"] {
+  background: var(--bg-card) !important;
+  border-color: var(--border-main) !important;
+}
+/* catches rgba(0,0,0,0.3) tab bar backgrounds */
+.light-mode [style*="rgba(0,0,0,0.3)"],
+.light-mode [style*="rgba(0,0,0, 0.3)"] {
+  background: var(--bg-input) !important;
+  border-color: var(--border-main) !important;
+}
+
+/* ── Dashboard stat card in light mode ── */
+/* value text with background-clip gradient still works since it's on text-fill, not bg */
+.light-mode .stat-card .text-4xl {
+  /* keep gradient text as-is — it works in both modes */
+}
+
+/* ── Recharts Legend text fix for light mode ── */
+.light-mode .recharts-legend-item-text { color: var(--text-muted) !important; }
+.light-mode .recharts-default-tooltip { color: var(--text-primary) !important; }
+.light-mode .recharts-tooltip-label { color: var(--text-primary) !important; }
+.light-mode .recharts-tooltip-item { color: var(--text-secondary) !important; }
+
+/* ── Timeline vertical line in light mode (handled via inline var already) ── */
+
+

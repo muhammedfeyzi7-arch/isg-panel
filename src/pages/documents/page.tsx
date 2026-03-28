@@ -1,0 +1,478 @@
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useApp } from '../../store/AppContext';
+import type { Evrak, EvrakStatus } from '../../types';
+import Modal from '../../components/base/Modal';
+import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
+import { getEvrakKategori, KATEGORI_META } from '../../utils/evrakKategori';
+
+const EVRAK_TURLERI = ['Kimlik', 'EK-2', 'Sağlık Raporu', 'Sürücü Belgesi', 'SRC', 'Sertifika / MYK / Diploma', 'Oryantasyon Eğitimi', 'İşbaşı Eğitimi', 'İş Sözleşmesi', 'Diğer'];
+
+const emptyEvrak: Omit<Evrak, 'id' | 'olusturmaTarihi'> = {
+  ad: '', tur: 'Kimlik', firmaId: '', personelId: '', durum: 'Eksik',
+  yuklemeTarihi: '', gecerlilikTarihi: '', dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '', notlar: '',
+};
+
+// Auto-calculate evrak durum based on dates and file
+function calcEvrakDurum(dosyaAdi: string | undefined, gecerlilikTarihi: string | undefined): EvrakStatus {
+  if (!dosyaAdi) return 'Eksik';
+  if (!gecerlilikTarihi) return 'Yüklü';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const gecerlilik = new Date(gecerlilikTarihi);
+  gecerlilik.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((gecerlilik.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return 'Süre Dolmuş';
+  if (diffDays <= 7) return 'Süre Yaklaşıyor';
+  return 'Yüklü';
+}
+
+const statusConfig = {
+  'Yüklü': { icon: 'ri-checkbox-circle-fill', color: '#10B981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.2)' },
+  'Eksik': { icon: 'ri-close-circle-fill', color: '#EF4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.2)' },
+  'Süre Yaklaşıyor': { icon: 'ri-time-fill', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.2)' },
+  'Süre Dolmuş': { icon: 'ri-error-warning-fill', color: '#F97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.2)' },
+};
+
+export default function EvraklarPage() {
+  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, getEvrakFile, addToast, quickCreate, setQuickCreate } = useApp();
+  const location = useLocation();
+  const [search, setSearch] = useState('');
+  const [firmaFilter, setFirmaFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [turFilter, setTurFilter] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ ...emptyEvrak });
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // PersonelDetayModal'dan "Evrak Ekle" butonuyla gelindiğinde pre-fill
+  useEffect(() => {
+    const state = location.state as { personelId?: string; firmaId?: string; autoOpen?: boolean } | null;
+    if (state?.autoOpen) {
+      const preForm = {
+        ...emptyEvrak,
+        personelId: state.personelId || '',
+        firmaId: state.firmaId || '',
+      };
+      setForm(preForm);
+      setEditingId(null);
+      setFormOpen(true);
+      // State'i temizle (sayfayı yenileme senaryosu)
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (quickCreate === 'evraklar') {
+      setForm({ ...emptyEvrak });
+      setEditingId(null);
+      setFormOpen(true);
+      setQuickCreate(null);
+    }
+  }, [quickCreate, setQuickCreate]);
+
+  const filtPersonel = useMemo(() => {
+    if (!form.firmaId) return [];
+    return personeller.filter(p => p.firmaId === form.firmaId);
+  }, [form.firmaId, personeller]);
+
+  // Evrakları gösterirken durumu otomatik hesapla
+  const evraklarWithDurum = useMemo(() => evraklar.filter(e => !e.silinmis).map(e => ({
+    ...e,
+    durum: calcEvrakDurum(e.dosyaAdi, e.gecerlilikTarihi),
+  })), [evraklar]);
+
+  const filtered = useMemo(() => evraklarWithDurum.filter(e => {
+    const q = search.toLowerCase();
+    return (!search || e.ad.toLowerCase().includes(q) || e.tur.toLowerCase().includes(q))
+      && (!firmaFilter || e.firmaId === firmaFilter)
+      && (!statusFilter || e.durum === statusFilter)
+      && (!turFilter || e.tur === turFilter);
+  }), [evraklarWithDurum, search, firmaFilter, statusFilter, turFilter]);
+
+  const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
+  const getPersonelAd = (id?: string) => id ? (personeller.find(p => p.id === id)?.adSoyad || '—') : 'Firma Evrakı';
+
+  const openAdd = () => { setForm({ ...emptyEvrak }); setEditingId(null); setFormOpen(true); };
+  const openEdit = (e: Evrak) => { setForm({ ...e }); setEditingId(e.id); setFormOpen(true); };
+
+  const handleFileChange = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const veri = e.target?.result as string;
+      setForm(prev => ({
+        ...prev,
+        dosyaAdi: file.name,
+        dosyaBoyutu: file.size,
+        dosyaTipi: file.type,
+        yuklemeTarihi: new Date().toISOString().split('T')[0],
+        dosyaVeri: veri,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDownload = (ev: typeof filtered[0]) => {
+    const veri = getEvrakFile(ev.id) || ev.dosyaVeri;
+    if (!veri) { addToast('İndirilebilir dosya bulunamadı. Lütfen evrakı tekrar yükleyin.', 'error'); return; }
+    try {
+      const arr = veri.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+      const bstr = atob(arr[1]);
+      const u8arr = new Uint8Array(bstr.length);
+      for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+      const blob = new Blob([u8arr], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = ev.dosyaAdi || 'evrak';
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      addToast(`"${ev.dosyaAdi}" indiriliyor...`, 'success');
+    } catch { addToast('Dosya indirilemedi.', 'error'); }
+  };
+
+  const handlePreview = (ev: typeof filtered[0]) => {
+    const veri = getEvrakFile(ev.id) || ev.dosyaVeri;
+    if (!veri) { addToast('Önizlenecek dosya bulunamadı.', 'error'); return; }
+    try {
+      const arr = veri.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+      const bstr = atob(arr[1]);
+      const u8arr = new Uint8Array(bstr.length);
+      for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+      const blob = new Blob([u8arr], { type: mime });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch { addToast('Dosya açılamadı.', 'error'); }
+  };
+
+  const handleSave = () => {
+    if (!form.ad.trim()) { addToast('Evrak adı zorunludur.', 'error'); return; }
+    if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
+    const autoDurum = calcEvrakDurum(form.dosyaAdi, form.gecerlilikTarihi);
+    // Kategoriyi kayıt anında hesapla ve sakla
+    const kategori = getEvrakKategori(form.tur, form.ad);
+    const savedForm = { ...form, durum: autoDurum, kategori };
+    if (editingId) { updateEvrak(editingId, savedForm); addToast('Evrak güncellendi.', 'success'); }
+    else { addEvrak(savedForm); addToast('Evrak eklendi.', 'success'); }
+    setFormOpen(false);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteEvrak(id); setDeleteConfirm(null);
+    addToast('Evrak silindi.', 'info');
+  };
+
+  const f = (field: keyof typeof form) => form[field] as string;
+  const set = (field: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const statusCounts = useMemo(() => ({
+    'Yüklü': evraklarWithDurum.filter(e => e.durum === 'Yüklü').length,
+    'Eksik': evraklarWithDurum.filter(e => e.durum === 'Eksik').length,
+    'Süre Yaklaşıyor': evraklarWithDurum.filter(e => e.durum === 'Süre Yaklaşıyor').length,
+    'Süre Dolmuş': evraklarWithDurum.filter(e => e.durum === 'Süre Dolmuş').length,
+  }), [evraklarWithDurum]);
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Takibi</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{evraklar.length} toplam evrak — durum otomatik hesaplanır</p>
+        </div>
+        <button onClick={openAdd} className="btn-primary">
+          <i className="ri-file-add-line text-base" />
+          Yeni Evrak
+        </button>
+      </div>
+
+      {/* Status Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {(Object.keys(statusCounts) as Array<keyof typeof statusCounts>).map(key => {
+          const cfg = statusConfig[key];
+          const isActive = statusFilter === key;
+          return (
+            <div
+              key={key}
+              className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
+              style={{
+                background: cfg.bg,
+                border: `1px solid ${isActive ? cfg.color : cfg.border}`,
+                boxShadow: isActive ? `0 0 0 2px ${cfg.color}30` : 'none',
+              }}
+              onClick={() => setStatusFilter(statusFilter === key ? '' : key)}
+            >
+              <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${cfg.color}20` }}>
+                <i className={`${cfg.icon} text-base`} style={{ color: cfg.color }} />
+              </div>
+              <div>
+                <p className="text-xl font-extrabold" style={{ color: 'var(--text-primary)' }}>{statusCounts[key]}</p>
+                <p className="text-xs font-medium" style={{ color: cfg.color }}>{key}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
+        <div className="relative flex-1 min-w-[160px]">
+          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Evrak adı veya tür ara..."
+            className="isg-input pl-9"
+          />
+        </div>
+        <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
+          <option value="">Tüm Firmalar</option>
+          {firmalar.map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
+          <option value="">Tüm Durumlar</option>
+          {['Yüklü', 'Eksik', 'Süre Yaklaşıyor', 'Süre Dolmuş'].map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={turFilter} onChange={e => setTurFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
+          <option value="">Tüm Türler</option>
+          {EVRAK_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {(search || firmaFilter || statusFilter || turFilter) && (
+          <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); setTurFilter(''); }} className="btn-secondary">
+            <i className="ri-filter-off-line" /> Temizle
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl p-16 flex flex-col items-center text-center isg-card">
+          <div className="w-16 h-16 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+            <i className="ri-file-list-3-line text-3xl" style={{ color: 'var(--text-faint)' }} />
+          </div>
+          <p className="text-base font-bold" style={{ color: 'var(--text-muted)' }}>
+            {search || firmaFilter || statusFilter || turFilter ? 'Filtrelerle eşleşen evrak yok' : 'Henüz evrak eklenmedi'}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-2xl overflow-hidden isg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full table-premium">
+              <thead>
+                <tr>
+                  <th className="text-left">Evrak Adı / Tür</th>
+                  <th className="text-left hidden md:table-cell">Firma</th>
+                  <th className="text-left hidden lg:table-cell">Personel</th>
+                  <th className="text-left">Durum</th>
+                  <th className="text-left hidden lg:table-cell">Geçerlilik</th>
+                  <th className="w-20 text-right">İşlemler</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(ev => (
+                  <tr key={ev.id}>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                          <i className="ri-file-text-line text-sm" style={{ color: '#60A5FA' }} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-200">{ev.ad}</p>
+                          <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{ev.tur}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="hidden md:table-cell"><p className="text-sm text-slate-300">{getFirmaAd(ev.firmaId)}</p></td>
+                    <td className="hidden lg:table-cell"><p className="text-sm text-slate-400">{getPersonelAd(ev.personelId)}</p></td>
+                    <td><Badge label={ev.durum} color={getEvrakStatusColor(ev.durum)} /></td>
+                    <td className="hidden lg:table-cell">
+                      <p className="text-sm text-slate-400">
+                        {ev.gecerlilikTarihi ? new Date(ev.gecerlilikTarihi).toLocaleDateString('tr-TR') : '—'}
+                      </p>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-1 justify-end">
+                        {ev.dosyaAdi && <ABtn icon="ri-eye-line" color="#60A5FA" onClick={() => handlePreview(ev)} title="Görüntüle" />}
+                        {ev.dosyaAdi && <ABtn icon="ri-download-line" color="#10B981" onClick={() => handleDownload(ev)} title="Dosyayı İndir" />}
+                        <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(ev)} title="Düzenle" />
+                        <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Form Modal */}
+      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editingId ? 'Evrak Düzenle' : 'Yeni Evrak Ekle'} size="lg" icon="ri-file-add-line"
+        footer={
+          <>
+            <button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button>
+            <button onClick={handleSave} className="btn-primary"><i className="ri-save-line" /> Kaydet</button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Evrak Adı *</label>
+            <input value={f('ad')} onChange={e => set('ad', e.target.value)} placeholder="Evrak adı giriniz" className="input-premium" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Firma *</label>
+            <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer">
+              <option value="">Firma Seçin...</option>
+              {firmalar.map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Personel (Opsiyonel)</label>
+            <select value={f('personelId')} onChange={e => set('personelId', e.target.value)} disabled={!form.firmaId} className="input-premium cursor-pointer disabled:opacity-40">
+              <option value="">Firma Evrakı (Kişisel Değil)</option>
+              {filtPersonel.map(p => <option key={p.id} value={p.id}>{p.adSoyad}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Evrak Türü</label>
+            <select value={f('tur')} onChange={e => set('tur', e.target.value)} className="input-premium cursor-pointer">
+              {EVRAK_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            {/* Kategori göstergesi — hangi bölüme gideceğini anlık göster */}
+            {(() => {
+              const kat = getEvrakKategori(form.tur, form.ad);
+              const meta = KATEGORI_META[kat];
+              return (
+                <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 rounded-lg" style={{ background: meta.bgColor, border: `1px solid ${meta.borderColor}` }}>
+                  <i className={`${meta.icon} text-xs`} style={{ color: meta.color }} />
+                  <span className="text-xs font-medium" style={{ color: meta.color }}>
+                    → {meta.label} olarak kaydedilecek
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Evrak Tarihi</label>
+            <input type="date" value={f('yuklemeTarihi')} onChange={e => set('yuklemeTarihi', e.target.value)} className="input-premium" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Geçerlilik Süresi (Otomatik Hesapla)</label>
+            <select
+              className="input-premium cursor-pointer"
+              onChange={e => {
+                const sure = e.target.value;
+                if (!form.yuklemeTarihi || !sure) return;
+                const d = new Date(form.yuklemeTarihi);
+                if (sure === '3ay') d.setMonth(d.getMonth() + 3);
+                else if (sure === '6ay') d.setMonth(d.getMonth() + 6);
+                else if (sure === '1yil') d.setFullYear(d.getFullYear() + 1);
+                else if (sure === '5yil') d.setFullYear(d.getFullYear() + 5);
+                set('gecerlilikTarihi', d.toISOString().split('T')[0]);
+              }}
+            >
+              <option value="">Süre Seçin...</option>
+              <option value="3ay">3 Ay</option>
+              <option value="6ay">6 Ay</option>
+              <option value="1yil">1 Yıl</option>
+              <option value="5yil">5 Yıl</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Geçerlilik Tarihi</label>
+            <input type="date" value={f('gecerlilikTarihi')} onChange={e => set('gecerlilikTarihi', e.target.value)} className="input-premium" />
+          </div>
+          {/* Durum bilgi satırı */}
+          <div className="md:col-span-2">
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <i className="ri-information-line text-sm" style={{ color: '#818CF8' }} />
+              <p className="text-xs" style={{ color: '#94A3B8' }}>
+                Durum otomatik hesaplanır: dosya yoksa <strong className="text-red-400">Eksik</strong>, geçerlilik tarihi 7 günden az kaldıysa <strong className="text-amber-400">Süre Yaklaşıyor</strong>, geçtiyse <strong className="text-orange-400">Süre Dolmuş</strong>, aksi halde <strong className="text-green-400">Yüklü</strong>.
+              </p>
+            </div>
+          </div>
+          {/* File Upload */}
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Dosya Yükle (PDF / JPG / PNG)</label>
+            <div
+              className="rounded-xl p-6 text-center cursor-pointer transition-all duration-200"
+              style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
+              onClick={() => fileRef.current?.click()}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; e.currentTarget.style.background = 'rgba(59,130,246,0.04)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
+            >
+              {form.dosyaAdi ? (
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.12)' }}>
+                    <i className="ri-file-check-line text-xl" style={{ color: '#10B981' }} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-slate-200">{form.dosyaAdi}</p>
+                    <p className="text-xs" style={{ color: '#475569' }}>{form.dosyaBoyutu ? `${(form.dosyaBoyutu / 1024).toFixed(1)} KB` : ''}</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="w-12 h-12 flex items-center justify-center rounded-2xl mx-auto mb-3" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <i className="ri-upload-cloud-2-line text-2xl" style={{ color: '#334155' }} />
+                  </div>
+                  <p className="text-sm font-medium text-slate-400">Dosyayı buraya sürükleyin veya tıklayın</p>
+                  <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG desteklenir • Maks. 10MB</p>
+                </>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={e => handleFileChange(e.target.files?.[0])} />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Notlar</label>
+            <textarea
+              value={f('notlar')}
+              onChange={e => set('notlar', e.target.value)}
+              rows={2}
+              className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none resize-none transition-all"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#E2E8F0' }}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Modal */}
+      <Modal open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="Evrakı Sil" size="sm" icon="ri-delete-bin-line"
+        footer={
+          <>
+            <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">İptal</button>
+            <button onClick={() => handleDelete(deleteConfirm!)} className="btn-danger"><i className="ri-delete-bin-line" /> Evet, Sil</button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu evrakı silmek istediğinizden emin misiniz?</p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Evrak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function ABtn({ icon, color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
+  return (
+    <button onClick={onClick} title={title}
+      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 hover:scale-110"
+      style={{ color: '#475569' }}
+      onMouseEnter={e => { e.currentTarget.style.color = color; e.currentTarget.style.background = `${color}18`; }}
+      onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'transparent'; }}
+    >
+      <i className={`${icon} text-sm`} />
+    </button>
+  );
+}
