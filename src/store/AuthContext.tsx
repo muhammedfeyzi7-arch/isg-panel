@@ -30,8 +30,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+      } else {
+        setSession(newSession);
+      }
       setLoading(false);
     });
 
@@ -53,7 +57,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    // 1. State'i anında temizle — korumalı sayfalar hemen login'e atar
+    setSession(null);
+
+    // 2. Supabase oturumunu sunucu tarafında da kapat
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+      // signOut hatası sessizce yutulsun, state zaten temizlendi
+    }
+
+    // 3. localStorage'daki tüm Supabase token anahtarlarını sil
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('sb-') || key.startsWith('supabase')) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    // 4. sessionStorage temizle (hoş geldiniz animasyonu bayrağı dahil)
+    sessionStorage.clear();
+
+    // 5. Login sayfasına yönlendir
+    if (typeof window !== 'undefined' && (window as unknown as { REACT_APP_NAVIGATE?: (path: string) => void }).REACT_APP_NAVIGATE) {
+      (window as unknown as { REACT_APP_NAVIGATE: (path: string) => void }).REACT_APP_NAVIGATE('/login');
+    } else {
+      window.location.replace('/login');
+    }
   }, []);
 
   const updatePassword = useCallback(async (newPassword: string) => {

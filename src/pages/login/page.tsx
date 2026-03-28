@@ -1,6 +1,19 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../../store/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+
+const LOGO_URL =
+  'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/ae509f81-0883-42e1-9ed0-d08483f4284e_ChatGPT-Image-28-Mar-2026-23_09_27.png?v=f1e78272586c7081b6d13820591aa1f8';
+
+const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
+  id: i,
+  left: `${Math.floor(Math.random() * 100)}%`,
+  top: `${Math.floor(Math.random() * 100)}%`,
+  size: i % 3 === 0 ? 2.5 : i % 5 === 0 ? 1.5 : 1,
+  delay: `${(i * 0.37) % 4}s`,
+  duration: `${3 + (i * 0.43) % 4}s`,
+  opacity: i % 4 === 0 ? 0.6 : i % 3 === 0 ? 0.4 : 0.25,
+}));
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -10,6 +23,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 60);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -24,197 +45,379 @@ export default function LoginPage() {
     if (loginError) {
       setError(loginError);
     } else {
+      sessionStorage.setItem('isg_show_welcome', 'true');
       navigate('/', { replace: true });
     }
   };
 
-  const inputStyle = {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '10px',
-    color: '#E2E8F0',
-    outline: 'none',
-    width: '100%',
-    padding: '11px 14px',
-    fontSize: '14px',
-    transition: 'all 0.15s',
-  };
-
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: 'linear-gradient(135deg, #0A0F1E 0%, #0D1526 50%, #0A1020 100%)' }}
+      className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden"
+      style={{ background: 'linear-gradient(150deg, #040C1A 0%, #061628 45%, #050E1C 75%, #030A15 100%)' }}
     >
-      {/* Background glow */}
+      <style>{`
+        @keyframes floatParticle {
+          0%, 100% { transform: translateY(0px) scale(1); opacity: var(--op); }
+          50% { transform: translateY(-18px) scale(1.3); opacity: calc(var(--op) * 1.6); }
+        }
+        @keyframes loginFadeUp {
+          from { opacity: 0; transform: translateY(28px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes glowPulse {
+          0%, 100% { opacity: 0.7; }
+          50% { opacity: 1; }
+        }
+        @keyframes shimmerSlide {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        .login-card-animate {
+          animation: loginFadeUp 0.65s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+        .login-logo-animate {
+          animation: loginFadeUp 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) 0.1s both;
+        }
+        .btn-shimmer::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.12) 50%, transparent 65%);
+          animation: shimmerSlide 2.4s ease-in-out infinite;
+        }
+      `}</style>
+
+      {/* Deep ambient glows */}
       <div
-        className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] opacity-20 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse, #3B82F6 0%, transparent 70%)', filter: 'blur(60px)' }}
+        className="fixed pointer-events-none"
+        style={{
+          top: '-120px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '900px',
+          height: '560px',
+          background: 'radial-gradient(ellipse, rgba(6,182,212,0.14) 0%, rgba(0,200,180,0.07) 40%, transparent 70%)',
+          filter: 'blur(55px)',
+          animation: 'glowPulse 5s ease-in-out infinite',
+        }}
       />
       <div
-        className="fixed bottom-0 right-0 w-[500px] h-[400px] opacity-10 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse, #6366F1 0%, transparent 70%)', filter: 'blur(60px)' }}
+        className="fixed pointer-events-none"
+        style={{
+          bottom: '-60px',
+          right: '-100px',
+          width: '650px',
+          height: '520px',
+          background: 'radial-gradient(ellipse, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.05) 45%, transparent 70%)',
+          filter: 'blur(60px)',
+          animation: 'glowPulse 7s ease-in-out infinite 2s',
+        }}
+      />
+      <div
+        className="fixed pointer-events-none"
+        style={{
+          top: '30%',
+          left: '-80px',
+          width: '480px',
+          height: '420px',
+          background: 'radial-gradient(ellipse, rgba(6,182,212,0.08) 0%, transparent 65%)',
+          filter: 'blur(50px)',
+        }}
       />
 
-      <div className="w-full max-w-md relative z-10">
+      {/* Subtle grid */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(6,182,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(6,182,212,0.04) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+        }}
+      />
+
+      {/* Particles */}
+      {mounted && PARTICLES.map(p => (
+        <div
+          key={p.id}
+          className="fixed pointer-events-none rounded-full"
+          style={{
+            left: p.left,
+            top: p.top,
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            background: p.id % 3 === 0 ? '#06B6D4' : p.id % 5 === 0 ? '#10B981' : '#0FCCCE',
+            boxShadow: p.id % 3 === 0
+              ? `0 0 ${p.size * 3}px rgba(6,182,212,0.8)`
+              : `0 0 ${p.size * 3}px rgba(16,185,129,0.8)`,
+            // @ts-expect-error custom css var
+            '--op': p.opacity,
+            animation: `floatParticle ${p.duration} ease-in-out ${p.delay} infinite`,
+            opacity: p.opacity,
+          } as React.CSSProperties}
+        />
+      ))}
+
+      <div className={`w-full max-w-[420px] relative z-10 ${mounted ? 'login-logo-animate' : 'opacity-0'}`}>
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-            style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 8px 30px rgba(99,102,241,0.45)' }}
-          >
-            <i className="ri-shield-check-line text-white text-2xl" />
+          <div className="relative mb-5 flex items-center justify-center" style={{ width: '100px', height: '100px' }}>
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                background: 'radial-gradient(circle, rgba(6,182,212,0.4) 0%, rgba(0,200,180,0.15) 55%, transparent 72%)',
+                filter: 'blur(14px)',
+                transform: 'scale(1.5)',
+                animation: 'glowPulse 3s ease-in-out infinite',
+              }}
+            />
+            <img
+              src={LOGO_URL}
+              alt="ISG Denetim Logo"
+              style={{
+                width: '100px',
+                height: '100px',
+                objectFit: 'contain',
+                objectPosition: 'center',
+                position: 'relative',
+                zIndex: 1,
+                filter: 'drop-shadow(0 0 18px rgba(6,182,212,0.6)) drop-shadow(0 0 8px rgba(0,200,180,0.3))',
+              }}
+            />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">ISG Denetim</h1>
-          <p className="text-sm mt-1.5" style={{ color: '#475569' }}>Yönetim Sistemine Hoş Geldiniz</p>
+          <h1
+            className="text-2xl font-bold tracking-tight"
+            style={{ color: '#E2F8FB', letterSpacing: '-0.02em' }}
+          >
+            ISG Denetim
+          </h1>
+          <p className="text-sm mt-1.5 font-medium" style={{ color: '#4A9BB5' }}>
+            Yönetim Platformu
+          </p>
         </div>
 
-        {/* Card */}
+        {/* Glass card */}
         <div
-          className="rounded-2xl p-8"
+          className={mounted ? 'login-card-animate' : 'opacity-0'}
           style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
+            position: 'relative',
+            borderRadius: '20px',
+            overflow: 'hidden',
+            background: 'rgba(6,182,212,0.04)',
+            border: '1px solid rgba(6,182,212,0.12)',
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            boxShadow:
+              '0 0 0 1px rgba(6,182,212,0.06) inset, 0 36px 88px rgba(0,0,0,0.65), 0 8px 32px rgba(0,0,0,0.35)',
           }}
         >
-          <h2 className="text-lg font-bold text-white mb-1">Giriş Yap</h2>
-          <p className="text-sm mb-6" style={{ color: '#475569' }}>Hesabınıza erişmek için bilgilerinizi girin.</p>
+          {/* Accent top line */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '1px',
+              background:
+                'linear-gradient(90deg, transparent 0%, rgba(6,182,212,0.6) 30%, rgba(0,200,180,0.6) 60%, transparent 100%)',
+            }}
+          />
+          {/* Accent bottom glow */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: '20%',
+              right: '20%',
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent, rgba(6,182,212,0.2), transparent)',
+            }}
+          />
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>
-                E-posta Adresi
-              </label>
-              <div className="relative">
-                <span
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center"
-                  style={{ color: '#475569' }}
-                >
-                  <i className="ri-mail-line text-sm" />
-                </span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setError(null); }}
-                  placeholder="ornek@sirket.com"
-                  style={{ ...inputStyle, paddingLeft: '36px' }}
-                  onFocus={e => {
-                    e.currentTarget.style.borderColor = 'rgba(59,130,246,0.6)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                  }}
-                  onBlur={e => {
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                  }}
-                  autoComplete="email"
-                />
-              </div>
+          <div className="p-8 sm:p-9">
+            {/* Header */}
+            <div className="mb-7">
+              <h2 className="text-xl font-bold mb-1.5" style={{ color: '#E2F8FB', letterSpacing: '-0.015em' }}>
+                Giriş Yap
+              </h2>
+              <p className="text-sm leading-relaxed" style={{ color: '#7ECFDC' }}>
+                Hesabınıza erişmek için bilgilerinizi girin.
+              </p>
             </div>
 
-            {/* Password */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold" style={{ color: '#94A3B8' }}>
-                  Şifre
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Email */}
+              <div>
+                <label
+                  className="block text-xs font-semibold mb-2"
+                  style={{ color: emailFocused ? '#7DE8F0' : '#4A9BB5', transition: 'color 0.15s' }}
+                >
+                  E-posta Adresi
                 </label>
-                <Link
-                  to="/forgot-password"
-                  className="text-xs font-medium transition-colors cursor-pointer"
-                  style={{ color: '#475569' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = '#60A5FA'; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = '#475569'; }}
-                >
-                  Şifremi Unuttum
-                </Link>
+                <div className="relative">
+                  <span
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center pointer-events-none"
+                    style={{ color: emailFocused ? '#06B6D4' : '#3A8A9E', transition: 'color 0.15s' }}
+                  >
+                    <i className="ri-mail-line text-sm" />
+                  </span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError(null); }}
+                    onFocus={() => setEmailFocused(true)}
+                    onBlur={() => setEmailFocused(false)}
+                    placeholder="ornek@sirket.com"
+                    autoComplete="email"
+                    style={{
+                      width: '100%',
+                      paddingLeft: '40px',
+                      paddingRight: '14px',
+                      paddingTop: '11px',
+                      paddingBottom: '11px',
+                      background: emailFocused ? 'rgba(6,182,212,0.07)' : 'rgba(6,182,212,0.02)',
+                      border: emailFocused ? '1px solid rgba(6,182,212,0.45)' : '1px solid rgba(6,182,212,0.1)',
+                      borderRadius: '10px',
+                      color: '#D0F4F8',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      boxShadow: emailFocused ? '0 0 0 3px rgba(6,182,212,0.1)' : 'none',
+                    }}
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <span
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center"
-                  style={{ color: '#475569' }}
+
+              {/* Password */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label
+                    className="block text-xs font-semibold"
+                    style={{ color: passwordFocused ? '#7DE8F0' : '#4A9BB5', transition: 'color 0.15s' }}
+                  >
+                    Şifre
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-medium transition-colors cursor-pointer whitespace-nowrap"
+                    style={{ color: '#4A9BB5' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#06B6D4'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#4A9BB5'; }}
+                  >
+                    Şifremi Unuttum
+                  </Link>
+                </div>
+                <div className="relative">
+                  <span
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center pointer-events-none"
+                    style={{ color: passwordFocused ? '#06B6D4' : '#3A8A9E', transition: 'color 0.15s' }}
+                  >
+                    <i className="ri-lock-line text-sm" />
+                  </span>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setError(null); }}
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    style={{
+                      width: '100%',
+                      paddingLeft: '40px',
+                      paddingRight: '44px',
+                      paddingTop: '11px',
+                      paddingBottom: '11px',
+                      background: passwordFocused ? 'rgba(6,182,212,0.07)' : 'rgba(6,182,212,0.02)',
+                      border: passwordFocused ? '1px solid rgba(6,182,212,0.45)' : '1px solid rgba(6,182,212,0.1)',
+                      borderRadius: '10px',
+                      color: '#D0F4F8',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      boxShadow: passwordFocused ? '0 0 0 3px rgba(6,182,212,0.1)' : 'none',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(p => !p)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center cursor-pointer transition-colors"
+                    style={{ color: '#3A8A9E' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#7DE8F0'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#3A8A9E'; }}
+                  >
+                    <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div
+                  className="flex items-start gap-3 rounded-xl p-3.5"
+                  style={{
+                    background: 'rgba(239,68,68,0.07)',
+                    border: '1px solid rgba(239,68,68,0.18)',
+                  }}
                 >
-                  <i className="ri-lock-line text-sm" />
-                </span>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => { setPassword(e.target.value); setError(null); }}
-                  placeholder="••••••••"
-                  style={{ ...inputStyle, paddingLeft: '36px', paddingRight: '42px' }}
-                  onFocus={e => {
-                    e.currentTarget.style.borderColor = 'rgba(59,130,246,0.6)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                  }}
-                  onBlur={e => {
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                  }}
-                  autoComplete="current-password"
-                />
+                  <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i className="ri-error-warning-line text-sm" style={{ color: '#F87171' }} />
+                  </span>
+                  <p className="text-sm leading-relaxed" style={{ color: '#FCA5A5' }}>
+                    {error}
+                  </p>
+                </div>
+              )}
+
+              {/* Submit */}
+              <div className="pt-1">
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(p => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center cursor-pointer transition-colors"
-                  style={{ color: '#475569' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = '#94A3B8'; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = '#475569'; }}
+                  type="submit"
+                  disabled={loading}
+                  className="btn-shimmer w-full py-3 rounded-xl font-semibold text-sm cursor-pointer whitespace-nowrap flex items-center justify-center gap-2.5 relative overflow-hidden"
+                  style={{
+                    background: loading
+                      ? 'rgba(6,182,212,0.3)'
+                      : 'linear-gradient(135deg, #0891B2 0%, #0E7490 50%, #06B6D4 100%)',
+                    boxShadow: loading
+                      ? 'none'
+                      : '0 4px 28px rgba(6,182,212,0.4), 0 1px 0 rgba(255,255,255,0.08) inset',
+                    color: loading ? 'rgba(255,255,255,0.5)' : '#ffffff',
+                    opacity: loading ? 0.7 : 1,
+                    transition: 'all 0.22s ease',
+                    border: '1px solid rgba(6,182,212,0.25)',
+                  }}
+                  onMouseEnter={e => {
+                    if (!loading) {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 8px 34px rgba(6,182,212,0.55), 0 1px 0 rgba(255,255,255,0.1) inset';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = loading
+                      ? 'none'
+                      : '0 4px 28px rgba(6,182,212,0.4), 0 1px 0 rgba(255,255,255,0.08) inset';
+                  }}
                 >
-                  <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
+                  {loading ? (
+                    <>
+                      <i className="ri-loader-4-line text-base animate-spin" />
+                      <span>Giriş yapılıyor...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="ri-login-circle-line text-base" />
+                      <span>Giriş Yap</span>
+                    </>
+                  )}
                 </button>
               </div>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <div
-                className="flex items-start gap-2.5 rounded-xl p-3.5"
-                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
-              >
-                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <i className="ri-error-warning-line text-sm" style={{ color: '#EF4444' }} />
-                </span>
-                <p className="text-sm leading-relaxed" style={{ color: '#FCA5A5' }}>{error}</p>
-              </div>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold text-sm text-white cursor-pointer whitespace-nowrap transition-all duration-200 flex items-center justify-center gap-2"
-              style={{
-                background: loading
-                  ? 'rgba(99,102,241,0.4)'
-                  : 'linear-gradient(135deg, #3B82F6, #6366F1)',
-                boxShadow: loading ? 'none' : '0 4px 20px rgba(99,102,241,0.4)',
-                opacity: loading ? 0.7 : 1,
-              }}
-              onMouseEnter={e => {
-                if (!loading) e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              {loading ? (
-                <>
-                  <i className="ri-loader-4-line text-base animate-spin" />
-                  <span>Giriş yapılıyor...</span>
-                </>
-              ) : (
-                <>
-                  <i className="ri-login-circle-line text-base" />
-                  <span>Giriş Yap</span>
-                </>
-              )}
-            </button>
-          </form>
+            </form>
+          </div>
         </div>
 
-        <p className="text-center text-xs mt-6" style={{ color: '#1E293B' }}>
+        <p className="text-center text-xs mt-6" style={{ color: '#2E7A8F' }}>
           ISG Denetim Yönetim Sistemi &copy; {new Date().getFullYear()}
         </p>
       </div>

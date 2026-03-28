@@ -1,12 +1,26 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/AppContext';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, CartesianGrid,
 } from 'recharts';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
+import WelcomeAnimation from './components/WelcomeAnimation';
 
 export default function DashboardPage() {
+  const [showWelcome, setShowWelcome] = useState(() => {
+    const flag = sessionStorage.getItem('isg_show_welcome');
+    if (flag === 'true') {
+      sessionStorage.removeItem('isg_show_welcome');
+      return true;
+    }
+    return false;
+  });
+
+  const handleWelcomeDone = useCallback(() => {
+    setShowWelcome(false);
+  }, []);
+
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
     uygunsuzluklar, bildirimler, gorevler,
@@ -130,355 +144,358 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Kontrol Paneli</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            {new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div
-            className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-            style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}
-          >
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-            Sistem Aktif
-          </div>
-          {stats.acikGorev > 0 && (
-            <div
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-              style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}
-            >
-              <i className="ri-task-line" />
-              {stats.acikGorev} açık görev
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Welcome Banner */}
-      {isEmpty && (
-        <div
-          className="rounded-2xl p-5 flex items-start gap-4 animate-fade-in"
-          style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(99,102,241,0.05))', border: '1px solid rgba(99,102,241,0.2)' }}
-        >
-          <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 8px 20px rgba(99,102,241,0.35)' }}>
-            <i className="ri-rocket-line text-white text-base" />
-          </div>
+    <>
+      {showWelcome && <WelcomeAnimation onDone={handleWelcomeDone} />}
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <p className="font-bold" style={{ color: 'var(--text-primary)' }}>ISG Denetim\'e Hoş Geldiniz!</p>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Kontrol Paneli</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-              Sistemi kullanmaya başlamak için sol menüden <strong>Firmalar</strong> modülüne giderek ilk firmanızı ekleyin.
+              {new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
-        </div>
-      )}
-
-      {/* 7-Gün Uyarı Kartı */}
-      {yediGunEvraklar.length > 0 && (
-        <div className="rounded-2xl p-4 flex items-start gap-4" style={{ background: 'linear-gradient(135deg,rgba(245,158,11,0.1),rgba(239,68,68,0.06))', border: '1px solid rgba(245,158,11,0.25)' }}>
-          <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
-            <i className="ri-alarm-warning-line text-xl" style={{ color: '#F59E0B' }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              Süresi Yaklaşan Evraklar — {yediGunEvraklar.length} kayıt
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Aşağıdaki evrakların geçerlilik süresi 7 gün içinde dolacak.
-            </p>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {yediGunEvraklar.slice(0, 5).map(b => (
-                <span key={b.id} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(245,158,11,0.15)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>
-                  {b.mesaj.replace(' evrakının süresi dolmak üzere', '')}
-                </span>
-              ))}
-              {yediGunEvraklar.length > 5 && (
-                <span className="text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(245,158,11,0.15)', color: '#FCD34D' }}>
-                  +{yediGunEvraklar.length - 5} daha
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card) => (
-          <div key={card.label} className="stat-card rounded-2xl p-5" style={{ background: card.gradient, border: `1px solid ${card.border}` }}>
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-11 h-11 flex items-center justify-center rounded-xl" style={{ background: card.iconBg, boxShadow: card.iconShadow }}>
-                <i className={`${card.icon} text-white text-lg`} />
-              </div>
-            </div>
-            <div>
-              <p
-                className="text-4xl font-extrabold"
-                style={{ background: card.valueColor, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}
-              >
-                {card.value}
-              </p>
-              <p className="text-sm font-semibold mt-2" style={{ color: 'var(--text-primary)' }}>{card.label}</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{card.sub}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Area Chart */}
-        <div className="lg:col-span-2 rounded-2xl p-5 isg-card">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
-            <div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Büyüme Trendi</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                {new Date().getFullYear()} yılı — aylık firma ve personel artışı
-              </p>
-            </div>
-            <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--text-muted)' }}>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#3B82F6' }} />Firmalar
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#10B981' }} />Personeller
-              </span>
-            </div>
-          </div>
-          {firmalar.length === 0 && personeller.length === 0 ? (
-            <DashEmptyState icon="ri-bar-chart-line" text="Grafik için veri yok" subtext="Firma ve personel ekledikçe grafik dolacak" />
-          ) : (
-            <ResponsiveContainer width="100%" height={210}>
-              <AreaChart data={monthlyData}>
-                <defs>
-                  <linearGradient id="gradBlue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradGreen" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="ay" stroke="var(--chart-axis)" tick={{ fontSize: 11, fill: 'var(--chart-tick)' }} />
-                <YAxis stroke="var(--chart-axis)" tick={{ fontSize: 11, fill: 'var(--chart-tick)' }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: 'var(--chart-tooltip-bg)',
-                    border: '1px solid var(--chart-tooltip-border)',
-                    borderRadius: '12px',
-                    color: 'var(--text-primary)',
-                  }}
-                  labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
-                  itemStyle={{ color: 'var(--text-secondary)' }}
-                />
-                <Area type="monotone" dataKey="firmalar" stroke="#3B82F6" fill="url(#gradBlue)" strokeWidth={2.5} name="Firmalar" dot={false} activeDot={{ r: 4 }} />
-                <Area type="monotone" dataKey="personeller" stroke="#10B981" fill="url(#gradGreen)" strokeWidth={2.5} name="Personeller" dot={false} activeDot={{ r: 4 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Pie Chart */}
-        <div className="rounded-2xl p-5 isg-card">
-          <div className="mb-5">
-            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Durumları</h3>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Toplam {evraklar.length} evrak kaydı
-            </p>
-          </div>
-          {evrakPie.length > 0 ? (
-            <ResponsiveContainer width="100%" height={210}>
-              <PieChart>
-                <Pie
-                  data={evrakPie}
-                  cx="50%"
-                  cy="42%"
-                  innerRadius={52}
-                  outerRadius={78}
-                  dataKey="value"
-                  paddingAngle={4}
-                  strokeWidth={0}
-                >
-                  {evrakPie.map((_, index) => (
-                    <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    background: 'var(--chart-tooltip-bg)',
-                    border: '1px solid var(--chart-tooltip-border)',
-                    borderRadius: '12px',
-                    color: 'var(--text-primary)',
-                  }}
-                  itemStyle={{ color: 'var(--text-secondary)' }}
-                />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <DashEmptyState icon="ri-file-chart-line" text="Henüz evrak yok" subtext="Evrak yükledikçe grafik dolacak" />
-          )}
-        </div>
-      </div>
-
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Yaklaşan Süreler */}
-        <div className="rounded-2xl p-5 isg-card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Süreler</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Önümüzdeki 60 gün</p>
-            </div>
-            <span
-              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
-              style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
+          <div className="flex items-center gap-3">
+            <div
+              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
+              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}
             >
-              <i className="ri-time-line" />{yaklaşanEvraklar.length} kayıt
-            </span>
-          </div>
-          {yaklaşanEvraklar.length === 0 ? (
-            <DashEmptyState icon="ri-check-double-line" text="Yaklaşan süre yok" subtext="Tüm evraklar güncel" color="#10B981" />
-          ) : (
-            <div className="space-y-2">
-              {yaklaşanEvraklar.map(ev => {
-                const d = new Date(ev.gecerlilikTarihi!);
-                d.setHours(0, 0, 0, 0);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const days = Math.ceil((d.getTime() - today.getTime()) / 86400000);
-                const isUrgent = days <= 15;
-                return (
-                  <div
-                    key={ev.id}
-                    className="flex items-center gap-3 rounded-xl px-3.5 py-3 transition-all duration-150"
-                    style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}
-                  >
-                    <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: isUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)' }}>
-                      <i className="ri-file-warning-line text-sm" style={{ color: isUrgent ? '#EF4444' : '#F59E0B' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
-                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
-                    </div>
-                    <span
-                      className="text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex items-center gap-1"
-                      style={{ background: isUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)', color: isUrgent ? '#F87171' : '#FCD34D' }}
-                    >
-                      <i className="ri-timer-line" />{days === 0 ? 'Bugün!' : `${days}g`}
-                    </span>
-                  </div>
-                );
-              })}
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+              Sistem Aktif
             </div>
-          )}
-        </div>
-
-        {/* Son Aktiviteler */}
-        <div className="rounded-2xl p-5 isg-card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Son Aktiviteler</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>En son eklenen kayıtlar</p>
-            </div>
-          </div>
-          {recentItems.length === 0 ? (
-            <DashEmptyState icon="ri-time-line" text="Henüz aktivite yok" subtext="Kayıt ekledikçe burada görünecek" />
-          ) : (
-            <div className="relative">
+            {stats.acikGorev > 0 && (
               <div
-                className="absolute left-3.5 top-0 bottom-0 w-px"
-                style={{ background: 'var(--border-subtle)' }}
-              />
-              <div className="space-y-0.5">
-                {recentItems.map((item, idx) => (
-                  <div key={idx} className="relative flex items-start gap-3 pb-3 pl-9 last:pb-0">
-                    <div
-                      className="absolute left-0 top-1 w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
-                      style={{ background: `${item.color}18`, border: `1px solid ${item.color}25` }}
-                    >
-                      <i className={`${item.icon} text-xs`} style={{ color: item.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[11px] font-semibold" style={{ color: item.color }}>{item.tip}</span>
-                        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                          {new Date(item.tarih).toLocaleDateString('tr-TR')}
-                        </span>
-                      </div>
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{item.ad}</p>
-                    </div>
-                  </div>
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
+                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}
+              >
+                <i className="ri-task-line" />
+                {stats.acikGorev} açık görev
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Welcome Banner */}
+        {isEmpty && (
+          <div
+            className="rounded-2xl p-5 flex items-start gap-4 animate-fade-in"
+            style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(99,102,241,0.05))', border: '1px solid rgba(99,102,241,0.2)' }}
+          >
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 8px 20px rgba(99,102,241,0.35)' }}>
+              <i className="ri-rocket-line text-white text-base" />
+            </div>
+            <div>
+              <p className="font-bold" style={{ color: 'var(--text-primary)' }}>ISG Denetim\'e Hoş Geldiniz!</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                Sistemi kullanmaya başlamak için sol menüden <strong>Firmalar</strong> modülüne giderek ilk firmanızı ekleyin.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* 7-Gün Uyarı Kartı */}
+        {yediGunEvraklar.length > 0 && (
+          <div className="rounded-2xl p-4 flex items-start gap-4" style={{ background: 'linear-gradient(135deg,rgba(245,158,11,0.1),rgba(239,68,68,0.06))', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
+              <i className="ri-alarm-warning-line text-xl" style={{ color: '#F59E0B' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                Süresi Yaklaşan Evraklar — {yediGunEvraklar.length} kayıt
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Aşağıdaki evrakların geçerlilik süresi 7 gün içinde dolacak.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {yediGunEvraklar.slice(0, 5).map(b => (
+                  <span key={b.id} className="text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(245,158,11,0.15)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>
+                    {b.mesaj.replace(' evrakının süresi dolmak üzere', '')}
+                  </span>
                 ))}
+                {yediGunEvraklar.length > 5 && (
+                  <span className="text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(245,158,11,0.15)', color: '#FCD34D' }}>
+                    +{yediGunEvraklar.length - 5} daha
+                  </span>
+                )}
               </div>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {statCards.map((card) => (
+            <div key={card.label} className="stat-card rounded-2xl p-5" style={{ background: card.gradient, border: `1px solid ${card.border}` }}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-11 h-11 flex items-center justify-center rounded-xl" style={{ background: card.iconBg, boxShadow: card.iconShadow }}>
+                  <i className={`${card.icon} text-white text-lg`} />
+                </div>
+              </div>
+              <div>
+                <p
+                  className="text-4xl font-extrabold"
+                  style={{ background: card.valueColor, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}
+                >
+                  {card.value}
+                </p>
+                <p className="text-sm font-semibold mt-2" style={{ color: 'var(--text-primary)' }}>{card.label}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{card.sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Area Chart */}
+          <div className="lg:col-span-2 rounded-2xl p-5 isg-card">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Büyüme Trendi</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {new Date().getFullYear()} yılı — aylık firma ve personel artışı
+                </p>
+              </div>
+              <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#3B82F6' }} />Firmalar
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#10B981' }} />Personeller
+                </span>
+              </div>
+            </div>
+            {firmalar.length === 0 && personeller.length === 0 ? (
+              <DashEmptyState icon="ri-bar-chart-line" text="Grafik için veri yok" subtext="Firma ve personel ekledikçe grafik dolacak" />
+            ) : (
+              <ResponsiveContainer width="100%" height={210}>
+                <AreaChart data={monthlyData}>
+                  <defs>
+                    <linearGradient id="gradBlue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradGreen" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10B981" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="ay" stroke="var(--chart-axis)" tick={{ fontSize: 11, fill: 'var(--chart-tick)' }} />
+                  <YAxis stroke="var(--chart-axis)" tick={{ fontSize: 11, fill: 'var(--chart-tick)' }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--chart-tooltip-bg)',
+                      border: '1px solid var(--chart-tooltip-border)',
+                      borderRadius: '12px',
+                      color: 'var(--text-primary)',
+                    }}
+                    labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
+                    itemStyle={{ color: 'var(--text-secondary)' }}
+                  />
+                  <Area type="monotone" dataKey="firmalar" stroke="#3B82F6" fill="url(#gradBlue)" strokeWidth={2.5} name="Firmalar" dot={false} activeDot={{ r: 4 }} />
+                  <Area type="monotone" dataKey="personeller" stroke="#10B981" fill="url(#gradGreen)" strokeWidth={2.5} name="Personeller" dot={false} activeDot={{ r: 4 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Pie Chart */}
+          <div className="rounded-2xl p-5 isg-card">
+            <div className="mb-5">
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Durumları</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Toplam {evraklar.length} evrak kaydı
+              </p>
+            </div>
+            {evrakPie.length > 0 ? (
+              <ResponsiveContainer width="100%" height={210}>
+                <PieChart>
+                  <Pie
+                    data={evrakPie}
+                    cx="50%"
+                    cy="42%"
+                    innerRadius={52}
+                    outerRadius={78}
+                    dataKey="value"
+                    paddingAngle={4}
+                    strokeWidth={0}
+                  >
+                    {evrakPie.map((_, index) => (
+                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--chart-tooltip-bg)',
+                      border: '1px solid var(--chart-tooltip-border)',
+                      borderRadius: '12px',
+                      color: 'var(--text-primary)',
+                    }}
+                    itemStyle={{ color: 'var(--text-secondary)' }}
+                  />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <DashEmptyState icon="ri-file-chart-line" text="Henüz evrak yok" subtext="Evrak yükledikçe grafik dolacak" />
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Yaklaşan Süreler */}
+          <div className="rounded-2xl p-5 isg-card">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Süreler</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Önümüzdeki 60 gün</p>
+              </div>
+              <span
+                className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
+              >
+                <i className="ri-time-line" />{yaklaşanEvraklar.length} kayıt
+              </span>
+            </div>
+            {yaklaşanEvraklar.length === 0 ? (
+              <DashEmptyState icon="ri-check-double-line" text="Yaklaşan süre yok" subtext="Tüm evraklar güncel" color="#10B981" />
+            ) : (
+              <div className="space-y-2">
+                {yaklaşanEvraklar.map(ev => {
+                  const d = new Date(ev.gecerlilikTarihi!);
+                  d.setHours(0, 0, 0, 0);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const days = Math.ceil((d.getTime() - today.getTime()) / 86400000);
+                  const isUrgent = days <= 15;
+                  return (
+                    <div
+                      key={ev.id}
+                      className="flex items-center gap-3 rounded-xl px-3.5 py-3 transition-all duration-150"
+                      style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}
+                    >
+                      <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: isUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)' }}>
+                        <i className="ri-file-warning-line text-sm" style={{ color: isUrgent ? '#EF4444' : '#F59E0B' }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
+                        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
+                      </div>
+                      <span
+                        className="text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex items-center gap-1"
+                        style={{ background: isUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)', color: isUrgent ? '#F87171' : '#FCD34D' }}
+                      >
+                        <i className="ri-timer-line" />{days === 0 ? 'Bugün!' : `${days}g`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Son Aktiviteler */}
+          <div className="rounded-2xl p-5 isg-card">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Son Aktiviteler</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>En son eklenen kayıtlar</p>
+              </div>
+            </div>
+            {recentItems.length === 0 ? (
+              <DashEmptyState icon="ri-time-line" text="Henüz aktivite yok" subtext="Kayıt ekledikçe burada görünecek" />
+            ) : (
+              <div className="relative">
+                <div
+                  className="absolute left-3.5 top-0 bottom-0 w-px"
+                  style={{ background: 'var(--border-subtle)' }}
+                />
+                <div className="space-y-0.5">
+                  {recentItems.map((item, idx) => (
+                    <div key={idx} className="relative flex items-start gap-3 pb-3 pl-9 last:pb-0">
+                      <div
+                        className="absolute left-0 top-1 w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+                        style={{ background: `${item.color}18`, border: `1px solid ${item.color}25` }}
+                      >
+                        <i className={`${item.icon} text-xs`} style={{ color: item.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[11px] font-semibold" style={{ color: item.color }}>{item.tip}</span>
+                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                            {new Date(item.tarih).toLocaleDateString('tr-TR')}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{item.ad}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Stats Bottom */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            {
+              label: 'Aktif Firmalar',
+              value: firmalar.filter(f => f.durum === 'Aktif').length,
+              total: firmalar.length,
+              color: '#3B82F6',
+              icon: 'ri-building-2-line',
+            },
+            {
+              label: 'Aktif Personeller',
+              value: personeller.filter(p => p.durum === 'Aktif').length,
+              total: personeller.length,
+              color: '#10B981',
+              icon: 'ri-team-line',
+            },
+            {
+              label: 'Tamamlanan Eğitimler',
+              value: egitimler.filter(e => e.durum === 'Tamamlandı').length,
+              total: egitimler.length,
+              color: '#F59E0B',
+              icon: 'ri-graduation-cap-line',
+            },
+            {
+              label: 'Çalışabilir Muayene',
+              value: muayeneler.filter(m => m.sonuc === 'Çalışabilir').length,
+              total: muayeneler.length,
+              color: '#6366F1',
+              icon: 'ri-heart-pulse-line',
+            },
+          ].map(item => {
+            const pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;
+            return (
+              <div key={item.label} className="rounded-2xl p-4 isg-card">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${item.color}15` }}>
+                    <i className={`${item.icon} text-xs`} style={{ color: item.color }} />
+                  </div>
+                  <span className="text-xs font-bold" style={{ color: item.color }}>{pct}%</span>
+                </div>
+                <p className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                  {item.value}
+                  <span className="text-sm font-normal ml-1" style={{ color: 'var(--text-muted)' }}>/ {item.total}</span>
+                </p>
+                <p className="text-xs mt-1 mb-2" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-item)' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${pct}%`, background: item.color }}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
-
-      {/* Quick Stats Bottom */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          {
-            label: 'Aktif Firmalar',
-            value: firmalar.filter(f => f.durum === 'Aktif').length,
-            total: firmalar.length,
-            color: '#3B82F6',
-            icon: 'ri-building-2-line',
-          },
-          {
-            label: 'Aktif Personeller',
-            value: personeller.filter(p => p.durum === 'Aktif').length,
-            total: personeller.length,
-            color: '#10B981',
-            icon: 'ri-team-line',
-          },
-          {
-            label: 'Tamamlanan Eğitimler',
-            value: egitimler.filter(e => e.durum === 'Tamamlandı').length,
-            total: egitimler.length,
-            color: '#F59E0B',
-            icon: 'ri-graduation-cap-line',
-          },
-          {
-            label: 'Çalışabilir Muayene',
-            value: muayeneler.filter(m => m.sonuc === 'Çalışabilir').length,
-            total: muayeneler.length,
-            color: '#6366F1',
-            icon: 'ri-heart-pulse-line',
-          },
-        ].map(item => {
-          const pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;
-          return (
-            <div key={item.label} className="rounded-2xl p-4 isg-card">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${item.color}15` }}>
-                  <i className={`${item.icon} text-xs`} style={{ color: item.color }} />
-                </div>
-                <span className="text-xs font-bold" style={{ color: item.color }}>{pct}%</span>
-              </div>
-              <p className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
-                {item.value}
-                <span className="text-sm font-normal ml-1" style={{ color: 'var(--text-muted)' }}>/ {item.total}</span>
-              </p>
-              <p className="text-xs mt-1 mb-2" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-item)' }}>
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${pct}%`, background: item.color }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    </>
   );
 }
 

@@ -45,17 +45,34 @@ export default function Sidebar() {
       style={{ background: 'var(--bg-sidebar)', borderRight: '1px solid rgba(255,255,255,0.06)', transition: 'width 0.3s ease, background 0.3s ease' }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div
+        className={`flex items-center gap-3 py-4 ${sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+      >
         <div
-          className="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 4px 15px rgba(99,102,241,0.4)' }}
+          className="flex-shrink-0 flex items-center justify-center"
+          style={{
+            width: sidebarCollapsed ? '36px' : '44px',
+            height: sidebarCollapsed ? '36px' : '44px',
+            filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))',
+            transition: 'width 0.3s ease, height 0.3s ease',
+          }}
         >
-          <i className="ri-shield-check-line text-white text-base" />
+          <img
+            src="https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/ae509f81-0883-42e1-9ed0-d08483f4284e_ChatGPT-Image-28-Mar-2026-23_09_27.png?v=f1e78272586c7081b6d13820591aa1f8"
+            alt="ISG Denetim Logo"
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
         </div>
         {!sidebarCollapsed && (
           <div>
             <h1 className="text-sm font-bold text-white tracking-wide leading-tight">ISG Denetim</h1>
-            <p className="text-[10px] mt-0.5" style={{ color: '#6366F1' }}>Yönetim Sistemi</p>
+            <p
+              className="text-[10px] mt-0.5 font-medium"
+              style={{ color: '#06B6D4' }}
+            >
+              Yönetim Sistemi
+            </p>
           </div>
         )}
       </div>
