@@ -209,7 +209,7 @@ export default function EkipmanlarPage() {
           style={{ width: 'auto', minWidth: '180px' }}
         >
           <option value="">Tüm Firmalar</option>
-          {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+          {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
         </select>
         <select
           value={statusFilter}
@@ -371,7 +371,7 @@ export default function EkipmanlarPage() {
               onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
             >
               <option value="">Firma Seçin</option>
-              {firmalar.filter(f => f.durum === 'Aktif').map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+              {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
             </select>
           </div>
 

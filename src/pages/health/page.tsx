@@ -48,7 +48,7 @@ export default function MuayenelerPage() {
   }, [quickCreate, setQuickCreate]);
 
   const filteredPersoneller = useMemo(
-    () => form.firmaId ? personeller.filter(p => p.firmaId === form.firmaId && p.durum === 'Aktif') : personeller.filter(p => p.durum === 'Aktif'),
+    () => form.firmaId ? personeller.filter(p => p.firmaId === form.firmaId && p.durum === 'Aktif' && !p.silinmis) : personeller.filter(p => p.durum === 'Aktif' && !p.silinmis),
     [personeller, form.firmaId]
   );
 
@@ -179,7 +179,7 @@ export default function MuayenelerPage() {
           style={{ minWidth: '180px' }}
         >
           <option value="">Tüm Firmalar</option>
-          {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+          {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
         </select>
       </div>
 
@@ -372,7 +372,7 @@ export default function MuayenelerPage() {
             <label className="form-label">Firma</label>
             <select value={form.firmaId} onChange={e => setForm(p => ({ ...p, firmaId: e.target.value, personelId: '' }))} className="isg-input">
               <option value="">Firma Seçin</option>
-              {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+              {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
             </select>
           </div>
           <div>

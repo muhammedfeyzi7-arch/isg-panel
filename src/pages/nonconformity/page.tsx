@@ -51,7 +51,7 @@ export default function UygunsuzluklarPage() {
   }, [quickCreate, setQuickCreate]);
 
   const filteredPersoneller = useMemo(
-    () => form.firmaId ? personeller.filter(p => p.firmaId === form.firmaId) : personeller,
+    () => form.firmaId ? personeller.filter(p => p.firmaId === form.firmaId && !p.silinmis) : personeller.filter(p => !p.silinmis),
     [personeller, form.firmaId]
   );
 
@@ -142,7 +142,7 @@ export default function UygunsuzluklarPage() {
         </div>
         <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ minWidth: '180px' }}>
           <option value="">Tüm Firmalar</option>
-          {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+          {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ minWidth: '150px' }}>
           <option value="">Tüm Durumlar</option>
@@ -236,7 +236,7 @@ export default function UygunsuzluklarPage() {
             <label className="form-label">Firma *</label>
             <select value={form.firmaId} onChange={e => setForm(p => ({ ...p, firmaId: e.target.value, personelId: '' }))} className="isg-input">
               <option value="">Firma Seçin</option>
-              {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+              {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
             </select>
           </div>
           <div>

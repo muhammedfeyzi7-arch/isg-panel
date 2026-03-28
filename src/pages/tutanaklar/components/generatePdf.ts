@@ -1,19 +1,5 @@
 import type { Tutanak, Firma } from '../../../types';
 
-const STATUS_COLORS: Record<string, string> = {
-  'Taslak':     '#64748B',
-  'Tamamlandı': '#10B981',
-  'Onaylandı':  '#0EA5E9',
-  'İptal':      '#EF4444',
-};
-
-const STATUS_BG: Record<string, string> = {
-  'Taslak':     '#F1F5F9',
-  'Tamamlandı': '#ECFDF5',
-  'Onaylandı':  '#F0F9FF',
-  'İptal':      '#FEF2F2',
-};
-
 function esc(str: unknown): string {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
@@ -33,8 +19,8 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
   const printDate = new Date().toLocaleDateString('tr-TR', {
     day: '2-digit', month: 'long', year: 'numeric',
   });
-  const stColor = STATUS_COLORS[tutanak.durum] ?? '#64748B';
-  const stBg    = STATUS_BG[tutanak.durum]    ?? '#F1F5F9';
+
+  /* — Status bilgisi artık belge çıktısında gösterilmiyor — */
 
   return `<!DOCTYPE html>
 <html lang="tr">
@@ -60,7 +46,14 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
   .page {
     width: 794px;
     margin: 0 auto;
-    padding: 40px 48px 48px;
+    padding: 0 48px 48px;
+  }
+
+  /* ── Top accent bar ── */
+  .accent-bar {
+    height: 5px;
+    background: linear-gradient(90deg, #4F46E5 0%, #6366F1 60%, #A5B4FC 100%);
+    margin-bottom: 28px;
   }
 
   /* ── HEADER ── */
@@ -69,43 +62,38 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
     width: 100%;
     border-collapse: collapse;
     padding-bottom: 18px;
-    border-bottom: 2.5px solid #6366F1;
-    margin-bottom: 24px;
+    border-bottom: 1.5px solid #E2E8F0;
+    margin-bottom: 22px;
   }
   .hdr-left  { display: table-cell; vertical-align: middle; }
   .hdr-right { display: table-cell; vertical-align: middle; text-align: right; white-space: nowrap; }
-  .hdr-tc    { font-size:10px; letter-spacing:4px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:2px; }
-  .hdr-title { font-size:19px; font-weight:800; color:#0F172A; line-height:1.2; }
-  .hdr-sub   { font-size:12px; font-weight:500; color:#475569; margin-top:2px; }
-  .no-lbl    { font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px; }
-  .no-val    { display:inline-block; font-size:14px; font-weight:800; color:#6366F1;
+  .hdr-tc    { font-size:10px; letter-spacing:4px; font-weight:700; color:#94A3B8; text-transform:uppercase; margin-bottom:3px; }
+  .hdr-title { font-size:20px; font-weight:800; color:#0F172A; line-height:1.2; }
+  .hdr-sub   { font-size:12px; font-weight:600; color:#6366F1; margin-top:3px; text-transform:uppercase; letter-spacing:1px; }
+  .no-lbl    { font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+  .no-val    { display:inline-block; font-size:14px; font-weight:800; color:#4F46E5;
                font-family:'Courier New',monospace; background:#EEF2FF;
-               padding:5px 14px; border-radius:6px; border:1px solid #C7D2FE; letter-spacing:1px; }
+               padding:6px 16px; border-radius:6px; border:1px solid #C7D2FE; letter-spacing:1.5px; }
 
   /* ── Title row ── */
   .title-row {
-    display: table; width: 100%;
-    background: #F8FAFC; border: 1px solid #E2E8F0;
-    border-radius: 10px; padding: 14px 18px;
-    margin-bottom: 20px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid #6366F1;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 22px;
   }
-  .title-cell  { display:table-cell; vertical-align:middle; }
-  .title-badge { display:table-cell; vertical-align:middle; text-align:right; white-space:nowrap; padding-left:16px; }
-  .tlabel { font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:1px; margin-bottom:3px; }
-  .ttitle { font-size:16px; font-weight:800; color:#0F172A; }
-  .badge {
-    display:inline-block;
-    font-size:11px; font-weight:700;
-    padding: 4px 14px; border-radius:20px;
-  }
+  .tlabel { font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  .ttitle { font-size:17px; font-weight:800; color:#0F172A; }
 
   /* ── Info table ── */
-  .info-tbl { width:100%; border-collapse:separate; border-spacing:8px; margin-bottom:20px; }
+  .info-tbl { width:100%; border-collapse:separate; border-spacing:8px; margin-bottom:22px; }
   .info-cell {
     width:50%; background:#F8FAFC; border:1px solid #E2E8F0;
     border-radius:8px; padding:10px 14px; vertical-align:top;
   }
-  .icell-lbl { font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:1px; margin-bottom:3px; }
+  .icell-lbl { font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
   .icell-val { font-size:13px; font-weight:600; color:#1E293B; }
 
   /* ── Section ── */
@@ -118,11 +106,16 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
               letter-spacing:1.5px; color:#475569; }
   .sec-body {
     background:#F8FAFC; border:1px solid #E2E8F0;
+    border-left: 3px solid #6366F1;
     border-radius:10px; padding:14px 16px;
-    font-size:13px; line-height:1.75; color:#374151;
+    font-size:13px; line-height:1.8; color:#374151;
     white-space:pre-wrap; word-wrap:break-word;
   }
-  .sec-body.notes { background:#FFFBEB; border-color:#FDE68A; color:#78716C; font-style:italic; }
+  .sec-body.notes {
+    background:#FFFBEB; border-color:#FDE68A;
+    border-left: 3px solid #F59E0B;
+    color:#78716C; font-style:italic;
+  }
 
   /* ── Attachment (non-image) ── */
   .attach {
@@ -145,7 +138,7 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
   }
   .attach-img-sec-head {
     background: #ECFDF5;
-    padding: 7px 14px;
+    padding: 8px 14px;
     border-bottom: 1px solid #A7F3D0;
     font-size: 10px;
     font-weight: 700;
@@ -155,7 +148,7 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
   }
   .attach-img-body {
     background: #F9FAFB;
-    padding: 14px;
+    padding: 16px;
     text-align: center;
   }
   .attach-img-body img {
@@ -181,29 +174,35 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
 
   /* ── Signature ── */
   .sig-wrap { border:1px solid #E2E8F0; border-radius:10px; overflow:hidden; margin-bottom:24px; }
-  .sig-head { background:#F8FAFC; padding:10px 16px; border-bottom:1px solid #E2E8F0;
-              font-size:10px; font-weight:700; text-transform:uppercase;
-              letter-spacing:1.5px; color:#94A3B8; }
-  .sig-body { display:table; width:100%; padding:16px; }
-  .sig-col  { display:table-cell; width:50%; vertical-align:top; padding:0 8px; }
+  .sig-head {
+    background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%);
+    padding:10px 16px; border-bottom:1px solid #E2E8F0;
+    font-size:10px; font-weight:700; text-transform:uppercase;
+    letter-spacing:1.5px; color:#6366F1;
+  }
+  .sig-body { display:table; width:100%; padding:18px 16px; }
+  .sig-col  { display:table-cell; width:50%; vertical-align:top; padding:0 12px; }
   .sig-lbl  { font-size:10px; color:#94A3B8; margin-bottom:4px; }
   .sig-val  { font-size:13px; font-weight:600; color:#1E293B;
-              padding-bottom:28px; border-bottom:1px solid #CBD5E1; }
-  .sig-line-lbl { font-size:10px; color:#94A3B8; margin-top:4px; }
+              padding-bottom:32px; border-bottom:1.5px solid #CBD5E1; }
+  .sig-line-lbl { font-size:10px; color:#94A3B8; margin-top:5px; }
 
   /* ── Footer ── */
-  .footer { text-align:center; font-size:10px; color:#94A3B8;
-            padding-top:14px; border-top:1px solid #E2E8F0; }
+  .footer {
+    text-align:center; font-size:10px; color:#94A3B8;
+    padding-top:14px; border-top:1px solid #E2E8F0;
+  }
 
   /* ── Print media ── */
   @media print {
     body { background:#fff !important; }
-    .page { width:100% !important; padding:20px 28px !important; }
+    .page { width:100% !important; padding:0 28px 28px !important; }
     @page { size: A4 portrait; margin: 1.2cm; }
   }
 </style>
 </head>
 <body>
+<div class="accent-bar"></div>
 <div class="page">
 
   <!-- HEADER -->
@@ -211,7 +210,7 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
     <div class="hdr-left">
       <div class="hdr-tc">T.C.</div>
       <div class="hdr-title">İŞ SAĞLIĞI VE GÜVENLİĞİ</div>
-      <div class="hdr-sub">DENETİM TUTANAĞI</div>
+      <div class="hdr-sub">Denetim ve Kontrol Tutanağı</div>
     </div>
     <div class="hdr-right">
       <div class="no-lbl">Tutanak No</div>
@@ -219,15 +218,10 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
     </div>
   </div>
 
-  <!-- BAŞLIK + DURUM -->
+  <!-- BAŞLIK -->
   <div class="title-row">
-    <div class="title-cell">
-      <div class="tlabel">Tutanak Başlığı</div>
-      <div class="ttitle">${esc(tutanak.baslik)}</div>
-    </div>
-    <div class="title-badge">
-      <span class="badge" style="background:${stBg};color:${stColor};border:1px solid ${stColor}44;">${esc(tutanak.durum)}</span>
-    </div>
+    <div class="tlabel">Tutanak Başlığı</div>
+    <div class="ttitle">${esc(tutanak.baslik)}</div>
   </div>
 
   <!-- BİLGİ TABLOSU -->
@@ -323,7 +317,7 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
 
   <!-- FOOTER -->
   <div class="footer">
-    ISG Denetim Sistemi &nbsp;&bull;&nbsp; ${esc(tutanak.tutanakNo)} &nbsp;&bull;&nbsp; ${esc(printDate)}
+    ISG Denetim Sistemi &nbsp;&bull;&nbsp; ${esc(tutanak.tutanakNo)} &nbsp;&bull;&nbsp; Belge Tarihi: ${esc(printDate)}
   </div>
 
 </div>

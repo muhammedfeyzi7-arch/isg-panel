@@ -85,7 +85,7 @@ export default function EgitimlerPage() {
 
   const firmaPersoneller = useMemo(() => {
     if (!form.firmaId) return [];
-    return personeller.filter(p => p.firmaId === form.firmaId);
+    return personeller.filter(p => p.firmaId === form.firmaId && !p.silinmis);
   }, [form.firmaId, personeller]);
 
   const filtered = useMemo(() => egitimler.filter(e => {
@@ -204,7 +204,7 @@ export default function EgitimlerPage() {
         </div>
         <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ minWidth: '160px' }}>
           <option value="">Tüm Firmalar</option>
-          {firmalar.map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
+          {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ minWidth: '140px' }}>
           <option value="">Tüm Durumlar</option>
@@ -320,7 +320,7 @@ export default function EgitimlerPage() {
             <label className="form-label">Firma *</label>
             <select value={form.firmaId} onChange={e => setForm(p => ({ ...p, firmaId: e.target.value, katilimciIds: [] }))} className="isg-input">
               <option value="">Firma Seçin</option>
-              {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+              {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
             </select>
           </div>
 

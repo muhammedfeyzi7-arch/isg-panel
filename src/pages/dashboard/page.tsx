@@ -26,63 +26,72 @@ export default function DashboardPage() {
     uygunsuzluklar, bildirimler, gorevler,
   } = useApp();
 
+  /* ── Çöpe atılmamış (aktif) kayıtlar ─────────────────────── */
+  const aktifFirmalar = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
+  const aktifPersoneller = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);
+  const aktifEvraklar = useMemo(() => evraklar.filter(e => !e.silinmis), [evraklar]);
+  const aktifEgitimler = useMemo(() => egitimler.filter(e => !e.silinmis), [egitimler]);
+  const aktifMuayeneler = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
+  const aktifUygunsuzluklar = useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
+  const aktifGorevler = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);
+
   const yediGunEvraklar = useMemo(() => bildirimler.filter(b => b.tip === 'evrak_surecek'), [bildirimler]);
 
   const stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const in30 = new Date(today.getTime() + 30 * 86400000);
-    const yaklaşan = evraklar.filter(e => {
+    const yaklaşan = aktifEvraklar.filter(e => {
       if (!e.gecerlilikTarihi) return false;
       const d = new Date(e.gecerlilikTarihi);
       d.setHours(0, 0, 0, 0);
       return d >= today && d <= in30;
     }).length;
-    const eksik = evraklar.filter(e => e.durum === 'Eksik' || e.durum === 'Süre Dolmuş').length;
-    const acikU = uygunsuzluklar.filter(u => u.durum === 'Açık').length;
-    const acikGorev = gorevler.filter(g => g.durum !== 'Tamamlandı').length;
+    const eksik = aktifEvraklar.filter(e => e.durum === 'Eksik' || e.durum === 'Süre Dolmuş').length;
+    const acikU = aktifUygunsuzluklar.filter(u => u.durum === 'Açık').length;
+    const acikGorev = aktifGorevler.filter(g => g.durum !== 'Tamamlandı').length;
     return { yaklaşan, eksik, acikU, acikGorev };
-  }, [evraklar, uygunsuzluklar, gorevler]);
+  }, [aktifEvraklar, aktifUygunsuzluklar, aktifGorevler]);
 
   const evrakPie = useMemo(() => [
-    { name: 'Yüklü', value: evraklar.filter(e => e.durum === 'Yüklü').length },
-    { name: 'Eksik', value: evraklar.filter(e => e.durum === 'Eksik').length },
-    { name: 'Süre Yaklaşıyor', value: evraklar.filter(e => e.durum === 'Süre Yaklaşıyor').length },
-    { name: 'Süre Dolmuş', value: evraklar.filter(e => e.durum === 'Süre Dolmuş').length },
-  ].filter(d => d.value > 0), [evraklar]);
+    { name: 'Yüklü', value: aktifEvraklar.filter(e => e.durum === 'Yüklü').length },
+    { name: 'Eksik', value: aktifEvraklar.filter(e => e.durum === 'Eksik').length },
+    { name: 'Süre Yaklaşıyor', value: aktifEvraklar.filter(e => e.durum === 'Süre Yaklaşıyor').length },
+    { name: 'Süre Dolmuş', value: aktifEvraklar.filter(e => e.durum === 'Süre Dolmuş').length },
+  ].filter(d => d.value > 0), [aktifEvraklar]);
 
   const monthlyData = useMemo(() => {
     const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
     const currentMonth = new Date().getMonth();
     return months.slice(0, currentMonth + 1).map((ay, idx) => ({
       ay,
-      firmalar: firmalar.filter(f => {
+      firmalar: aktifFirmalar.filter(f => {
         const m = new Date(f.olusturmaTarihi).getMonth();
         const y = new Date(f.olusturmaTarihi).getFullYear();
         return y <= new Date().getFullYear() && m <= idx;
       }).length,
-      personeller: personeller.filter(p => {
+      personeller: aktifPersoneller.filter(p => {
         const m = new Date(p.olusturmaTarihi).getMonth();
         const y = new Date(p.olusturmaTarihi).getFullYear();
         return y <= new Date().getFullYear() && m <= idx;
       }).length,
     }));
-  }, [firmalar, personeller]);
+  }, [aktifFirmalar, aktifPersoneller]);
 
   const recentItems = useMemo(() => {
     const all = [
-      ...firmalar.map(f => ({ tip: 'Firma', ad: f.ad, tarih: f.olusturmaTarihi, icon: 'ri-building-2-line', color: '#3B82F6' })),
-      ...personeller.map(p => ({ tip: 'Personel', ad: p.adSoyad, tarih: p.olusturmaTarihi, icon: 'ri-user-line', color: '#10B981' })),
-      ...egitimler.map(e => ({ tip: 'Eğitim', ad: e.ad, tarih: e.olusturmaTarihi, icon: 'ri-graduation-cap-line', color: '#F59E0B' })),
+      ...aktifFirmalar.map(f => ({ tip: 'Firma', ad: f.ad, tarih: f.olusturmaTarihi, icon: 'ri-building-2-line', color: '#3B82F6' })),
+      ...aktifPersoneller.map(p => ({ tip: 'Personel', ad: p.adSoyad, tarih: p.olusturmaTarihi, icon: 'ri-user-line', color: '#10B981' })),
+      ...aktifEgitimler.map(e => ({ tip: 'Eğitim', ad: e.ad, tarih: e.olusturmaTarihi, icon: 'ri-graduation-cap-line', color: '#F59E0B' })),
     ];
     return all.sort((a, b) => new Date(b.tarih).getTime() - new Date(a.tarih).getTime()).slice(0, 8);
-  }, [firmalar, personeller, egitimler]);
+  }, [aktifFirmalar, aktifPersoneller, aktifEgitimler]);
 
   const yaklaşanEvraklar = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const in60 = new Date(today.getTime() + 60 * 86400000);
-    return evraklar
+    return aktifEvraklar
       .filter(e => {
         if (!e.gecerlilikTarihi) return false;
         const d = new Date(e.gecerlilikTarihi);
@@ -91,17 +100,17 @@ export default function DashboardPage() {
       })
       .sort((a, b) => new Date(a.gecerlilikTarihi!).getTime() - new Date(b.gecerlilikTarihi!).getTime())
       .slice(0, 5);
-  }, [evraklar]);
+  }, [aktifEvraklar]);
 
-  const isEmpty = firmalar.length === 0 && personeller.length === 0;
+  const isEmpty = aktifFirmalar.length === 0 && aktifPersoneller.length === 0;
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
 
   const statCards = [
     {
       label: 'Toplam Firma',
-      value: firmalar.length,
+      value: aktifFirmalar.length,
       icon: 'ri-building-2-line',
-      sub: `${firmalar.filter(f => f.durum === 'Aktif').length} aktif firma`,
+      sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`,
       gradient: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.08))',
       border: 'rgba(59,130,246,0.2)',
       iconBg: 'linear-gradient(135deg, #3B82F6, #6366F1)',
@@ -110,9 +119,9 @@ export default function DashboardPage() {
     },
     {
       label: 'Toplam Personel',
-      value: personeller.length,
+      value: aktifPersoneller.length,
       icon: 'ri-team-line',
-      sub: `${personeller.filter(p => p.durum === 'Aktif').length} aktif personel`,
+      sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`,
       gradient: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))',
       border: 'rgba(16,185,129,0.2)',
       iconBg: 'linear-gradient(135deg, #10B981, #059669)',
@@ -134,7 +143,7 @@ export default function DashboardPage() {
       label: 'Açık Uygunsuzluk',
       value: stats.acikU,
       icon: 'ri-alert-line',
-      sub: `${uygunsuzluklar.length} toplam kayıt`,
+      sub: `${aktifUygunsuzluklar.length} toplam kayıt`,
       gradient: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(217,119,6,0.08))',
       border: 'rgba(245,158,11,0.2)',
       iconBg: 'linear-gradient(135deg, #F59E0B, #D97706)',
@@ -185,7 +194,7 @@ export default function DashboardPage() {
               <i className="ri-rocket-line text-white text-base" />
             </div>
             <div>
-              <p className="font-bold" style={{ color: 'var(--text-primary)' }}>ISG Denetim\'e Hoş Geldiniz!</p>
+              <p className="font-bold" style={{ color: 'var(--text-primary)' }}>ISG Denetim&apos;e Hoş Geldiniz!</p>
               <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
                 Sistemi kullanmaya başlamak için sol menüden <strong>Firmalar</strong> modülüne giderek ilk firmanızı ekleyin.
               </p>
@@ -265,7 +274,7 @@ export default function DashboardPage() {
                 </span>
               </div>
             </div>
-            {firmalar.length === 0 && personeller.length === 0 ? (
+            {aktifFirmalar.length === 0 && aktifPersoneller.length === 0 ? (
               <DashEmptyState icon="ri-bar-chart-line" text="Grafik için veri yok" subtext="Firma ve personel ekledikçe grafik dolacak" />
             ) : (
               <ResponsiveContainer width="100%" height={210}>
@@ -305,7 +314,7 @@ export default function DashboardPage() {
             <div className="mb-5">
               <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Durumları</h3>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Toplam {evraklar.length} evrak kaydı
+                Toplam {aktifEvraklar.length} evrak kaydı
               </p>
             </div>
             {evrakPie.length > 0 ? (
@@ -443,29 +452,29 @@ export default function DashboardPage() {
           {[
             {
               label: 'Aktif Firmalar',
-              value: firmalar.filter(f => f.durum === 'Aktif').length,
-              total: firmalar.length,
+              value: aktifFirmalar.filter(f => f.durum === 'Aktif').length,
+              total: aktifFirmalar.length,
               color: '#3B82F6',
               icon: 'ri-building-2-line',
             },
             {
               label: 'Aktif Personeller',
-              value: personeller.filter(p => p.durum === 'Aktif').length,
-              total: personeller.length,
+              value: aktifPersoneller.filter(p => p.durum === 'Aktif').length,
+              total: aktifPersoneller.length,
               color: '#10B981',
               icon: 'ri-team-line',
             },
             {
               label: 'Tamamlanan Eğitimler',
-              value: egitimler.filter(e => e.durum === 'Tamamlandı').length,
-              total: egitimler.length,
+              value: aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length,
+              total: aktifEgitimler.length,
               color: '#F59E0B',
               icon: 'ri-graduation-cap-line',
             },
             {
               label: 'Çalışabilir Muayene',
-              value: muayeneler.filter(m => m.sonuc === 'Çalışabilir').length,
-              total: muayeneler.length,
+              value: aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length,
+              total: aktifMuayeneler.length,
               color: '#6366F1',
               icon: 'ri-heart-pulse-line',
             },

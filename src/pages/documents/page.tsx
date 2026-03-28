@@ -75,7 +75,7 @@ export default function EvraklarPage() {
 
   const filtPersonel = useMemo(() => {
     if (!form.firmaId) return [];
-    return personeller.filter(p => p.firmaId === form.firmaId);
+    return personeller.filter(p => p.firmaId === form.firmaId && !p.silinmis);
   }, [form.firmaId, personeller]);
 
   // Evrakları gösterirken durumu otomatik hesapla
@@ -231,7 +231,7 @@ export default function EvraklarPage() {
         </div>
         <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
           <option value="">Tüm Firmalar</option>
-          {firmalar.map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
+          {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
           <option value="">Tüm Durumlar</option>
@@ -328,7 +328,7 @@ export default function EvraklarPage() {
             <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Firma *</label>
             <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer">
               <option value="">Firma Seçin...</option>
-              {firmalar.map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
+              {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
             </select>
           </div>
           <div>

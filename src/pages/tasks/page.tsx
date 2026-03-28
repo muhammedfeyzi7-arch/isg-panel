@@ -255,14 +255,14 @@ export default function GorevlerPage() {
             <label className="form-label">İlgili Firma</label>
             <select value={form.firmaId} onChange={e => setForm(p => ({ ...p, firmaId: e.target.value }))} className="isg-input">
               <option value="">Firma Seçin (İsteğe Bağlı)</option>
-              {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+              {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
             </select>
           </div>
           <div>
             <label className="form-label">İlgili Personel</label>
             <select value={form.personelId} onChange={e => setForm(p => ({ ...p, personelId: e.target.value }))} className="isg-input">
               <option value="">Personel Seçin (İsteğe Bağlı)</option>
-              {personeller.map(p => <option key={p.id} value={p.id}>{p.adSoyad}</option>)}
+              {personeller.filter(p => !p.silinmis).map(p => <option key={p.id} value={p.id}>{p.adSoyad}</option>)}
             </select>
           </div>
           <div>

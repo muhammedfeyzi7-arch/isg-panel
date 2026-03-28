@@ -119,7 +119,6 @@ async function generateWordDoc(
       infoRow('Firma Adı',     firmaAd),
       infoRow('Başlık',        tutanak.baslik),
       infoRow('Tarih',         tarihStr),
-      infoRow('Durum',         tutanak.durum),
       infoRow('Oluşturan',     tutanak.olusturanKisi || '—'),
       infoRow('Kayıt Tarihi',  olusturmaTarih),
     ],
@@ -203,49 +202,127 @@ async function generateWordDoc(
     })],
   });
 
+  /* — Üst dekoratif çizgi (kalın accent) — */
+  const topAccentLine = new Paragraph({
+    spacing: { before: 0, after: 0 },
+    border: {
+      top: { style: BorderStyle.THICK, size: 36, color: '4F46E5' },
+    },
+    children: [],
+  });
+
+  /* — Başlık tablosu (logo solda, TC+başlık sağda) — */
+  const headerTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
+      left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
+      insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE },
+    },
+    rows: [new TableRow({
+      children: [
+        /* Sol: Logo veya boş */
+        new TableCell({
+          width: { size: 25, type: WidthType.PERCENTAGE },
+          verticalAlign: 'center' as any,
+          margins: { top: 120, bottom: 120, left: 0, right: 200 },
+          children: logoParagraflar.length > 0
+            ? logoParagraflar
+            : [new Paragraph({ children: [] })],
+        }),
+        /* Sağ: TC + Başlık bloku */
+        new TableCell({
+          width: { size: 75, type: WidthType.PERCENTAGE },
+          verticalAlign: 'center' as any,
+          margins: { top: 120, bottom: 120, left: 200, right: 0 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              spacing: { before: 0, after: 40 },
+              children: [new TextRun({ text: 'T.C.', bold: true, size: 20, font: FONT, color: '6B7280', allCaps: true })],
+            }),
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              spacing: { before: 0, after: 40 },
+              children: [new TextRun({ text: 'İŞ SAĞLIĞI VE GÜVENLİĞİ', bold: true, size: 30, font: FONT, color: '111827' })],
+            }),
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              spacing: { before: 0, after: 0 },
+              children: [new TextRun({ text: 'DENETİM VE KONTROL TUTANAĞI', bold: true, size: 24, font: FONT, color: '4F46E5', allCaps: true })],
+            }),
+          ],
+        }),
+      ],
+    })],
+  });
+
+  /* — Tutanak No bandı — */
+  const noTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
+      left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
+      insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE },
+    },
+    rows: [new TableRow({
+      children: [
+        new TableCell({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          shading: { type: ShadingType.SOLID, color: 'EEF2FF' },
+          margins: { top: 140, bottom: 140, left: 280, right: 280 },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({ text: 'Tutanak No: ', size: 22, font: FONT, color: '6366F1' }),
+                new TextRun({ text: tutanak.tutanakNo, bold: true, size: 26, font: FONT, color: '4338CA' }),
+                new TextRun({ text: '    |    Tarih: ', size: 22, font: FONT, color: '6366F1' }),
+                new TextRun({ text: tarihStr, bold: true, size: 22, font: FONT, color: '4338CA' }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    })],
+  });
+
   const doc = new Document({
     styles: { default: { document: { run: { font: FONT, size: 22 } } } },
     sections: [{
       properties: {
-        page: { margin: { top: 1000, right: 900, bottom: 1000, left: 900 } },
+        page: { margin: { top: 720, right: 900, bottom: 900, left: 900 } },
       },
       children: [
-        /* Logo */
-        ...logoParagraflar,
+        /* Üst accent çizgisi */
+        topAccentLine,
 
-        /* Üst başlık */
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 60 },
-          children: [new TextRun({ text: 'T.C.', bold: true, size: 22, font: FONT, color: '4B5563' })],
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 60 },
-          children: [new TextRun({ text: 'İŞ SAĞLIĞI VE GÜVENLİĞİ', bold: true, size: 34, font: FONT, color: '0F172A' })],
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 60 },
-          children: [new TextRun({ text: 'DENETİM TUTANAĞI', bold: true, size: 34, font: FONT, color: '0F172A' })],
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 80, after: 60 },
-          children: [new TextRun({ text: tutanak.tutanakNo, bold: true, size: 26, font: FONT, color: '4F46E5' })],
-        }),
+        /* Başlık tablosu */
+        new Paragraph({ spacing: { before: 160, after: 0 }, children: [] }),
+        headerTable,
 
-        ruler(80, 320),
+        ruler(200, 160),
+
+        /* Tutanak No bandı */
+        noTable,
 
         /* Bilgi tablosu */
+        new Paragraph({ spacing: { before: 240, after: 0 }, children: [] }),
         infoTable,
 
-        ruler(320, 120),
+        ruler(320, 140),
 
         /* Açıklama */
-        sectionTitle('AÇIKLAMA / TUTANAK DETAYI', 120),
+        sectionTitle('AÇIKLAMA / TUTANAK DETAYI', 80),
         new Paragraph({
-          spacing: { before: 100, after: 100 },
+          spacing: { before: 120, after: 120 },
+          shading: { type: ShadingType.SOLID, color: 'F8FAFC' },
+          border: {
+            top: { style: BorderStyle.SINGLE, size: 2, color: 'E2E8F0' },
+            bottom: { style: BorderStyle.SINGLE, size: 2, color: 'E2E8F0' },
+            left: { style: BorderStyle.THICK, size: 12, color: '6366F1' },
+            right: { style: BorderStyle.SINGLE, size: 2, color: 'E2E8F0' },
+          },
           indent: { left: 360, right: 360 },
           children: [new TextRun({ text: tutanak.aciklama || '—', size: 22, font: FONT, color: '374151' })],
         }),
@@ -256,11 +333,18 @@ async function generateWordDoc(
         /* Notlar */
         ...(tutanak.notlar ? [
           ruler(280, 120),
-          sectionTitle('NOTLAR', 120),
+          sectionTitle('NOTLAR', 80),
           new Paragraph({
-            spacing: { before: 80, after: 80 },
-            indent: { left: 360 },
-            children: [new TextRun({ text: tutanak.notlar, size: 20, font: FONT, italics: true, color: '6B7280' })],
+            spacing: { before: 100, after: 100 },
+            shading: { type: ShadingType.SOLID, color: 'FFFBEB' },
+            border: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: 'FDE68A' },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: 'FDE68A' },
+              left: { style: BorderStyle.THICK, size: 12, color: 'F59E0B' },
+              right: { style: BorderStyle.SINGLE, size: 2, color: 'FDE68A' },
+            },
+            indent: { left: 360, right: 360 },
+            children: [new TextRun({ text: tutanak.notlar, size: 20, font: FONT, italics: true, color: '78716C' })],
           }),
         ] : []),
 
@@ -269,17 +353,16 @@ async function generateWordDoc(
         /* İmza */
         signatureTable,
 
-        ruler(260, 80),
+        ruler(200, 80),
 
         /* Footer */
         new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { before: 0, after: 0 },
+          border: { top: { style: BorderStyle.SINGLE, size: 2, color: 'E2E8F0' } },
           children: [
-            new TextRun({
-              text: `ISG Denetim Sistemi  •  Belge tarihi: ${new Date().toLocaleString('tr-TR')}`,
-              size: 16, font: FONT, color: 'AAAAAA', italics: true,
-            }),
+            new TextRun({ text: 'ISG Denetim Sistemi', size: 15, font: FONT, color: 'B0B7C3', bold: true }),
+            new TextRun({ text: `   ·   ${tutanak.tutanakNo}   ·   Belge Tarihi: ${new Date().toLocaleDateString('tr-TR')}`, size: 15, font: FONT, color: 'B0B7C3' }),
           ],
         }),
       ],
