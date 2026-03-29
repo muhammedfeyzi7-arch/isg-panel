@@ -17,7 +17,36 @@ import CopKutusuPage from '../trash/page';
 import SettingsPage from '../settings/page';
 
 function AppContent() {
-  const { activeModule } = useApp();
+  const { activeModule, dataLoading, needsOnboarding, org } = useApp();
+
+  // Redirect handled in AppContext via window.REACT_APP_NAVIGATE
+  if (needsOnboarding) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
+        <div className="flex flex-col items-center gap-3">
+          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#6366F1' }} />
+          <span className="text-sm" style={{ color: '#64748B' }}>Yönlendiriliyor...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (dataLoading && !org) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
+            <i className="ri-shield-check-line text-white text-xl" />
+          </div>
+          <div className="flex items-center gap-2" style={{ color: '#475569' }}>
+            <i className="ri-loader-4-line text-lg animate-spin" />
+            <span className="text-sm">Veriler yükleniyor...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const renderPage = () => {
     switch (activeModule) {

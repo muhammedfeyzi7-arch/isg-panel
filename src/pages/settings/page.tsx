@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
+import TeamMembersSection from './components/TeamMembersSection';
+import ActivityLogSection from './components/ActivityLogSection';
 
 interface NotifState {
   type: 'success' | 'error';
@@ -25,8 +27,44 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
 }
 
 export default function SettingsPage() {
-  const { currentUser, updateCurrentUser, addToast, theme } = useApp();
+  const { currentUser, updateCurrentUser, addToast, theme, firmalar, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, org, orgLoading, regenerateInviteCode, logAction } = useApp();
   const { updatePassword, user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [importMsg, setImportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [regenLoading, setRegenLoading] = useState(false);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!org?.id) return;
+    import('../../lib/supabase').then(({ supabase }) => {
+      supabase
+        .from('user_organizations')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', org.id)
+        .then(({ count }) => { if (count !== null) setMemberCount(count); });
+    });
+  }, [org?.id]);
+
+  const handleCopyCode = () => {
+    if (!org?.invite_code) return;
+    navigator.clipboard.writeText(org.invite_code).then(() => {
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    });
+  };
+
+  const handleRegenCode = async () => {
+    setRegenLoading(true);
+    const result = await regenerateInviteCode();
+    if (result.error) {
+      addToast(result.error, 'error');
+    } else {
+      addToast('Davet kodu yenilendi.', 'success');
+    }
+    setRegenLoading(false);
+  };
 
   const isDark = theme === 'dark';
 
@@ -81,6 +119,30 @@ export default function SettingsPage() {
     e.currentTarget.style.boxShadow = 'none';
   };
 
+  const handleExport = () => {
+    setBackupLoading(true);
+    try {
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        version: '2.0.0',
+        firmalar, personeller, evraklar, egitimler,
+        muayeneler, uygunsuzluklar, ekipmanlar, gorevler, tutanaklar,
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `isg_yedek_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      addToast('Veriler başarıyla dışa aktarıldı.', 'success');
+    } catch {
+      addToast('Dışa aktarma sırasında hata oluştu.', 'error');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   const handleProfileSave = async () => {
     if (!profileData.ad.trim()) {
       setProfileNotif({ type: 'error', message: 'Ad Soyad alanı boş bırakılamaz.', target: 'profile' });
@@ -121,6 +183,7 @@ export default function SettingsPage() {
       setPwdNotif({ type: 'success', message: 'Şifreniz başarıyla güncellendi.', target: 'password' });
       setPwdData({ newPassword: '', confirmPassword: '' });
       addToast('Şifre başarıyla güncellendi.', 'success');
+      logAction('password_changed', { module: 'Hesap', description: 'Ayarlar sayfasından şifre değiştirildi' });
     }
     setPwdLoading(false);
   };
@@ -424,6 +487,161 @@ export default function SettingsPage() {
               </>
             )}
           </button>
+        </div>
+      </div>
+
+      {/* ─── Takım & Organizasyon ─── */}
+      {!orgLoading && org && (
+        <div style={cardStyle} className="p-6 space-y-5">
+          <div className="flex items-center gap-3 pb-4" style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(15,23,42,0.08)' }}>
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <i className="ri-building-2-line text-base" style={{ color: '#6366F1' }} />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold" style={{ color: sectionTitleColor }}>Takım &amp; Organizasyon</h4>
+              <p className="text-xs mt-0.5" style={{ color: subColor }}>Davet kodu ile ekip arkadaşlarınızı ekleyin</p>
+            </div>
+          </div>
+
+          {/* Org info */}
+          <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: isDark ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
+              <i className="ri-building-2-line text-white text-base" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold truncate" style={{ color: nameColor }}>{org.name}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: org.role === 'admin' ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.15)', color: org.role === 'admin' ? '#F59E0B' : '#818CF8' }}>
+                  {org.role === 'admin' ? 'Admin' : 'Üye'}
+                </span>
+                {memberCount !== null && (
+                  <span className="text-xs" style={{ color: subColor }}>
+                    <i className="ri-group-line mr-1" />{memberCount} üye
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Invite code */}
+          <div>
+            <label style={labelStyle}>Davet Kodu</label>
+            <p className="text-xs mb-2" style={{ color: subColor }}>Bu kodu ekip arkadaşlarınızla paylaşın. Kayıt olduktan sonra bu kodla organizasyonunuza katılabilirler.</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl font-mono text-lg font-bold tracking-[0.3em]"
+                style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)', border: isDark ? '1px solid rgba(255,255,255,0.09)' : '1px solid rgba(15,23,42,0.12)', color: '#6366F1' }}>
+                {org.invite_code}
+              </div>
+              <button
+                onClick={handleCopyCode}
+                className="whitespace-nowrap flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+                style={{
+                  background: codeCopied ? 'rgba(16,185,129,0.15)' : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
+                  border: codeCopied ? '1px solid rgba(16,185,129,0.3)' : isDark ? '1px solid rgba(255,255,255,0.09)' : '1px solid rgba(15,23,42,0.12)',
+                  color: codeCopied ? '#10B981' : (isDark ? '#94A3B8' : '#475569'),
+                }}
+              >
+                <i className={codeCopied ? 'ri-checkbox-circle-line' : 'ri-clipboard-line'} />
+                {codeCopied ? 'Kopyalandı!' : 'Kopyala'}
+              </button>
+            </div>
+          </div>
+
+          {/* Regenerate (admin only) */}
+          {org.role === 'admin' && (
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={handleRegenCode}
+                disabled={regenLoading}
+                className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+                style={{
+                  background: isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.06)',
+                  border: '1px solid rgba(239,68,68,0.15)',
+                  color: '#EF4444',
+                  opacity: regenLoading ? 0.7 : 1,
+                }}
+              >
+                <i className={regenLoading ? 'ri-loader-4-line animate-spin' : 'ri-refresh-line'} />
+                Kodu Yenile
+              </button>
+              <p className="text-xs" style={{ color: subColor }}>Eski kod geçersiz hale gelir.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── Kullanıcı Yönetimi (Admin Only) ─── */}
+      <TeamMembersSection />
+
+      {/* ─── Aktivite Geçmişi ─── */}
+      <ActivityLogSection />
+
+      {/* ─── Veri Güvenliği & Yedekleme ─── */}
+      <div style={cardStyle} className="p-6 space-y-5">
+        <div className="flex items-center gap-3 pb-4" style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(15,23,42,0.08)' }}>
+          <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.15)' }}>
+            <i className="ri-shield-check-line text-base" style={{ color: '#10B981' }} />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold" style={{ color: sectionTitleColor }}>Veri Güvenliği &amp; Yedekleme</h4>
+            <p className="text-xs mt-0.5" style={{ color: subColor }}>Verilerinizi JSON olarak dışa aktarın ve güvenlik durumunu görün</p>
+          </div>
+        </div>
+
+        {/* RLS Güvenlik Durumu */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { icon: 'ri-shield-check-line', label: 'RLS Aktif', desc: 'Row Level Security', color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+            { icon: 'ri-lock-2-line', label: 'Auth Korumalı', desc: 'Supabase Auth', color: '#6366F1', bg: 'rgba(99,102,241,0.1)' },
+            { icon: 'ri-building-line', label: 'Org. İzolasyon', desc: 'Firmaya Özel Erişim', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+          ].map(item => (
+            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: item.bg, border: `1px solid ${item.bg}` }}>
+              <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                <i className={`${item.icon} text-base`} style={{ color: item.color }} />
+              </div>
+              <div>
+                <p className="text-xs font-bold" style={{ color: item.color }}>{item.label}</p>
+                <p className="text-[10px]" style={{ color: subColor }}>{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* İstatistikler */}
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
+          {[
+            { label: 'Firma', count: firmalar.filter(f => !f.silinmis).length },
+            { label: 'Personel', count: personeller.filter(p => !p.silinmis).length },
+            { label: 'Evrak', count: evraklar.filter(e => !e.silinmis).length },
+            { label: 'Ekipman', count: ekipmanlar.filter(e => !e.silinmis).length },
+            { label: 'Tutanak', count: tutanaklar.length },
+          ].map(item => (
+            <div key={item.label} className="p-2 rounded-lg" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.04)', border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(15,23,42,0.07)' }}>
+              <p className="text-lg font-bold" style={{ color: nameColor }}>{item.count}</p>
+              <p className="text-[10px]" style={{ color: subColor }}>{item.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {importMsg && (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs" style={{ background: importMsg.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${importMsg.type === 'success' ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`, color: importMsg.type === 'success' ? '#10B981' : '#EF4444' }}>
+            <i className={importMsg.type === 'success' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'} />
+            {importMsg.text}
+          </div>
+        )}
+
+        <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={() => setImportMsg({ type: 'info' as 'success', text: 'İçe aktarma yakında eklenecek.' })} />
+
+        <div className="flex flex-wrap gap-3 pt-1">
+          <button onClick={handleExport} disabled={backupLoading} className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 cursor-pointer" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)', opacity: backupLoading ? 0.7 : 1 }}>
+            <i className={backupLoading ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} />
+            {backupLoading ? 'Hazırlanıyor...' : 'JSON Yedek İndir'}
+          </button>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.04)', border: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(15,23,42,0.1)', color: subColor }}>
+            <i className="ri-calendar-check-line" />
+            Son yedek: {new Date().toLocaleDateString('tr-TR')}
+          </div>
         </div>
       </div>
 

@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
+import { useOrganization, type OrgInfo } from '../hooks/useOrganization';
 import type { Toast } from '../types';
+import { logActivity, type ActionType } from '../lib/activityLog';
 
 export interface Bildirim {
   id: string;
@@ -30,6 +32,18 @@ interface AppContextType extends StoreType {
   okunmamisBildirimSayisi: number;
   bildirimOku: (id: string) => void;
   tumunuOku: () => void;
+  // Org context
+  org: OrgInfo | null;
+  orgLoading: boolean;
+  needsOnboarding: boolean;
+  mustChangePassword: boolean;
+  clearMustChangePassword: () => Promise<void>;
+  createOrg: (name: string, userId: string) => Promise<{ error: string | null }>;
+  joinOrg: (code: string) => Promise<{ error: string | null }>;
+  regenerateInviteCode: () => Promise<{ error: string | null; newCode?: string }>;
+  refetchOrg: () => Promise<void>;
+  // Activity log
+  logAction: (actionType: ActionType, opts?: { module?: string; recordId?: string; recordName?: string; description?: string }) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -44,9 +58,16 @@ function getInitialTheme(): Theme {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const userId = user?.id ?? 'guest';
-  const store = useStore(userId);
+  const { user, logout } = useAuth();
+  const {
+    org, loading: orgLoading,
+    createOrg, joinOrg, regenerateInviteCode,
+    refetch: refetchOrg, autoCreateOrg, clearMustChangePassword,
+  } = useOrganization(user);
+  const passiveChecked = useRef(false);
+
+  const store = useStore(org?.id ?? null);
+
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [activeModule, setActiveModule] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -54,6 +75,98 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [okunanlar, setOkunanlar] = useState<Set<string>>(new Set());
 
+  const needsOnboarding = false;
+  const mustChangePassword = org?.mustChangePassword === true;
+
+  const addToast = useCallback((message: string, type: Toast['type'] = 'success') => {
+    const id = Math.random().toString(36).substring(2);
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // ── Activity log function ──
+  const logAction = useCallback((
+    actionType: ActionType,
+    opts?: { module?: string; recordId?: string; recordName?: string; description?: string },
+  ) => {
+    if (!user || !org) return;
+    logActivity({
+      organizationId: org.id,
+      userId: user.id,
+      userEmail: user.email ?? '',
+      userName: store.currentUser.ad || org.displayName || user.email?.split('@')[0] || 'Kullanıcı',
+      userRole: org.role,
+      actionType,
+      ...opts,
+    });
+  }, [user, org, store.currentUser.ad]);
+
+  // ── Wire log callback into store mutations ──
+  useEffect(() => {
+    if (!user || !org) {
+      store.setLogCallback(null);
+      return;
+    }
+    store.setLogCallback((actionType, opts) => {
+      logActivity({
+        organizationId: org.id,
+        userId: user.id,
+        userEmail: user.email ?? '',
+        userName: store.currentUser.ad || org.displayName || user.email?.split('@')[0] || 'Kullanıcı',
+        userRole: org.role,
+        actionType: actionType as ActionType,
+        ...opts,
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, org?.id, store.currentUser.ad]);
+
+  // Passive user check: if user is deactivated by admin, sign them out
+  useEffect(() => {
+    if (!org || orgLoading || passiveChecked.current) return;
+    passiveChecked.current = true;
+    if (org.isActive === false) {
+      addToast('Hesabınız devre dışı bırakıldı. Yöneticinizle iletişime geçin.', 'error');
+      const t = setTimeout(() => { logout(); }, 2500);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [org, orgLoading, addToast, logout]);
+
+  // Log user login once per session
+  useEffect(() => {
+    if (!org || !user) return;
+    const key = `isg_logged_login_${user.id}`;
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      logActivity({
+        organizationId: org.id,
+        userId: user.id,
+        userEmail: user.email ?? '',
+        userName: store.currentUser.ad || org.displayName || user.email?.split('@')[0] || 'Kullanıcı',
+        userRole: org.role,
+        actionType: 'user_login',
+        module: 'Hesap',
+        description: `${org.name} paneline giriş yapıldı`,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org?.id, user?.id]);
+
+  // Auto-create org silently if user logged in but has no org
+  useEffect(() => {
+    if (!user || orgLoading || org) return;
+    const timer = setTimeout(() => { autoCreateOrg(); }, 800);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, orgLoading, org]);
+
+  // Sync user email into store
   useEffect(() => {
     if (user?.email && store.currentUser.email !== user.email) {
       store.updateCurrentUser({
@@ -64,6 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.email]);
 
+  // Theme effect
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'light') {
@@ -85,7 +199,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const result: Bildirim[] = [];
 
     store.evraklar.forEach(e => {
-      if (!e.gecerlilikTarihi) return;
+      if (!e.gecerlilikTarihi || e.silinmis) return;
       const d = new Date(e.gecerlilikTarihi);
       d.setHours(0, 0, 0, 0);
       if (d >= today && d <= in7) {
@@ -119,7 +233,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const okunmamisBildirimSayisi = useMemo(
     () => bildirimler.filter(b => !b.okundu).length,
-    [bildirimler]
+    [bildirimler],
   );
 
   const bildirimOku = useCallback((id: string) => {
@@ -130,17 +244,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOkunanlar(new Set(bildirimler.map(b => b.id)));
   }, [bildirimler]);
 
-  const addToast = useCallback((message: string, type: Toast['type'] = 'success') => {
-    const id = Math.random().toString(36).substring(2);
-    const toast: Toast = { id, message, type };
-    setToasts(prev => [...prev, toast]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
   return (
     <AppContext.Provider value={{
       ...store,
@@ -150,6 +253,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       quickCreate, setQuickCreate,
       theme, toggleTheme,
       bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
+      org, orgLoading, needsOnboarding, mustChangePassword, clearMustChangePassword,
+      createOrg, joinOrg, regenerateInviteCode, refetchOrg,
+      logAction,
     }}>
       {children}
     </AppContext.Provider>

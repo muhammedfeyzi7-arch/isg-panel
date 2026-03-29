@@ -4,6 +4,7 @@ import Home from "../pages/home/page";
 import LoginPage from "../pages/login/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
+import OnboardingPage from "../pages/onboarding/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
 
 const routes: RouteObject[] = [
@@ -18,6 +19,14 @@ const routes: RouteObject[] = [
   {
     path: "/reset-password",
     element: <ResetPasswordPage />,
+  },
+  {
+    path: "/onboarding",
+    element: (
+      <ProtectedRoute>
+        <OnboardingPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/",
