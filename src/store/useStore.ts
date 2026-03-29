@@ -36,6 +36,18 @@ export function generateTutanakNo(existing: { tutanakNo: string }[]): string {
   return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
 }
 
+// ──────── DÖF no generator ────────
+export function generateDofNo(existing: { acilisNo?: string }[]): string {
+  const year = new Date().getFullYear();
+  const prefix = `DÖF-${year}-`;
+  const maxNum = existing
+    .filter(u => u.acilisNo?.startsWith(prefix))
+    .map(u => parseInt(u.acilisNo!.replace(prefix, ''), 10))
+    .filter(n => !isNaN(n))
+    .reduce((a, b) => Math.max(a, b), 0);
+  return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
+}
+
 // ──────── Default data ────────
 const defaultUser: CurrentUser = { id: 'u1', ad: '', email: '', rol: 'Kullanıcı' };
 
@@ -70,7 +82,19 @@ function parseAppData(parsed: Partial<AppData>): AppData {
     })),
     egitimler: ensureArray<Egitim>(parsed.egitimler),
     muayeneler: ensureArray<Muayene>(parsed.muayeneler),
-    uygunsuzluklar: ensureArray<Uygunsuzluk>(parsed.uygunsuzluklar),
+    uygunsuzluklar: ensureArray<Uygunsuzluk>(parsed.uygunsuzluklar).map(u => {
+      // Migrate old status values
+      let durum = u.durum as string;
+      if (durum === 'Kapatıldı' || durum === 'İncelemede') {
+        durum = durum === 'Kapatıldı' ? 'Kapandı' : 'Açık';
+      }
+      return {
+        ...u,
+        durum: durum as import('../types').UygunsuzlukStatus,
+        // Migrate old records that had Kapatıldı → treat as having closing photo
+        kapatmaFotoMevcut: durum === 'Kapandı' ? (u.kapatmaFotoMevcut ?? true) : (u.kapatmaFotoMevcut ?? false),
+      };
+    }),
     ekipmanlar: ensureArray<Ekipman>(parsed.ekipmanlar),
     gorevler: ensureArray<Gorev>(parsed.gorevler),
     tutanaklar: ensureArray<Tutanak>(parsed.tutanaklar),
@@ -92,24 +116,30 @@ function stripFileData(data: AppData): AppData {
   };
 }
 
+// ──────── LogFn type ────────
+export type LogFn = (
+  actionType: string,
+  module: string,
+  recordId: string,
+  recordName?: string,
+  description?: string,
+) => void;
+
 // ──────── Main hook ────────
-export function useStore(organizationId: string | null) {
+export function useStore(organizationId: string | null, logFn?: LogFn) {
   const [data, setDataState] = useState<AppData>(defaultData);
   const [dataLoading, setDataLoading] = useState(true);
 
   const orgIdRef = useRef(organizationId);
   const lastSavedAt = useRef(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logFnRef = useRef(logFn);
+  const dataRef = useRef(data);
 
-  // Log callback — injected by AppContext after org/user are known
-  type LogCb = (actionType: string, opts?: { module?: string; recordId?: string; recordName?: string; description?: string }) => void;
-  const logCallbackRef = useRef<LogCb | null>(null);
-  const setLogCallback = useCallback((fn: LogCb | null) => {
-    logCallbackRef.current = fn;
-  }, []);
-
-  // Keep ref in sync
+  // Keep refs in sync
   useEffect(() => { orgIdRef.current = organizationId; }, [organizationId]);
+  useEffect(() => { logFnRef.current = logFn; }, [logFn]);
+  useEffect(() => { dataRef.current = data; }, [data]);
 
   // ── Load from Supabase when org changes ──
   useEffect(() => {
@@ -189,7 +219,7 @@ export function useStore(organizationId: string | null) {
     const now = new Date().toISOString();
     const newFirma: Firma = { ...firma, id: genId(), olusturmaTarihi: now, guncellemeTarihi: now };
     setData(prev => ({ ...prev, firmalar: [...prev.firmalar, newFirma] }));
-    logCallbackRef.current?.('firma_created', { module: 'Firmalar', recordId: newFirma.id, recordName: firma.ad });
+    logFnRef.current?.('firma_created', 'Firmalar', newFirma.id, newFirma.ad, `${newFirma.ad} firması oluşturuldu.`);
     return newFirma;
   }, [setData]);
 
@@ -198,18 +228,16 @@ export function useStore(organizationId: string | null) {
       ...prev,
       firmalar: prev.firmalar.map(f => f.id === id ? { ...f, ...updates, guncellemeTarihi: new Date().toISOString() } : f),
     }));
-    if (updates.ad !== undefined || updates.durum !== undefined) {
-      logCallbackRef.current?.('firma_updated', { module: 'Firmalar', recordId: id, recordName: updates.ad });
-    }
+    logFnRef.current?.('firma_updated', 'Firmalar', id, updates.ad, `Firma bilgileri güncellendi.`);
   }, [setData]);
 
   const deleteFirma = useCallback((id: string) => {
     const now = new Date().toISOString();
     setData(prev => {
       const firma = prev.firmalar.find(f => f.id === id);
-      logCallbackRef.current?.('firma_deleted', { module: 'Firmalar', recordId: id, recordName: firma?.ad });
       const ilgiliPersonelIds = prev.personeller.filter(p => p.firmaId === id && !p.silinmis).map(p => p.id);
       const cascadeFields = { silinmis: true as const, silinmeTarihi: now, cascadeSilindi: true as const, cascadeFirmaId: id };
+      logFnRef.current?.('firma_deleted', 'Firmalar', id, firma?.ad, `${firma?.ad ?? id} firması silindi.`);
       return {
         ...prev,
         firmalar: prev.firmalar.map(f => f.id === id ? { ...f, silinmis: true, silinmeTarihi: now } : f),
@@ -280,7 +308,7 @@ export function useStore(organizationId: string | null) {
     const now = new Date().toISOString();
     const newPersonel: Personel = { ...personel, id: genId(), olusturmaTarihi: now, guncellemeTarihi: now };
     setData(prev => ({ ...prev, personeller: [...prev.personeller, newPersonel] }));
-    logCallbackRef.current?.('personel_created', { module: 'Personeller', recordId: newPersonel.id, recordName: personel.adSoyad });
+    logFnRef.current?.('personel_created', 'Personeller', newPersonel.id, newPersonel.adSoyad, `${newPersonel.adSoyad} personel olarak eklendi.`);
     return newPersonel;
   }, [setData]);
 
@@ -289,18 +317,18 @@ export function useStore(organizationId: string | null) {
       ...prev,
       personeller: prev.personeller.map(p => p.id === id ? { ...p, ...updates, guncellemeTarihi: new Date().toISOString() } : p),
     }));
-    if (updates.adSoyad !== undefined || updates.durum !== undefined) {
-      logCallbackRef.current?.('personel_updated', { module: 'Personeller', recordId: id, recordName: updates.adSoyad });
+    if (updates.adSoyad) {
+      logFnRef.current?.('personel_updated', 'Personeller', id, updates.adSoyad, `Personel bilgileri güncellendi.`);
     }
   }, [setData]);
 
   const deletePersonel = useCallback((id: string) => {
     setData(prev => {
       const p = prev.personeller.find(x => x.id === id);
-      logCallbackRef.current?.('personel_deleted', { module: 'Personeller', recordId: id, recordName: p?.adSoyad });
+      logFnRef.current?.('personel_deleted', 'Personeller', id, p?.adSoyad, `${p?.adSoyad ?? id} personel silindi.`);
       return {
         ...prev,
-        personeller: prev.personeller.map(p => p.id === id ? { ...p, silinmis: true, silinmeTarihi: new Date().toISOString() } : p),
+        personeller: prev.personeller.map(x => x.id === id ? { ...x, silinmis: true, silinmeTarihi: new Date().toISOString() } : x),
       };
     });
   }, [setData]);
@@ -326,7 +354,7 @@ export function useStore(organizationId: string | null) {
     const newEvrak: Evrak = { ...rest, kategori, id, olusturmaTarihi: now };
     if (dosyaVeri) saveFileData(orgId, 'evrak', id, dosyaVeri);
     setData(prev => ({ ...prev, evraklar: [...prev.evraklar, newEvrak] }));
-    logCallbackRef.current?.('document_added', { module: 'Evraklar', recordId: id, recordName: evrak.ad });
+    logFnRef.current?.('evrak_created', 'Evraklar', id, newEvrak.ad, `${newEvrak.ad} evrakı eklendi.`);
     return { ...newEvrak, dosyaVeri };
   }, [setData]);
 
@@ -350,10 +378,10 @@ export function useStore(organizationId: string | null) {
   const deleteEvrak = useCallback((id: string) => {
     setData(prev => {
       const e = prev.evraklar.find(x => x.id === id);
-      logCallbackRef.current?.('document_deleted', { module: 'Evraklar', recordId: id, recordName: e?.ad });
+      logFnRef.current?.('evrak_deleted', 'Evraklar', id, e?.ad, `${e?.ad ?? id} evrakı silindi.`);
       return {
         ...prev,
-        evraklar: prev.evraklar.map(e => e.id === id ? { ...e, silinmis: true, silinmeTarihi: new Date().toISOString() } : e),
+        evraklar: prev.evraklar.map(x => x.id === id ? { ...x, silinmis: true, silinmeTarihi: new Date().toISOString() } : x),
       };
     });
   }, [setData]);
@@ -380,6 +408,7 @@ export function useStore(organizationId: string | null) {
     const newEgitim: Egitim = { ...rest, id, olusturmaTarihi: new Date().toISOString() };
     if (belgeDosyaVeri) saveFileData(orgId, 'egitim', id, belgeDosyaVeri);
     setData(prev => ({ ...prev, egitimler: [...prev.egitimler, newEgitim] }));
+    logFnRef.current?.('egitim_created', 'Eğitimler', id, newEgitim.ad, `${newEgitim.ad} eğitimi oluşturuldu.`);
     return newEgitim;
   }, [setData]);
 
@@ -420,21 +449,44 @@ export function useStore(organizationId: string | null) {
 
   // ──────── UYGUNSUZLUK ────────
   const addUygunsuzluk = useCallback((u: Omit<Uygunsuzluk, 'id' | 'olusturmaTarihi'>) => {
-    const newU: Uygunsuzluk = { ...u, id: genId(), olusturmaTarihi: new Date().toISOString() };
+    const id = genId();
+    const now = new Date().toISOString();
+    const acilisNo = generateDofNo(dataRef.current.uygunsuzluklar);
+    const durum = u.kapatmaFotoMevcut ? 'Kapandı' as const : 'Açık' as const;
+    const newU: Uygunsuzluk = { ...u, id, acilisNo, durum, olusturmaTarihi: now };
     setData(prev => ({ ...prev, uygunsuzluklar: [...prev.uygunsuzluklar, newU] }));
+    logFnRef.current?.('uygunsuzluk_created', 'Uygunsuzluklar', id, newU.baslik, `${acilisNo} - ${newU.baslik} uygunsuzluk kaydı oluşturuldu.`);
     return newU;
   }, [setData]);
 
   const updateUygunsuzluk = useCallback((id: string, updates: Partial<Uygunsuzluk>) => {
     setData(prev => ({
       ...prev,
-      uygunsuzluklar: prev.uygunsuzluklar.map(u => u.id === id ? { ...u, ...updates } : u),
+      uygunsuzluklar: prev.uygunsuzluklar.map(u => {
+        if (u.id !== id) return u;
+        const merged = { ...u, ...updates };
+        // Auto-calculate durum from photo flags
+        merged.durum = merged.kapatmaFotoMevcut ? 'Kapandı' : 'Açık';
+        return merged;
+      }),
     }));
+    if (updates.kapatmaFotoMevcut) {
+      logFnRef.current?.('uygunsuzluk_closed', 'Uygunsuzluklar', id, updates.baslik, 'Uygunsuzluk kapatıldı.');
+    }
   }, [setData]);
 
   const deleteUygunsuzluk = useCallback((id: string) => {
+    const orgId = orgIdRef.current ?? '';
+    removeFileData(orgId, 'uyg_acilis', id);
+    removeFileData(orgId, 'uyg_kapatma', id);
     setData(prev => ({ ...prev, uygunsuzluklar: prev.uygunsuzluklar.filter(u => u.id !== id) }));
   }, [setData]);
+
+  const getUygunsuzlukPhoto = useCallback((id: string, type: 'acilis' | 'kapatma') =>
+    getFileData(orgIdRef.current ?? '', `uyg_${type}`, id), []);
+
+  const setUygunsuzlukPhoto = useCallback((id: string, type: 'acilis' | 'kapatma', veri: string) =>
+    saveFileData(orgIdRef.current ?? '', `uyg_${type}`, id, veri), []);
 
   // ──────── EKİPMAN ────────
   const addEkipman = useCallback((e: Omit<Ekipman, 'id' | 'olusturmaTarihi'>) => {
@@ -468,6 +520,7 @@ export function useStore(organizationId: string | null) {
   const addGorev = useCallback((g: Omit<Gorev, 'id' | 'olusturmaTarihi'>) => {
     const newG: Gorev = { ...g, id: genId(), olusturmaTarihi: new Date().toISOString() };
     setData(prev => ({ ...prev, gorevler: [...prev.gorevler, newG] }));
+    logFnRef.current?.('gorev_created', 'Görevler', newG.id, newG.baslik, `${newG.baslik} görevi oluşturuldu.`);
     return newG;
   }, [setData]);
 
@@ -491,7 +544,7 @@ export function useStore(organizationId: string | null) {
     const newT: Tutanak = { ...rest, id, olusturmaTarihi: now, guncellemeTarihi: now };
     if (dosyaVeri) saveFileData(orgId, 'tutanak', id, dosyaVeri);
     setData(prev => ({ ...prev, tutanaklar: [...prev.tutanaklar, newT] }));
-    logCallbackRef.current?.('tutanak_created', { module: 'Tutanaklar', recordId: id, recordName: t.baslik });
+    logFnRef.current?.('tutanak_created', 'Tutanaklar', id, newT.baslik, `${newT.tutanakNo} - ${newT.baslik} tutanağı oluşturuldu.`);
     return { ...newT, dosyaVeri };
   }, [setData]);
 
@@ -503,9 +556,6 @@ export function useStore(organizationId: string | null) {
       ...prev,
       tutanaklar: prev.tutanaklar.map(t => t.id === id ? { ...t, ...rest, guncellemeTarihi: new Date().toISOString() } : t),
     }));
-    if (updates.baslik !== undefined || updates.durum !== undefined) {
-      logCallbackRef.current?.('tutanak_updated', { module: 'Tutanaklar', recordId: id, recordName: updates.baslik });
-    }
   }, [setData]);
 
   const deleteTutanak = useCallback((id: string) => {
@@ -528,13 +578,12 @@ export function useStore(organizationId: string | null) {
   return {
     ...data,
     dataLoading,
-    setLogCallback,
     addFirma, updateFirma, deleteFirma, restoreFirma, permanentDeleteFirma,
     addPersonel, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
     addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak, getEvrakFile,
     addEgitim, updateEgitim, deleteEgitim, getEgitimFile,
     addMuayene, updateMuayene, deleteMuayene,
-    addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk,
+    addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, getUygunsuzlukPhoto, setUygunsuzlukPhoto,
     addEkipman, updateEkipman, deleteEkipman, getEkipmanFile,
     addGorev, updateGorev, deleteGorev,
     addTutanak, updateTutanak, deleteTutanak, getTutanakFile,

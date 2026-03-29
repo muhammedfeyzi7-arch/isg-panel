@@ -25,7 +25,7 @@ interface AddUserForm {
 const emptyForm: AddUserForm = { display_name: '', email: '', password: '', role: 'member' };
 
 export default function TeamMembersSection() {
-  const { org, orgLoading, theme, addToast, logAction } = useApp();
+  const { org, orgLoading, theme, addToast } = useApp();
   const { user } = useAuth();
   const isDark = theme === 'dark';
 
@@ -95,11 +95,6 @@ export default function TeamMembersSection() {
         setFormError(json.error);
       } else {
         addToast(`${form.display_name} başarıyla eklendi.`, 'success');
-        logAction('user_created', {
-          module: 'Kullanicilar',
-          recordName: form.display_name,
-          description: `${form.email} e-postasıyla yeni kullanıcı oluşturuldu (Rol: ${form.role === 'admin' ? 'Admin' : 'Kullanıcı'})`,
-        });
         setShowAddModal(false);
         setForm(emptyForm);
         await fetchMembers();
@@ -128,16 +123,12 @@ export default function TeamMembersSection() {
       if (json.error) {
         addToast(json.error, 'error');
       } else {
-        const name = member.display_name || member.email;
         addToast(
-          member.is_active ? `${name} pasif yapıldı.` : `${name} aktif yapıldı.`,
+          member.is_active
+            ? `${member.display_name || member.email} pasif yapıldı.`
+            : `${member.display_name || member.email} aktif yapıldı.`,
           'success',
         );
-        logAction(member.is_active ? 'user_deactivated' : 'user_activated', {
-          module: 'Kullanicilar',
-          recordName: name,
-          description: `${name} kullanıcısı ${member.is_active ? 'pasif' : 'aktif'} yapıldı`,
-        });
         await fetchMembers();
       }
     } catch {

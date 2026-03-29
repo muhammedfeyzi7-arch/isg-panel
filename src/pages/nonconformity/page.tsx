@@ -1,99 +1,70 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../store/AppContext';
+import type { Uygunsuzluk } from '../../types';
+import { STATUS_CONFIG, SEV_CONFIG } from './utils/statusHelper';
+import NonconformityForm from './components/NonconformityForm';
+import KapatmaModal from './components/KapatmaModal';
+import DetailModal from './components/DetailModal';
+import ReportBuilder from './components/ReportBuilder';
 import Modal from '../../components/base/Modal';
-import type { Uygunsuzluk, UygunsuzlukSeverity, UygunsuzlukStatus } from '../../types';
-
-const SEV_CONFIG: Record<UygunsuzlukSeverity, { color: string; bg: string }> = {
-  'Düşük': { color: '#34D399', bg: 'rgba(52,211,153,0.12)' },
-  'Orta': { color: '#FBBF24', bg: 'rgba(251,191,36,0.12)' },
-  'Yüksek': { color: '#FB923C', bg: 'rgba(251,146,60,0.12)' },
-  'Kritik': { color: '#F87171', bg: 'rgba(248,113,113,0.12)' },
-};
-
-const STS_CONFIG: Record<UygunsuzlukStatus, { color: string; bg: string; icon: string }> = {
-  'Açık': { color: '#F87171', bg: 'rgba(248,113,113,0.12)', icon: 'ri-error-warning-line' },
-  'İncelemede': { color: '#FBBF24', bg: 'rgba(251,191,36,0.12)', icon: 'ri-search-eye-line' },
-  'Kapatıldı': { color: '#34D399', bg: 'rgba(52,211,153,0.12)', icon: 'ri-checkbox-circle-line' },
-};
-
-const defaultForm: Omit<Uygunsuzluk, 'id' | 'olusturmaTarihi'> = {
-  baslik: '',
-  aciklama: '',
-  firmaId: '',
-  personelId: '',
-  tarih: '',
-  severity: 'Orta',
-  durum: 'Açık',
-  sorumlu: '',
-  hedefTarih: '',
-  kapatmaTarihi: '',
-  notlar: '',
-};
 
 export default function UygunsuzluklarPage() {
-  const { uygunsuzluklar, firmalar, personeller, addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, addToast, quickCreate, setQuickCreate } = useApp();
+  const {
+    uygunsuzluklar, firmalar, personeller,
+    deleteUygunsuzluk, addToast, quickCreate, setQuickCreate,
+  } = useApp();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const [showForm, setShowForm] = useState(false);
+  const [editRecord, setEditRecord] = useState<Uygunsuzluk | null>(null);
+  const [kapatmaRecord, setKapatmaRecord] = useState<Uygunsuzluk | null>(null);
+  const [detailRecord, setDetailRecord] = useState<Uygunsuzluk | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState<Omit<Uygunsuzluk, 'id' | 'olusturmaTarihi'>>(defaultForm);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     if (quickCreate === 'uygunsuzluklar') {
-      setEditId(null);
-      setForm(defaultForm);
-      setShowModal(true);
+      setEditRecord(null);
+      setShowForm(true);
       setQuickCreate(null);
     }
   }, [quickCreate, setQuickCreate]);
 
-  const filteredPersoneller = useMemo(
-    () => form.firmaId ? personeller.filter(p => p.firmaId === form.firmaId && !p.silinmis) : personeller.filter(p => !p.silinmis),
-    [personeller, form.firmaId]
-  );
+  const aktif = useMemo(() => uygunsuzluklar.filter(u => !u.silinmis && !u.cascadeSilindi), [uygunsuzluklar]);
 
   const filtered = useMemo(() => {
-    return uygunsuzluklar.filter(u => {
-      if (u.silinmis) return false;
-      const firma = firmalar.find(f => f.id === u.firmaId);
-      const q = search.toLowerCase();
-      const matchSearch = !q || u.baslik.toLowerCase().includes(q) || (firma?.ad.toLowerCase().includes(q) ?? false);
-      const matchFirma = !firmaFilter || u.firmaId === firmaFilter;
-      const matchStatus = !statusFilter || u.durum === statusFilter;
-      return matchSearch && matchFirma && matchStatus;
+    const q = search.toLowerCase();
+    return aktif.filter(u => {
+      if (firmaFilter && u.firmaId !== firmaFilter) return false;
+      if (statusFilter && u.durum !== statusFilter) return false;
+      if (dateFrom && u.tarih && u.tarih < dateFrom) return false;
+      if (dateTo && u.tarih && u.tarih > dateTo) return false;
+      if (q) {
+        const firma = firmalar.find(f => f.id === u.firmaId);
+        if (!u.baslik.toLowerCase().includes(q) && !(firma?.ad.toLowerCase().includes(q) ?? false) && !(u.acilisNo?.toLowerCase().includes(q) ?? false)) return false;
+      }
+      return true;
     });
-  }, [uygunsuzluklar, firmalar, search, firmaFilter, statusFilter]);
+  }, [aktif, search, firmaFilter, statusFilter, dateFrom, dateTo, firmalar]);
 
-  const aktifUygunsuzluklar = useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
   const stats = useMemo(() => ({
-    total: aktifUygunsuzluklar.length,
-    acik: aktifUygunsuzluklar.filter(u => u.durum === 'Açık').length,
-    kritik: aktifUygunsuzluklar.filter(u => u.severity === 'Kritik').length,
-    kapali: aktifUygunsuzluklar.filter(u => u.durum === 'Kapatıldı').length,
-  }), [aktifUygunsuzluklar]);
+    total: aktif.length,
+    acik: aktif.filter(u => u.durum === 'Açık').length,
+    kapandi: aktif.filter(u => u.durum === 'Kapandı').length,
+    kritik: aktif.filter(u => u.severity === 'Kritik' && u.durum === 'Açık').length,
+  }), [aktif]);
 
-  const openAdd = () => { setEditId(null); setForm(defaultForm); setShowModal(true); };
-  const openEdit = (u: Uygunsuzluk) => {
-    setEditId(u.id);
-    setForm({ baslik: u.baslik, aciklama: u.aciklama, firmaId: u.firmaId, personelId: u.personelId || '', tarih: u.tarih, severity: u.severity, durum: u.durum, sorumlu: u.sorumlu, hedefTarih: u.hedefTarih, kapatmaTarihi: u.kapatmaTarihi || '', notlar: u.notlar });
-    setShowModal(true);
-  };
+  const allSelected = filtered.length > 0 && filtered.every(u => selected.has(u.id));
+  const toggleAll = () => allSelected ? setSelected(new Set()) : setSelected(new Set(filtered.map(u => u.id)));
+  const toggleOne = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const handleSave = () => {
-    if (!form.baslik.trim()) { addToast('Başlık zorunludur.', 'error'); return; }
-    if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
-    if (editId) {
-      updateUygunsuzluk(editId, form);
-      addToast('Uygunsuzluk güncellendi.', 'success');
-    } else {
-      addUygunsuzluk(form);
-      addToast('Uygunsuzluk kaydı oluşturuldu.', 'success');
-    }
-    setShowModal(false);
-  };
+  const openEdit = (u: Uygunsuzluk) => { setEditRecord(u); setShowForm(true); };
 
   const handleDelete = () => {
     if (!deleteId) return;
@@ -102,32 +73,46 @@ export default function UygunsuzluklarPage() {
     setDeleteId(null);
   };
 
+  const resetFilters = () => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); setDateFrom(''); setDateTo(''); };
+  const hasFilters = search || firmaFilter || statusFilter || dateFrom || dateTo;
+
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetim</h2>
-          <p className="text-sm mt-1" style={{ color: '#64748B' }}>Sahada tespit edilen uygunsuzlukları kaydedin ve takip edin</p>
+          <p className="text-sm mt-1" style={{ color: '#64748B' }}>Uygunsuzlukları kaydedin, takip edin ve raporlayın</p>
         </div>
-        <button onClick={openAdd} className="btn-primary self-start sm:self-auto whitespace-nowrap">
-          <i className="ri-add-line" /> Saha Kaydı Ekle
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button onClick={() => setShowReport(true)} className="btn-secondary whitespace-nowrap">
+            <i className="ri-file-chart-line mr-1" />DÖF Raporu
+          </button>
+          <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap">
+            <i className="ri-add-line mr-1" />Yeni Kayıt
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Toplam Kayıt', value: stats.total, icon: 'ri-alert-line', color: '#FB923C', bg: 'rgba(251,146,60,0.1)' },
-          { label: 'Açık', value: stats.acik, icon: 'ri-error-warning-line', color: '#F87171', bg: 'rgba(248,113,113,0.1)' },
-          { label: 'Kritik', value: stats.kritik, icon: 'ri-fire-line', color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
-          { label: 'Kapatıldı', value: stats.kapali, icon: 'ri-checkbox-circle-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)' },
+          { label: 'Toplam Kayıt', val: stats.total, icon: 'ri-file-list-3-line', c: '#F97316', bg: 'rgba(249,115,22,0.1)' },
+          { label: 'Açık Uygunsuzluk', val: stats.acik, icon: 'ri-error-warning-line', c: '#EF4444', bg: 'rgba(239,68,68,0.1)', badge: stats.acik > 0 },
+          { label: 'Kapandı', val: stats.kapandi, icon: 'ri-checkbox-circle-line', c: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
+          { label: 'Kritik Açık', val: stats.kritik, icon: 'ri-fire-line', c: '#EF4444', bg: 'rgba(239,68,68,0.08)' },
         ].map(s => (
           <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4">
             <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
-              <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
+              <i className={`${s.icon} text-xl`} style={{ color: s.c }} />
             </div>
             <div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{s.val}</p>
+                {s.badge && s.val > 0 && (
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#EF4444', color: '#fff' }}>!</span>
+                )}
+              </div>
               <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{s.label}</p>
             </div>
           </div>
@@ -135,71 +120,146 @@ export default function UygunsuzluklarPage() {
       </div>
 
       {/* Filters */}
-      <div className="filter-bar">
-        <div className="relative flex-1 min-w-[200px]">
-          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: '#475569' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Uygunsuzluk başlığı veya firma ara..." className="isg-input pl-9" />
+      <div className="isg-card rounded-xl p-4 space-y-3">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: '#475569' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="DÖF no, başlık veya firma ara..." className="isg-input pl-9" />
+          </div>
+          <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ minWidth: '160px' }}>
+            <option value="">Tüm Firmalar</option>
+            {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+          </select>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ minWidth: '140px' }}>
+            <option value="">Tüm Durumlar</option>
+            <option value="Açık">Açık</option>
+            <option value="Kapandı">Kapandı</option>
+          </select>
         </div>
-        <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ minWidth: '180px' }}>
-          <option value="">Tüm Firmalar</option>
-          {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
-        </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ minWidth: '150px' }}>
-          <option value="">Tüm Durumlar</option>
-          {Object.keys(STS_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium whitespace-nowrap" style={{ color: '#64748B' }}>Tarih:</label>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="isg-input text-sm" style={{ width: '140px' }} />
+            <span className="text-xs" style={{ color: '#475569' }}>—</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="isg-input text-sm" style={{ width: '140px' }} />
+          </div>
+          {hasFilters && (
+            <button onClick={resetFilters} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer transition-all whitespace-nowrap" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+              <i className="ri-close-line mr-1" />Filtreleri Temizle
+            </button>
+          )}
+          <span className="text-xs ml-auto" style={{ color: '#64748B' }}>
+            {filtered.length} kayıt gösteriliyor
+          </span>
+        </div>
       </div>
+
+      {/* Bulk actions */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          <span className="text-sm font-semibold" style={{ color: '#818CF8' }}>{selected.size} kayıt seçildi</span>
+          <button onClick={() => setShowReport(true)} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap" style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8' }}>
+            <i className="ri-file-chart-line mr-1" />Seçilenlerden Rapor
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+            Seçimi Kaldır
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="isg-card rounded-xl overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-20 text-center">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.15)' }}>
-              <i className="ri-alert-line text-3xl" style={{ color: '#FB923C' }} />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.15)' }}>
+              <i className="ri-alert-line text-3xl" style={{ color: '#F97316' }} />
             </div>
-            <p className="font-semibold" style={{ color: 'var(--text-muted)' }}>Uygunsuzluk kaydı bulunamadı</p>
-            <p className="text-sm mt-2" style={{ color: 'var(--text-faint)' }}>Yeni uygunsuzluk kaydı ekleyin</p>
-            <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Uygunsuzluk Ekle</button>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+              {hasFilters ? 'Arama kriterlerine uygun kayıt bulunamadı' : 'Henüz uygunsuzluk kaydı yok'}
+            </p>
+            {!hasFilters && (
+              <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary mt-4">
+                <i className="ri-add-line" />Yeni Kayıt Ekle
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="table-premium w-full">
               <thead>
                 <tr>
-                  <th className="text-left">Başlık</th>
+                  <th className="w-10 text-center">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                  </th>
+                  <th className="text-left">DÖF No / Başlık</th>
                   <th className="text-left hidden md:table-cell">Firma</th>
                   <th className="text-left hidden lg:table-cell">Personel</th>
                   <th className="text-left hidden sm:table-cell">Tarih</th>
                   <th className="text-left">Önem</th>
                   <th className="text-left">Durum</th>
-                  <th className="text-left hidden lg:table-cell">Sorumlu</th>
-                  <th className="text-left hidden lg:table-cell">Hedef Tarih</th>
-                  <th className="text-right w-20">İşlemler</th>
+                  <th className="text-center hidden lg:table-cell">Foto</th>
+                  <th className="text-right">İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(u => {
                   const firma = firmalar.find(f => f.id === u.firmaId);
                   const personel = personeller.find(p => p.id === u.personelId);
-                  const sc = SEV_CONFIG[u.severity];
-                  const stc = STS_CONFIG[u.durum];
+                  const sc = STATUS_CONFIG[u.durum];
+                  const sev = SEV_CONFIG[u.severity];
+                  const isChecked = selected.has(u.id);
                   return (
-                    <tr key={u.id}>
-                      <td>
-                        <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.baslik}</p>
-                        {u.aciklama && <p className="text-xs mt-0.5 truncate max-w-[180px]" style={{ color: '#475569' }}>{u.aciklama}</p>}
+                    <tr key={u.id} style={{ background: isChecked ? 'rgba(99,102,241,0.04)' : undefined }}>
+                      <td className="text-center">
+                        <input type="checkbox" checked={isChecked} onChange={() => toggleOne(u.id)} className="cursor-pointer" />
                       </td>
-                      <td className="hidden md:table-cell"><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{firma?.ad || '—'}</span></td>
-                      <td className="hidden lg:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{personel?.adSoyad || '—'}</span></td>
-                      <td className="hidden sm:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{u.tarih ? new Date(u.tarih).toLocaleDateString('tr-TR') : '—'}</span></td>
-                      <td><span className="inline-block px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: sc.bg, color: sc.color }}>{u.severity}</span></td>
-                      <td><span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: stc.bg, color: stc.color }}><i className={stc.icon} />{u.durum}</span></td>
-                      <td className="hidden lg:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{u.sorumlu || '—'}</span></td>
-                      <td className="hidden lg:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{u.hedefTarih ? new Date(u.hedefTarih).toLocaleDateString('tr-TR') : '—'}</span></td>
                       <td>
-                        <div className="flex items-center gap-1.5 justify-end">
-                          <button onClick={() => openEdit(u)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }}><i className="ri-edit-line text-sm" /></button>
-                          <button onClick={() => setDeleteId(u.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}><i className="ri-delete-bin-line text-sm" /></button>
+                        <p className="font-mono text-xs font-bold mb-0.5" style={{ color: '#6366F1' }}>{u.acilisNo ?? '—'}</p>
+                        <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.baslik}</p>
+                      </td>
+                      <td className="hidden md:table-cell">
+                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{firma?.ad ?? '—'}</span>
+                      </td>
+                      <td className="hidden lg:table-cell">
+                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{personel?.adSoyad ?? '—'}</span>
+                      </td>
+                      <td className="hidden sm:table-cell">
+                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{u.tarih ? new Date(u.tarih).toLocaleDateString('tr-TR') : '—'}</span>
+                      </td>
+                      <td>
+                        <span className="inline-block px-2 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: sev.bg, color: sev.color }}>{u.severity}</span>
+                      </td>
+                      <td>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
+                          <i className={sc.icon + ' text-xs'} />{u.durum}
+                        </span>
+                      </td>
+                      <td className="hidden lg:table-cell text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span title="Açılış fotoğrafı" className={`w-6 h-6 flex items-center justify-center rounded-md text-xs ${u.acilisFotoMevcut ? 'opacity-100' : 'opacity-25'}`} style={{ background: u.acilisFotoMevcut ? 'rgba(249,115,22,0.15)' : 'rgba(71,85,105,0.1)', color: u.acilisFotoMevcut ? '#F97316' : '#64748B' }}>
+                            <i className="ri-camera-line" />
+                          </span>
+                          <span title="Kapatma fotoğrafı" className={`w-6 h-6 flex items-center justify-center rounded-md text-xs ${u.kapatmaFotoMevcut ? 'opacity-100' : 'opacity-25'}`} style={{ background: u.kapatmaFotoMevcut ? 'rgba(34,197,94,0.15)' : 'rgba(71,85,105,0.1)', color: u.kapatmaFotoMevcut ? '#22C55E' : '#64748B' }}>
+                            <i className="ri-camera-line" />
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => setDetailRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }} title="Detay">
+                            <i className="ri-eye-line text-xs" />
+                          </button>
+                          {u.durum !== 'Kapandı' && (
+                            <button onClick={() => setKapatmaRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }} title="Kapatma Yap">
+                              <i className="ri-checkbox-circle-line text-xs" />
+                            </button>
+                          )}
+                          <button onClick={() => openEdit(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Düzenle">
+                            <i className="ri-edit-line text-xs" />
+                          </button>
+                          <button onClick={() => setDeleteId(u.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil">
+                            <i className="ri-delete-bin-line text-xs" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -211,71 +271,26 @@ export default function UygunsuzluklarPage() {
         )}
       </div>
 
-      {/* Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editId ? 'Uygunsuzluk Düzenle' : 'Yeni Uygunsuzluk Ekle'}
-        size="lg"
-        icon="ri-alert-line"
-        footer={
-          <>
-            <button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleSave} className="btn-primary whitespace-nowrap">
-              <i className={editId ? 'ri-save-line' : 'ri-add-line'} />{editId ? 'Güncelle' : 'Kaydet'}
-            </button>
-          </>
-        }
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <label className="form-label">Başlık *</label>
-            <input value={form.baslik} onChange={e => setForm(p => ({ ...p, baslik: e.target.value }))} placeholder="Uygunsuzluk başlığı..." className="isg-input" />
-          </div>
-          <div>
-            <label className="form-label">Firma *</label>
-            <select value={form.firmaId} onChange={e => setForm(p => ({ ...p, firmaId: e.target.value, personelId: '' }))} className="isg-input">
-              <option value="">Firma Seçin</option>
-              {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">İlgili Personel</label>
-            <select value={form.personelId} onChange={e => setForm(p => ({ ...p, personelId: e.target.value }))} className="isg-input">
-              <option value="">Personel Seçin (İsteğe Bağlı)</option>
-              {filteredPersoneller.map(p => <option key={p.id} value={p.id}>{p.adSoyad}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Tespit Tarihi</label>
-            <input type="date" value={form.tarih} onChange={e => setForm(p => ({ ...p, tarih: e.target.value }))} className="isg-input" />
-          </div>
-          <div>
-            <label className="form-label">Önem Derecesi</label>
-            <select value={form.severity} onChange={e => setForm(p => ({ ...p, severity: e.target.value as UygunsuzlukSeverity }))} className="isg-input">
-              {Object.keys(SEV_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Durum</label>
-            <select value={form.durum} onChange={e => setForm(p => ({ ...p, durum: e.target.value as UygunsuzlukStatus }))} className="isg-input">
-              {Object.keys(STS_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Sorumlu Kişi</label>
-            <input value={form.sorumlu} onChange={e => setForm(p => ({ ...p, sorumlu: e.target.value }))} placeholder="Ad Soyad" className="isg-input" />
-          </div>
-          <div>
-            <label className="form-label">Hedef Kapatma Tarihi</label>
-            <input type="date" value={form.hedefTarih} onChange={e => setForm(p => ({ ...p, hedefTarih: e.target.value }))} className="isg-input" />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="form-label">Açıklama</label>
-            <textarea value={form.aciklama} onChange={e => setForm(p => ({ ...p, aciklama: e.target.value }))} placeholder="Uygunsuzluk detayları..." rows={3} maxLength={500} className="isg-input" />
-          </div>
-        </div>
-      </Modal>
+      {/* Modals */}
+      <NonconformityForm
+        isOpen={showForm}
+        onClose={() => { setShowForm(false); setEditRecord(null); }}
+        editRecord={editRecord}
+      />
+
+      <KapatmaModal
+        record={kapatmaRecord}
+        onClose={() => setKapatmaRecord(null)}
+      />
+
+      <DetailModal
+        record={detailRecord}
+        onClose={() => setDetailRecord(null)}
+        onKapat={r => { setDetailRecord(null); setKapatmaRecord(r); }}
+        onEdit={r => { setDetailRecord(null); openEdit(r); }}
+      />
+
+      <ReportBuilder isOpen={showReport} onClose={() => setShowReport(false)} />
 
       <Modal
         isOpen={!!deleteId}
@@ -294,8 +309,8 @@ export default function UygunsuzluklarPage() {
           <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
           </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu uygunsuzluk kaydını silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
+          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Bu uygunsuzluk kaydını silmek istediğinizden emin misiniz?</p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz. Tüm fotoğraflar da silinecektir.</p>
         </div>
       </Modal>
     </div>

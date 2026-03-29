@@ -2,8 +2,8 @@ import { createContext, useContext, useState, useCallback, useMemo, useEffect, u
 import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
 import { useOrganization, type OrgInfo } from '../hooks/useOrganization';
+import { logActivity } from '../utils/activityLog';
 import type { Toast } from '../types';
-import { logActivity, type ActionType } from '../lib/activityLog';
 
 export interface Bildirim {
   id: string;
@@ -43,7 +43,7 @@ interface AppContextType extends StoreType {
   regenerateInviteCode: () => Promise<{ error: string | null; newCode?: string }>;
   refetchOrg: () => Promise<void>;
   // Activity log
-  logAction: (actionType: ActionType, opts?: { module?: string; recordId?: string; recordName?: string; description?: string }) => void;
+  logAction: (actionType: string, module: string, recordId: string, recordName?: string, description?: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -65,8 +65,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     refetch: refetchOrg, autoCreateOrg, clearMustChangePassword,
   } = useOrganization(user);
   const passiveChecked = useRef(false);
+  const loginLoggedRef = useRef(false);
 
-  const store = useStore(org?.id ?? null);
+  // ── Activity log helper ──
+  const logAction = useCallback((
+    actionType: string,
+    module: string,
+    recordId: string,
+    recordName?: string,
+    description?: string,
+  ) => {
+    if (!user || !org) return;
+    logActivity({
+      organizationId: org.id,
+      userId: user.id,
+      userEmail: user.email ?? '',
+      userName: org.displayName || user.email?.split('@')[0] || 'Bilinmeyen',
+      userRole: org.role,
+      actionType,
+      module,
+      recordId,
+      recordName,
+      description,
+    });
+  }, [user, org]);
+
+  const store = useStore(org?.id ?? null, logAction);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [activeModule, setActiveModule] = useState('dashboard');
@@ -89,43 +113,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // ── Activity log function ──
-  const logAction = useCallback((
-    actionType: ActionType,
-    opts?: { module?: string; recordId?: string; recordName?: string; description?: string },
-  ) => {
-    if (!user || !org) return;
-    logActivity({
-      organizationId: org.id,
-      userId: user.id,
-      userEmail: user.email ?? '',
-      userName: store.currentUser.ad || org.displayName || user.email?.split('@')[0] || 'Kullanıcı',
-      userRole: org.role,
-      actionType,
-      ...opts,
-    });
-  }, [user, org, store.currentUser.ad]);
-
-  // ── Wire log callback into store mutations ──
-  useEffect(() => {
-    if (!user || !org) {
-      store.setLogCallback(null);
-      return;
-    }
-    store.setLogCallback((actionType, opts) => {
-      logActivity({
-        organizationId: org.id,
-        userId: user.id,
-        userEmail: user.email ?? '',
-        userName: store.currentUser.ad || org.displayName || user.email?.split('@')[0] || 'Kullanıcı',
-        userRole: org.role,
-        actionType: actionType as ActionType,
-        ...opts,
-      });
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, org?.id, store.currentUser.ad]);
-
   // Passive user check: if user is deactivated by admin, sign them out
   useEffect(() => {
     if (!org || orgLoading || passiveChecked.current) return;
@@ -138,26 +125,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return undefined;
   }, [org, orgLoading, addToast, logout]);
 
-  // Log user login once per session
-  useEffect(() => {
-    if (!org || !user) return;
-    const key = `isg_logged_login_${user.id}`;
-    if (!sessionStorage.getItem(key)) {
-      sessionStorage.setItem(key, '1');
-      logActivity({
-        organizationId: org.id,
-        userId: user.id,
-        userEmail: user.email ?? '',
-        userName: store.currentUser.ad || org.displayName || user.email?.split('@')[0] || 'Kullanıcı',
-        userRole: org.role,
-        actionType: 'user_login',
-        module: 'Hesap',
-        description: `${org.name} paneline giriş yapıldı`,
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [org?.id, user?.id]);
-
   // Auto-create org silently if user logged in but has no org
   useEffect(() => {
     if (!user || orgLoading || org) return;
@@ -165,6 +132,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, orgLoading, org]);
+
+  // Log login event once per session when user + org are both loaded
+  useEffect(() => {
+    if (!user || !org || loginLoggedRef.current) return;
+    loginLoggedRef.current = true;
+    logActivity({
+      organizationId: org.id,
+      userId: user.id,
+      userEmail: user.email ?? '',
+      userName: org.displayName || user.email?.split('@')[0] || 'Bilinmeyen',
+      userRole: org.role,
+      actionType: 'user_login',
+      module: 'Sistem',
+      recordId: user.id,
+      description: 'Kullanıcı sisteme giriş yaptı.',
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, org?.id]);
 
   // Sync user email into store
   useEffect(() => {

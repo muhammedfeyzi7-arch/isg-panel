@@ -3,7 +3,7 @@ export type FirmaStatus = 'Aktif' | 'Pasif' | 'Askıda';
 export type PersonelStatus = 'Aktif' | 'Pasif' | 'Ayrıldı';
 export type EvrakStatus = 'Yüklü' | 'Eksik' | 'Süre Yaklaşıyor' | 'Süre Dolmuş';
 export type UygunsuzlukSeverity = 'Düşük' | 'Orta' | 'Yüksek' | 'Kritik';
-export type UygunsuzlukStatus = 'Açık' | 'İncelemede' | 'Kapatıldı';
+export type UygunsuzlukStatus = 'Açık' | 'Kapandı';
 export type EgitimStatus = 'Planlandı' | 'Tamamlandı' | 'Eksik';
 export type MuayeneResult = 'Çalışabilir' | 'Kısıtlı Çalışabilir' | 'Çalışamaz';
 export type UserRole = 'Admin' | 'ISG Uzmanı' | 'Firma Yetkilisi' | 'Görüntüleyici';
@@ -133,17 +133,22 @@ export interface Muayene {
 
 export interface Uygunsuzluk {
   id: string;
+  acilisNo?: string;          // DÖF-2026-0001 (auto-generated)
   baslik: string;
   aciklama: string;
+  onlem?: string;             // Alınması gereken önlem
   firmaId: string;
   personelId?: string;
   tarih: string;
   severity: UygunsuzlukSeverity;
-  durum: UygunsuzlukStatus;
-  sorumlu: string;
-  hedefTarih: string;
+  durum: UygunsuzlukStatus;   // Auto-calculated: 'Açık' | 'Kapandı'
+  sorumlu?: string;
+  hedefTarih?: string;
   kapatmaTarihi?: string;
-  notlar: string;
+  kapatmaAciklama?: string;
+  acilisFotoMevcut?: boolean; // Has opening photo stored in localStorage
+  kapatmaFotoMevcut?: boolean;// Has closing photo stored in localStorage
+  notlar?: string;
   olusturmaTarihi: string;
   silinmis?: boolean;
   silinmeTarihi?: string;

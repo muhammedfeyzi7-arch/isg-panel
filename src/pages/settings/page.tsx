@@ -27,7 +27,7 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
 }
 
 export default function SettingsPage() {
-  const { currentUser, updateCurrentUser, addToast, theme, firmalar, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, org, orgLoading, regenerateInviteCode, logAction } = useApp();
+  const { currentUser, updateCurrentUser, addToast, theme, firmalar, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, org, orgLoading, regenerateInviteCode } = useApp();
   const { updatePassword, user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [backupLoading, setBackupLoading] = useState(false);
@@ -183,7 +183,6 @@ export default function SettingsPage() {
       setPwdNotif({ type: 'success', message: 'Şifreniz başarıyla güncellendi.', target: 'password' });
       setPwdData({ newPassword: '', confirmPassword: '' });
       addToast('Şifre başarıyla güncellendi.', 'success');
-      logAction('password_changed', { module: 'Hesap', description: 'Ayarlar sayfasından şifre değiştirildi' });
     }
     setPwdLoading(false);
   };
@@ -574,7 +573,7 @@ export default function SettingsPage() {
       {/* ─── Kullanıcı Yönetimi (Admin Only) ─── */}
       <TeamMembersSection />
 
-      {/* ─── Aktivite Geçmişi ─── */}
+      {/* ─── İşlem Kayıtları ─── */}
       <ActivityLogSection />
 
       {/* ─── Veri Güvenliği & Yedekleme ─── */}

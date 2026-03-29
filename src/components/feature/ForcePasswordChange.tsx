@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../store/AuthContext';
 import { useApp } from '../../store/AppContext';
+import { logActivity } from '../../utils/activityLog';
 
 function getPasswordStrength(pwd: string): { score: number; label: string; color: string } {
   if (!pwd) return { score: 0, label: '', color: '' };
@@ -18,8 +19,8 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
 }
 
 export default function ForcePasswordChange() {
-  const { updatePassword, logout } = useAuth();
-  const { clearMustChangePassword, theme, logAction } = useApp();
+  const { updatePassword, logout, user } = useAuth();
+  const { clearMustChangePassword, theme, org } = useApp();
   const isDark = theme === 'dark';
 
   const [newPassword, setNewPassword] = useState('');
@@ -55,10 +56,20 @@ export default function ForcePasswordChange() {
       setLoading(false);
       return;
     }
-    logAction('password_changed', {
-      module: 'Hesap',
-      description: 'İlk giriş zorunlu şifre değişikliği tamamlandı',
-    });
+    // Log password change
+    if (user && org) {
+      await logActivity({
+        organizationId: org.id,
+        userId: user.id,
+        userEmail: user.email ?? '',
+        userName: org.displayName || user.email?.split('@')[0] || 'Bilinmeyen',
+        userRole: org.role,
+        actionType: 'password_changed',
+        module: 'Sistem',
+        recordId: user.id,
+        description: 'İlk giriş zorunlu şifre değişikliği tamamlandı.',
+      });
+    }
     await clearMustChangePassword();
     setLoading(false);
   };
