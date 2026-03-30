@@ -67,10 +67,7 @@ export default function Sidebar() {
         {!sidebarCollapsed && (
           <div>
             <h1 className="text-sm font-bold text-white tracking-wide leading-tight">ISG Denetim</h1>
-            <p
-              className="text-[10px] mt-0.5 font-medium"
-              style={{ color: '#06B6D4' }}
-            >
+            <p className="text-[10px] mt-0.5 font-medium" style={{ color: '#06B6D4' }}>
               Yönetim Sistemi
             </p>
           </div>
@@ -169,38 +166,24 @@ export default function Sidebar() {
           className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
           style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 2px 10px rgba(99,102,241,0.4)' }}
         >
-          {currentUser.ad.charAt(0)}
+          {(currentUser.ad || 'U').charAt(0).toUpperCase()}
         </div>
         {!sidebarCollapsed && (
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-300 truncate">{currentUser.ad}</p>
+            <p className="text-xs font-semibold text-slate-300 truncate">{currentUser.ad || 'Kullanıcı'}</p>
             <p className="text-[10px] text-slate-600 truncate">{currentUser.rol}</p>
           </div>
         )}
-        {!sidebarCollapsed && (
-          <button
-            onClick={logout}
-            title="Çıkış Yap"
-            className="w-6 h-6 flex items-center justify-center cursor-pointer transition-colors rounded-lg"
-            style={{ color: '#475569' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'transparent'; }}
-          >
-            <i className="ri-logout-box-r-line text-sm" />
-          </button>
-        )}
-        {sidebarCollapsed && (
-          <button
-            onClick={logout}
-            title="Çıkış Yap"
-            className="w-7 h-7 flex items-center justify-center cursor-pointer transition-colors rounded-lg"
-            style={{ color: '#475569' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'transparent'; }}
-          >
-            <i className="ri-logout-box-r-line text-sm" />
-          </button>
-        )}
+        <button
+          onClick={logout}
+          title="Çıkış Yap"
+          className={`flex items-center justify-center cursor-pointer transition-colors rounded-lg ${sidebarCollapsed ? 'w-7 h-7' : 'w-6 h-6'}`}
+          style={{ color: '#475569' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'transparent'; }}
+        >
+          <i className="ri-logout-box-r-line text-sm" />
+        </button>
       </div>
     </aside>
   );

@@ -7,14 +7,14 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
-  logout: () => Promise<void>;
+  logout: () => void;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 }
 
@@ -25,82 +25,94 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
+    // Load existing session on mount
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      if (event === 'SIGNED_OUT') {
-        setSession(null);
-      } else {
-        setSession(newSession);
-      }
-      setLoading(false);
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
-      }
-      if (error.message.includes('Email not confirmed')) {
-        return { error: 'E-posta adresiniz henüz doğrulanmamış.' };
-      }
-      return { error: error.message };
+  const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
+    if (!isSupabaseConfigured) {
+      return { error: 'Supabase bağlantısı yapılandırılmamış. Lütfen Supabase\'i bağlayın.' };
     }
-    return { error: null };
+    if (!email.trim()) return { error: 'E-posta adresi boş olamaz.' };
+    if (password.length < 4) return { error: 'Şifre en az 4 karakter olmalıdır.' };
+
+    // Try sign in first
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (!signInError) return { error: null };
+
+    // If user doesn't exist → auto sign up (preserves the "any email/password" UX)
+    const isNewUser =
+      signInError.message.toLowerCase().includes('invalid login') ||
+      signInError.message.toLowerCase().includes('invalid_credentials') ||
+      signInError.message.toLowerCase().includes('user not found');
+
+    if (isNewUser) {
+      const displayName = email.split('@')[0]
+        .replace(/[._-]/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { full_name: displayName } },
+      });
+
+      if (signUpError) return { error: signUpError.message };
+
+      // Immediately sign in after sign up
+      const { error: signIn2Error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signIn2Error) {
+        return { error: 'Hesap oluşturuldu. Lütfen e-posta kutunuzu kontrol edip doğrulama yapın, ardından giriş deneyin.' };
+      }
+      return { error: null };
+    }
+
+    return { error: signInError.message };
   }, []);
 
   const logout = useCallback(async () => {
-    // 1. State'i anında temizle — korumalı sayfalar hemen login'e atar
-    setSession(null);
-
-    // 2. Supabase oturumunu sunucu tarafında da kapat
-    try {
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch {
-      // signOut hatası sessizce yutulsun, state zaten temizlendi
-    }
-
-    // 3. localStorage'daki tüm Supabase token anahtarlarını sil
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('sb-') || key.startsWith('supabase')) {
-        localStorage.removeItem(key);
-      }
-    });
-
-    // 4. sessionStorage temizle (hoş geldiniz animasyonu bayrağı dahil)
-    sessionStorage.clear();
-
-    // 5. Login sayfasına yönlendir
-    if (typeof window !== 'undefined' && (window as unknown as { REACT_APP_NAVIGATE?: (path: string) => void }).REACT_APP_NAVIGATE) {
-      (window as unknown as { REACT_APP_NAVIGATE: (path: string) => void }).REACT_APP_NAVIGATE('/login');
+    await supabase.auth.signOut();
+    const nav = (window as unknown as { REACT_APP_NAVIGATE?: (p: string) => void }).REACT_APP_NAVIGATE;
+    if (nav) {
+      nav('/login');
     } else {
       window.location.replace('/login');
     }
   }, []);
 
-  const updatePassword = useCallback(async (newPassword: string) => {
+  const updatePassword = useCallback(async (newPassword: string): Promise<{ error: string | null }> => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      if (error.message.includes('New password should be different')) {
-        return { error: 'Yeni şifre mevcut şifreden farklı olmalıdır.' };
-      }
-      if (error.message.includes('Password should be at least')) {
-        return { error: 'Şifre en az 6 karakter olmalıdır.' };
-      }
-      return { error: error.message };
-    }
+    if (error) return { error: error.message };
     return { error: null };
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, login, logout, updatePassword }}>
+    <AuthContext.Provider value={{
+      session,
+      user: session?.user ?? null,
+      loading,
+      login,
+      logout,
+      updatePassword,
+    }}>
       {children}
     </AuthContext.Provider>
   );

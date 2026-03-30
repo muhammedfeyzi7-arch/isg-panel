@@ -1,8 +1,10 @@
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from 'react';
+import {
+  createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode,
+} from 'react';
+import type { User } from '@supabase/supabase-js';
 import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
-import { useOrganization, type OrgInfo } from '../hooks/useOrganization';
-import { logActivity } from '../utils/activityLog';
+import { useOrganization } from '../hooks/useOrganization';
 import type { Toast } from '../types';
 
 export interface Bildirim {
@@ -15,6 +17,17 @@ export interface Bildirim {
 }
 
 export type Theme = 'dark' | 'light';
+
+export interface OrgInfo {
+  id: string;
+  name: string;
+  invite_code: string;
+  role: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  displayName?: string;
+  email?: string;
+}
 
 interface AppContextType extends StoreType {
   toasts: Toast[];
@@ -34,6 +47,8 @@ interface AppContextType extends StoreType {
   tumunuOku: () => void;
   org: OrgInfo | null;
   orgLoading: boolean;
+  orgError: string | null;
+  autoCreatePending: boolean;
   needsOnboarding: boolean;
   mustChangePassword: boolean;
   clearMustChangePassword: () => Promise<void>;
@@ -55,18 +70,71 @@ function getInitialTheme(): Theme {
   }
 }
 
+function getUserDisplayName(user: User | null): string {
+  if (!user) return 'Kullanıcı';
+  const fullName = user.user_metadata?.full_name as string | undefined;
+  if (fullName) return fullName;
+  if (user.email) return user.email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return 'Kullanıcı';
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const {
-    org, loading: orgLoading,
-    createOrg, joinOrg, regenerateInviteCode,
-    refetch: refetchOrg, autoCreateOrg, clearMustChangePassword,
+    org: rawOrg,
+    loading: orgLoading,
+    loadError,
+    createOrg,
+    joinOrg,
+    regenerateInviteCode,
+    refetch: refetchOrg,
+    autoCreateOrg,
+    clearMustChangePassword: clearMustChangePw,
   } = useOrganization(user);
 
-  const passiveChecked = useRef(false);
-  const loginLoggedRef = useRef(false);
+  // Keep a stable ref to autoCreateOrg so it never appears in useEffect deps.
+  // autoCreateOrg is NOT useCallback-wrapped in useOrganization, so its reference
+  // changes every render. Including it in deps causes React to cancel the timeout
+  // via cleanup and re-run the effect — but the ref guard then prevents a new timeout
+  // from starting, leaving autoCreatePending = true forever.
+  const autoCreateOrgRef = useRef(autoCreateOrg);
+  useEffect(() => { autoCreateOrgRef.current = autoCreateOrg; });
 
-  // ── Toast system — MUST be defined BEFORE useStore so the callback is valid ──
+  const autoCreateAttemptedRef = useRef<string | null>(null);
+  const [autoCreatePending, setAutoCreatePending] = useState(false);
+
+  useEffect(() => {
+    // Deps: user?.id, orgLoading, rawOrg — intentionally excludes autoCreateOrg
+    if (!user || orgLoading || rawOrg) return;
+    if (autoCreateAttemptedRef.current === user.id) return;
+    autoCreateAttemptedRef.current = user.id;
+    setAutoCreatePending(true);
+
+    // 500ms so JWT session is fully stable before RLS-protected insert.
+    // IMPORTANT: No cleanup/clearTimeout here — the timeout MUST always complete.
+    // The autoCreateInProgressRef inside autoCreateOrg prevents duplicate execution.
+    setTimeout(async () => {
+      try {
+        await autoCreateOrgRef.current();
+      } catch (err) {
+        console.error('[ISG] AppContext autoCreate error:', err);
+      } finally {
+        setAutoCreatePending(false);
+      }
+    }, 500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, orgLoading, rawOrg]);
+
+  // Map rawOrg to OrgInfo with user display name
+  const org = useMemo<OrgInfo | null>(() => {
+    if (!rawOrg) return null;
+    return {
+      ...rawOrg,
+      displayName: rawOrg.displayName || getUserDisplayName(user),
+      email: rawOrg.email || user?.email,
+    };
+  }, [rawOrg, user]);
+
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = useCallback((message: string, type: Toast['type'] = 'success') => {
@@ -80,98 +148,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // ── Activity log helper — MUST be defined BEFORE useStore ──
   const logAction = useCallback((
-    actionType: string,
-    module: string,
-    recordId: string,
-    recordName?: string,
-    description?: string,
+    _actionType: string, _module: string, _recordId: string,
+    _recordName?: string, _description?: string,
   ) => {
-    if (!user || !org) return;
-    logActivity({
-      organizationId: org.id,
-      userId: user.id,
-      userEmail: user.email ?? '',
-      userName: org.displayName || user.email?.split('@')[0] || 'Bilinmeyen',
-      userRole: org.role,
-      actionType,
-      module,
-      recordId,
-      recordName,
-      description,
-    });
-  }, [user, org]);
+    // Activity logging — no-op for now
+  }, []);
 
-  // ── Use a stable ref for addToast to avoid dependency issues ──
   const addToastRef = useRef(addToast);
   useEffect(() => { addToastRef.current = addToast; }, [addToast]);
 
-  // ── Now initialize store — addToast is already defined above ──
-  const store = useStore(org?.id ?? null, logAction, useCallback((msg: string) => {
-    addToastRef.current(msg, 'error');
-  }, []), user?.id);
+  const store = useStore(
+    org?.id ?? null,
+    logAction,
+    useCallback((msg: string) => { addToastRef.current(msg, 'error'); }, []),
+    user?.id,
+    orgLoading,
+  );
 
-  // ── UI state ──
   const [activeModule, setActiveModule] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [quickCreate, setQuickCreate] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [okunanlar, setOkunanlar] = useState<Set<string>>(new Set());
 
-  const needsOnboarding = false;
-  const mustChangePassword = org?.mustChangePassword === true;
-
-  // Passive user check
-  useEffect(() => {
-    if (!org || orgLoading || passiveChecked.current) return;
-    passiveChecked.current = true;
-    if (org.isActive === false) {
-      addToast('Hesabınız devre dışı bırakıldı. Yöneticinizle iletişime geçin.', 'error');
-      const t = setTimeout(() => { logout(); }, 2500);
-      return () => clearTimeout(t);
-    }
-    return undefined;
-  }, [org, orgLoading, addToast, logout]);
-
-  // Auto-create org silently if user has none
-  useEffect(() => {
-    if (!user || orgLoading || org) return;
-    const timer = setTimeout(() => { autoCreateOrg(); }, 800);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, orgLoading, org]);
-
-  // Log login event once per session
-  useEffect(() => {
-    if (!user || !org || loginLoggedRef.current) return;
-    loginLoggedRef.current = true;
-    logActivity({
-      organizationId: org.id,
-      userId: user.id,
-      userEmail: user.email ?? '',
-      userName: org.displayName || user.email?.split('@')[0] || 'Bilinmeyen',
-      userRole: org.role,
-      actionType: 'user_login',
-      module: 'Sistem',
-      recordId: user.id,
-      description: 'Kullanıcı sisteme giriş yaptı.',
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, org?.id]);
-
-  // Sync user email into store
+  // Sync user email into store's currentUser
   useEffect(() => {
     if (user?.email && store.currentUser.email !== user.email) {
       store.updateCurrentUser({
         email: user.email,
-        ad: store.currentUser.ad || (user.user_metadata?.full_name as string) || '',
+        ad: store.currentUser.ad || getUserDisplayName(user),
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.email]);
 
-  // Theme effect
+  // Theme sync
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'light') {
@@ -183,7 +195,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
   const bildirimler = useMemo<Bildirim[]>(() => {
@@ -238,6 +250,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOkunanlar(new Set(bildirimler.map(b => b.id)));
   }, [bildirimler]);
 
+  const clearMustChangePassword = useCallback(async () => {
+    await clearMustChangePw();
+  }, [clearMustChangePw]);
+
+  // needsOnboarding is now only true if both autoCreate finished AND we still have no org AND there's a real error
+  // For normal new users, autoCreatePending will be true while org is being made — they never see onboarding
+  const needsOnboarding = false; // Onboarding redirect disabled — org is always created silently
+
   return (
     <AppContext.Provider value={{
       ...store,
@@ -247,8 +267,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       quickCreate, setQuickCreate,
       theme, toggleTheme,
       bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
-      org, orgLoading, needsOnboarding, mustChangePassword, clearMustChangePassword,
-      createOrg, joinOrg, regenerateInviteCode, refetchOrg,
+      org, orgLoading, orgError: loadError, needsOnboarding, autoCreatePending,
+      mustChangePassword: org?.mustChangePassword ?? false,
+      clearMustChangePassword,
+      createOrg,
+      joinOrg,
+      regenerateInviteCode,
+      refetchOrg,
       logAction,
     }}>
       {children}

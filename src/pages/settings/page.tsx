@@ -27,7 +27,7 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
 }
 
 export default function SettingsPage() {
-  const { currentUser, updateCurrentUser, addToast, theme, firmalar, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, org, orgLoading, regenerateInviteCode } = useApp();
+  const { currentUser, updateCurrentUser, addToast, theme, firmalar, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, org, orgLoading, regenerateInviteCode, joinOrg } = useApp();
   const { updatePassword, user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [backupLoading, setBackupLoading] = useState(false);
@@ -35,6 +35,10 @@ export default function SettingsPage() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [regenLoading, setRegenLoading] = useState(false);
   const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinSuccess, setJoinSuccess] = useState(false);
 
   useEffect(() => {
     if (!org?.id) return;
@@ -53,6 +57,23 @@ export default function SettingsPage() {
       setCodeCopied(true);
       setTimeout(() => setCodeCopied(false), 2000);
     });
+  };
+
+  const handleJoinOrg = async () => {
+    setJoinError(null);
+    setJoinSuccess(false);
+    const code = joinCode.trim().toUpperCase();
+    if (!code || code.length < 4) { setJoinError('Geçerli bir davet kodu girin.'); return; }
+    setJoinLoading(true);
+    const result = await joinOrg(code);
+    setJoinLoading(false);
+    if (result.error) {
+      setJoinError(result.error);
+    } else {
+      setJoinSuccess(true);
+      setJoinCode('');
+      addToast('Organizasyona başarıyla katıldınız!', 'success');
+    }
   };
 
   const handleRegenCode = async () => {
@@ -569,6 +590,41 @@ export default function SettingsPage() {
           )}
         </div>
       )}
+
+      {/* ─── Davet Koduyla Katıl ─── */}
+      <div style={cardStyle} className="p-6 space-y-4">
+        <div className="flex items-center gap-3 pb-4" style={{ borderBottom: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(15,23,42,0.08)' }}>
+          <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.15)' }}>
+            <i className="ri-key-2-line text-base" style={{ color: '#10B981' }} />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold" style={{ color: sectionTitleColor }}>Davet Koduyla Organizasyona Katıl</h4>
+            <p className="text-xs mt-0.5" style={{ color: subColor }}>Bir ekip davet kodu aldıysanız buradan katılabilirsiniz</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={joinCode}
+            onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError(null); setJoinSuccess(false); }}
+            placeholder="Davet kodunu girin (örn: ABC123)"
+            maxLength={8}
+            style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', letterSpacing: '0.15em', fontWeight: 700 }}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+          />
+          <button
+            onClick={handleJoinOrg}
+            disabled={joinLoading || !joinCode.trim()}
+            className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all"
+            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: (joinLoading || !joinCode.trim()) ? 0.6 : 1 }}
+          >
+            {joinLoading ? <i className="ri-loader-4-line animate-spin" /> : <i className="ri-login-box-line" />}
+            Katıl
+          </button>
+        </div>
+        {joinError && <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}><i className="ri-error-warning-line mr-1" />{joinError}</p>}
+        {joinSuccess && <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}><i className="ri-checkbox-circle-line mr-1" />Organizasyona başarıyla katıldınız! Sayfayı yenileyerek görüntüleyebilirsiniz.</p>}
+      </div>
 
       {/* ─── Kullanıcı Yönetimi (Admin Only) ─── */}
       <TeamMembersSection />

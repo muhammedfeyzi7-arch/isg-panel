@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppProvider, useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ToastContainer from '../../components/base/ToastContainer';
@@ -17,21 +17,46 @@ import CopKutusuPage from '../trash/page';
 import SettingsPage from '../settings/page';
 
 function AppContent() {
-  const { activeModule, dataLoading, needsOnboarding, org } = useApp();
+  const { activeModule, dataLoading, orgLoading, autoCreatePending, orgError, org } = useApp();
+  const [hardTimeout, setHardTimeout] = useState(false);
 
-  // Redirect handled in AppContext via window.REACT_APP_NAVIGATE
-  if (needsOnboarding) {
+  // Absolute safety net: if still loading after 15s, unblock the UI with an error
+  const isBootstrapping = (orgLoading || autoCreatePending || dataLoading) && !org;
+  useEffect(() => {
+    if (!isBootstrapping) { setHardTimeout(false); return; }
+    const t = setTimeout(() => {
+      console.error('[ISG] Hard timeout: loading lasted >15s — forcing error state');
+      setHardTimeout(true);
+    }, 15000);
+    return () => clearTimeout(t);
+  }, [isBootstrapping]);
+
+  // Show error when org failed to load, autoCreate is not pending, OR hard timeout hit
+  if ((orgError && !org && !orgLoading && !autoCreatePending) || (hardTimeout && !org)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
-        <div className="flex flex-col items-center gap-3">
-          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#6366F1' }} />
-          <span className="text-sm" style={{ color: '#64748B' }}>Yönlendiriliyor...</span>
+        <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}>
+            <i className="ri-error-warning-line text-red-400 text-xl" />
+          </div>
+          <p className="font-semibold text-slate-300">Organizasyon yüklenemedi</p>
+          <p className="text-sm" style={{ color: '#64748B' }}>
+            {orgError || 'Bağlantı zaman aşımı. Lütfen internet bağlantınızı kontrol edin.'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer"
+            style={{ background: 'rgba(99,102,241,0.2)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.3)' }}
+          >
+            Tekrar Dene
+          </button>
         </div>
       </div>
     );
   }
 
-  if (dataLoading && !org) {
+  if (isBootstrapping) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
         <div className="flex flex-col items-center gap-4">
@@ -41,7 +66,7 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-2" style={{ color: '#475569' }}>
             <i className="ri-loader-4-line text-lg animate-spin" />
-            <span className="text-sm">Veriler yükleniyor...</span>
+            <span className="text-sm">{autoCreatePending ? 'Organizasyon oluşturuluyor...' : 'Veriler yükleniyor...'}</span>
           </div>
         </div>
       </div>

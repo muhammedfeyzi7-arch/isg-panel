@@ -1,5 +1,3 @@
-import { supabase } from '../lib/supabase';
-
 export interface ActivityLogPayload {
   organizationId: string;
   userId: string;
@@ -13,23 +11,9 @@ export interface ActivityLogPayload {
   description?: string;
 }
 
-export async function logActivity(payload: ActivityLogPayload): Promise<void> {
-  try {
-    await supabase.from('activity_logs').insert({
-      organization_id: payload.organizationId,
-      user_id: payload.userId,
-      user_email: payload.userEmail,
-      user_name: payload.userName,
-      user_role: payload.userRole,
-      action_type: payload.actionType,
-      module: payload.module ?? null,
-      record_id: payload.recordId ?? null,
-      record_name: payload.recordName ?? null,
-      description: payload.description ?? null,
-    });
-  } catch {
-    // Loglama asla uygulamayı kırmamalı
-  }
+// No-op in local mode — activity logging is disabled
+export async function logActivity(_payload: ActivityLogPayload): Promise<void> {
+  // Local mode: no activity logging
 }
 
 export const ACTION_LABELS: Record<string, string> = {

@@ -28,7 +28,6 @@ export default function Modal({ open, isOpen, onClose, title, children, size = '
     theme = app.theme;
   } catch { /* outside context */ }
 
-  // ESC tuşu ile kapat
   useEffect(() => {
     if (!visible) return;
     const handler = (e: KeyboardEvent) => {
@@ -50,12 +49,10 @@ export default function Modal({ open, isOpen, onClose, title, children, size = '
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* Backdrop */}
       <div
         className="absolute inset-0"
         style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
       />
-      {/* Modal */}
       <div
         className={`relative w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col animate-slide-up`}
         style={{
@@ -69,7 +66,6 @@ export default function Modal({ open, isOpen, onClose, title, children, size = '
           transition: 'background 0.3s ease',
         }}
       >
-        {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-4 flex-shrink-0"
           style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)'}` }}
@@ -109,12 +105,10 @@ export default function Modal({ open, isOpen, onClose, title, children, size = '
           </button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>
           {children}
         </div>
 
-        {/* Footer */}
         {footer && (
           <div
             className="px-6 py-4 flex items-center justify-end gap-3 flex-shrink-0"

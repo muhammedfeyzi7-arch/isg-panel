@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type { AppData } from '../types';
@@ -21,6 +21,9 @@ function getLegacyStorageKey(userId: string): string {
 export function useOrganization(user: User | null) {
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const autoCreateInProgressRef = useRef(false);
+  const autoCreateDoneRef = useRef<string | null>(null); // tracks userId for which autoCreate ran
 
   const loadOrg = useCallback(async () => {
     if (!user) {
@@ -29,12 +32,34 @@ export function useOrganization(user: User | null) {
       return;
     }
     setLoading(true);
+    setLoadError(null);
+
+    // Safety timeout: if Supabase hangs > 12s, unblock the UI
+    const timeoutId = setTimeout(() => {
+      console.warn('[ISG] loadOrg timeout — unblocking UI');
+      setLoadError('Bağlantı zaman aşımına uğradı. Lütfen sayfayı yenileyin.');
+      setOrg(null);
+      setLoading(false);
+    }, 12000);
     try {
-      const { data } = await supabase
+      // CRITICAL: ORDER BY joined_at ASC to ALWAYS get the oldest/original org.
+      // Without this, maybeSingle() is non-deterministic and may return different
+      // orgs on different logins — causing data to appear "lost" when actually
+      // the user has multiple orgs and data is in a different one.
+      const { data, error } = await supabase
         .from('user_organizations')
         .select('role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
         .eq('user_id', user.id)
+        .order('joined_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
+
+      clearTimeout(timeoutId);
+
+      if (error) {
+        console.error('[ISG] loadOrg error:', error.message);
+        setLoadError(error.message);
+      }
 
       if (data && data.organizations) {
         const o = data.organizations as { id: string; name: string; invite_code: string };
@@ -51,7 +76,10 @@ export function useOrganization(user: User | null) {
       } else {
         setOrg(null);
       }
-    } catch {
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.error('[ISG] loadOrg exception:', err);
+      setLoadError(err instanceof Error ? err.message : String(err));
       setOrg(null);
     } finally {
       setLoading(false);
@@ -60,7 +88,10 @@ export function useOrganization(user: User | null) {
 
   useEffect(() => {
     loadOrg();
-  }, [loadOrg]);
+    // Reset autoCreate tracking when user changes
+    autoCreateDoneRef.current = null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const generateInviteCode = (): string => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -117,7 +148,6 @@ export function useOrganization(user: User | null) {
 
       if (memberError) return { error: memberError.message };
 
-      // Pre-create empty app_data row so upsert always succeeds
       await supabase.from('app_data').upsert(
         { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
         { onConflict: 'organization_id' },
@@ -130,9 +160,55 @@ export function useOrganization(user: User | null) {
     }
   };
 
-  const autoCreateOrg = async (): Promise<void> => {
+  const autoCreateOrg = useCallback(async (): Promise<void> => {
     if (!user) return;
+    // CRITICAL: Prevent multiple simultaneous calls
+    if (autoCreateInProgressRef.current) {
+      console.log('[ISG] autoCreateOrg already in progress, skipping');
+      return;
+    }
+    // CRITICAL: Only run once per user session
+    if (autoCreateDoneRef.current === user.id) {
+      console.log('[ISG] autoCreateOrg already ran for this user, skipping');
+      return;
+    }
+
+    autoCreateInProgressRef.current = true;
+    autoCreateDoneRef.current = user.id;
+
     try {
+      // CRITICAL: Check if user ALREADY has an org before creating a new one.
+      // ALSO check for errors — maybeSingle() returns data=null for BOTH empty result AND error.
+      const { data: existingMembership, error: memberCheckError } = await supabase
+        .from('user_organizations')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberCheckError) {
+        // Query failed — user might already have an org but we can't confirm.
+        // Safe approach: try to reload. If org loads, great. If not, we'll try again next session.
+        console.warn('[ISG] autoCreateOrg: membership check failed, attempting reload:', memberCheckError.message);
+        await loadOrg();
+        return;
+      }
+
+      if (existingMembership) {
+        console.log('[ISG] autoCreateOrg: user already has org, reloading...');
+        await loadOrg();
+        return;
+      }
+
+      console.log('[ISG] autoCreateOrg: creating new org for user', user.id);
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData?.session) {
+        console.error('[ISG] autoCreateOrg: no valid session, aborting', sessionError?.message);
+        autoCreateDoneRef.current = null; // allow retry on next load
+        return;
+      }
+
       const inviteCode = generateInviteCode();
       const orgName = user.email
         ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'Firmam'
@@ -143,7 +219,12 @@ export function useOrganization(user: User | null) {
         .select()
         .maybeSingle();
 
-      if (orgError || !newOrg) return;
+      if (orgError || !newOrg) {
+        console.error('[ISG] autoCreateOrg org insert error:', orgError?.message);
+        // Could be a race condition (two tabs). Try to reload existing org.
+        await loadOrg();
+        return;
+      }
 
       const { error: memberError } = await supabase
         .from('user_organizations')
@@ -156,7 +237,13 @@ export function useOrganization(user: User | null) {
           must_change_password: false,
         });
 
-      if (memberError) return;
+      if (memberError) {
+        console.error('[ISG] autoCreateOrg member insert error:', memberError.message);
+        // CRITICAL: Even if membership insert failed (e.g. UNIQUE constraint — user already
+        // has another org), try to load whatever org exists. Never leave org=null silently.
+        await loadOrg();
+        return;
+      }
 
       await supabase.from('app_data').upsert(
         { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
@@ -164,10 +251,16 @@ export function useOrganization(user: User | null) {
       );
       await migrateLegacyData(user.id, newOrg.id);
       await loadOrg();
-    } catch {
-      // Silent fail
+      console.log('[ISG] autoCreateOrg: org created and loaded successfully ✓');
+    } catch (err) {
+      console.error('[ISG] autoCreateOrg exception:', err);
+      // Last resort: try loading whatever org might exist
+      try { await loadOrg(); } catch { /* ignore */ }
+    } finally {
+      autoCreateInProgressRef.current = false;
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, loadOrg]);
 
   const joinOrg = async (inviteCode: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Kullanıcı bulunamadı.' };
@@ -237,6 +330,7 @@ export function useOrganization(user: User | null) {
   return {
     org,
     loading,
+    loadError,
     createOrg,
     joinOrg,
     regenerateInviteCode,

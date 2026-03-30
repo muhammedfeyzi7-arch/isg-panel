@@ -28,7 +28,6 @@ export interface Firma {
   notlar: string;
   olusturmaTarihi: string;
   guncellemeTarihi: string;
-  /** Soft-delete: true ise çöp kutusunda */
   silinmis?: boolean;
   silinmeTarihi?: string;
 }
@@ -51,10 +50,8 @@ export interface Personel {
   adres: string;
   olusturmaTarihi: string;
   guncellemeTarihi: string;
-  /** Soft-delete: true ise çöp kutusunda */
   silinmis?: boolean;
   silinmeTarihi?: string;
-  /** Firma silindiğinde cascade ile silindiyse true, hangi firmayla silindi */
   cascadeSilindi?: boolean;
   cascadeFirmaId?: string;
 }
@@ -63,11 +60,6 @@ export interface Evrak {
   id: string;
   ad: string;
   tur: string;
-  /**
-   * Evrak kategorisi — kayıt anında hesaplanıp saklanır.
-   * Değerler: 'kimlik' | 'saglik' | 'egitim' | 'sertifika' | 'diger'
-   * Eski kayıtlarda undefined olabilir; o durumda runtime'da tur/ad'dan hesaplanır.
-   */
   kategori?: string;
   firmaId: string;
   personelId?: string;
@@ -80,10 +72,8 @@ export interface Evrak {
   dosyaVeri?: string;
   notlar: string;
   olusturmaTarihi: string;
-  /** Soft-delete: true ise çöp kutusunda */
   silinmis?: boolean;
   silinmeTarihi?: string;
-  /** Firma silindiğinde cascade ile silindiyse true */
   cascadeSilindi?: boolean;
   cascadeFirmaId?: string;
 }
@@ -133,23 +123,23 @@ export interface Muayene {
 
 export interface Uygunsuzluk {
   id: string;
-  acilisNo?: string;          // DÖF-2026-0001 (auto-generated)
+  acilisNo?: string;
   baslik: string;
   aciklama: string;
-  onlem?: string;             // Alınması gereken önlem
+  onlem?: string;
   firmaId: string;
   personelId?: string;
   tarih: string;
   severity: UygunsuzlukSeverity;
-  durum: UygunsuzlukStatus;   // Auto-calculated: 'Açık' | 'Kapandı'
+  durum: UygunsuzlukStatus;
   sorumlu?: string;
   hedefTarih?: string;
   kapatmaTarihi?: string;
   kapatmaAciklama?: string;
-  acilisFotoMevcut?: boolean;  // Has opening photo stored in localStorage (legacy)
-  kapatmaFotoMevcut?: boolean; // Has closing photo stored in localStorage (legacy)
-  acilisFotoUrl?: string;      // Supabase Storage URL for opening photo
-  kapatmaFotoUrl?: string;     // Supabase Storage URL for closing photo
+  acilisFotoMevcut?: boolean;
+  kapatmaFotoMevcut?: boolean;
+  acilisFotoUrl?: string;
+  kapatmaFotoUrl?: string;
   notlar?: string;
   olusturmaTarihi: string;
   silinmis?: boolean;

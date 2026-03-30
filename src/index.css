@@ -1,5 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* ── Print styles for ISG reports ── */
+@media print {
+  body { background: white !important; color: black !important; }
+  aside, nav, header, button, .no-print { display: none !important; }
+  #report-preview { display: block !important; padding: 0; }
+  * { box-shadow: none !important; }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

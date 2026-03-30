@@ -1,11 +1,10 @@
 import { type ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import ForcePasswordChange from './ForcePasswordChange';
 import { useApp } from '../../store/AppContext';
 
 export default function Layout({ children }: { children: ReactNode }) {
-  const { sidebarCollapsed, mustChangePassword } = useApp();
+  const { sidebarCollapsed } = useApp();
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-app)', transition: 'background 0.3s ease' }}>
       <Sidebar />
@@ -17,9 +16,6 @@ export default function Layout({ children }: { children: ReactNode }) {
           {children}
         </div>
       </main>
-
-      {/* Force password change overlay for temp-password users */}
-      {mustChangePassword && <ForcePasswordChange />}
     </div>
   );
 }

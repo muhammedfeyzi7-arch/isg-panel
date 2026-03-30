@@ -78,7 +78,6 @@ export default function UygunsuzluklarPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetim</h2>
@@ -94,7 +93,6 @@ export default function UygunsuzluklarPage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Toplam Kayıt', val: stats.total, icon: 'ri-file-list-3-line', c: '#F97316', bg: 'rgba(249,115,22,0.1)' },
@@ -109,9 +107,7 @@ export default function UygunsuzluklarPage() {
             <div>
               <div className="flex items-center gap-2">
                 <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{s.val}</p>
-                {s.badge && s.val > 0 && (
-                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#EF4444', color: '#fff' }}>!</span>
-                )}
+                {s.badge && s.val > 0 && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#EF4444', color: '#fff' }}>!</span>}
               </div>
               <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{s.label}</p>
             </div>
@@ -119,7 +115,6 @@ export default function UygunsuzluklarPage() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="isg-card rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
@@ -148,13 +143,10 @@ export default function UygunsuzluklarPage() {
               <i className="ri-close-line mr-1" />Filtreleri Temizle
             </button>
           )}
-          <span className="text-xs ml-auto" style={{ color: '#64748B' }}>
-            {filtered.length} kayıt gösteriliyor
-          </span>
+          <span className="text-xs ml-auto" style={{ color: '#64748B' }}>{filtered.length} kayıt gösteriliyor</span>
         </div>
       </div>
 
-      {/* Bulk actions */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
           <span className="text-sm font-semibold" style={{ color: '#818CF8' }}>{selected.size} kayıt seçildi</span>
@@ -167,7 +159,6 @@ export default function UygunsuzluklarPage() {
         </div>
       )}
 
-      {/* Table */}
       <div className="isg-card rounded-xl overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-20 text-center">
@@ -188,9 +179,7 @@ export default function UygunsuzluklarPage() {
             <table className="table-premium w-full">
               <thead>
                 <tr>
-                  <th className="w-10 text-center">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                  </th>
+                  <th className="w-10 text-center"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" /></th>
                   <th className="text-left">DÖF No / Başlık</th>
                   <th className="text-left hidden md:table-cell">Firma</th>
                   <th className="text-left hidden lg:table-cell">Personel</th>
@@ -210,25 +199,15 @@ export default function UygunsuzluklarPage() {
                   const isChecked = selected.has(u.id);
                   return (
                     <tr key={u.id} style={{ background: isChecked ? 'rgba(99,102,241,0.04)' : undefined }}>
-                      <td className="text-center">
-                        <input type="checkbox" checked={isChecked} onChange={() => toggleOne(u.id)} className="cursor-pointer" />
-                      </td>
+                      <td className="text-center"><input type="checkbox" checked={isChecked} onChange={() => toggleOne(u.id)} className="cursor-pointer" /></td>
                       <td>
                         <p className="font-mono text-xs font-bold mb-0.5" style={{ color: '#6366F1' }}>{u.acilisNo ?? '—'}</p>
                         <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.baslik}</p>
                       </td>
-                      <td className="hidden md:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{firma?.ad ?? '—'}</span>
-                      </td>
-                      <td className="hidden lg:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{personel?.adSoyad ?? '—'}</span>
-                      </td>
-                      <td className="hidden sm:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{u.tarih ? new Date(u.tarih).toLocaleDateString('tr-TR') : '—'}</span>
-                      </td>
-                      <td>
-                        <span className="inline-block px-2 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: sev.bg, color: sev.color }}>{u.severity}</span>
-                      </td>
+                      <td className="hidden md:table-cell"><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{firma?.ad ?? '—'}</span></td>
+                      <td className="hidden lg:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{personel?.adSoyad ?? '—'}</span></td>
+                      <td className="hidden sm:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{u.tarih ? new Date(u.tarih).toLocaleDateString('tr-TR') : '—'}</span></td>
+                      <td><span className="inline-block px-2 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: sev.bg, color: sev.color }}>{u.severity}</span></td>
                       <td>
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
                           <i className={sc.icon + ' text-xs'} />{u.durum}
@@ -246,20 +225,12 @@ export default function UygunsuzluklarPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => setDetailRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }} title="Detay">
-                            <i className="ri-eye-line text-xs" />
-                          </button>
+                          <button onClick={() => setDetailRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }} title="Detay"><i className="ri-eye-line text-xs" /></button>
                           {u.durum !== 'Kapandı' && (
-                            <button onClick={() => setKapatmaRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }} title="Kapatma Yap">
-                              <i className="ri-checkbox-circle-line text-xs" />
-                            </button>
+                            <button onClick={() => setKapatmaRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }} title="Kapatma Yap"><i className="ri-checkbox-circle-line text-xs" /></button>
                           )}
-                          <button onClick={() => openEdit(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Düzenle">
-                            <i className="ri-edit-line text-xs" />
-                          </button>
-                          <button onClick={() => setDeleteId(u.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil">
-                            <i className="ri-delete-bin-line text-xs" />
-                          </button>
+                          <button onClick={() => openEdit(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Düzenle"><i className="ri-edit-line text-xs" /></button>
+                          <button onClick={() => setDeleteId(u.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil"><i className="ri-delete-bin-line text-xs" /></button>
                         </div>
                       </td>
                     </tr>
@@ -271,40 +242,13 @@ export default function UygunsuzluklarPage() {
         )}
       </div>
 
-      {/* Modals */}
-      <NonconformityForm
-        isOpen={showForm}
-        onClose={() => { setShowForm(false); setEditRecord(null); }}
-        editRecord={editRecord}
-      />
-
-      <KapatmaModal
-        record={kapatmaRecord}
-        onClose={() => setKapatmaRecord(null)}
-      />
-
-      <DetailModal
-        record={detailRecord}
-        onClose={() => setDetailRecord(null)}
-        onKapat={r => { setDetailRecord(null); setKapatmaRecord(r); }}
-        onEdit={r => { setDetailRecord(null); openEdit(r); }}
-      />
-
+      <NonconformityForm isOpen={showForm} onClose={() => { setShowForm(false); setEditRecord(null); }} editRecord={editRecord} />
+      <KapatmaModal record={kapatmaRecord} onClose={() => setKapatmaRecord(null)} />
+      <DetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onKapat={r => { setDetailRecord(null); setKapatmaRecord(r); }} onEdit={r => { setDetailRecord(null); openEdit(r); }} />
       <ReportBuilder isOpen={showReport} onClose={() => setShowReport(false)} />
 
-      <Modal
-        isOpen={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        title="Kaydı Sil"
-        size="sm"
-        icon="ri-delete-bin-line"
-        footer={
-          <>
-            <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
-          </>
-        }
-      >
+      <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Kaydı Sil" size="sm" icon="ri-delete-bin-line"
+        footer={<><button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button><button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button></>}>
         <div className="py-2">
           <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
