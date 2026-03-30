@@ -75,38 +75,29 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
     try {
       if (editRecord) {
         updateUygunsuzluk(editRecord.id, {
-          baslik: form.baslik.trim(),
-          aciklama: form.aciklama.trim(),
-          onlem: form.onlem.trim(),
-          firmaId: form.firmaId,
-          personelId: form.personelId || undefined,
-          tarih: form.tarih,
-          severity: form.severity,
-          sorumlu: form.sorumlu.trim(),
-          hedefTarih: form.hedefTarih,
-          notlar: form.notlar.trim(),
-          acilisFotoMevcut: !!form.acilisFoto,
+          baslik: form.baslik.trim(), aciklama: form.aciklama.trim(), onlem: form.onlem.trim(),
+          firmaId: form.firmaId, personelId: form.personelId || undefined, tarih: form.tarih,
+          severity: form.severity, sorumlu: form.sorumlu.trim(), hedefTarih: form.hedefTarih,
+          notlar: form.notlar.trim(), acilisFotoMevcut: !!form.acilisFoto,
         });
-        if (form.acilisFoto) setUygunsuzlukPhoto(editRecord.id, 'acilis', form.acilisFoto);
+        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
+          const url = await setUygunsuzlukPhoto(editRecord.id, 'acilis', form.acilisFoto);
+          if (url) updateUygunsuzluk(editRecord.id, { acilisFotoUrl: url });
+        }
         logAction('uygunsuzluk_updated', 'Uygunsuzluklar', editRecord.id, form.baslik, 'Uygunsuzluk güncellendi.');
         addToast('Uygunsuzluk güncellendi.', 'success');
       } else {
         const rec = addUygunsuzluk({
-          baslik: form.baslik.trim(),
-          aciklama: form.aciklama.trim(),
-          onlem: form.onlem.trim(),
-          firmaId: form.firmaId,
-          personelId: form.personelId || undefined,
-          tarih: form.tarih,
-          severity: form.severity,
-          sorumlu: form.sorumlu.trim(),
-          hedefTarih: form.hedefTarih,
-          notlar: form.notlar.trim(),
-          durum: 'Açık',
-          acilisFotoMevcut: !!form.acilisFoto,
-          kapatmaFotoMevcut: false,
+          baslik: form.baslik.trim(), aciklama: form.aciklama.trim(), onlem: form.onlem.trim(),
+          firmaId: form.firmaId, personelId: form.personelId || undefined, tarih: form.tarih,
+          severity: form.severity, sorumlu: form.sorumlu.trim(), hedefTarih: form.hedefTarih,
+          notlar: form.notlar.trim(), durum: 'Açık',
+          acilisFotoMevcut: !!form.acilisFoto, kapatmaFotoMevcut: false,
         });
-        if (form.acilisFoto) setUygunsuzlukPhoto(rec.id, 'acilis', form.acilisFoto);
+        if (form.acilisFoto) {
+          const url = await setUygunsuzlukPhoto(rec.id, 'acilis', form.acilisFoto);
+          if (url) updateUygunsuzluk(rec.id, { acilisFotoUrl: url });
+        }
         addToast('Uygunsuzluk kaydı oluşturuldu.', 'success');
       }
       onClose();

@@ -117,6 +117,11 @@ export function useOrganization(user: User | null) {
 
       if (memberError) return { error: memberError.message };
 
+      // Pre-create empty app_data row so upsert always succeeds
+      await supabase.from('app_data').upsert(
+        { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
+        { onConflict: 'organization_id' },
+      );
       await migrateLegacyData(userId, newOrg.id);
       await loadOrg();
       return { error: null };
@@ -153,6 +158,10 @@ export function useOrganization(user: User | null) {
 
       if (memberError) return;
 
+      await supabase.from('app_data').upsert(
+        { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
+        { onConflict: 'organization_id' },
+      );
       await migrateLegacyData(user.id, newOrg.id);
       await loadOrg();
     } catch {

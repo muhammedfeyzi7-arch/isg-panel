@@ -27,13 +27,14 @@ export default function KapatmaModal({ record, onClose }: Props) {
     setSaving(true);
     try {
       const now = new Date().toISOString();
+      const url = await setUygunsuzlukPhoto(record.id, 'kapatma', foto);
       updateUygunsuzluk(record.id, {
         kapatmaAciklama: aciklama.trim() || undefined,
         kapatmaFotoMevcut: true,
+        kapatmaFotoUrl: url ?? undefined,
         kapatmaTarihi: now,
         durum: 'Kapandı',
       });
-      setUygunsuzlukPhoto(record.id, 'kapatma', foto);
       addToast('Uygunsuzluk başarıyla kapatıldı.', 'success');
       handleClose();
     } finally {

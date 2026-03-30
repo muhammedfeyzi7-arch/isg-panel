@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -102,6 +103,14 @@ export default function DashboardPage() {
       .slice(0, 5);
   }, [aktifEvraklar]);
 
+  const acikUygunsuzluklar = useMemo(() =>
+    aktifUygunsuzluklar
+      .filter(u => u.durum === 'Açık')
+      .sort((a, b) => new Date(b.olusturmaTarihi).getTime() - new Date(a.olusturmaTarihi).getTime())
+      .slice(0, 5),
+  [aktifUygunsuzluklar]);
+
+  const navigate = useNavigate();
   const isEmpty = aktifFirmalar.length === 0 && aktifPersoneller.length === 0;
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
 
@@ -143,12 +152,20 @@ export default function DashboardPage() {
       label: 'Açık Uygunsuzluk',
       value: stats.acikU,
       icon: 'ri-alert-line',
-      sub: `${aktifUygunsuzluklar.length} toplam kayıt`,
-      gradient: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(217,119,6,0.08))',
-      border: 'rgba(245,158,11,0.2)',
-      iconBg: 'linear-gradient(135deg, #F59E0B, #D97706)',
-      iconShadow: '0 8px 20px rgba(245,158,11,0.3)',
-      valueColor: 'linear-gradient(135deg, #FCD34D, #F59E0B)',
+      sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`,
+      gradient: stats.acikU > 0
+        ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(220,38,38,0.08))'
+        : 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))',
+      border: stats.acikU > 0 ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)',
+      iconBg: stats.acikU > 0
+        ? 'linear-gradient(135deg, #EF4444, #DC2626)'
+        : 'linear-gradient(135deg, #10B981, #059669)',
+      iconShadow: stats.acikU > 0
+        ? '0 8px 20px rgba(239,68,68,0.35)'
+        : '0 8px 20px rgba(16,185,129,0.3)',
+      valueColor: stats.acikU > 0
+        ? 'linear-gradient(135deg, #FCA5A5, #F87171)'
+        : 'linear-gradient(135deg, #34D399, #10B981)',
     },
   ];
 
@@ -253,6 +270,68 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* Açık Uygunsuzluklar Mini Panel */}
+        {acikUygunsuzluklar.length > 0 && (
+          <div className="rounded-2xl p-5 isg-card" style={{ borderLeft: '3px solid #EF4444' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(239,68,68,0.15)' }}>
+                  <i className="ri-alert-fill" style={{ color: '#EF4444' }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Açık Uygunsuzluklar</h3>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Kapatılmayı bekleyen kayıtlar</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className="text-xs font-bold px-2.5 py-1 rounded-full animate-pulse"
+                  style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}
+                >
+                  {stats.acikU} Açık
+                </span>
+                <button
+                  onClick={() => navigate('/nonconformity')}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap transition-all hover:scale-105"
+                  style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                >
+                  Tümünü Gör
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+              {acikUygunsuzluklar.map(u => {
+                const firma = aktifFirmalar.find(f => f.id === u.firmaId);
+                return (
+                  <div
+                    key={u.id}
+                    className="rounded-xl p-3 cursor-pointer transition-all duration-150 hover:scale-[1.02]"
+                    style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}
+                    onClick={() => navigate('/nonconformity')}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>
+                        {u.acilisNo ?? 'DÖF'}
+                      </span>
+                      <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>
+                        {new Date(u.olusturmaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold line-clamp-2 mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                      {u.baslik || u.aciklama?.slice(0, 40) || '—'}
+                    </p>
+                    {firma && (
+                      <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                        <i className="ri-building-2-line mr-1" />{firma.ad}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

@@ -146,8 +146,10 @@ export interface Uygunsuzluk {
   hedefTarih?: string;
   kapatmaTarihi?: string;
   kapatmaAciklama?: string;
-  acilisFotoMevcut?: boolean; // Has opening photo stored in localStorage
-  kapatmaFotoMevcut?: boolean;// Has closing photo stored in localStorage
+  acilisFotoMevcut?: boolean;  // Has opening photo stored in localStorage (legacy)
+  kapatmaFotoMevcut?: boolean; // Has closing photo stored in localStorage (legacy)
+  acilisFotoUrl?: string;      // Supabase Storage URL for opening photo
+  kapatmaFotoUrl?: string;     // Supabase Storage URL for closing photo
   notlar?: string;
   olusturmaTarihi: string;
   silinmis?: boolean;

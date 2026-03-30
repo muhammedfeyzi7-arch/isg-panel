@@ -32,7 +32,6 @@ interface AppContextType extends StoreType {
   okunmamisBildirimSayisi: number;
   bildirimOku: (id: string) => void;
   tumunuOku: () => void;
-  // Org context
   org: OrgInfo | null;
   orgLoading: boolean;
   needsOnboarding: boolean;
@@ -42,7 +41,6 @@ interface AppContextType extends StoreType {
   joinOrg: (code: string) => Promise<{ error: string | null }>;
   regenerateInviteCode: () => Promise<{ error: string | null; newCode?: string }>;
   refetchOrg: () => Promise<void>;
-  // Activity log
   logAction: (actionType: string, module: string, recordId: string, recordName?: string, description?: string) => void;
 }
 
@@ -64,10 +62,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     createOrg, joinOrg, regenerateInviteCode,
     refetch: refetchOrg, autoCreateOrg, clearMustChangePassword,
   } = useOrganization(user);
+
   const passiveChecked = useRef(false);
   const loginLoggedRef = useRef(false);
 
-  // ── Activity log helper ──
+  // ── Toast system — MUST be defined BEFORE useStore so the callback is valid ──
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const addToast = useCallback((message: string, type: Toast['type'] = 'success') => {
+    const id = Math.random().toString(36).substring(2);
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // ── Activity log helper — MUST be defined BEFORE useStore ──
   const logAction = useCallback((
     actionType: string,
     module: string,
@@ -90,9 +103,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [user, org]);
 
-  const store = useStore(org?.id ?? null, logAction);
+  // ── Use a stable ref for addToast to avoid dependency issues ──
+  const addToastRef = useRef(addToast);
+  useEffect(() => { addToastRef.current = addToast; }, [addToast]);
 
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  // ── Now initialize store — addToast is already defined above ──
+  const store = useStore(org?.id ?? null, logAction, useCallback((msg: string) => {
+    addToastRef.current(msg, 'error');
+  }, []), user?.id);
+
+  // ── UI state ──
   const [activeModule, setActiveModule] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [quickCreate, setQuickCreate] = useState<string | null>(null);
@@ -102,18 +122,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const needsOnboarding = false;
   const mustChangePassword = org?.mustChangePassword === true;
 
-  const addToast = useCallback((message: string, type: Toast['type'] = 'success') => {
-    const id = Math.random().toString(36).substring(2);
-    const toast: Toast = { id, message, type };
-    setToasts(prev => [...prev, toast]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  // Passive user check: if user is deactivated by admin, sign them out
+  // Passive user check
   useEffect(() => {
     if (!org || orgLoading || passiveChecked.current) return;
     passiveChecked.current = true;
@@ -125,7 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return undefined;
   }, [org, orgLoading, addToast, logout]);
 
-  // Auto-create org silently if user logged in but has no org
+  // Auto-create org silently if user has none
   useEffect(() => {
     if (!user || orgLoading || org) return;
     const timer = setTimeout(() => { autoCreateOrg(); }, 800);
@@ -133,7 +142,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, orgLoading, org]);
 
-  // Log login event once per session when user + org are both loaded
+  // Log login event once per session
   useEffect(() => {
     if (!user || !org || loginLoggedRef.current) return;
     loginLoggedRef.current = true;

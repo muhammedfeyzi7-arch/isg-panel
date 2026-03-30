@@ -45,10 +45,24 @@ export default function RaporlarPage() {
   ].filter(d => d.value > 0), [evraklar]);
 
   const uygunsuzlukDurum = useMemo(() => [
-    { name: 'Açık', value: uygunsuzluklar.filter(u => u.durum === 'Açık').length },
-    { name: 'İncelemede', value: uygunsuzluklar.filter(u => u.durum === 'İncelemede').length },
-    { name: 'Kapatıldı', value: uygunsuzluklar.filter(u => u.durum === 'Kapatıldı').length },
+    { name: 'Açık', value: uygunsuzluklar.filter(u => !u.silinmis && u.durum === 'Açık').length },
+    { name: 'Kapandı', value: uygunsuzluklar.filter(u => !u.silinmis && u.durum === 'Kapandı').length },
   ].filter(d => d.value > 0), [uygunsuzluklar]);
+
+  const firmaUygunsuzlukData = useMemo(() => {
+    const aktifUyg = uygunsuzluklar.filter(u => !u.silinmis);
+    return firmalar
+      .filter(f => !f.silinmis)
+      .map(f => ({
+        ad: f.ad.length > 13 ? f.ad.substring(0, 13) + '..' : f.ad,
+        acik: aktifUyg.filter(u => u.firmaId === f.id && u.durum === 'Açık').length,
+        kapandi: aktifUyg.filter(u => u.firmaId === f.id && u.durum === 'Kapandı').length,
+        toplam: aktifUyg.filter(u => u.firmaId === f.id).length,
+      }))
+      .filter(f => f.toplam > 0)
+      .sort((a, b) => b.toplam - a.toplam)
+      .slice(0, 10);
+  }, [firmalar, uygunsuzluklar]);
 
   const monthlyData = useMemo(() => {
     const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
@@ -82,7 +96,7 @@ export default function RaporlarPage() {
     { label: 'Toplam Evrak', value: evraklar.length, sub: `${evraklar.filter(e => e.durum === 'Yüklü').length} yüklü`, icon: 'ri-file-list-3-line', gradient: 'linear-gradient(135deg, #F59E0B, #D97706)', shadow: '0 8px 20px rgba(245,158,11,0.35)' },
     { label: 'Toplam Eğitim', value: egitimler.length, sub: `${egitimler.filter(e => e.durum === 'Tamamlandı').length} tamamlandı`, icon: 'ri-graduation-cap-line', gradient: 'linear-gradient(135deg, #8B5CF6, #7C3AED)', shadow: '0 8px 20px rgba(139,92,246,0.35)' },
     { label: 'Sağlık Muayenesi', value: muayeneler.length, sub: `${muayeneler.filter(m => m.sonuc === 'Çalışabilir').length} çalışabilir`, icon: 'ri-heart-pulse-line', gradient: 'linear-gradient(135deg, #EF4444, #DC2626)', shadow: '0 8px 20px rgba(239,68,68,0.35)' },
-    { label: 'Uygunsuzluk', value: uygunsuzluklar.length, sub: `${uygunsuzluklar.filter(u => u.durum === 'Açık').length} açık`, icon: 'ri-alert-line', gradient: 'linear-gradient(135deg, #F97316, #EA580C)', shadow: '0 8px 20px rgba(249,115,22,0.35)' },
+    { label: 'Uygunsuzluk', value: uygunsuzluklar.filter(u => !u.silinmis).length, sub: `${uygunsuzluklar.filter(u => !u.silinmis && u.durum === 'Açık').length} açık`, icon: 'ri-alert-line', gradient: 'linear-gradient(135deg, #F97316, #EA580C)', shadow: '0 8px 20px rgba(249,115,22,0.35)' },
   ];
 
   const ChartCard = ({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) => (
@@ -188,12 +202,14 @@ export default function RaporlarPage() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Uygunsuzluk Dağılımı" sub="Uygunsuzlukların durum dağılımı">
+        <ChartCard title="Uygunsuzluk Durumu" sub={`Toplam ${uygunsuzluklar.filter(u=>!u.silinmis).length} kayıt — Açık vs Kapandı`}>
           {uygunsuzlukDurum.length === 0 ? <EmptyChart /> : (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={uygunsuzlukDurum} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" paddingAngle={4} strokeWidth={0}>
-                  {uygunsuzlukDurum.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  {uygunsuzlukDurum.map((entry, i) => (
+                    <Cell key={i} fill={entry.name === 'Açık' ? '#EF4444' : '#10B981'} />
+                  ))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 11, color: tickColor }} />
@@ -202,6 +218,69 @@ export default function RaporlarPage() {
           )}
         </ChartCard>
       </div>
+
+      {/* Firma Bazlı Uygunsuzluk Analizi */}
+      <ChartCard
+        title="Firma Bazlı Uygunsuzluk Analizi"
+        sub="Her firma için açık (kırmızı) ve kapatılan (yeşil) uygunsuzluk sayıları"
+      >
+        {firmaUygunsuzlukData.length === 0 ? (
+          <div className="h-64 flex flex-col items-center justify-center gap-3">
+            <i className="ri-bar-chart-2-line text-4xl" style={{ color: isDark ? '#1E293B' : '#CBD5E1' }} />
+            <p className="text-sm" style={{ color: mutedText }}>Henüz uygunsuzluk kaydı yok</p>
+            <p className="text-xs" style={{ color: isDark ? '#334155' : '#94A3B8' }}>Uygunsuzluk kaydı eklendikçe grafik oluşacak</p>
+          </div>
+        ) : (
+          <>
+            {/* Özet satırı */}
+            <div className="flex flex-wrap gap-3 mb-5">
+              {[
+                { label: 'Toplam Uygunsuzluk', value: uygunsuzluklar.filter(u => !u.silinmis).length, color: isDark ? '#64748B' : '#94A3B8', bg: isDark ? 'rgba(100,116,139,0.1)' : 'rgba(148,163,184,0.1)', border: isDark ? 'rgba(100,116,139,0.2)' : 'rgba(148,163,184,0.2)' },
+                { label: 'Açık', value: uygunsuzluklar.filter(u => !u.silinmis && u.durum === 'Açık').length, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' },
+                { label: 'Kapandı', value: uygunsuzluklar.filter(u => !u.silinmis && u.durum === 'Kapandı').length, color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)' },
+                { label: 'Kapanma Oranı', value: `${uygunsuzluklar.filter(u => !u.silinmis).length > 0 ? Math.round((uygunsuzluklar.filter(u => !u.silinmis && u.durum === 'Kapandı').length / uygunsuzluklar.filter(u => !u.silinmis).length) * 100) : 0}%`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
+              ].map(s => (
+                <div
+                  key={s.label}
+                  className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
+                  style={{ background: s.bg, border: `1px solid ${s.border}` }}
+                >
+                  <p className="text-xl font-extrabold" style={{ color: s.color }}>{s.value}</p>
+                  <p className="text-xs font-semibold" style={{ color: mutedText }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={firmaUygunsuzlukData} margin={{ left: 0, right: 10, top: 5, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <XAxis
+                  dataKey="ad"
+                  stroke={axisColor}
+                  tick={{ fontSize: 11, fill: tickColor }}
+                  interval={0}
+                  angle={firmaUygunsuzlukData.length > 5 ? -20 : 0}
+                  textAnchor={firmaUygunsuzlukData.length > 5 ? 'end' : 'middle'}
+                  height={firmaUygunsuzlukData.length > 5 ? 50 : 30}
+                />
+                <YAxis stroke={axisColor} tick={{ fontSize: 11, fill: tickColor }} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(value: number, name: string) => [
+                    value,
+                    name === 'acik' ? 'Açık' : 'Kapandı',
+                  ]}
+                />
+                <Legend
+                  formatter={(value) => value === 'acik' ? 'Açık' : 'Kapandı'}
+                  wrapperStyle={{ fontSize: 12, color: tickColor }}
+                />
+                <Bar dataKey="acik" name="acik" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={52} />
+                <Bar dataKey="kapandi" name="kapandi" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={52} />
+              </BarChart>
+            </ResponsiveContainer>
+          </>
+        )}
+      </ChartCard>
 
       {/* Tehlike Sınıfı */}
       <div className="rounded-2xl p-5" style={cardStyle}>
