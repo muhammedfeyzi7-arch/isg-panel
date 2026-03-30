@@ -1,53 +1,48 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supports both VITE_SUPABASE_URL and VITE_PUBLIC_SUPABASE_URL (legacy)
+// Support both VITE_PUBLIC_ and VITE_ prefixed env vars
 const supabaseUrl =
-  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
   (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string | undefined) ||
+  (import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
   '';
 
-const supabaseAnonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ||
+// The API key — supports both legacy JWT (eyJ...) and new publishable key (sb_publishable_...)
+// Supabase rolled out sb_publishable_ as the default for all new projects from May 2025.
+// Both formats are fully supported by supabase-js.
+const supabaseKey =
   (import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ||
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ||
   '';
 
 // ── Startup diagnostics ──────────────────────────────────────────
-// Log exactly what URL and key format are in use so we can diagnose
-// production "Failed to fetch" issues without guessing.
-const keyPrefix = supabaseAnonKey.substring(0, 20);
-const keyFormat = supabaseAnonKey.startsWith('eyJ')
-  ? 'JWT ✓'
-  : supabaseAnonKey.startsWith('sb_publishable_')
-    ? 'Readdy proxy key (may fail in published site — needs real anon key)'
-    : supabaseAnonKey.length === 0
-      ? 'MISSING'
-      : 'unknown format';
+const detectKeyFormat = (key: string): string => {
+  if (!key) return 'MISSING';
+  if (key.startsWith('eyJ')) return 'JWT (legacy anon key)';
+  if (key.startsWith('sb_publishable_')) return 'Publishable key (new format) ✓';
+  if (key.startsWith('sb_secret_')) return 'Secret key (do NOT use on frontend!)';
+  return `unknown format: ${key.substring(0, 12)}…`;
+};
 
-console.log('[ISG:Supabase] URL:', supabaseUrl || '(NOT SET)');
-console.log('[ISG:Supabase] Key prefix:', keyPrefix ? `${keyPrefix}…` : '(NOT SET)');
-console.log('[ISG:Supabase] Key format:', keyFormat);
-console.log('[ISG:Supabase] Auth endpoint:', supabaseUrl ? `${supabaseUrl}/auth/v1` : '(unknown)');
+console.log('[Supabase] URL:', supabaseUrl || '(NOT SET)');
+console.log('[Supabase] Key format:', detectKeyFormat(supabaseKey));
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Returns true if Supabase environment variables are properly configured.
- * Use this to show a friendly error instead of crashing.
+ * Returns true when Supabase environment variables are present and non-placeholder.
  */
 export const isSupabaseConfigured =
   supabaseUrl.length > 0 &&
   supabaseUrl !== 'https://your-project-id.supabase.co' &&
-  supabaseAnonKey.length > 0 &&
-  supabaseAnonKey !== 'your-anon-key-here';
+  supabaseKey.length > 0 &&
+  supabaseKey !== 'your-anon-key-here';
 
-/** The resolved Supabase project URL — exposed for diagnostic display */
+/** Exposed for diagnostics */
 export const resolvedSupabaseUrl = supabaseUrl;
-/** Key format indicator — exposed for diagnostic display */
-export const resolvedKeyFormat = keyFormat;
+export const resolvedKeyFormat = detectKeyFormat(supabaseKey);
 
 /**
- * Ping the Supabase health endpoint to test connectivity.
- * Returns { ok, error, detail, statusCode }.
- * Catches CORS / network errors and gives a specific diagnosis.
+ * Ping the Supabase health endpoint to test live connectivity.
+ * Works with both legacy JWT keys and new sb_publishable_ keys.
  */
 export async function testSupabaseConnection(): Promise<{
   ok: boolean;
@@ -59,25 +54,27 @@ export async function testSupabaseConnection(): Promise<{
     return {
       ok: false,
       error: 'Supabase yapılandırılmamış',
-      detail: 'VITE_SUPABASE_URL veya VITE_SUPABASE_ANON_KEY eksik.',
+      detail: 'VITE_PUBLIC_SUPABASE_URL veya VITE_PUBLIC_SUPABASE_ANON_KEY eksik.',
     };
   }
+
   try {
-    // Use the Supabase auth health endpoint — doesn't require auth, just tests reachability
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
       method: 'GET',
-      headers: { 'apikey': supabaseAnonKey },
+      headers: { apikey: supabaseKey },
       signal: controller.signal,
     });
     clearTimeout(timeout);
 
-    console.log(`[ISG:Supabase] Health check → ${response.status} ${response.statusText}`);
+    console.log(`[Supabase] Health check → ${response.status} ${response.statusText}`);
 
-    if (response.ok || response.status === 200) {
+    if (response.ok) {
       return { ok: true, statusCode: response.status };
     }
+
     const text = await response.text().catch(() => '');
     return {
       ok: false,
@@ -88,43 +85,39 @@ export async function testSupabaseConnection(): Promise<{
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isAbort = err instanceof Error && err.name === 'AbortError';
-    const isCors = msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('network');
+    const isNetwork =
+      msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('network');
 
-    console.error('[ISG:Supabase] Connection test failed:', msg);
+    console.error('[Supabase] Connection test failed:', msg);
 
     if (isAbort) {
       return {
         ok: false,
         error: 'Zaman aşımı',
-        detail: `Supabase ${supabaseUrl} adresine 8 saniyede ulaşılamadı. İnternet bağlantınızı kontrol edin.`,
+        detail: `${supabaseUrl} adresine 8 saniyede ulaşılamadı.`,
       };
     }
-    if (isCors) {
+    if (isNetwork) {
       return {
         ok: false,
-        error: 'CORS / Ağ Hatası (Failed to fetch)',
-        detail: `Yayınlanan site ${supabaseUrl} adresine erişemiyor. Supabase Dashboard → Authentication → URL Configuration → Site URL ve Redirect URLs bölümlerine yayın domaininizi ekleyin. Ayrıca ${supabaseUrl.replace('https://', '')} adresinin Supabase CORS izin listesinde olduğundan emin olun.`,
+        error: 'Ağ Hatası (Failed to fetch)',
+        detail: `Supabase → Authentication → URL Configuration bölümüne yayın domaininizi ekleyin (Site URL + Redirect URLs).`,
       };
     }
-    return {
-      ok: false,
-      error: msg,
-      detail: `Tam hata: ${msg}`,
-    };
+    return { ok: false, error: msg, detail: `Tam hata: ${msg}` };
   }
 }
 
 /**
- * Safe Supabase client — only initialised when config is valid.
- * If config is missing the app renders a friendly error screen instead of crashing.
+ * Singleton Supabase client.
+ * supabase-js 2.x supports both legacy JWT anon keys and new sb_publishable_ keys natively.
  */
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+  ? createClient(supabaseUrl, supabaseKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
     })
-  : // Provide a no-op mock so imports don't explode before the config check
-    createClient('https://placeholder.supabase.co', 'placeholder-key');
+  : createClient('https://placeholder.supabase.co', 'placeholder-key');
