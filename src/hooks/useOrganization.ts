@@ -177,74 +177,38 @@ export function useOrganization(user: User | null) {
     autoCreateDoneRef.current = user.id;
 
     try {
-      // CRITICAL: Check if user ALREADY has an org before creating a new one.
-      // This prevents duplicate org creation when autoCreateOrg is called multiple times.
-      const { data: existingMembership } = await supabase
-        .from('user_organizations')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (existingMembership) {
-        // User already has an org — just reload it
-        console.log('[ISG] autoCreateOrg: user already has org, reloading...');
-        await loadOrg();
-        return;
-      }
-
-      // No org found — create one
-      console.log('[ISG] autoCreateOrg: creating new org for user', user.id);
-
-      // CRITICAL: Ensure the auth session is fully active before insert.
-      // Without this, auth.uid() can return NULL inside RLS check even
-      // though the user object exists in frontend state.
+      // Use edge function (service role) to bypass RLS timing issues
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData?.session) {
         console.error('[ISG] autoCreateOrg: no valid session, aborting', sessionError?.message);
-        autoCreateDoneRef.current = null; // allow retry on next call
+        autoCreateDoneRef.current = null;
         return;
       }
 
-      const inviteCode = generateInviteCode();
-      const orgName = user.email
-        ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'Firmam'
-        : 'Firmam';
-      const { data: newOrg, error: orgError } = await supabase
-        .from('organizations')
-        .insert({ name: orgName, invite_code: inviteCode, created_by: user.id })
-        .select()
-        .maybeSingle();
+      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+      const accessToken = sessionData.session.access_token;
 
-      if (orgError || !newOrg) {
-        console.error('[ISG] autoCreateOrg org insert error:', orgError?.message);
+      const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => 'unknown');
+        console.error('[ISG] autoCreateOrg edge function error:', res.status, errBody);
+        autoCreateDoneRef.current = null;
         return;
       }
 
-      const { error: memberError } = await supabase
-        .from('user_organizations')
-        .insert({
-          user_id: user.id,
-          organization_id: newOrg.id,
-          role: 'admin',
-          email: user.email ?? '',
-          is_active: true,
-          must_change_password: false,
-        });
-
-      if (memberError) {
-        console.error('[ISG] autoCreateOrg member insert error:', memberError.message);
-        return;
-      }
-
-      await supabase.from('app_data').upsert(
-        { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
-        { onConflict: 'organization_id' },
-      );
-      await migrateLegacyData(user.id, newOrg.id);
+      const result = await res.json() as { org: { id: string; name: string; invite_code: string }; created: boolean };
+      console.log('[ISG] autoCreateOrg edge function result:', result);
       await loadOrg();
     } catch (err) {
       console.error('[ISG] autoCreateOrg exception:', err);
+      autoCreateDoneRef.current = null;
     } finally {
       autoCreateInProgressRef.current = false;
     }
