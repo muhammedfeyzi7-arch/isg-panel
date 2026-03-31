@@ -178,12 +178,21 @@ export function useOrganization(user: User | null) {
 
     try {
       // CRITICAL: Check if user ALREADY has an org before creating a new one.
-      const { data: existingMembership } = await supabase
+      // ALSO check for errors — maybeSingle() returns data=null for BOTH empty result AND error.
+      const { data: existingMembership, error: memberCheckError } = await supabase
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
+
+      if (memberCheckError) {
+        // Query failed — user might already have an org but we can't confirm.
+        // Safe approach: try to reload. If org loads, great. If not, we'll try again next session.
+        console.warn('[ISG] autoCreateOrg: membership check failed, attempting reload:', memberCheckError.message);
+        await loadOrg();
+        return;
+      }
 
       if (existingMembership) {
         console.log('[ISG] autoCreateOrg: user already has org, reloading...');
@@ -196,7 +205,7 @@ export function useOrganization(user: User | null) {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData?.session) {
         console.error('[ISG] autoCreateOrg: no valid session, aborting', sessionError?.message);
-        autoCreateDoneRef.current = null; // allow retry
+        autoCreateDoneRef.current = null; // allow retry on next load
         return;
       }
 
@@ -212,6 +221,8 @@ export function useOrganization(user: User | null) {
 
       if (orgError || !newOrg) {
         console.error('[ISG] autoCreateOrg org insert error:', orgError?.message);
+        // Could be a race condition (two tabs). Try to reload existing org.
+        await loadOrg();
         return;
       }
 
@@ -228,6 +239,9 @@ export function useOrganization(user: User | null) {
 
       if (memberError) {
         console.error('[ISG] autoCreateOrg member insert error:', memberError.message);
+        // CRITICAL: Even if membership insert failed (e.g. UNIQUE constraint — user already
+        // has another org), try to load whatever org exists. Never leave org=null silently.
+        await loadOrg();
         return;
       }
 
@@ -237,8 +251,11 @@ export function useOrganization(user: User | null) {
       );
       await migrateLegacyData(user.id, newOrg.id);
       await loadOrg();
+      console.log('[ISG] autoCreateOrg: org created and loaded successfully ✓');
     } catch (err) {
       console.error('[ISG] autoCreateOrg exception:', err);
+      // Last resort: try loading whatever org might exist
+      try { await loadOrg(); } catch { /* ignore */ }
     } finally {
       autoCreateInProgressRef.current = false;
     }
