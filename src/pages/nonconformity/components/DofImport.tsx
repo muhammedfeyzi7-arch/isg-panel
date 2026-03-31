@@ -43,46 +43,50 @@ function downloadTemplate() {
 
   // Column widths
   ws['!cols'] = [
-    { wch: 35 }, { wch: 50 }, { wch: 18 }, { wch: 25 },
-    { wch: 20 }, { wch: 28 }, { wch: 20 }, { wch: 40 },
+    { wch: 35 }, { wch: 50 }, { wch: 20 }, { wch: 28 },
+    { wch: 22 }, { wch: 30 }, { wch: 22 }, { wch: 42 },
   ];
 
-  // Style header row
-  const headerStyle = {
-    font: { bold: true, color: { rgb: 'FFFFFF' } },
-    fill: { fgColor: { rgb: '1E3A5F' } },
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-    border: {
-      top: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      left: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      right: { style: 'thin', color: { rgb: 'CCCCCC' } },
-    },
-  };
-
-  TEMPLATE_HEADERS.forEach((_, colIndex) => {
-    const cellRef = XLSX.utils.encode_cell({ r: 0, c: colIndex });
-    if (!ws[cellRef]) ws[cellRef] = {};
-    ws[cellRef].s = headerStyle;
-  });
+  // Freeze top row
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
 
   // Add validation note sheet
   const noteWs = XLSX.utils.aoa_to_sheet([
-    ['DÖF İçe Aktarma Şablonu - Notlar'],
+    ['DÖF İçe Aktarma Şablonu - Kullanım Kılavuzu'],
     [''],
-    ['Doldurma Kuralları:'],
-    ['• Başlık alanı zorunludur.'],
-    ['• Tarih formatı: YYYY-AA-GG (örn: 2026-03-15)'],
-    ['• Önem değerleri: Düşük | Orta | Yüksek | Kritik'],
-    ['• Firma Adı ve Personel Adı sistemde kayıtlı adlarla eşleştirilir.'],
-    ['• İlk satır başlık satırıdır, silmeyin.'],
-    ['• Örnek veriler 2. ve 3. satırlarda verilmiştir, silebilirsiniz.'],
+    ['DOLDURMA KURALLARI:'],
+    [''],
+    ['Kolon 1 — Başlık *       : Zorunlu alan. Uygunsuzluğun kısa adı.'],
+    ['Kolon 2 — Açıklama       : Detaylı açıklama (isteğe bağlı).'],
+    ['Kolon 3 — Tarih          : YYYY-AA-GG formatında (örn: 2026-03-15)'],
+    ['                           veya GG.AA.YYYY (örn: 15.03.2026)'],
+    ['Kolon 4 — Firma Adı      : Sistemde kayıtlı firma adıyla eşleştirilir.'],
+    ['Kolon 5 — Personel Adı   : Sistemde kayıtlı personel adıyla eşleştirilir.'],
+    ['Kolon 6 — Önem           : Düşük / Orta / Yüksek / Kritik'],
+    ['Kolon 7 — Bölüm/Alan     : Uygunsuzluğun tespit edildiği alan (isteğe bağlı).'],
+    ['Kolon 8 — Notlar         : Ek notlar (isteğe bağlı).'],
+    [''],
+    ['ÖNEMLİ NOTLAR:'],
+    ['• İlk satır başlık satırıdır — silmeyin veya değiştirmeyin.'],
+    ['• Örnek veriler (2-4. satırlar) içe aktarmadan önce silinebilir.'],
+    ['• Boş satırlar otomatik atlanır.'],
+    ['• Desteklenen format: .xlsx (Excel 2007+)'],
   ]);
-  noteWs['!cols'] = [{ wch: 70 }];
+  noteWs['!cols'] = [{ wch: 75 }];
 
   XLSX.utils.book_append_sheet(wb, ws, 'DÖF Verileri');
-  XLSX.utils.book_append_sheet(wb, noteWs, 'Notlar');
-  XLSX.writeFile(wb, 'DOF_Sablon.xlsx');
+  XLSX.utils.book_append_sheet(wb, noteWs, 'Kullanım Kılavuzu');
+
+  // Use blob-based download for better browser compatibility
+  const wbArray = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'DOF_Sablon.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
 }
 
 function parseExcelDate(val: unknown): string {

@@ -132,6 +132,26 @@ export function useStore(
   useEffect(() => { orgIdRef.current = organizationId; }, [organizationId]);
   useEffect(() => { userIdRef.current = userId; }, [userId]);
 
+  // ── Pending saves queue (saves queued before org is loaded) ──
+  const pendingSavesRef = useRef<{ table: string; item: { id: string } & Record<string, unknown> }[]>([]);
+
+  // Flush pending saves when orgId + userId become available
+  useEffect(() => {
+    if (!organizationId || !userId || orgLoading) return;
+    if (pendingSavesRef.current.length === 0) return;
+    const pending = [...pendingSavesRef.current];
+    pendingSavesRef.current = [];
+    console.log(`[ISG] Flushing ${pending.length} pending saves for org=${organizationId}`);
+    pending.forEach(({ table, item }) => {
+      dbUpsert(table, item, userId, organizationId).then(() => {
+        console.log(`[ISG] Pending save OK ${table}/${item.id} ✓`);
+      }).catch(err => {
+        console.error(`[ISG] Pending save FAILED ${table}/${item.id}:`, err);
+        onSaveErrorRef.current?.(`Bekleyen kayıt hatası (${table}): ${err instanceof Error ? err.message : String(err)}`);
+      });
+    });
+  }, [organizationId, userId, orgLoading]);
+
   // ── Stable setters ──
   const setFirmalar = useCallback((u: Firma[] | ((p: Firma[]) => Firma[])) => { _setFirmalar(u); }, []);
   const setPersoneller = useCallback((u: Personel[] | ((p: Personel[]) => Personel[])) => { _setPersoneller(u); }, []);
@@ -160,7 +180,9 @@ export function useStore(
     const orgId = orgIdRef.current;
     const uid = userIdRef.current;
     if (!orgId || !uid) {
-      console.error(`[ISG] SAVE SKIPPED ${table}/${item.id}: missing orgId=${orgId} userId=${uid}`);
+      // Queue the save — will be flushed once org becomes available
+      console.warn(`[ISG] SAVE QUEUED ${table}/${item.id}: orgId=${orgId} userId=${uid} not ready yet`);
+      pendingSavesRef.current.push({ table, item });
       return;
     }
     try {
