@@ -48,7 +48,6 @@ interface AppContextType extends StoreType {
   org: OrgInfo | null;
   orgLoading: boolean;
   orgError: string | null;
-  autoCreatePending: boolean;
   needsOnboarding: boolean;
   mustChangePassword: boolean;
   clearMustChangePassword: () => Promise<void>;
@@ -92,38 +91,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearMustChangePassword: clearMustChangePw,
   } = useOrganization(user);
 
-  // Keep a stable ref to autoCreateOrg so it never appears in useEffect deps.
-  // autoCreateOrg is NOT useCallback-wrapped in useOrganization, so its reference
-  // changes every render. Including it in deps causes React to cancel the timeout
-  // via cleanup and re-run the effect — but the ref guard then prevents a new timeout
-  // from starting, leaving autoCreatePending = true forever.
-  const autoCreateOrgRef = useRef(autoCreateOrg);
-  useEffect(() => { autoCreateOrgRef.current = autoCreateOrg; });
-
+  // Auto-create org when user has no org
+  // Uses a small delay to ensure the Supabase session token is fully active
+  // before the insert (prevents RLS auth.uid() = null race condition).
   const autoCreateAttemptedRef = useRef<string | null>(null);
-  const [autoCreatePending, setAutoCreatePending] = useState(false);
-
   useEffect(() => {
-    // Deps: user?.id, orgLoading, rawOrg — intentionally excludes autoCreateOrg
     if (!user || orgLoading || rawOrg) return;
     if (autoCreateAttemptedRef.current === user.id) return;
     autoCreateAttemptedRef.current = user.id;
-    setAutoCreatePending(true);
-
-    // 500ms so JWT session is fully stable before RLS-protected insert.
-    // IMPORTANT: No cleanup/clearTimeout here — the timeout MUST always complete.
-    // The autoCreateInProgressRef inside autoCreateOrg prevents duplicate execution.
-    setTimeout(async () => {
-      try {
-        await autoCreateOrgRef.current();
-      } catch (err) {
-        console.error('[ISG] AppContext autoCreate error:', err);
-      } finally {
-        setAutoCreatePending(false);
-      }
-    }, 500);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, orgLoading, rawOrg]);
+    // 500ms delay so the JWT session is fully stable before hitting RLS-protected insert
+    const t = setTimeout(() => { autoCreateOrg(); }, 500);
+    return () => clearTimeout(t);
+  }, [user, orgLoading, rawOrg, autoCreateOrg]);
 
   // Map rawOrg to OrgInfo with user display name
   const org = useMemo<OrgInfo | null>(() => {
@@ -254,9 +233,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await clearMustChangePw();
   }, [clearMustChangePw]);
 
-  // needsOnboarding is now only true if both autoCreate finished AND we still have no org AND there's a real error
-  // For normal new users, autoCreatePending will be true while org is being made — they never see onboarding
-  const needsOnboarding = false; // Onboarding redirect disabled — org is always created silently
+  const needsOnboarding = !org && !orgLoading && !!user && autoCreateAttemptedRef.current === user.id;
 
   return (
     <AppContext.Provider value={{
@@ -267,7 +244,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       quickCreate, setQuickCreate,
       theme, toggleTheme,
       bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
-      org, orgLoading, orgError: loadError, needsOnboarding, autoCreatePending,
+      org, orgLoading, orgError: loadError, needsOnboarding,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,
       createOrg,

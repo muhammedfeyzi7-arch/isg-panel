@@ -160,7 +160,7 @@ export function useOrganization(user: User | null) {
     }
   };
 
-  const autoCreateOrg = useCallback(async (): Promise<void> => {
+  const autoCreateOrg = async (): Promise<void> => {
     if (!user) return;
     // CRITICAL: Prevent multiple simultaneous calls
     if (autoCreateInProgressRef.current) {
@@ -178,34 +178,31 @@ export function useOrganization(user: User | null) {
 
     try {
       // CRITICAL: Check if user ALREADY has an org before creating a new one.
-      // ALSO check for errors — maybeSingle() returns data=null for BOTH empty result AND error.
-      const { data: existingMembership, error: memberCheckError } = await supabase
+      // This prevents duplicate org creation when autoCreateOrg is called multiple times.
+      const { data: existingMembership } = await supabase
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
 
-      if (memberCheckError) {
-        // Query failed — user might already have an org but we can't confirm.
-        // Safe approach: try to reload. If org loads, great. If not, we'll try again next session.
-        console.warn('[ISG] autoCreateOrg: membership check failed, attempting reload:', memberCheckError.message);
-        await loadOrg();
-        return;
-      }
-
       if (existingMembership) {
+        // User already has an org — just reload it
         console.log('[ISG] autoCreateOrg: user already has org, reloading...');
         await loadOrg();
         return;
       }
 
+      // No org found — create one
       console.log('[ISG] autoCreateOrg: creating new org for user', user.id);
 
+      // CRITICAL: Ensure the auth session is fully active before insert.
+      // Without this, auth.uid() can return NULL inside RLS check even
+      // though the user object exists in frontend state.
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData?.session) {
         console.error('[ISG] autoCreateOrg: no valid session, aborting', sessionError?.message);
-        autoCreateDoneRef.current = null; // allow retry on next load
+        autoCreateDoneRef.current = null; // allow retry on next call
         return;
       }
 
@@ -221,8 +218,6 @@ export function useOrganization(user: User | null) {
 
       if (orgError || !newOrg) {
         console.error('[ISG] autoCreateOrg org insert error:', orgError?.message);
-        // Could be a race condition (two tabs). Try to reload existing org.
-        await loadOrg();
         return;
       }
 
@@ -239,9 +234,6 @@ export function useOrganization(user: User | null) {
 
       if (memberError) {
         console.error('[ISG] autoCreateOrg member insert error:', memberError.message);
-        // CRITICAL: Even if membership insert failed (e.g. UNIQUE constraint — user already
-        // has another org), try to load whatever org exists. Never leave org=null silently.
-        await loadOrg();
         return;
       }
 
@@ -251,16 +243,12 @@ export function useOrganization(user: User | null) {
       );
       await migrateLegacyData(user.id, newOrg.id);
       await loadOrg();
-      console.log('[ISG] autoCreateOrg: org created and loaded successfully ✓');
     } catch (err) {
       console.error('[ISG] autoCreateOrg exception:', err);
-      // Last resort: try loading whatever org might exist
-      try { await loadOrg(); } catch { /* ignore */ }
     } finally {
       autoCreateInProgressRef.current = false;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, loadOrg]);
+  };
 
   const joinOrg = async (inviteCode: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Kullanıcı bulunamadı.' };

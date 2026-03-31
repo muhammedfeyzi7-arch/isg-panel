@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ToastContainer from '../../components/base/ToastContainer';
@@ -17,22 +18,15 @@ import CopKutusuPage from '../trash/page';
 import SettingsPage from '../settings/page';
 
 function AppContent() {
-  const { activeModule, dataLoading, orgLoading, autoCreatePending, orgError, org } = useApp();
-  const [hardTimeout, setHardTimeout] = useState(false);
+  const { activeModule, dataLoading, needsOnboarding, orgLoading, orgError, org } = useApp();
 
-  // Absolute safety net: if still loading after 15s, unblock the UI with an error
-  const isBootstrapping = (orgLoading || autoCreatePending || dataLoading) && !org;
-  useEffect(() => {
-    if (!isBootstrapping) { setHardTimeout(false); return; }
-    const t = setTimeout(() => {
-      console.error('[ISG] Hard timeout: loading lasted >15s — forcing error state');
-      setHardTimeout(true);
-    }, 15000);
-    return () => clearTimeout(t);
-  }, [isBootstrapping]);
+  // Org not found / create failed → send to onboarding so user can take action
+  if (needsOnboarding) {
+    return <Navigate to="/onboarding" replace />;
+  }
 
-  // Show error when org failed to load, autoCreate is not pending, OR hard timeout hit
-  if ((orgError && !org && !orgLoading && !autoCreatePending) || (hardTimeout && !org)) {
+  // Show error if org loading failed and we have no org
+  if (orgError && !org) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
         <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6">
@@ -41,9 +35,7 @@ function AppContent() {
             <i className="ri-error-warning-line text-red-400 text-xl" />
           </div>
           <p className="font-semibold text-slate-300">Organizasyon yüklenemedi</p>
-          <p className="text-sm" style={{ color: '#64748B' }}>
-            {orgError || 'Bağlantı zaman aşımı. Lütfen internet bağlantınızı kontrol edin.'}
-          </p>
+          <p className="text-sm" style={{ color: '#64748B' }}>{orgError}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer"
@@ -56,7 +48,7 @@ function AppContent() {
     );
   }
 
-  if (isBootstrapping) {
+  if ((orgLoading || dataLoading) && !org) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
         <div className="flex flex-col items-center gap-4">
@@ -66,7 +58,7 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-2" style={{ color: '#475569' }}>
             <i className="ri-loader-4-line text-lg animate-spin" />
-            <span className="text-sm">{autoCreatePending ? 'Organizasyon oluşturuluyor...' : 'Veriler yükleniyor...'}</span>
+            <span className="text-sm">Veriler yükleniyor...</span>
           </div>
         </div>
       </div>
