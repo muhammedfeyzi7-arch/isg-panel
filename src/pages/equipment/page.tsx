@@ -2,12 +2,73 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import Modal from '../../components/base/Modal';
 import type { Ekipman, EkipmanStatus } from '../../types';
-
 const EKIPMAN_TURLERI = [
   'İş Makinesi', 'Kaldırma Ekipmanı', 'Basınçlı Kap', 'Elektrikli Ekipman',
   'İskele / Platform', 'Koruyucu Donanım', 'Yangın Söndürücü', 'İlk Yardım Kiti',
   'Ölçüm Aleti', 'El Aleti', 'Diğer',
 ];
+
+function parseTrDate(d: string): string {
+  // Converts DD.MM.YYYY or DD/MM/YYYY to YYYY-MM-DD
+  const parts = d.split(/[./]/);
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  // Already ISO
+  if (d.match(/^\d{4}-\d{2}-\d{2}$/)) return d;
+  return '';
+}
+
+function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad: string }[]): void {
+  const headers = ['Ekipman Adı', 'Ekipman Türü', 'Firma Adı', 'Bulunduğu Alan', 'Seri No', 'Marka', 'Model', 'Son Kontrol (GG.AA.YYYY)', 'Sonraki Kontrol (GG.AA.YYYY)', 'Durum', 'Açıklama'];
+  const rows = ekipmanlar
+    .filter(e => !e.silinmis)
+    .map(e => {
+      const firma = firmalar.find(f => f.id === e.firmaId);
+      const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '';
+      return [
+        e.ad, e.tur, firma?.ad ?? '', e.bulunduguAlan, e.seriNo,
+        e.marka, e.model, fmtDate(e.sonKontrolTarihi), fmtDate(e.sonrakiKontrolTarihi),
+        e.durum, e.aciklama,
+      ];
+    });
+
+  const csvRows = [headers, ...rows].map(row =>
+    row.map(cell => {
+      const str = String(cell ?? '');
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    }).join(','),
+  );
+
+  const csvContent = '\uFEFF' + csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Ekipmanlar-${new Date().toLocaleDateString('tr-TR').replace(/\./g, '-')}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadEkipmanTemplate(): void {
+  const headers = ['Ekipman Adı', 'Ekipman Türü', 'Firma Adı', 'Bulunduğu Alan', 'Seri No', 'Marka', 'Model', 'Son Kontrol (GG.AA.YYYY)', 'Sonraki Kontrol (GG.AA.YYYY)', 'Durum', 'Açıklama'];
+  const example = ['Forklift', 'İş Makinesi', 'Örnek Firma A.Ş.', 'Depo', 'SN-001', 'Toyota', 'Model-X', '15.01.2025', '15.07.2025', 'Uygun', 'Yıllık bakım yapıldı'];
+  const csvContent = '\uFEFF' + [headers, example].map(row => row.join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'Ekipman-Sablonu.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: string; icon: string }> = {
   'Uygun': { label: 'Uygun', color: '#34D399', bg: 'rgba(52,211,153,0.12)', icon: 'ri-checkbox-circle-line' },
@@ -52,7 +113,11 @@ export default function EkipmanlarPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Ekipman, 'id' | 'olusturmaTarihi'>>(defaultForm);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (quickCreate === 'ekipmanlar') {
@@ -155,6 +220,50 @@ export default function EkipmanlarPage() {
     setDeleteId(null);
   };
 
+  const handleImportFile = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImportText(e.target?.result as string);
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  const handleImport = () => {
+    if (!importText.trim()) { addToast('Dosya içeriği boş.', 'error'); return; }
+    setImporting(true);
+    try {
+      // Remove BOM if present
+      const clean = importText.replace(/^\uFEFF/, '');
+      const lines = clean.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { addToast('Dosya geçerli veri içermiyor.', 'error'); setImporting(false); return; }
+      // Skip header row (index 0)
+      let count = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cells = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+        const [ad, tur, firmaAd, alan, seriNo, marka, model, sonKontrol, sonrakiKontrol, durum, aciklama] = cells;
+        if (!ad) continue;
+        const firma = firmalar.find(f => !f.silinmis && f.ad.toLowerCase() === firmaAd.toLowerCase());
+        const durumTyped: EkipmanStatus = ['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'].includes(durum) ? (durum as EkipmanStatus) : 'Uygun';
+        addEkipman({
+          ad, tur: tur || '', firmaId: firma?.id ?? '',
+          bulunduguAlan: alan || '', seriNo: seriNo || '',
+          marka: marka || '', model: model || '',
+          sonKontrolTarihi: parseTrDate(sonKontrol || ''),
+          sonrakiKontrolTarihi: parseTrDate(sonrakiKontrol || ''),
+          durum: durumTyped, aciklama: aciklama || '',
+          belgeMevcut: false, dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '', notlar: '',
+        });
+        count++;
+      }
+      addToast(`${count} ekipman başarıyla içe aktarıldı.`, 'success');
+      setShowImport(false);
+      setImportText('');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // inputStyle replaced by .isg-input CSS class
 
   return (
@@ -165,10 +274,18 @@ export default function EkipmanlarPage() {
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Ekipman Kontrolleri</h2>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Ekipman kayıtlarını ve kontrol durumlarını yönetin</p>
         </div>
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
-          <i className="ri-add-line text-base" />
-          Ekipman Ekle
-        </button>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button onClick={() => exportEkipmanToExcel(ekipmanlar, firmalar)} className="btn-secondary whitespace-nowrap">
+            <i className="ri-file-excel-2-line mr-1" />Excel İndir
+          </button>
+          <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
+            <i className="ri-upload-2-line mr-1" />Excel İçe Aktar
+          </button>
+          <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
+            <i className="ri-add-line text-base" />
+            Ekipman Ekle
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -553,10 +670,7 @@ export default function EkipmanlarPage() {
         size="sm"
       >
         <div className="text-center py-4">
-          <div
-            className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}
-          >
+          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <i className="ri-delete-bin-line text-2xl text-red-400" />
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu ekipmanı silmek istediğinizden emin misiniz?</p>
@@ -565,6 +679,58 @@ export default function EkipmanlarPage() {
         <div className="flex justify-center gap-3 mt-4">
           <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
           <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
+        </div>
+      </Modal>
+
+      {/* Import Modal */}
+      <Modal isOpen={showImport} onClose={() => { setShowImport(false); setImportText(''); }} title="Excel / CSV İçe Aktar" size="md" icon="ri-upload-2-line"
+        footer={
+          <>
+            <button onClick={downloadEkipmanTemplate} className="btn-secondary whitespace-nowrap"><i className="ri-download-line mr-1" />Şablon İndir</button>
+            <button onClick={() => { setShowImport(false); setImportText(''); }} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleImport} disabled={!importText || importing} className="btn-primary whitespace-nowrap disabled:opacity-50">
+              <i className="ri-check-line mr-1" />{importing ? 'Aktarılıyor...' : 'İçe Aktar'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl p-3.5" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
+            <p className="text-xs font-semibold mb-1" style={{ color: '#60A5FA' }}>Kullanım Kılavuzu</p>
+            <ul className="text-xs space-y-1" style={{ color: '#94A3B8' }}>
+              <li>• Önce <strong style={{ color: '#60A5FA' }}>Şablon İndir</strong> ile Excel şablonunu indirin</li>
+              <li>• Şablonu Excel&apos;de doldurun, CSV olarak kaydedin</li>
+              <li>• Durum değerleri: Uygun / Uygun Değil / Bakımda / Hurda</li>
+              <li>• Tarih formatı: GG.AA.YYYY (örn: 15.03.2025)</li>
+              <li>• Firma adı sistemdeki firma adıyla birebir eşleşmeli</li>
+            </ul>
+          </div>
+          <div
+            className="rounded-xl p-6 text-center cursor-pointer transition-all"
+            style={{ border: '2px dashed var(--border-main)', background: 'var(--bg-item)' }}
+            onClick={() => importFileRef.current?.click()}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.4)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-main)'; }}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); handleImportFile(e.dataTransfer.files[0]); }}
+          >
+            {importText ? (
+              <div className="flex items-center justify-center gap-3">
+                <i className="ri-file-check-line text-2xl" style={{ color: '#34D399' }} />
+                <div className="text-left">
+                  <p className="text-sm font-semibold" style={{ color: '#34D399' }}>Dosya yüklendi</p>
+                  <p className="text-xs" style={{ color: '#64748B' }}>{importText.split('\n').length - 1} satır tespit edildi</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <i className="ri-file-excel-2-line text-3xl mb-2" style={{ color: '#475569' }} />
+                <p className="text-sm font-medium" style={{ color: '#64748B' }}>CSV dosyanızı sürükleyin veya tıklayın</p>
+                <p className="text-xs mt-1" style={{ color: '#334155' }}>Excel&apos;den CSV olarak kaydedilmiş dosyalar desteklenir</p>
+              </>
+            )}
+          </div>
+          <input ref={importFileRef} type="file" accept=".csv,.txt" className="hidden" onChange={e => handleImportFile(e.target.files?.[0])} />
         </div>
       </Modal>
     </div>

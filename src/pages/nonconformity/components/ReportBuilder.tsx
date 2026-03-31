@@ -3,7 +3,7 @@ import Modal from '../../../components/base/Modal';
 import { useApp } from '../../../store/AppContext';
 import type { Uygunsuzluk } from '../../../types';
 import { STATUS_CONFIG, SEV_CONFIG } from '../utils/statusHelper';
-import { printDofRaporu } from '../utils/dofPdfGenerator';
+import { printDofRaporu, exportDofToExcel } from '../utils/dofPdfGenerator';
 
 interface Props {
   isOpen: boolean;
@@ -18,6 +18,7 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
   const [statusFilter, setStatusFilter] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const aktif = useMemo(() => uygunsuzluklar.filter(u => !u.silinmis && !u.cascadeSilindi), [uygunsuzluklar]);
 
@@ -56,6 +57,16 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
     }
   };
 
+  const handleExcelExport = () => {
+    if (selectedRecords.length === 0) return;
+    setExporting(true);
+    try {
+      exportDofToExcel(selectedRecords, firmalar, personeller);
+    } finally {
+      setTimeout(() => setExporting(false), 800);
+    }
+  };
+
   const allSelected = filtered.length > 0 && filtered.every(u => selected.has(u.id));
 
   return (
@@ -69,6 +80,15 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
                 {selectedRecords.length} kayıt seçildi
               </span>
             )}
+            <button
+              onClick={handleExcelExport}
+              disabled={selectedRecords.length === 0 || exporting}
+              className="whitespace-nowrap px-4 py-2 rounded-lg font-semibold text-sm transition-all cursor-pointer disabled:opacity-50"
+              style={{ background: '#16A34A', color: '#fff' }}
+            >
+              <i className="ri-file-excel-2-line mr-1.5" />
+              {exporting ? 'İndiriliyor...' : 'Excel İndir'}
+            </button>
             <button
               onClick={handleGenerate}
               disabled={selectedRecords.length === 0 || generating}

@@ -17,10 +17,10 @@ const EGITIM_TURLERI = [
   'Diğer',
 ];
 
-const STATUS_CFG: Record<EgitimStatus, { color: string; bg: string; border: string; icon: string }> = {
-  'Planlandı': { color: '#60A5FA', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.2)', icon: 'ri-calendar-schedule-line' },
-  'Tamamlandı': { color: '#34D399', bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.2)', icon: 'ri-checkbox-circle-line' },
-  'Eksik': { color: '#F97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.2)', icon: 'ri-error-warning-line' },
+const STATUS_CFG: Record<EgitimStatus, { color: string; bg: string; border: string; icon: string; label: string }> = {
+  'Planlandı': { color: '#60A5FA', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.2)', icon: 'ri-time-line', label: 'Bekliyor' },
+  'Tamamlandı': { color: '#34D399', bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.2)', icon: 'ri-file-check-line', label: 'Evrak Yüklendi' },
+  'Eksik': { color: '#F97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.2)', icon: 'ri-error-warning-line', label: 'Evrak Eksik' },
 };
 
 function getStatusColor(s: string): 'sky' | 'green' | 'amber' {
@@ -29,11 +29,11 @@ function getStatusColor(s: string): 'sky' | 'green' | 'amber' {
   return 'sky';
 }
 
-const emptyEgitim: Omit<Egitim, 'id' | 'olusturmaTarihi'> = {
-  ad: '', firmaId: '', katilimciIds: [], tarih: '', gecerlilikSuresi: 12,
-  egitmen: '', yer: '', sure: 0, durum: 'Planlandı', belgeMevcut: false,
-  aciklama: '', belgeDosyaAdi: '', belgeDosyaBoyutu: 0, belgeDosyaTipi: '', belgeDosyaVeri: '', notlar: '',
-};
+  const emptyEgitim: Omit<Egitim, 'id' | 'olusturmaTarihi'> = {
+    ad: '', firmaId: '', katilimciIds: [], tarih: '', gecerlilikSuresi: 12,
+    egitmen: '', yer: '', sure: 0, durum: 'Eksik', belgeMevcut: false,
+    aciklama: '', belgeDosyaAdi: '', belgeDosyaBoyutu: 0, belgeDosyaTipi: '', belgeDosyaVeri: '', notlar: '',
+  };
 
 function downloadFromDataUrl(dataUrl: string, filename: string): void {
   try {
@@ -69,6 +69,11 @@ export default function EgitimlerPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const emptyEgitim: Omit<Egitim, 'id' | 'olusturmaTarihi'> = {
+    ad: '', firmaId: '', katilimciIds: [], tarih: '', gecerlilikSuresi: 12,
+    egitmen: '', yer: '', sure: 0, durum: 'Eksik', belgeMevcut: false,
+    aciklama: '', belgeDosyaAdi: '', belgeDosyaBoyutu: 0, belgeDosyaTipi: '', belgeDosyaVeri: '', notlar: '',
+  };
   const [form, setForm] = useState({ ...emptyEgitim });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -110,7 +115,7 @@ export default function EgitimlerPage() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const veri = ev.target?.result as string;
-      setForm(prev => ({ ...prev, belgeDosyaAdi: file.name, belgeDosyaBoyutu: file.size, belgeDosyaTipi: file.type, belgeDosyaVeri: veri, belgeMevcut: true }));
+      setForm(prev => ({ ...prev, belgeDosyaAdi: file.name, belgeDosyaBoyutu: file.size, belgeDosyaTipi: file.type, belgeDosyaVeri: veri, belgeMevcut: true, durum: 'Tamamlandı' }));
     };
     reader.readAsDataURL(file);
   };
@@ -165,24 +170,24 @@ export default function EgitimlerPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Eğitim Yönetimi</h1>
-          <p className="text-sm mt-1" style={{ color: '#475569' }}>Personel eğitim ve belge takibi</p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Eğitim Evrakları</h1>
+          <p className="text-sm mt-1" style={{ color: '#475569' }}>Personellerin eğitim evraklarını yükleyin ve takip edin</p>
         </div>
         <button onClick={openAdd} className="btn-primary whitespace-nowrap">
           <i className="ri-add-circle-line text-base" />
-          Yeni Eğitim Ekle
+          Eğitim Evrakı Ekle
         </button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Toplam Eğitim', value: stats.toplam, icon: 'ri-graduation-cap-line', color: 'var(--text-primary)', bg: 'var(--bg-input)', border: 'var(--border-main)' },
-          { label: 'Planlandı', value: stats.planlandi, icon: 'ri-calendar-schedule-line', color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.2)' },
-          { label: 'Tamamlandı', value: stats.tamamlandi, icon: 'ri-checkbox-circle-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)' },
-          { label: 'Eksik / Belgesi Yok', value: stats.eksik, icon: 'ri-error-warning-line', color: '#F97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.2)' },
+          { label: 'Toplam Evrak', value: stats.toplam, icon: 'ri-graduation-cap-line', color: 'var(--text-primary)', bg: 'var(--bg-input)', border: 'var(--border-main)' },
+          { label: 'Bekliyor', value: stats.planlandi, icon: 'ri-time-line', color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.2)' },
+          { label: 'Evrak Yüklendi', value: stats.tamamlandi, icon: 'ri-file-check-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)' },
+          { label: 'Evrak Eksik', value: stats.eksik, icon: 'ri-error-warning-line', color: '#F97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.2)' },
         ].map(s => (
-          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4 transition-all duration-200 hover:scale-[1.02] cursor-pointer" style={{ border: `1px solid ${s.border}`, background: s.bg }} onClick={() => setStatusFilter(s.label === 'Toplam Eğitim' ? '' : s.label === 'Eksik / Belgesi Yok' ? 'Eksik' : s.label)}>
+          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4 transition-all duration-200 hover:scale-[1.02] cursor-pointer" style={{ border: `1px solid ${s.border}`, background: s.bg }} onClick={() => setStatusFilter(s.label === 'Toplam Evrak' ? '' : s.label === 'Evrak Eksik' ? 'Eksik' : s.label === 'Evrak Yüklendi' ? 'Tamamlandı' : 'Planlandı')}>
             <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${s.color}18` }}>
               <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
             </div>
@@ -208,7 +213,7 @@ export default function EgitimlerPage() {
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ minWidth: '140px' }}>
           <option value="">Tüm Durumlar</option>
-          {Object.keys(STATUS_CFG).map(s => <option key={s} value={s}>{s}</option>)}
+          {Object.keys(STATUS_CFG).map(s => <option key={s} value={s}>{STATUS_CFG[s as EgitimStatus].label}</option>)}
         </select>
         {(search || firmaFilter || statusFilter) && (
           <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); }} className="btn-secondary whitespace-nowrap">
@@ -224,9 +229,9 @@ export default function EgitimlerPage() {
             <i className="ri-graduation-cap-line text-3xl" style={{ color: 'var(--text-faint)' }} />
           </div>
           <p className="text-base font-bold" style={{ color: 'var(--text-muted)' }}>
-            {search || firmaFilter || statusFilter ? 'Sonuç bulunamadı' : 'Henüz eğitim kaydı eklenmedi'}
+            {search || firmaFilter || statusFilter ? 'Sonuç bulunamadı' : 'Henüz eğitim evrakı eklenmedi'}
           </p>
-          <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Yeni Eğitim Ekle</button>
+          <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Eğitim Evrakı Ekle</button>
         </div>
       ) : (
         <div className="isg-card rounded-2xl overflow-hidden">
@@ -269,7 +274,7 @@ export default function EgitimlerPage() {
                         </span>
                       </td>
                       <td className="hidden sm:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'}</span></td>
-                      <td><Badge label={eg.durum} color={getStatusColor(eg.durum)} /></td>
+                      <td><Badge label={STATUS_CFG[eg.durum as EgitimStatus]?.label ?? eg.durum} color={getStatusColor(eg.durum)} /></td>
                       <td className="hidden lg:table-cell">
                         {hasBelge ? (
                           <button onClick={() => handleBelgeIndir(eg)} className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-all whitespace-nowrap" style={{ color: '#34D399' }}
@@ -301,7 +306,7 @@ export default function EgitimlerPage() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title={editingId ? 'Eğitim Düzenle' : 'Yeni Eğitim Ekle'}
+        title={editingId ? 'Eğitim Evrakı Düzenle' : 'Eğitim Evrakı Ekle'}
         size="lg"
         icon="ri-graduation-cap-line"
         footer={
@@ -309,7 +314,7 @@ export default function EgitimlerPage() {
             <button onClick={() => setFormOpen(false)} className="btn-secondary whitespace-nowrap">İptal</button>
             <button onClick={handleSave} className="btn-primary whitespace-nowrap">
               <i className={editingId ? 'ri-save-line' : 'ri-add-line'} />
-              {editingId ? 'Güncelle' : 'Eğitim Ekle'}
+              {editingId ? 'Güncelle' : 'Evrak Ekle'}
             </button>
           </>
         }
@@ -351,9 +356,9 @@ export default function EgitimlerPage() {
           <div>
             <label className="form-label">Durum</label>
             <select value={form.durum} onChange={e => setForm(p => ({ ...p, durum: e.target.value as EgitimStatus }))} className="isg-input">
-              <option value="Planlandı">Planlandı</option>
-              <option value="Tamamlandı">Tamamlandı</option>
-              <option value="Eksik">Eksik</option>
+              <option value="Tamamlandı">Evrak Yüklendi</option>
+              <option value="Eksik">Evrak Eksik</option>
+              <option value="Planlandı">Bekliyor</option>
             </select>
           </div>
 
@@ -438,7 +443,7 @@ export default function EgitimlerPage() {
         >
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
-              <Badge label={detailEgitim.durum} color={getStatusColor(detailEgitim.durum)} />
+              <Badge label={STATUS_CFG[detailEgitim.durum as EgitimStatus]?.label ?? detailEgitim.durum} color={getStatusColor(detailEgitim.durum)} />
               <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}>
                 {getFirmaAd(detailEgitim.firmaId)}
               </span>

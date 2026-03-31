@@ -208,7 +208,7 @@ function buildHtml(tutanak: Tutanak, firma: Firma | undefined, dosyaVeri?: strin
   <!-- HEADER -->
   <div class="hdr">
     <div class="hdr-left">
-      <div class="hdr-tc">T.C.</div>
+      <div class="hdr-tc">${esc(firma?.ad ?? 'ISG Denetim')}</div>
       <div class="hdr-title">İŞ SAĞLIĞI VE GÜVENLİĞİ</div>
       <div class="hdr-sub">Denetim ve Kontrol Tutanağı</div>
     </div>

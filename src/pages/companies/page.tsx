@@ -254,15 +254,24 @@ export default function FirmalarPage() {
                         className="group cursor-pointer text-left"
                       >
                         <div className="flex items-center gap-3">
-                          <div
-                            className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-xs font-bold text-white"
-                            style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}
-                          >
-                            {firma.ad.charAt(0).toUpperCase()}
-                          </div>
+                          {(() => {
+                            const logoUrl = getFirmaLogo(firma.id);
+                            return logoUrl ? (
+                              <div className="w-9 h-9 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <img src={logoUrl} alt={firma.ad} className="w-full h-full object-contain p-0.5" />
+                              </div>
+                            ) : (
+                              <div
+                                className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-xs font-bold text-white"
+                                style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}
+                              >
+                                {firma.ad.charAt(0).toUpperCase()}
+                              </div>
+                            );
+                          })()}
                           <div>
                             <p className="text-sm font-semibold text-slate-200 group-hover:text-blue-400 transition-colors">{firma.ad}</p>
-                            <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{firma.vergiNo || 'Vergi no yok'}</p>
+                            {firma.sgkSicil && <p className="text-xs mt-0.5" style={{ color: '#475569' }}>SGK: {firma.sgkSicil}</p>}
                           </div>
                         </div>
                       </button>

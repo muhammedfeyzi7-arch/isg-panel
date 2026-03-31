@@ -14,7 +14,7 @@ const menuGroups = [
     label: 'YÖNETİM',
     items: [
       { id: 'evraklar', label: 'Evrak Takibi', icon: 'ri-file-list-3-line' },
-      { id: 'egitimler', label: 'Eğitim Yönetimi', icon: 'ri-graduation-cap-line' },
+      { id: 'egitimler', label: 'Eğitim Evrakları', icon: 'ri-graduation-cap-line' },
       { id: 'muayeneler', label: 'Sağlık Evrakları', icon: 'ri-heart-pulse-line' },
       { id: 'tutanaklar', label: 'Tutanaklar', icon: 'ri-article-line' },
       { id: 'uygunsuzluklar', label: 'Saha Denetim', icon: 'ri-map-pin-user-line' },
