@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ToastContainer from '../../components/base/ToastContainer';
@@ -18,12 +17,7 @@ import CopKutusuPage from '../trash/page';
 import SettingsPage from '../settings/page';
 
 function AppContent() {
-  const { activeModule, dataLoading, needsOnboarding, orgLoading, orgError, org } = useApp();
-
-  // Org not found / create failed → send to onboarding so user can take action
-  if (needsOnboarding) {
-    return <Navigate to="/onboarding" replace />;
-  }
+  const { activeModule, dataLoading, orgLoading, orgError, org } = useApp();
 
   // Show error if org loading failed and we have no org
   if (orgError && !org) {

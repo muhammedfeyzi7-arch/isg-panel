@@ -48,7 +48,6 @@ interface AppContextType extends StoreType {
   org: OrgInfo | null;
   orgLoading: boolean;
   orgError: string | null;
-  needsOnboarding: boolean;
   mustChangePassword: boolean;
   clearMustChangePassword: () => Promise<void>;
   createOrg: (name: string, userId: string) => Promise<{ error: string | null }>;
@@ -233,8 +232,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await clearMustChangePw();
   }, [clearMustChangePw]);
 
-  const needsOnboarding = !org && !orgLoading && !!user && autoCreateAttemptedRef.current === user.id;
-
   return (
     <AppContext.Provider value={{
       ...store,
@@ -244,7 +241,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       quickCreate, setQuickCreate,
       theme, toggleTheme,
       bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
-      org, orgLoading, orgError: loadError, needsOnboarding,
+      org, orgLoading, orgError: loadError,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,
       createOrg,

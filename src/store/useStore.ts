@@ -214,7 +214,8 @@ export function useStore(
           .from(table)
           .select('id, data, created_at')
           .eq('user_id', userId)
-          .eq('organization_id', organizationId)
+          // No organization_id filter — fetch ALL user data regardless of which org it's in.
+          // This prevents data loss when auto-org creation generates a new org ID.
           .order('created_at', { ascending: false }),
       ),
     ).then(results => {
