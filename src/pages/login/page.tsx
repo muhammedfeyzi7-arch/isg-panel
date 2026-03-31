@@ -1,6 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../../store/AuthContext';
-import { testSupabaseConnection, resolvedSupabaseUrl, resolvedKeyFormat } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 const LOGO_URL =
@@ -40,7 +39,7 @@ const PARTICLES = Array.from({ length: 22 }, (_, i) => ({
 }));
 
 export default function LoginPage() {
-  const { login, connectionError } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,22 +47,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [connTest, setConnTest] = useState<{ tested: boolean; ok: boolean; error?: string; detail?: string } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
-  }, []);
-
-  // Run a connection test on mount so production CORS/network failures are immediately visible
-  useEffect(() => {
-    let cancelled = false;
-    testSupabaseConnection().then(result => {
-      if (cancelled) return;
-      console.log('[ISG:Login] Connection test result:', result);
-      setConnTest({ tested: true, ...result });
-    });
-    return () => { cancelled = true; };
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -84,40 +71,11 @@ export default function LoginPage() {
     }
   };
 
-  // Show the most relevant error: auth connectionError > login form error
-  const displayError = connectionError || error;
-  const isCorsError = !!connectionError || (!!error && (error.includes('Failed to fetch') || error.includes('CORS') || error.includes('Ağ Hatası')));
-
   return (
     <div
       className="min-h-screen flex relative overflow-hidden"
       style={{ background: 'linear-gradient(150deg, #040C1A 0%, #061628 45%, #050E1C 75%, #030A15 100%)' }}
     >
-      {/* ── Connection status banner ── */}
-      {connTest && !connTest.ok && (
-        <div className="fixed top-0 left-0 right-0 z-50 px-4 py-3" style={{ background: 'rgba(239,68,68,0.92)', backdropFilter: 'blur(8px)' }}>
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-start gap-3">
-              <i className="ri-error-warning-line text-white text-lg flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-bold">Supabase Bağlantı Hatası: {connTest.error}</p>
-                <p className="text-red-100 text-xs mt-1 leading-relaxed break-words">{connTest.detail}</p>
-                <div className="flex flex-wrap gap-3 mt-2 text-xs text-red-200">
-                  <span>URL: <code className="text-white">{resolvedSupabaseUrl || '(boş)'}</code></span>
-                  <span>Anahtar: <code className="text-white">{resolvedKeyFormat}</code></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {connTest && connTest.ok && (
-        <div className="fixed top-0 left-0 right-0 z-50 px-4 py-2" style={{ background: 'rgba(16,185,129,0.85)', backdropFilter: 'blur(8px)' }}>
-          <p className="text-center text-white text-xs font-medium">
-            <i className="ri-checkbox-circle-line mr-1" /> Supabase bağlantısı başarılı — {resolvedSupabaseUrl}
-          </p>
-        </div>
-      )}
       <style>{`
         @keyframes floatParticle { 0%,100%{transform:translateY(0) scale(1);opacity:var(--op)}50%{transform:translateY(-18px) scale(1.3);opacity:calc(var(--op)*1.6)} }
         @keyframes loginFadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
@@ -327,17 +285,10 @@ export default function LoginPage() {
                 </div>
 
                 {/* Error */}
-                {displayError && (
-                  <div className="flex items-start gap-3 rounded-xl p-3.5" style={{ background: isCorsError ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)', border: `1px solid ${isCorsError ? 'rgba(239,68,68,0.35)' : 'rgba(239,68,68,0.2)'}` }}>
-                    <i className={`${isCorsError ? 'ri-wifi-off-line' : 'ri-error-warning-line'} text-sm flex-shrink-0 mt-0.5`} style={{ color: '#F87171' }} />
-                    <div>
-                      <p className="text-sm leading-relaxed" style={{ color: '#FCA5A5' }}>{displayError.split('\n')[0]}</p>
-                      {isCorsError && (
-                        <p className="text-xs mt-1.5 leading-relaxed" style={{ color: '#FDA4A4' }}>
-                          Supabase Dashboard → Authentication → URL Configuration → <strong>Site URL</strong> ve <strong>Redirect URLs</strong> alanlarına yayın domaininizi ekleyin.
-                        </p>
-                      )}
-                    </div>
+                {error && (
+                  <div className="flex items-start gap-3 rounded-xl p-3.5" style={{ background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)' }}>
+                    <i className="ri-error-warning-line text-sm flex-shrink-0 mt-0.5" style={{ color:'#F87171' }} />
+                    <p className="text-sm leading-relaxed" style={{ color:'#FCA5A5' }}>{error}</p>
                   </div>
                 )}
 

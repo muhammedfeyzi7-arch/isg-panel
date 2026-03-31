@@ -208,12 +208,12 @@ export function useStore(
       'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar',
     ] as const;
 
-    console.log(`[ISG] Load query: organization_id=${organizationId} (org-scoped, all members)`);
     Promise.all(
       TABLES.map(table =>
         supabase
           .from(table)
           .select('id, data, created_at')
+          .eq('user_id', userId)
           .eq('organization_id', organizationId)
           .order('created_at', { ascending: false }),
       ),
