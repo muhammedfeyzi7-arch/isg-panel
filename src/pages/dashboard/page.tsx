@@ -9,6 +9,7 @@ import {
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 
 export default function DashboardPage() {
+  const [welcomeDone, setWelcomeDone] = useState(false);
   const [showWelcome] = useState(() => {
     const flag = sessionStorage.getItem('isg_show_welcome');
     if (flag === 'true') { sessionStorage.removeItem('isg_show_welcome'); return true; }
@@ -93,7 +94,9 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <>
+      {showWelcome && !welcomeDone && <WelcomeAnimation onDone={() => setWelcomeDone(true)} />}
+    <div className="space-y-6" style={showWelcome && !welcomeDone ? { opacity: 0, pointerEvents: 'none' } : undefined}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Kontrol Paneli</h1>
@@ -354,6 +357,7 @@ export default function DashboardPage() {
         })}
       </div>
     </div>
+    </>
   );
 }
 

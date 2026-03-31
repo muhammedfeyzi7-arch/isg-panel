@@ -321,7 +321,6 @@ export default function FirmalarPage() {
           <FormField label="Yetkili Kişi" value={f('yetkiliKisi')} onChange={v => set('yetkiliKisi', v)} placeholder="Yetkili kişi adı" />
           <FormField label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0212 000 00 00" />
           <FormField label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="info@firma.com" type="email" />
-          <FormField label="Vergi No" value={f('vergiNo')} onChange={v => set('vergiNo', v)} placeholder="1234567890" />
           <FormField label="SGK Sicil No" value={f('sgkSicil')} onChange={v => set('sgkSicil', v)} placeholder="SGK sicil numarası" />
           <div className="md:col-span-2">
             <FormField label="Adres" value={f('adres')} onChange={v => set('adres', v)} placeholder="Firma adresi" />

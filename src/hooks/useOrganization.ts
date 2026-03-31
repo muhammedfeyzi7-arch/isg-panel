@@ -162,12 +162,10 @@ export function useOrganization(user: User | null) {
 
   const autoCreateOrg = async (): Promise<void> => {
     if (!user) return;
-    // CRITICAL: Prevent multiple simultaneous calls
     if (autoCreateInProgressRef.current) {
       console.log('[ISG] autoCreateOrg already in progress, skipping');
       return;
     }
-    // CRITICAL: Only run once per user session
     if (autoCreateDoneRef.current === user.id) {
       console.log('[ISG] autoCreateOrg already ran for this user, skipping');
       return;
@@ -177,34 +175,78 @@ export function useOrganization(user: User | null) {
     autoCreateDoneRef.current = user.id;
 
     try {
-      // Use edge function (service role) to bypass RLS timing issues
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData?.session) {
-        console.error('[ISG] autoCreateOrg: no valid session, aborting', sessionError?.message);
+      // Step 1: Double-check no org exists (race condition guard)
+      const { data: existingCheck } = await supabase
+        .from('user_organizations')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingCheck) {
+        console.log('[ISG] autoCreateOrg: org already exists, loading');
+        await loadOrg();
+        return;
+      }
+
+      // Step 2: Create org directly via Supabase client (no edge function dependency)
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      const orgName = user.email
+        ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'ISG Firması'
+        : 'ISG Firması';
+
+      const { data: newOrg, error: orgError } = await supabase
+        .from('organizations')
+        .insert({ name: orgName, invite_code: inviteCode, created_by: user.id })
+        .select()
+        .maybeSingle();
+
+      if (orgError || !newOrg) {
+        console.error('[ISG] autoCreateOrg: org insert failed:', orgError?.message);
+        // Fallback: try edge function
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session) {
+            const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+            const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${sessionData.session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            if (res.ok) {
+              console.log('[ISG] autoCreateOrg: edge function fallback succeeded');
+              await loadOrg();
+              return;
+            }
+          }
+        } catch (fallbackErr) {
+          console.error('[ISG] autoCreateOrg: edge function fallback also failed:', fallbackErr);
+        }
         autoCreateDoneRef.current = null;
         return;
       }
 
-      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-      const accessToken = sessionData.session.access_token;
+      const { error: memberError } = await supabase
+        .from('user_organizations')
+        .insert({
+          user_id: user.id,
+          organization_id: newOrg.id,
+          role: 'admin',
+          email: user.email ?? '',
+          is_active: true,
+          must_change_password: false,
+        });
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!res.ok) {
-        const errBody = await res.text().catch(() => 'unknown');
-        console.error('[ISG] autoCreateOrg edge function error:', res.status, errBody);
+      if (memberError) {
+        console.error('[ISG] autoCreateOrg: member insert failed:', memberError.message);
         autoCreateDoneRef.current = null;
         return;
       }
 
-      const result = await res.json() as { org: { id: string; name: string; invite_code: string }; created: boolean };
-      console.log('[ISG] autoCreateOrg edge function result:', result);
+      console.log('[ISG] autoCreateOrg: org created successfully', newOrg.id);
       await loadOrg();
     } catch (err) {
       console.error('[ISG] autoCreateOrg exception:', err);

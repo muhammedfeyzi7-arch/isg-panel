@@ -6,12 +6,13 @@ import NonconformityForm from './components/NonconformityForm';
 import KapatmaModal from './components/KapatmaModal';
 import DetailModal from './components/DetailModal';
 import ReportBuilder from './components/ReportBuilder';
+import DofImport from './components/DofImport';
 import Modal from '../../components/base/Modal';
 
 export default function UygunsuzluklarPage() {
   const {
     uygunsuzluklar, firmalar, personeller,
-    deleteUygunsuzluk, addToast, quickCreate, setQuickCreate,
+    deleteUygunsuzluk, addUygunsuzluk, addToast, quickCreate, setQuickCreate,
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -27,6 +28,7 @@ export default function UygunsuzluklarPage() {
   const [detailRecord, setDetailRecord] = useState<Uygunsuzluk | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     if (quickCreate === 'uygunsuzluklar') {
@@ -76,6 +78,33 @@ export default function UygunsuzluklarPage() {
   const resetFilters = () => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); setDateFrom(''); setDateTo(''); };
   const hasFilters = search || firmaFilter || statusFilter || dateFrom || dateTo;
 
+  const handleDofImport = (rows: { baslik: string; aciklama: string; tarih: string; firmaAd: string; personelAd: string; severity: string; bolum: string; notlar: string }[]) => {
+    let importedCount = 0;
+    rows.forEach(row => {
+      if (!row.baslik) return;
+      const firma = firmalar.find(f => !f.silinmis && f.ad.toLowerCase() === row.firmaAd.toLowerCase());
+      const personel = personeller.find(p => !p.silinmis && p.adSoyad.toLowerCase() === row.personelAd.toLowerCase());
+      const sevMapping: Record<string, 'Düşük' | 'Orta' | 'Yüksek' | 'Kritik'> = {
+        'Düşük': 'Düşük', 'Orta': 'Orta', 'Yüksek': 'Yüksek', 'Kritik': 'Kritik',
+      };
+      addUygunsuzluk({
+        baslik: row.baslik,
+        aciklama: row.aciklama || '',
+        tarih: row.tarih || new Date().toISOString().split('T')[0],
+        firmaId: firma?.id ?? '',
+        personelId: personel?.id,
+        severity: sevMapping[row.severity] ?? 'Orta',
+        bolum: row.bolum || '',
+        notlar: row.notlar || '',
+        durum: 'Açık',
+        acilisFotoMevcut: false,
+        kapatmaFotoMevcut: false,
+      });
+      importedCount++;
+    });
+    addToast(`${importedCount} DÖF kaydı başarıyla içe aktarıldı.`, 'success');
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -83,9 +112,12 @@ export default function UygunsuzluklarPage() {
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetim</h2>
           <p className="text-sm mt-1" style={{ color: '#64748B' }}>Uygunsuzlukları kaydedin, takip edin ve raporlayın</p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <button onClick={() => setShowReport(true)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-chart-line mr-1" />DÖF Raporu
+          </button>
+          <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
+            <i className="ri-file-excel-2-line mr-1" />Excel İçe Aktar
           </button>
           <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap">
             <i className="ri-add-line mr-1" />Yeni Kayıt
@@ -246,6 +278,7 @@ export default function UygunsuzluklarPage() {
       <KapatmaModal record={kapatmaRecord} onClose={() => setKapatmaRecord(null)} />
       <DetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onKapat={r => { setDetailRecord(null); setKapatmaRecord(r); }} onEdit={r => { setDetailRecord(null); openEdit(r); }} />
       <ReportBuilder isOpen={showReport} onClose={() => setShowReport(false)} />
+      <DofImport isOpen={showImport} onClose={() => setShowImport(false)} onImport={handleDofImport} />
 
       <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Kaydı Sil" size="sm" icon="ri-delete-bin-line"
         footer={<><button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button><button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button></>}>
