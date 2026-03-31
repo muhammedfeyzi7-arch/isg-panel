@@ -119,25 +119,45 @@ export default function SettingsPage() {
     e.currentTarget.style.boxShadow = 'none';
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setBackupLoading(true);
     try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      const tarih = new Date().toISOString().slice(0, 10);
+
+      // Ana veri JSON
       const exportData = {
         exportDate: new Date().toISOString(),
         version: '2.0.0',
         firmalar, personeller, evraklar, egitimler,
         muayeneler, uygunsuzluklar, ekipmanlar, gorevler, tutanaklar,
       };
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      zip.file('isg_veriler.json', JSON.stringify(exportData, null, 2));
+
+      // Evrak dosyalarını ayrı klasöre koy
+      const evrakFolder = zip.folder('evraklar');
+      evraklar.filter(e => !e.silinmis && e.dosyaVeri).forEach(e => {
+        try {
+          const base64 = e.dosyaVeri!.split(',')[1];
+          if (base64 && evrakFolder) {
+            const ext = e.dosyaAdi?.split('.').pop() || 'pdf';
+            const personelAd = personeller.find(p => p.id === e.personelId)?.adSoyad?.replace(/\s+/g, '_') || 'firma';
+            evrakFolder.file(`${personelAd}_${e.ad.replace(/\s+/g, '_')}.${ext}`, base64, { base64: true });
+          }
+        } catch { /* skip bad file */ }
+      });
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `isg_yedek_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `isg_yedek_${tarih}.zip`;
       a.click();
       URL.revokeObjectURL(url);
-      addToast('Veriler başarıyla dışa aktarıldı.', 'success');
+      addToast('ZIP yedek başarıyla indirildi — tüm evraklar dahil.', 'success');
     } catch {
-      addToast('Dışa aktarma sırasında hata oluştu.', 'error');
+      addToast('Yedekleme sırasında hata oluştu.', 'error');
     } finally {
       setBackupLoading(false);
     }
@@ -635,7 +655,7 @@ export default function SettingsPage() {
         <div className="flex flex-wrap gap-3 pt-1">
           <button onClick={handleExport} disabled={backupLoading} className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 cursor-pointer" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)', opacity: backupLoading ? 0.7 : 1 }}>
             <i className={backupLoading ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} />
-            {backupLoading ? 'Hazırlanıyor...' : 'JSON Yedek İndir'}
+            {backupLoading ? 'Hazırlanıyor...' : 'ZIP Yedek İndir (Evraklar Dahil)'}
           </button>
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.04)', border: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(15,23,42,0.1)', color: subColor }}>
             <i className="ri-calendar-check-line" />

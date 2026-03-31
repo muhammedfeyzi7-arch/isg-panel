@@ -8,9 +8,12 @@ import {
 } from 'recharts';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 
-export default function DashboardPage() {
+interface DashboardProps { skipWelcome?: boolean; }
+
+export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
   const [welcomeDone, setWelcomeDone] = useState(false);
   const [showWelcome] = useState(() => {
+    if (skipWelcome) return false;
     const flag = sessionStorage.getItem('isg_show_welcome');
     if (flag === 'true') { sessionStorage.removeItem('isg_show_welcome'); return true; }
     return false;

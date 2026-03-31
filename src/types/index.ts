@@ -114,6 +114,10 @@ export interface Muayene {
   doktor: string;
   notlar: string;
   belgeMevcut: boolean;
+  dosyaAdi?: string;
+  dosyaBoyutu?: number;
+  dosyaTipi?: string;
+  dosyaVeri?: string;
   olusturmaTarihi: string;
   silinmis?: boolean;
   silinmeTarihi?: string;

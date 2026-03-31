@@ -5,6 +5,7 @@ import type { Evrak, EvrakStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import { getEvrakKategori, KATEGORI_META } from '../../utils/evrakKategori';
+import OtoEvrakModal from './components/OtoEvrakModal';
 
 const EVRAK_TURLERI = ['Kimlik', 'EK-2', 'Sağlık Raporu', 'Sürücü Belgesi', 'SRC', 'Sertifika / MYK / Diploma', 'Oryantasyon Eğitimi', 'İşbaşı Eğitimi', 'İş Sözleşmesi', 'Diğer'];
 
@@ -45,6 +46,9 @@ export default function EvraklarPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyEvrak });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [otoEvrakOpen, setOtoEvrakOpen] = useState(false);
+  const [otoDefaultPersonelId, setOtoDefaultPersonelId] = useState('');
+  const [otoDefaultFirmaId, setOtoDefaultFirmaId] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   // PersonelDetayModal'dan "Evrak Ekle" butonuyla gelindiğinde pre-fill
@@ -187,6 +191,21 @@ export default function EvraklarPage() {
         <button onClick={openAdd} className="btn-primary">
           <i className="ri-file-add-line text-base" />
           Yeni Evrak
+        </button>
+        <button
+          onClick={() => {
+            setOtoDefaultPersonelId('');
+            setOtoDefaultFirmaId('');
+            setOtoEvrakOpen(true);
+          }}
+          className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 cursor-pointer"
+          style={{
+            background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+            boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+          }}
+        >
+          <i className="ri-magic-line text-base" />
+          Oto Evrak Oluştur
         </button>
       </div>
 
@@ -460,6 +479,13 @@ export default function EvraklarPage() {
           <p className="text-xs" style={{ color: '#94A3B8' }}>Evrak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
+      {/* Oto Evrak Modal */}
+      <OtoEvrakModal
+        open={otoEvrakOpen}
+        onClose={() => setOtoEvrakOpen(false)}
+        defaultPersonelId={otoDefaultPersonelId}
+        defaultFirmaId={otoDefaultFirmaId}
+      />
     </div>
   );
 }

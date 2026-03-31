@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import Modal from '../../components/base/Modal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
@@ -21,6 +21,10 @@ const defaultForm: Omit<Muayene, 'id' | 'olusturmaTarihi'> = {
   doktor: '',
   notlar: '',
   belgeMevcut: false,
+  dosyaAdi: '',
+  dosyaBoyutu: 0,
+  dosyaTipi: '',
+  dosyaVeri: '',
 };
 
 function getDaysUntil(dateStr: string): number {
@@ -37,6 +41,7 @@ export default function MuayenelerPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Muayene, 'id' | 'olusturmaTarihi'>>(defaultForm);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (quickCreate === 'muayeneler') {
@@ -104,8 +109,27 @@ export default function MuayenelerPage() {
   const openAdd = () => { setEditId(null); setForm(defaultForm); setShowModal(true); };
   const openEdit = (m: Muayene) => {
     setEditId(m.id);
-    setForm({ personelId: m.personelId, firmaId: m.firmaId, muayeneTarihi: m.muayeneTarihi, sonrakiTarih: m.sonrakiTarih, sonuc: m.sonuc, hastane: m.hastane, doktor: m.doktor, notlar: m.notlar, belgeMevcut: m.belgeMevcut });
+    setForm({
+      personelId: m.personelId, firmaId: m.firmaId, muayeneTarihi: m.muayeneTarihi,
+      sonrakiTarih: m.sonrakiTarih, sonuc: m.sonuc, hastane: m.hastane,
+      doktor: m.doktor, notlar: m.notlar, belgeMevcut: m.belgeMevcut,
+      dosyaAdi: m.dosyaAdi || '', dosyaBoyutu: m.dosyaBoyutu || 0,
+      dosyaTipi: m.dosyaTipi || '', dosyaVeri: m.dosyaVeri || '',
+    });
     setShowModal(true);
+  };
+
+  const handleFileChange = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const veri = e.target?.result as string;
+      setForm(p => ({
+        ...p, dosyaAdi: file.name, dosyaBoyutu: file.size,
+        dosyaTipi: file.type, dosyaVeri: veri, belgeMevcut: true,
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = () => {
@@ -415,6 +439,42 @@ export default function MuayenelerPage() {
               ))}
             </div>
           </div>
+          {form.belgeMevcut && (
+            <div className="sm:col-span-2">
+              <label className="form-label">Belge Dosyası (PDF / JPG / PNG)</label>
+              <div
+                className="rounded-xl p-5 text-center cursor-pointer transition-all duration-200"
+                style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
+                onClick={() => fileRef.current?.click()}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; e.currentTarget.style.background = 'rgba(59,130,246,0.04)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
+              >
+                {form.dosyaAdi ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.12)' }}>
+                      <i className="ri-file-check-line text-lg" style={{ color: '#10B981' }} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-slate-200">{form.dosyaAdi}</p>
+                      <p className="text-xs" style={{ color: '#475569' }}>{form.dosyaBoyutu ? `${(form.dosyaBoyutu / 1024).toFixed(1)} KB` : ''}</p>
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); setForm(p => ({ ...p, dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '' })); }} className="ml-2 w-6 h-6 flex items-center justify-center rounded-full cursor-pointer" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
+                      <i className="ri-close-line text-xs" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <i className="ri-upload-cloud-2-line text-2xl mb-2" style={{ color: '#334155' }} />
+                    <p className="text-sm text-slate-400">Dosyayı buraya sürükleyin veya tıklayın</p>
+                    <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG — Maks. 10MB</p>
+                  </>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={e => handleFileChange(e.target.files?.[0])} />
+            </div>
+          )}
           <div className="sm:col-span-2">
             <label className="form-label">Notlar</label>
             <textarea value={form.notlar} onChange={e => setForm(p => ({ ...p, notlar: e.target.value }))} placeholder="Ek notlar..." rows={3} maxLength={500} className="isg-input" />

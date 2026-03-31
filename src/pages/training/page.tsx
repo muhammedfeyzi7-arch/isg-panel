@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { useApp } from '../../store/AppContext';
 import type { Egitim, EgitimStatus } from '../../types';
 import Modal from '../../components/base/Modal';
@@ -66,7 +67,6 @@ export default function EgitimlerPage() {
   const { egitimler, firmalar, personeller, addEgitim, updateEgitim, deleteEgitim, getEgitimFile, addToast, quickCreate, setQuickCreate } = useApp();
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const emptyEgitim: Omit<Egitim, 'id' | 'olusturmaTarihi'> = {
@@ -97,9 +97,8 @@ export default function EgitimlerPage() {
     if (e.silinmis) return false;
     const q = search.toLowerCase();
     return (!search || e.ad.toLowerCase().includes(q) || (e.aciklama || '').toLowerCase().includes(q))
-      && (!firmaFilter || e.firmaId === firmaFilter)
-      && (!statusFilter || e.durum === statusFilter);
-  }), [egitimler, search, firmaFilter, statusFilter]);
+      && (!firmaFilter || e.firmaId === firmaFilter);
+  }), [egitimler, search, firmaFilter]);
 
   const getFirmaAd = (id: string) => firmalar.find(fi => fi.id === id)?.ad || '—';
 
@@ -165,6 +164,85 @@ export default function EgitimlerPage() {
 
   const detailEgitim = egitimler.find(e => e.id === detailId);
 
+  /* ── Excel Şablon İndir ── */
+  const handleTemplateDownload = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Eğitim Türü *', 'Firma Adı *', 'Tarih (YYYY-MM-DD)', 'Açıklama', 'Notlar'],
+      ['İSG Temel Eğitimi', 'Örnek Firma A.Ş.', '2024-01-15', 'Temel ISG kuralları eğitimi', ''],
+    ]);
+    ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Eğitim Evrakları');
+    XLSX.writeFile(wb, 'egitim_sablon.xlsx');
+    addToast('Şablon indirildi.', 'success');
+  };
+
+  /* ── Excel Export ── */
+  const handleExcelExport = () => {
+    if (filtered.length === 0) { addToast('Dışa aktarılacak kayıt yok.', 'warning'); return; }
+    const rows = filtered.map(eg => ({
+      'Eğitim Türü': eg.ad,
+      'Firma': getFirmaAd(eg.firmaId),
+      'Tarih': eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—',
+      'Katılımcı Sayısı': eg.katilimciIds.length,
+      'Belge Mevcut': eg.belgeMevcut ? 'Evet' : 'Hayır',
+      'Belge Adı': eg.belgeDosyaAdi || '—',
+      'Açıklama': eg.aciklama || '',
+      'Notlar': eg.notlar || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 40 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Eğitim Evrakları');
+    XLSX.writeFile(wb, `egitim_evraklari_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    addToast(`${filtered.length} kayıt Excel'e aktarıldı.`, 'success');
+  };
+
+  /* ── Excel Import ── */
+  const excelImportRef = useRef<HTMLInputElement>(null);
+  const handleExcelImport = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
+        let added = 0;
+        rows.forEach(row => {
+          const ad = (row['Eğitim Türü'] || '').trim();
+          if (!ad) return;
+          const firmaAdi = (row['Firma Adı'] || '').trim();
+          const firma = firmalar.find(f => f.ad.toLowerCase() === firmaAdi.toLowerCase() && !f.silinmis);
+          addEgitim({
+            ad,
+            firmaId: firma?.id || '',
+            katilimciIds: [],
+            tarih: row['Tarih (YYYY-MM-DD)'] || row['Tarih'] || '',
+            gecerlilikSuresi: 12,
+            egitmen: '',
+            yer: '',
+            sure: 0,
+            durum: 'Eksik',
+            belgeMevcut: false,
+            aciklama: row['Açıklama'] || '',
+            belgeDosyaAdi: '',
+            belgeDosyaBoyutu: 0,
+            belgeDosyaTipi: '',
+            belgeDosyaVeri: '',
+            notlar: row['Notlar'] || '',
+          });
+          added++;
+        });
+        addToast(`${added} eğitim evrakı içe aktarıldı.`, 'success');
+      } catch {
+        addToast('Excel dosyası okunamadı. Lütfen şablonu kullanın.', 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -173,10 +251,25 @@ export default function EgitimlerPage() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Eğitim Evrakları</h1>
           <p className="text-sm mt-1" style={{ color: '#475569' }}>Personellerin eğitim evraklarını yükleyin ve takip edin</p>
         </div>
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap">
-          <i className="ri-add-circle-line text-base" />
-          Eğitim Evrakı Ekle
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={handleTemplateDownload} className="btn-secondary whitespace-nowrap">
+            <i className="ri-download-2-line text-base" />
+            Şablon
+          </button>
+          <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap" style={{ color: '#22C55E', borderColor: 'rgba(34,197,94,0.3)' }}>
+            <i className="ri-file-excel-2-line text-base" />
+            Excel İndir
+          </button>
+          <button onClick={() => excelImportRef.current?.click()} className="btn-secondary whitespace-nowrap" style={{ color: '#F59E0B', borderColor: 'rgba(245,158,11,0.3)' }}>
+            <i className="ri-upload-2-line text-base" />
+            Excel İçe Aktar
+          </button>
+          <input ref={excelImportRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => handleExcelImport(e.target.files?.[0])} />
+          <button onClick={openAdd} className="btn-primary whitespace-nowrap">
+            <i className="ri-add-circle-line text-base" />
+            Eğitim Evrakı Ekle
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -187,7 +280,7 @@ export default function EgitimlerPage() {
           { label: 'Evrak Yüklendi', value: stats.tamamlandi, icon: 'ri-file-check-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)' },
           { label: 'Evrak Eksik', value: stats.eksik, icon: 'ri-error-warning-line', color: '#F97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.2)' },
         ].map(s => (
-          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4 transition-all duration-200 hover:scale-[1.02] cursor-pointer" style={{ border: `1px solid ${s.border}`, background: s.bg }} onClick={() => setStatusFilter(s.label === 'Toplam Evrak' ? '' : s.label === 'Evrak Eksik' ? 'Eksik' : s.label === 'Evrak Yüklendi' ? 'Tamamlandı' : 'Planlandı')}>
+          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4 transition-all duration-200 hover:scale-[1.02] cursor-pointer" style={{ border: `1px solid ${s.border}`, background: s.bg }} onClick={() => setFirmaFilter('')}>
             <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${s.color}18` }}>
               <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
             </div>
@@ -211,12 +304,8 @@ export default function EgitimlerPage() {
           <option value="">Tüm Firmalar</option>
           {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
         </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ minWidth: '140px' }}>
-          <option value="">Tüm Durumlar</option>
-          {Object.keys(STATUS_CFG).map(s => <option key={s} value={s}>{STATUS_CFG[s as EgitimStatus].label}</option>)}
-        </select>
-        {(search || firmaFilter || statusFilter) && (
-          <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); }} className="btn-secondary whitespace-nowrap">
+        {(search || firmaFilter) && (
+          <button onClick={() => { setSearch(''); setFirmaFilter(''); }} className="btn-secondary whitespace-nowrap">
             <i className="ri-filter-off-line" /> Temizle
           </button>
         )}
@@ -229,7 +318,7 @@ export default function EgitimlerPage() {
             <i className="ri-graduation-cap-line text-3xl" style={{ color: 'var(--text-faint)' }} />
           </div>
           <p className="text-base font-bold" style={{ color: 'var(--text-muted)' }}>
-            {search || firmaFilter || statusFilter ? 'Sonuç bulunamadı' : 'Henüz eğitim evrakı eklenmedi'}
+            {search || firmaFilter ? 'Sonuç bulunamadı' : 'Henüz eğitim evrakı eklenmedi'}
           </p>
           <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Eğitim Evrakı Ekle</button>
         </div>
@@ -243,7 +332,6 @@ export default function EgitimlerPage() {
                   <th className="text-left hidden md:table-cell">Firma</th>
                   <th className="text-left hidden lg:table-cell">Katılımcılar</th>
                   <th className="text-left hidden sm:table-cell">Tarih</th>
-                  <th className="text-left">Durum</th>
                   <th className="text-left hidden lg:table-cell">Belge</th>
                   <th className="w-28 text-right">İşlemler</th>
                 </tr>
@@ -274,7 +362,6 @@ export default function EgitimlerPage() {
                         </span>
                       </td>
                       <td className="hidden sm:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'}</span></td>
-                      <td><Badge label={STATUS_CFG[eg.durum as EgitimStatus]?.label ?? eg.durum} color={getStatusColor(eg.durum)} /></td>
                       <td className="hidden lg:table-cell">
                         {hasBelge ? (
                           <button onClick={() => handleBelgeIndir(eg)} className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-all whitespace-nowrap" style={{ color: '#34D399' }}
