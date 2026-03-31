@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
 import WelcomeAnimation from './components/WelcomeAnimation';
@@ -42,8 +42,27 @@ export default function DashboardPage() {
     const eksik = aktifEvraklar.filter(e => e.durum === 'Eksik' || e.durum === 'Süre Dolmuş').length;
     const acikU = aktifUygunsuzluklar.filter(u => u.durum === 'Açık').length;
     const acikGorev = aktifGorevler.filter(g => g.durum !== 'Tamamlandı').length;
-    return { yaklaşan, eksik, acikU, acikGorev };
-  }, [aktifEvraklar, aktifUygunsuzluklar, aktifGorevler]);
+
+    // Son 30 gün trendi
+    const now = Date.now();
+    const d30 = now - 30 * 86400000;
+    const d60 = now - 60 * 86400000;
+    const firmaLast30 = aktifFirmalar.filter(f => new Date(f.olusturmaTarihi).getTime() >= d30).length;
+    const firmaPrev30 = aktifFirmalar.filter(f => { const t = new Date(f.olusturmaTarihi).getTime(); return t >= d60 && t < d30; }).length;
+    const personelLast30 = aktifPersoneller.filter(p => new Date(p.olusturmaTarihi).getTime() >= d30).length;
+    const personelPrev30 = aktifPersoneller.filter(p => { const t = new Date(p.olusturmaTarihi).getTime(); return t >= d60 && t < d30; }).length;
+
+    const calcTrend = (curr: number, prev: number) => {
+      if (prev === 0) return curr > 0 ? { pct: 100, dir: 'up' as const } : null;
+      const pct = Math.round(((curr - prev) / prev) * 100);
+      return { pct: Math.abs(pct), dir: pct >= 0 ? 'up' as const : 'down' as const };
+    };
+    return {
+      yaklaşan, eksik, acikU, acikGorev,
+      firmaLast30, firmaTrend: calcTrend(firmaLast30, firmaPrev30),
+      personelLast30, personelTrend: calcTrend(personelLast30, personelPrev30),
+    };
+  }, [aktifEvraklar, aktifUygunsuzluklar, aktifGorevler, aktifFirmalar, aktifPersoneller]);
 
   const evrakPie = useMemo(() => [
     { name: 'Yüklü', value: aktifEvraklar.filter(e => e.durum === 'Yüklü').length },
@@ -87,10 +106,10 @@ export default function DashboardPage() {
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
 
   const statCards = [
-    { label: 'Toplam Firma', value: aktifFirmalar.length, icon: 'ri-building-2-line', sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`, gradient: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.08))', border: 'rgba(59,130,246,0.2)', iconBg: 'linear-gradient(135deg, #3B82F6, #6366F1)', iconShadow: '0 8px 20px rgba(99,102,241,0.3)', valueColor: 'linear-gradient(135deg, #60A5FA, #818CF8)' },
-    { label: 'Toplam Personel', value: aktifPersoneller.length, icon: 'ri-team-line', sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`, gradient: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))', border: 'rgba(16,185,129,0.2)', iconBg: 'linear-gradient(135deg, #10B981, #059669)', iconShadow: '0 8px 20px rgba(16,185,129,0.3)', valueColor: 'linear-gradient(135deg, #34D399, #10B981)' },
-    { label: 'Eksik / Süresi Dolmuş', value: stats.eksik, icon: 'ri-file-warning-line', sub: `${stats.yaklaşan} evrak 30 gün içinde`, gradient: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.08))', border: 'rgba(239,68,68,0.2)', iconBg: 'linear-gradient(135deg, #EF4444, #DC2626)', iconShadow: '0 8px 20px rgba(239,68,68,0.3)', valueColor: 'linear-gradient(135deg, #FCA5A5, #F87171)' },
-    { label: 'Açık Uygunsuzluk', value: stats.acikU, icon: 'ri-alert-line', sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, gradient: stats.acikU > 0 ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(220,38,38,0.08))' : 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))', border: stats.acikU > 0 ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', iconShadow: stats.acikU > 0 ? '0 8px 20px rgba(239,68,68,0.35)' : '0 8px 20px rgba(16,185,129,0.3)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #34D399, #10B981)' },
+    { label: 'Toplam Firma', value: aktifFirmalar.length, icon: 'ri-building-2-line', sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`, trend: stats.firmaTrend, trendLabel: `Son 30g: +${stats.firmaLast30}`, gradient: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.08))', border: 'rgba(59,130,246,0.2)', iconBg: 'linear-gradient(135deg, #3B82F6, #6366F1)', iconShadow: '0 8px 20px rgba(99,102,241,0.3)', valueColor: 'linear-gradient(135deg, #60A5FA, #818CF8)' },
+    { label: 'Toplam Personel', value: aktifPersoneller.length, icon: 'ri-team-line', sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`, trend: stats.personelTrend, trendLabel: `Son 30g: +${stats.personelLast30}`, gradient: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))', border: 'rgba(16,185,129,0.2)', iconBg: 'linear-gradient(135deg, #10B981, #059669)', iconShadow: '0 8px 20px rgba(16,185,129,0.3)', valueColor: 'linear-gradient(135deg, #34D399, #10B981)' },
+    { label: 'Eksik / Süresi Dolmuş', value: stats.eksik, icon: 'ri-file-warning-line', sub: `${stats.yaklaşan} evrak 30 gün içinde`, trend: null, trendLabel: null, gradient: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.08))', border: 'rgba(239,68,68,0.2)', iconBg: 'linear-gradient(135deg, #EF4444, #DC2626)', iconShadow: '0 8px 20px rgba(239,68,68,0.3)', valueColor: 'linear-gradient(135deg, #FCA5A5, #F87171)' },
+    { label: 'Açık Uygunsuzluk', value: stats.acikU, icon: 'ri-alert-line', sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, trend: null, trendLabel: null, gradient: stats.acikU > 0 ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(220,38,38,0.08))' : 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))', border: stats.acikU > 0 ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', iconShadow: stats.acikU > 0 ? '0 8px 20px rgba(239,68,68,0.35)' : '0 8px 20px rgba(16,185,129,0.3)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #34D399, #10B981)' },
   ];
 
   return (
@@ -163,11 +182,28 @@ export default function DashboardPage() {
               <div className="w-11 h-11 flex items-center justify-center rounded-xl" style={{ background: card.iconBg, boxShadow: card.iconShadow }}>
                 <i className={`${card.icon} text-white text-lg`} />
               </div>
+              {card.trend && (
+                <span
+                  className="flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full"
+                  style={{
+                    background: card.trend.dir === 'up' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                    color: card.trend.dir === 'up' ? '#34D399' : '#F87171',
+                  }}
+                >
+                  <i className={card.trend.dir === 'up' ? 'ri-arrow-up-line' : 'ri-arrow-down-line'} />
+                  {card.trend.pct}%
+                </span>
+              )}
             </div>
             <div>
               <p className="text-4xl font-extrabold" style={{ background: card.valueColor, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}>{card.value}</p>
               <p className="text-sm font-semibold mt-2" style={{ color: 'var(--text-primary)' }}>{card.label}</p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{card.sub}</p>
+              {card.trendLabel && (
+                <p className="text-[11px] mt-1.5 font-medium" style={{ color: 'var(--text-faint, #64748B)' }}>
+                  <i className="ri-time-line mr-1" />{card.trendLabel}
+                </p>
+              )}
             </div>
           </div>
         ))}

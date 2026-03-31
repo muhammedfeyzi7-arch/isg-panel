@@ -128,19 +128,13 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Bottom stats */}
+          {/* Bottom info */}
           <div className="mt-10 pt-8" style={{ borderTop: '1px solid rgba(6,182,212,0.1)' }}>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { value: '500+', label: 'Firma' },
-                { value: '10K+', label: 'Evrak' },
-                { value: '99.9%', label: 'Uptime' },
-              ].map((s) => (
-                <div key={s.label} className="text-center">
-                  <p className="text-2xl font-extrabold" style={{ background: 'linear-gradient(135deg,#06B6D4,#10B981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{s.value}</p>
-                  <p className="text-xs mt-0.5" style={{ color: '#3A7A90' }}>{s.label}</p>
-                </div>
-              ))}
+            <div className="flex items-center gap-3 justify-center">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.12)' }}>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+                <span className="text-xs font-semibold" style={{ color: '#3A9BB5' }}>Tüm sistemler çalışıyor</span>
+              </div>
             </div>
           </div>
         </div>

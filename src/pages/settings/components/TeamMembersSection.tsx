@@ -3,7 +3,7 @@ import { useApp } from '../../../store/AppContext';
 import { useAuth } from '../../../store/AuthContext';
 import { supabase } from '../../../lib/supabase';
 
-const EDGE_URL = 'https://dhwthspnuzxowmhumfoy.supabase.co/functions/v1/admin-user-management';
+const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
 interface Member {
   user_id: string;
