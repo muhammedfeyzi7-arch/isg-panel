@@ -57,13 +57,15 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
     }
   };
 
-  const handleExcelExport = () => {
+  const handleExcelExport = async () => {
     if (selectedRecords.length === 0) return;
     setExporting(true);
     try {
-      exportDofToExcel(selectedRecords, firmalar, personeller);
+      await exportDofToExcel(selectedRecords, firmalar, personeller);
+    } catch {
+      // silent
     } finally {
-      setTimeout(() => setExporting(false), 800);
+      setExporting(false);
     }
   };
 

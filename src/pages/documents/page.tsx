@@ -6,6 +6,7 @@ import Modal from '../../components/base/Modal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import { getEvrakKategori, KATEGORI_META } from '../../utils/evrakKategori';
 import OtoEvrakModal from './components/OtoEvrakModal';
+import BulkEvrakUpload from './components/BulkEvrakUpload';
 
 const EVRAK_TURLERI = ['Kimlik', 'EK-2', 'Sağlık Raporu', 'Sürücü Belgesi', 'SRC', 'Sertifika / MYK / Diploma', 'Oryantasyon Eğitimi', 'İşbaşı Eğitimi', 'İş Sözleşmesi', 'Diğer'];
 
@@ -49,6 +50,7 @@ export default function EvraklarPage() {
   const [otoEvrakOpen, setOtoEvrakOpen] = useState(false);
   const [otoDefaultPersonelId, setOtoDefaultPersonelId] = useState('');
   const [otoDefaultFirmaId, setOtoDefaultFirmaId] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // PersonelDetayModal'dan "Evrak Ekle" butonuyla gelindiğinde pre-fill
@@ -188,25 +190,38 @@ export default function EvraklarPage() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Takibi</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{evraklar.length} toplam evrak — durum otomatik hesaplanır</p>
         </div>
-        <button onClick={openAdd} className="btn-primary">
-          <i className="ri-file-add-line text-base" />
-          Yeni Evrak
-        </button>
-        <button
-          onClick={() => {
-            setOtoDefaultPersonelId('');
-            setOtoDefaultFirmaId('');
-            setOtoEvrakOpen(true);
-          }}
-          className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 cursor-pointer"
-          style={{
-            background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-            boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
-          }}
-        >
-          <i className="ri-magic-line text-base" />
-          Oto Evrak Oluştur
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={openAdd} className="btn-primary">
+            <i className="ri-file-add-line text-base" />
+            Yeni Evrak
+          </button>
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 cursor-pointer"
+            style={{
+              background: 'linear-gradient(135deg, #10B981, #059669)',
+              boxShadow: '0 4px 12px rgba(16,185,129,0.3)',
+            }}
+          >
+            <i className="ri-upload-cloud-2-line text-base" />
+            Toplu Yükle
+          </button>
+          <button
+            onClick={() => {
+              setOtoDefaultPersonelId('');
+              setOtoDefaultFirmaId('');
+              setOtoEvrakOpen(true);
+            }}
+            className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 cursor-pointer"
+            style={{
+              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+              boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+            }}
+          >
+            <i className="ri-magic-line text-base" />
+            Oto Evrak Oluştur
+          </button>
+        </div>
       </div>
 
       {/* Status Stats */}
@@ -479,6 +494,8 @@ export default function EvraklarPage() {
           <p className="text-xs" style={{ color: '#94A3B8' }}>Evrak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
+      {/* Bulk Upload Modal */}
+      <BulkEvrakUpload open={bulkOpen} onClose={() => setBulkOpen(false)} />
       {/* Oto Evrak Modal */}
       <OtoEvrakModal
         open={otoEvrakOpen}

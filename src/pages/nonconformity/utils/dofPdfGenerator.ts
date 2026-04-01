@@ -163,12 +163,18 @@ export function printDofRaporu(
   win.addEventListener('afterprint', () => clearTimeout(fb));
 }
 
-export function exportDofToExcel(
+export async function exportDofToExcel(
   records: Uygunsuzluk[],
   firmalar: Firma[],
   personeller: Personel[],
-): void {
-  const headers = ['No', 'DÖF No', 'Tarih', 'Firma', 'Personel', 'Başlık', 'Uygunsuzluk Açıklaması', 'Alınması Gereken Önlemler', 'Sorumlu', 'Hedef Tarih', 'Kapanma Tarihi', 'Durum'];
+): Promise<void> {
+  const XLSX = await import('xlsx');
+
+  const headers = [
+    'No', 'DÖF No', 'Tarih', 'Firma', 'Personel', 'Başlık',
+    'Uygunsuzluk Açıklaması', 'Alınması Gereken Önlemler',
+    'Sorumlu', 'Hedef Tarih', 'Kapanma Tarihi', 'Durum',
+  ];
 
   const rows = records.map((r, i) => {
     const firma = firmalar.find(f => f.id === r.firmaId);
@@ -179,7 +185,7 @@ export function exportDofToExcel(
       r.tarih ? new Date(r.tarih).toLocaleDateString('tr-TR') : '—',
       firma?.ad ?? '—',
       personel?.adSoyad ?? '—',
-      r.baslik,
+      r.baslik ?? '',
       r.aciklama ?? '',
       r.onlem ?? '',
       r.sorumlu ?? '',
@@ -189,25 +195,110 @@ export function exportDofToExcel(
     ];
   });
 
-  // Build CSV (Excel compatible with UTF-8 BOM)
-  const csvRows = [headers, ...rows].map(row =>
-    row.map(cell => {
-      const str = String(cell ?? '');
-      // Wrap in quotes if contains comma, newline or quote
-      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
-        return `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    }).join(','),
-  );
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
-  const csvContent = '\uFEFF' + csvRows.join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  // Kolon genişlikleri
+  ws['!cols'] = [
+    { wch: 5 },   // No
+    { wch: 14 },  // DÖF No
+    { wch: 12 },  // Tarih
+    { wch: 28 },  // Firma
+    { wch: 22 },  // Personel
+    { wch: 32 },  // Başlık
+    { wch: 45 },  // Açıklama
+    { wch: 45 },  // Önlemler
+    { wch: 22 },  // Sorumlu
+    { wch: 14 },  // Hedef Tarih
+    { wch: 14 },  // Kapanma Tarihi
+    { wch: 14 },  // Durum
+  ];
+
+  // Başlık satırı stilini ayarla
+  const headerRange = XLSX.utils.decode_range(ws['!ref'] ?? 'A1');
+  for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+    const cellAddr = XLSX.utils.encode_cell({ r: 0, c: col });
+    if (!ws[cellAddr]) continue;
+    ws[cellAddr].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
+      fill: { fgColor: { rgb: '1E293B' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: {
+        bottom: { style: 'medium', color: { rgb: 'EF4444' } },
+      },
+    };
+  }
+
+  // Veri satırlarını stillendir
+  for (let row = 1; row <= rows.length; row++) {
+    const isEven = row % 2 === 0;
+    for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+      const cellAddr = XLSX.utils.encode_cell({ r: row, c: col });
+      if (!ws[cellAddr]) {
+        ws[cellAddr] = { t: 's', v: '' };
+      }
+      ws[cellAddr].s = {
+        fill: { fgColor: { rgb: isEven ? 'F8FAFC' : 'FFFFFF' } },
+        alignment: { vertical: 'top', wrapText: true },
+        border: {
+          bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
+          right: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        },
+      };
+
+      // Durum sütununu renklendir (son sütun = index 11)
+      if (col === 11) {
+        const val = ws[cellAddr].v;
+        if (val === 'Açık') {
+          ws[cellAddr].s.font = { bold: true, color: { rgb: 'DC2626' } };
+        } else if (val === 'Kapandı') {
+          ws[cellAddr].s.font = { bold: true, color: { rgb: '16A34A' } };
+        }
+      }
+    }
+  }
+
+  // Satır yükseklikleri
+  ws['!rows'] = [
+    { hpt: 28 }, // başlık
+    ...rows.map(() => ({ hpt: 60 })), // veri satırları
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'DÖF Raporu');
+
+  // Özet sayfası
+  const summaryData = [
+    ['DÖF RAPORU ÖZETİ', ''],
+    ['Oluşturma Tarihi', new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })],
+    ['', ''],
+    ['Toplam Kayıt', records.length],
+    ['Açık Uygunsuzluk', records.filter(r => r.durum === 'Açık').length],
+    ['Kapatılan', records.filter(r => r.durum === 'Kapandı').length],
+    ['', ''],
+    ['Firma Dağılımı', ''],
+    ...Object.entries(
+      records.reduce<Record<string, number>>((acc, r) => {
+        const firmAd = firmalar.find(f => f.id === r.firmaId)?.ad ?? 'Bilinmiyor';
+        acc[firmAd] = (acc[firmAd] ?? 0) + 1;
+        return acc;
+      }, {}),
+    ).map(([firma, count]) => [firma, count]),
+  ];
+
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+  wsSummary['!cols'] = [{ wch: 28 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Özet');
+
+  const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob(
+    [xlsxData],
+    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  );
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   const date = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
-  link.download = `DOF-Raporu-${date}.csv`;
+  link.download = `DOF-Raporu-${date}.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

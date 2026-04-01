@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
 import WelcomeAnimation from './components/WelcomeAnimation';
+import MonthlyStats from './components/MonthlyStats';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, CartesianGrid,
@@ -210,6 +211,15 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ─── Aylık Özet İstatistikler ─── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #6366F1, #8B5CF6)' }} />
+          <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
+        </div>
+        <MonthlyStats />
       </div>
 
       {acikUygunsuzluklar.length > 0 && (

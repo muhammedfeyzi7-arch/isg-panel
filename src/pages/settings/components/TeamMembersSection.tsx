@@ -37,6 +37,7 @@ export default function TeamMembersSection() {
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Member | null>(null);
 
   const getAuthHeader = useCallback(async (): Promise<string> => {
     const { data } = await supabase.auth.getSession();
@@ -51,10 +52,12 @@ export default function TeamMembersSection() {
       const res = await fetch(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
-        body: JSON.stringify({ action: 'list' }),
+        body: JSON.stringify({ action: 'list', organization_id: org.id }),
       });
       const json = await res.json();
-      if (json.members) {
+      if (json.error) {
+        addToast(json.error, 'error');
+      } else if (json.members) {
         setMembers(json.members);
       }
     } catch {
@@ -84,6 +87,7 @@ export default function TeamMembersSection() {
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
           action: 'create',
+          organization_id: org?.id,
           email: form.email.trim().toLowerCase(),
           password: form.password,
           display_name: form.display_name.trim(),
@@ -115,6 +119,7 @@ export default function TeamMembersSection() {
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
           action: 'update',
+          organization_id: org?.id,
           target_user_id: member.user_id,
           is_active: !member.is_active,
         }),
@@ -147,6 +152,7 @@ export default function TeamMembersSection() {
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
           action: 'update',
+          organization_id: org?.id,
           target_user_id: member.user_id,
           role: newRole,
         }),
@@ -160,6 +166,35 @@ export default function TeamMembersSection() {
       }
     } catch {
       addToast('Rol güncellenirken hata oluştu.', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteMember = async () => {
+    if (!deleteConfirm) return;
+    setActionLoading(deleteConfirm.user_id + '_delete');
+    try {
+      const authHeader = await getAuthHeader();
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+        body: JSON.stringify({
+          action: 'delete',
+          organization_id: org?.id,
+          target_user_id: deleteConfirm.user_id,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        addToast(json.error, 'error');
+      } else {
+        addToast(`${deleteConfirm.display_name || deleteConfirm.email} organizasyondan kaldırıldı.`, 'success');
+        setDeleteConfirm(null);
+        await fetchMembers();
+      }
+    } catch {
+      addToast('Silme işlemi sırasında hata oluştu.', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -262,6 +297,7 @@ export default function TeamMembersSection() {
           <div className="space-y-2">
             {members.map(member => {
               const isMe = member.user_id === user?.id;
+              const isDeleting = actionLoading === member.user_id + '_delete';
               return (
                 <div
                   key={member.user_id}
@@ -352,6 +388,28 @@ export default function TeamMembersSection() {
                         <i className={member.is_active ? 'ri-pause-circle-line' : 'ri-play-circle-line'} />
                       )}
                       {member.is_active ? 'Pasif Yap' : 'Aktif Yap'}
+                    </button>
+                  )}
+
+                  {/* Delete button */}
+                  {!isMe && (
+                    <button
+                      onClick={() => setDeleteConfirm(member)}
+                      disabled={isDeleting}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+                      style={{
+                        background: 'rgba(239,68,68,0.08)',
+                        border: '1px solid rgba(239,68,68,0.15)',
+                        color: '#EF4444',
+                        opacity: isDeleting ? 0.6 : 1,
+                      }}
+                      title="Kullanıcıyı kaldır"
+                    >
+                      {isDeleting ? (
+                        <i className="ri-loader-4-line animate-spin text-xs" />
+                      ) : (
+                        <i className="ri-delete-bin-line text-xs" />
+                      )}
                     </button>
                   )}
                 </div>
@@ -522,6 +580,70 @@ export default function TeamMembersSection() {
                   <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</>
                 ) : (
                   <><i className="ri-user-add-line" />Kullanıcı Ekle</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirm Modal ── */}
+      {deleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setDeleteConfirm(null); }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 space-y-4"
+            style={{
+              background: isDark ? '#0D1526' : '#fff',
+              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(15,23,42,0.15)',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <i className="ri-delete-bin-line text-base" style={{ color: '#EF4444' }} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: nameColor }}>Kullanıcıyı Kaldır</h3>
+                <p className="text-xs mt-0.5" style={{ color: subColor }}>Bu işlem geri alınamaz</p>
+              </div>
+            </div>
+            <div className="px-3 py-3 rounded-xl" style={{ background: isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
+              <p className="text-sm" style={{ color: nameColor }}>
+                <strong>{deleteConfirm.display_name || deleteConfirm.email}</strong> kullanıcısını
+                organizasyondan kaldırmak istediğinize emin misiniz?
+              </p>
+              <p className="text-xs mt-1.5" style={{ color: subColor }}>
+                Kullanıcı organizasyondan çıkarılacak ancak hesabı silinmeyecektir.
+              </p>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
+                  border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.1)',
+                  color: subColor,
+                }}
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleDeleteMember}
+                disabled={actionLoading === deleteConfirm.user_id + '_delete'}
+                className="flex-1 whitespace-nowrap flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                  opacity: actionLoading === deleteConfirm.user_id + '_delete' ? 0.7 : 1,
+                }}
+              >
+                {actionLoading === deleteConfirm.user_id + '_delete' ? (
+                  <><i className="ri-loader-4-line animate-spin" />Kaldırılıyor...</>
+                ) : (
+                  <><i className="ri-delete-bin-line" />Evet, Kaldır</>
                 )}
               </button>
             </div>
