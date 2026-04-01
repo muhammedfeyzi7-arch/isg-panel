@@ -23,7 +23,7 @@ export function useOrganization(user: User | null) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const autoCreateInProgressRef = useRef(false);
-  const autoCreateDoneRef = useRef<string | null>(null); // tracks userId for which autoCreate ran
+  const autoCreateDoneRef = useRef<string | null>(null);
 
   const loadOrg = useCallback(async () => {
     if (!user) {
@@ -34,18 +34,16 @@ export function useOrganization(user: User | null) {
     setLoading(true);
     setLoadError(null);
 
-    // Safety timeout: if Supabase hangs > 12s, unblock the UI
     const timeoutId = setTimeout(() => {
       console.warn('[ISG] loadOrg timeout — unblocking UI');
       setLoadError('Bağlantı zaman aşımına uğradı. Lütfen sayfayı yenileyin.');
       setOrg(null);
       setLoading(false);
     }, 12000);
+
     try {
       // CRITICAL: ORDER BY joined_at ASC to ALWAYS get the oldest/original org.
-      // Without this, maybeSingle() is non-deterministic and may return different
-      // orgs on different logins — causing data to appear "lost" when actually
-      // the user has multiple orgs and data is in a different one.
+      // Without this, maybeSingle() is non-deterministic across devices.
       const { data, error } = await supabase
         .from('user_organizations')
         .select('role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
@@ -57,8 +55,12 @@ export function useOrganization(user: User | null) {
       clearTimeout(timeoutId);
 
       if (error) {
-        console.error('[ISG] loadOrg error:', error.message);
+        // If the error is RLS-related, log clearly and try to proceed
+        console.error('[ISG] loadOrg error (possible RLS issue — run fix-rls.sql):', error.message);
         setLoadError(error.message);
+        setOrg(null);
+        setLoading(false);
+        return;
       }
 
       if (data && data.organizations) {
@@ -88,7 +90,6 @@ export function useOrganization(user: User | null) {
 
   useEffect(() => {
     loadOrg();
-    // Reset autoCreate tracking when user changes
     autoCreateDoneRef.current = null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -175,13 +176,23 @@ export function useOrganization(user: User | null) {
     autoCreateDoneRef.current = user.id;
 
     try {
-      // Step 1: Double-check no org exists (race condition guard)
-      const { data: existingCheck } = await supabase
+      // Step 1: Double-check no org exists (this is the key race-condition guard
+      // that prevents duplicate orgs when the same user logs in on multiple devices)
+      const { data: existingCheck, error: existingCheckError } = await supabase
         .from('user_organizations')
         .select('organization_id')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
+
+      if (existingCheckError) {
+        // If we get an RLS error here, the user_organizations RLS policy is too strict.
+        // The fix-rls.sql file must be run in Supabase SQL Editor.
+        console.error('[ISG] autoCreateOrg: cannot check existing org (RLS issue?) — run fix-rls.sql!', existingCheckError.message);
+        // Attempt to reload org in case it exists but the check failed
+        await loadOrg();
+        return;
+      }
 
       if (existingCheck) {
         console.log('[ISG] autoCreateOrg: org already exists, loading');
@@ -189,12 +200,20 @@ export function useOrganization(user: User | null) {
         return;
       }
 
-      // Step 2: Create org directly via Supabase client (no edge function dependency)
+      // Step 2: No org found — create a new organization for this user
+      // This happens when:
+      //   a) A brand-new SaaS customer signs up (correct use case)
+      //   b) A user was created directly via Supabase dashboard (incorrect — should use Settings > Add User)
+      //
+      // NOTE: If you created a user from Supabase dashboard and they land here with an empty
+      // org, delete them and re-add via Settings > Kullanıcı Ekle so they join your org.
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-      const orgName = user.email
-        ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'ISG Firması'
-        : 'ISG Firması';
+      const orgName = user.user_metadata?.full_name
+        ? String(user.user_metadata.full_name)
+        : user.email
+          ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'ISG Firması'
+          : 'ISG Firması';
 
       const { data: newOrg, error: orgError } = await supabase
         .from('organizations')
@@ -212,7 +231,7 @@ export function useOrganization(user: User | null) {
             const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${sessionData.session.access_token}`,
+                Authorization: `Bearer ${sessionData.session.access_token}`,
                 'Content-Type': 'application/json',
               },
             });
@@ -266,6 +285,16 @@ export function useOrganization(user: User | null) {
         .maybeSingle();
 
       if (!targetOrg) return { error: 'Geçersiz davet kodu.' };
+
+      // Check if already a member
+      const { data: alreadyMember } = await supabase
+        .from('user_organizations')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('organization_id', targetOrg.id)
+        .maybeSingle();
+
+      if (alreadyMember) return { error: 'Bu organizasyona zaten üyesiniz.' };
 
       const { error: memberError } = await supabase
         .from('user_organizations')
