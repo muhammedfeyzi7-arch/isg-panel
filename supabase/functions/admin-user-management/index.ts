@@ -6,6 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
 };
 
+const VALID_ROLES = ['admin', 'denetci', 'member'];
+
+function normalizeRole(role: string): string {
+  if (VALID_ROLES.includes(role)) return role;
+  return 'member';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -23,7 +30,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Authenticate the user
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
   });
@@ -40,7 +46,6 @@ Deno.serve(async (req) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Parse request body
   let body: Record<string, unknown> = {};
   try {
     body = await req.json();
@@ -51,7 +56,6 @@ Deno.serve(async (req) => {
   const action = body.action as string;
   const requestedOrgId = body.organization_id as string | undefined;
 
-  // Find caller's membership — use organization_id from request if provided
   let membershipQuery = adminClient
     .from('user_organizations')
     .select('role, organization_id, display_name, email')
@@ -83,7 +87,6 @@ Deno.serve(async (req) => {
   const callerName = callerMembership.display_name || user.email?.split('@')[0] || 'Admin';
   const callerEmail = callerMembership.email || user.email || '';
 
-  // Helper: log activity (silent fail)
   async function logActivity(
     actionType: string,
     module: string,
@@ -124,7 +127,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Enrich with auth email if missing
     const enriched = await Promise.all((members ?? []).map(async (m) => {
       let email = m.email;
       if (!email) {
@@ -161,15 +163,12 @@ Deno.serve(async (req) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-
-    // Check if auth user already exists
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
     const existingAuthUser = existingUsers?.users?.find((u) => u.email === normalizedEmail);
 
     let newUserId: string;
 
     if (existingAuthUser) {
-      // Check if already in this org
       const { data: alreadyMember } = await adminClient
         .from('user_organizations')
         .select('id')
@@ -185,7 +184,6 @@ Deno.serve(async (req) => {
       }
       newUserId = existingAuthUser.id;
     } else {
-      // Create new auth user
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email: normalizedEmail,
         password,
@@ -203,11 +201,10 @@ Deno.serve(async (req) => {
       newUserId = newUser.user.id;
     }
 
-    // Insert org membership
     const { error: memberError } = await adminClient.from('user_organizations').insert({
       user_id: newUserId,
       organization_id: orgId,
-      role: role === 'admin' ? 'admin' : 'member',
+      role: normalizeRole(role),
       display_name,
       email: normalizedEmail,
       is_active: true,
@@ -221,12 +218,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    const roleLabel = role === 'admin' ? 'Admin' : role === 'denetci' ? 'Denetçi' : 'Kullanıcı';
     await logActivity(
       'user_created',
       'Kullanıcı Yönetimi',
       newUserId,
       display_name,
-      `${display_name} (${normalizedEmail}) kullanıcısı ${role === 'admin' ? 'Admin' : 'Kullanıcı'} rolüyle oluşturuldu.`,
+      `${display_name} (${normalizedEmail}) kullanıcısı ${roleLabel} rolüyle oluşturuldu.`,
     );
 
     return new Response(JSON.stringify({ success: true, user_id: newUserId }), {
@@ -258,7 +256,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check target is in this org
     const { data: targetCheck } = await adminClient
       .from('user_organizations')
       .select('display_name, email')
@@ -275,7 +272,7 @@ Deno.serve(async (req) => {
 
     const updates: Record<string, unknown> = {};
     if (is_active !== undefined) updates.is_active = is_active;
-    if (role !== undefined) updates.role = role === 'admin' ? 'admin' : 'member';
+    if (role !== undefined) updates.role = normalizeRole(role);
     if (display_name !== undefined) updates.display_name = display_name;
 
     const { error: updateError } = await adminClient
@@ -302,14 +299,84 @@ Deno.serve(async (req) => {
       );
     }
     if (role !== undefined) {
+      const roleLabel = role === 'admin' ? 'Admin' : role === 'denetci' ? 'Denetçi' : 'Kullanıcı';
       await logActivity(
         'user_role_changed',
         'Kullanıcı Yönetimi',
         target_user_id,
         memberName,
-        `${memberName} kullanıcısının rolü ${role === 'admin' ? 'Admin' : 'Kullanıcı'} olarak değiştirildi.`,
+        `${memberName} kullanıcısının rolü ${roleLabel} olarak değiştirildi.`,
       );
     }
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // ── RESET PASSWORD ────────────────────────────────────────────
+  if (action === 'reset_password') {
+    const { target_user_id, new_password } = body as {
+      target_user_id: string;
+      new_password: string;
+    };
+
+    if (!target_user_id || !new_password) {
+      return new Response(JSON.stringify({ error: 'target_user_id ve new_password zorunludur.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (new_password.length < 8) {
+      return new Response(JSON.stringify({ error: 'Şifre en az 8 karakter olmalıdır.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: targetCheck } = await adminClient
+      .from('user_organizations')
+      .select('display_name, email')
+      .eq('user_id', target_user_id)
+      .eq('organization_id', orgId)
+      .maybeSingle();
+
+    if (!targetCheck) {
+      return new Response(
+        JSON.stringify({ error: 'Hedef kullanıcı bu organizasyonda bulunamadı.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Update password via admin API
+    const { error: pwError } = await adminClient.auth.admin.updateUserById(target_user_id, {
+      password: new_password,
+    });
+
+    if (pwError) {
+      return new Response(JSON.stringify({ error: pwError.message }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Mark must_change_password = true so they are forced to change on next login
+    await adminClient
+      .from('user_organizations')
+      .update({ must_change_password: true })
+      .eq('user_id', target_user_id)
+      .eq('organization_id', orgId);
+
+    const memberName = targetCheck.display_name || targetCheck.email || target_user_id;
+    await logActivity(
+      'password_reset',
+      'Kullanıcı Yönetimi',
+      target_user_id,
+      memberName,
+      `${memberName} kullanıcısının şifresi admin tarafından sıfırlandı.`,
+    );
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
@@ -349,7 +416,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Remove from organization only (keep auth user)
     const { error: deleteError } = await adminClient
       .from('user_organizations')
       .delete()

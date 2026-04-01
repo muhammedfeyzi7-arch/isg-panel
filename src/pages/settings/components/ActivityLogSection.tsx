@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../../store/AppContext';
 import { supabase } from '../../../lib/supabase';
 import { ACTION_LABELS, ACTION_COLORS } from '../../../utils/activityLog';
@@ -17,6 +17,11 @@ interface ActivityLog {
   created_at: string;
 }
 
+interface UniqueUser {
+  user_email: string;
+  user_name: string;
+}
+
 const MODULE_COLORS: Record<string, string> = {
   'Firmalar': '#60A5FA',
   'Personeller': '#4ADE80',
@@ -33,15 +38,52 @@ function formatDate(iso: string): string {
     + ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
 
+const ACTION_FILTER_OPTIONS = [
+  { value: 'all', label: 'Tüm İşlemler' },
+  { value: 'user_login', label: 'Giriş' },
+  { value: 'user_created', label: 'Kullanıcı Oluşturma' },
+  { value: 'password_changed', label: 'Şifre Değişikliği' },
+  { value: 'firma_created', label: 'Firma Oluşturma' },
+  { value: 'personel_created', label: 'Personel Ekleme' },
+  { value: 'evrak_created', label: 'Evrak Oluşturma' },
+  { value: 'evrak_deleted', label: 'Evrak Silme' },
+  { value: 'tutanak_created', label: 'Tutanak Oluşturma' },
+];
+
 export default function ActivityLogSection() {
   const { org, orgLoading, theme } = useApp();
   const isDark = theme === 'dark';
 
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<string>('all');
+  const [actionFilter, setActionFilter] = useState<string>('all');
+  const [userFilter, setUserFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [page, setPage] = useState(0);
+  const [uniqueUsers, setUniqueUsers] = useState<UniqueUser[]>([]);
   const PAGE_SIZE = 15;
+
+  const fetchUniqueUsers = useCallback(async () => {
+    if (!org?.id) return;
+    const { data } = await supabase
+      .from('activity_logs')
+      .select('user_email, user_name')
+      .eq('organization_id', org.id)
+      .order('user_name', { ascending: true });
+
+    if (data) {
+      const seen = new Set<string>();
+      const users: UniqueUser[] = [];
+      data.forEach(r => {
+        if (r.user_email && !seen.has(r.user_email)) {
+          seen.add(r.user_email);
+          users.push({ user_email: r.user_email, user_name: r.user_name || r.user_email });
+        }
+      });
+      setUniqueUsers(users);
+    }
+  }, [org?.id]);
 
   const fetchLogs = useCallback(async () => {
     if (!org?.id) return;
@@ -54,8 +96,17 @@ export default function ActivityLogSection() {
         .order('created_at', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      if (filter !== 'all') {
-        query = query.eq('action_type', filter);
+      if (actionFilter !== 'all') {
+        query = query.eq('action_type', actionFilter);
+      }
+      if (userFilter !== 'all') {
+        query = query.eq('user_email', userFilter);
+      }
+      if (dateFrom) {
+        query = query.gte('created_at', dateFrom + 'T00:00:00');
+      }
+      if (dateTo) {
+        query = query.lte('created_at', dateTo + 'T23:59:59');
       }
 
       const { data } = await query;
@@ -65,13 +116,25 @@ export default function ActivityLogSection() {
     } finally {
       setLoading(false);
     }
-  }, [org?.id, filter, page]);
+  }, [org?.id, actionFilter, userFilter, dateFrom, dateTo, page]);
 
   useEffect(() => {
-    if (org?.role === 'admin' || org) {
-      fetchLogs();
-    }
+    if (org) fetchUniqueUsers();
+  }, [org, fetchUniqueUsers]);
+
+  useEffect(() => {
+    if (org) fetchLogs();
   }, [org, fetchLogs]);
+
+  const handleReset = () => {
+    setActionFilter('all');
+    setUserFilter('all');
+    setDateFrom('');
+    setDateTo('');
+    setPage(0);
+  };
+
+  const hasActiveFilters = actionFilter !== 'all' || userFilter !== 'all' || dateFrom !== '' || dateTo !== '';
 
   if (orgLoading || !org) return null;
 
@@ -83,18 +146,15 @@ export default function ActivityLogSection() {
   const nameColor = isDark ? '#E2E8F0' : '#0F172A';
   const subColor = isDark ? '#64748B' : '#94A3B8';
   const sectionTitleColor = isDark ? '#CBD5E1' : '#334155';
-
-  const filterOptions = [
-    { value: 'all', label: 'Tümü' },
-    { value: 'user_login', label: 'Giriş' },
-    { value: 'user_created', label: 'Kullanıcı' },
-    { value: 'password_changed', label: 'Şifre' },
-    { value: 'firma_created', label: 'Firma' },
-    { value: 'personel_created', label: 'Personel' },
-    { value: 'evrak_created', label: 'Evrak' },
-    { value: 'evrak_deleted', label: 'Evrak Silme' },
-    { value: 'tutanak_created', label: 'Tutanak' },
-  ];
+  const inputStyle: React.CSSProperties = {
+    background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)',
+    border: isDark ? '1px solid rgba(255,255,255,0.09)' : '1px solid rgba(15,23,42,0.12)',
+    borderRadius: '10px',
+    color: isDark ? '#E2E8F0' : '#0F172A',
+    outline: 'none',
+    fontSize: '12px',
+    padding: '8px 10px',
+  };
 
   return (
     <div style={cardStyle} className="p-6 space-y-5">
@@ -117,40 +177,119 @@ export default function ActivityLogSection() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => { setPage(0); fetchLogs(); }}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap"
-          style={{
-            background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
-            border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.1)',
-            color: subColor,
-          }}
-        >
-          <i className="ri-refresh-line" />
-          Yenile
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        {filterOptions.map(opt => (
+        <div className="flex items-center gap-2">
+          {hasActiveFilters && (
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap"
+              style={{
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.15)',
+                color: '#EF4444',
+              }}
+            >
+              <i className="ri-filter-off-line" />
+              Filtreleri Temizle
+            </button>
+          )}
           <button
-            key={opt.value}
-            onClick={() => { setFilter(opt.value); setPage(0); }}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap transition-all"
+            onClick={() => { setPage(0); fetchLogs(); }}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap"
             style={{
-              background: filter === opt.value
-                ? 'rgba(99,102,241,0.15)'
-                : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'),
-              border: filter === opt.value
-                ? '1px solid rgba(99,102,241,0.3)'
-                : (isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(15,23,42,0.08)'),
-              color: filter === opt.value ? '#818CF8' : subColor,
+              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
+              border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.1)',
+              color: subColor,
             }}
           >
-            {opt.label}
+            <i className="ri-refresh-line" />
+            Yenile
           </button>
-        ))}
+        </div>
+      </div>
+
+      {/* ─── Filters ─── */}
+      <div
+        className="p-4 rounded-xl space-y-3"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
+          border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(15,23,42,0.07)',
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <i className="ri-filter-3-line text-sm" style={{ color: '#6366F1' }} />
+          <span className="text-xs font-bold uppercase tracking-wide" style={{ color: sectionTitleColor }}>Filtreler</span>
+          {hasActiveFilters && (
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8' }}
+            >
+              Aktif
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Action type filter */}
+          <div>
+            <label className="block text-[10px] font-semibold mb-1.5 uppercase tracking-wide" style={{ color: subColor }}>
+              İşlem Tipi
+            </label>
+            <select
+              value={actionFilter}
+              onChange={e => { setActionFilter(e.target.value); setPage(0); }}
+              style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}
+            >
+              {ACTION_FILTER_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* User filter */}
+          <div>
+            <label className="block text-[10px] font-semibold mb-1.5 uppercase tracking-wide" style={{ color: subColor }}>
+              Kullanıcı
+            </label>
+            <select
+              value={userFilter}
+              onChange={e => { setUserFilter(e.target.value); setPage(0); }}
+              style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}
+            >
+              <option value="all">Tüm Kullanıcılar</option>
+              {uniqueUsers.map(u => (
+                <option key={u.user_email} value={u.user_email}>
+                  {u.user_name !== u.user_email ? `${u.user_name} (${u.user_email})` : u.user_email}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date from */}
+          <div>
+            <label className="block text-[10px] font-semibold mb-1.5 uppercase tracking-wide" style={{ color: subColor }}>
+              Başlangıç Tarihi
+            </label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => { setDateFrom(e.target.value); setPage(0); }}
+              style={{ ...inputStyle, width: '100%' }}
+            />
+          </div>
+
+          {/* Date to */}
+          <div>
+            <label className="block text-[10px] font-semibold mb-1.5 uppercase tracking-wide" style={{ color: subColor }}>
+              Bitiş Tarihi
+            </label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => { setDateTo(e.target.value); setPage(0); }}
+              style={{ ...inputStyle, width: '100%' }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Log List */}
@@ -167,7 +306,18 @@ export default function ActivityLogSection() {
           >
             <i className="ri-history-line text-xl" style={{ color: subColor }} />
           </div>
-          <p className="text-sm" style={{ color: subColor }}>Henüz işlem kaydı bulunmuyor</p>
+          <p className="text-sm" style={{ color: subColor }}>
+            {hasActiveFilters ? 'Bu filtreyle eşleşen kayıt bulunamadı.' : 'Henüz işlem kaydı bulunmuyor.'}
+          </p>
+          {hasActiveFilters && (
+            <button
+              onClick={handleReset}
+              className="text-xs font-semibold cursor-pointer"
+              style={{ color: '#818CF8' }}
+            >
+              Filtreleri temizle
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -196,15 +346,12 @@ export default function ActivityLogSection() {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Action label */}
                     <span
                       className="text-xs font-bold px-2 py-0.5 rounded-md"
                       style={{ background: actionInfo.bg, color: actionInfo.color }}
                     >
                       {actionLabel}
                     </span>
-
-                    {/* Module */}
                     {log.module && (
                       <span
                         className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
@@ -213,16 +360,22 @@ export default function ActivityLogSection() {
                         {log.module}
                       </span>
                     )}
-
-                    {/* Role badge */}
                     <span
                       className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                       style={{
-                        background: log.user_role === 'admin' ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.1)',
-                        color: log.user_role === 'admin' ? '#F59E0B' : '#818CF8',
+                        background: log.user_role === 'admin'
+                          ? 'rgba(245,158,11,0.1)'
+                          : log.user_role === 'denetci'
+                          ? 'rgba(6,182,212,0.1)'
+                          : 'rgba(99,102,241,0.1)',
+                        color: log.user_role === 'admin'
+                          ? '#F59E0B'
+                          : log.user_role === 'denetci'
+                          ? '#06B6D4'
+                          : '#818CF8',
                       }}
                     >
-                      {log.user_role === 'admin' ? 'Admin' : 'Kullanıcı'}
+                      {log.user_role === 'admin' ? 'Admin' : log.user_role === 'denetci' ? 'Denetçi' : 'Kullanıcı'}
                     </span>
                   </div>
 
@@ -230,6 +383,9 @@ export default function ActivityLogSection() {
                     <p className="text-xs font-medium" style={{ color: nameColor }}>
                       {log.user_name || log.user_email || 'Bilinmeyen'}
                     </p>
+                    {log.user_email && log.user_name && log.user_name !== log.user_email && (
+                      <p className="text-[10px]" style={{ color: subColor }}>{log.user_email}</p>
+                    )}
                     {log.record_name && (
                       <p className="text-xs" style={{ color: subColor }}>
                         → <span style={{ color: isDark ? '#94A3B8' : '#475569' }}>{log.record_name}</span>
@@ -255,13 +411,16 @@ export default function ActivityLogSection() {
       {/* Pagination */}
       <div className="flex items-center justify-between pt-2">
         <p className="text-xs" style={{ color: subColor }}>
-          {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + logs.length} arası gösteriliyor
+          {logs.length > 0
+            ? `${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + logs.length} arası gösteriliyor`
+            : 'Sonuç yok'
+          }
         </p>
         <div className="flex gap-2">
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
             style={{
               background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
               border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.1)',
@@ -276,7 +435,7 @@ export default function ActivityLogSection() {
           <button
             onClick={() => setPage(p => p + 1)}
             disabled={logs.length < PAGE_SIZE}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
             style={{
               background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
               border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.1)',

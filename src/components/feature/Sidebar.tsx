@@ -1,5 +1,33 @@
+import { useEffect } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
+
+// ─── Role-based access control ──────────────────────────────────────────────
+// admin    → full access
+// denetci  → only audit/report related modules
+// member   → everything except settings (ayarlar)
+const ROLE_MODULES: Record<string, string[]> = {
+  admin: [
+    'dashboard', 'firmalar', 'personeller',
+    'evraklar', 'egitimler', 'muayeneler', 'tutanaklar',
+    'uygunsuzluklar', 'ekipmanlar', 'gorevler',
+    'raporlar', 'copkutusu', 'ayarlar',
+  ],
+  denetci: [
+    'dashboard', 'firmalar', 'personeller',
+    'uygunsuzluklar', 'tutanaklar', 'raporlar',
+  ],
+  member: [
+    'dashboard', 'firmalar', 'personeller',
+    'evraklar', 'egitimler', 'muayeneler', 'tutanaklar',
+    'uygunsuzluklar', 'ekipmanlar', 'gorevler',
+    'raporlar', 'copkutusu',
+  ],
+};
+
+function getAllowedModules(role: string): string[] {
+  return ROLE_MODULES[role] ?? ROLE_MODULES.member;
+}
 
 const menuGroups = [
   {
@@ -32,12 +60,37 @@ const menuGroups = [
   },
 ];
 
+const ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  admin: { label: 'Admin', color: '#F59E0B', bg: 'rgba(245,158,11,0.15)' },
+  denetci: { label: 'Denetçi', color: '#06B6D4', bg: 'rgba(6,182,212,0.15)' },
+  member: { label: 'Kullanıcı', color: '#818CF8', bg: 'rgba(99,102,241,0.15)' },
+};
+
 export default function Sidebar() {
-  const { activeModule, setActiveModule, sidebarCollapsed, currentUser, firmalar, personeller, evraklar } = useApp();
+  const { activeModule, setActiveModule, sidebarCollapsed, currentUser, firmalar, personeller, evraklar, org } = useApp();
   const { logout } = useAuth();
+
+  const userRole = org?.role ?? 'member';
+  const allowedModules = getAllowedModules(userRole);
+  const roleInfo = ROLE_LABELS[userRole] ?? ROLE_LABELS.member;
+
+  // If current active module is not allowed for this role, redirect to dashboard
+  useEffect(() => {
+    if (!allowedModules.includes(activeModule)) {
+      setActiveModule('dashboard');
+    }
+  }, [activeModule, allowedModules, setActiveModule]);
 
   const eksikEvrak = evraklar.filter(e => e.durum === 'Eksik' || e.durum === 'Süre Dolmuş').length;
   const badges: Record<string, number> = { evraklar: eksikEvrak };
+
+  // Filter groups to only show allowed modules
+  const filteredGroups = menuGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => allowedModules.includes(item.id)),
+    }))
+    .filter(group => group.items.length > 0);
 
   return (
     <aside
@@ -74,9 +127,22 @@ export default function Sidebar() {
         )}
       </div>
 
+      {/* Role badge (visible only when not collapsed) */}
+      {!sidebarCollapsed && (
+        <div className="px-4 pt-3 pb-1">
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
+            style={{ background: roleInfo.bg, color: roleInfo.color }}
+          >
+            <i className={`text-[10px] ${userRole === 'admin' ? 'ri-shield-star-line' : userRole === 'denetci' ? 'ri-search-eye-line' : 'ri-user-line'}`} />
+            {roleInfo.label}
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-5">
-        {menuGroups.map(group => (
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
+        {filteredGroups.map(group => (
           <div key={group.label}>
             {!sidebarCollapsed && (
               <p className="text-[10px] font-bold uppercase px-3 mb-2 select-none" style={{ color: '#3D4E63', letterSpacing: '0.08em' }}>
@@ -171,7 +237,7 @@ export default function Sidebar() {
         {!sidebarCollapsed && (
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-slate-300 truncate">{currentUser.ad || 'Kullanıcı'}</p>
-            <p className="text-[10px] text-slate-600 truncate">{currentUser.rol}</p>
+            <p className="text-[10px] truncate" style={{ color: roleInfo.color }}>{roleInfo.label}</p>
           </div>
         )}
         <button

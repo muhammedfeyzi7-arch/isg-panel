@@ -67,47 +67,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (!signInError) return { error: null };
 
-    // If user doesn't exist → auto sign up (preserves the "any email/password" UX)
-    const isNewUser =
-      signInError.message.toLowerCase().includes('invalid login') ||
-      signInError.message.toLowerCase().includes('invalid_credentials') ||
-      signInError.message.toLowerCase().includes('user not found');
+    // If sign-in failed, try sign-up to determine if user exists or not
+    const displayName = email.split('@')[0]
+      .replace(/[._-]/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
 
-    if (isNewUser) {
-      const displayName = email.split('@')[0]
-        .replace(/[._-]/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { data: { full_name: displayName } },
+    });
 
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { full_name: displayName } },
-      });
-
-      if (signUpError) return { error: signUpError.message };
-
-      // Immediately sign in after sign up
-      const { error: signIn2Error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (signIn2Error) {
-        return { error: 'Hesap oluşturuldu. Lütfen e-posta kutunuzu kontrol edip doğrulama yapın, ardından giriş deneyin.' };
+    // If sign-up also failed → check why
+    if (signUpError) {
+      const errMsg = signUpError.message.toLowerCase();
+      // User already exists but wrong password (or other sign-in issue)
+      if (
+        errMsg.includes('already registered') ||
+        errMsg.includes('already been registered') ||
+        errMsg.includes('email_exists') ||
+        errMsg.includes('user already registered') ||
+        errMsg.includes('duplicate')
+      ) {
+        return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
       }
-      return { error: null };
+      return { error: signUpError.message };
     }
 
-    return { error: signInError.message };
+    // Sign-up succeeded → new user was created, sign in immediately
+    const { error: signIn2Error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (signIn2Error) {
+      return { error: 'Hesap oluşturuldu. Lütfen e-posta kutunuzu kontrol edip doğrulama yapın, ardından giriş deneyin.' };
+    }
+
+    return { error: null };
   }, []);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
-    const nav = (window as unknown as { REACT_APP_NAVIGATE?: (p: string) => void }).REACT_APP_NAVIGATE;
-    if (nav) {
-      nav('/login');
-    } else {
-      window.location.replace('/login');
-    }
+    // Force full page reload to completely reset all in-memory state
+    // This prevents stale data from previous session appearing after re-login
+    window.location.replace('/login');
   }, []);
 
   const updatePassword = useCallback(async (newPassword: string): Promise<{ error: string | null }> => {

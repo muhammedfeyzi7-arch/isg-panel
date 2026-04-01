@@ -161,7 +161,7 @@ export default function LoginPage() {
           {/* Header */}
           <div className="mb-8">
             <h2 className="text-3xl font-extrabold mb-2" style={{ color: '#E2F8FB', letterSpacing: '-0.025em' }}>
-              Tekrar Hoşgeldiniz
+              Hoşgeldiniz
             </h2>
             <p className="text-sm" style={{ color: '#4A9BB5' }}>
               Hesabınıza giriş yaparak devam edin.
