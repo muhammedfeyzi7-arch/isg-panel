@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type {
   Firma, Personel, Evrak, Egitim, Muayene, Uygunsuzluk, Ekipman, Gorev, Tutanak, CurrentUser,
-  UygunsuzlukStatus,
+  UygunsuzlukStatus, IsIzni,
 } from '../types';
 import { getEvrakKategori } from '../utils/evrakKategori';
 import { supabase } from '../lib/supabase';
@@ -42,6 +42,17 @@ export function generateDofNo(existing: { acilisNo?: string }[]): string {
   const maxNum = existing
     .filter(u => u.acilisNo?.startsWith(prefix))
     .map(u => parseInt(u.acilisNo!.replace(prefix, ''), 10))
+    .filter(n => !isNaN(n))
+    .reduce((a, b) => Math.max(a, b), 0);
+  return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
+}
+
+export function generateIsIzniNo(existing: { izinNo: string }[]): string {
+  const year = new Date().getFullYear();
+  const prefix = `IZN-${year}-`;
+  const maxNum = existing
+    .filter(t => t.izinNo?.startsWith(prefix))
+    .map(t => parseInt(t.izinNo.replace(prefix, ''), 10))
     .filter(n => !isNaN(n))
     .reduce((a, b) => Math.max(a, b), 0);
   return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
@@ -107,6 +118,7 @@ export function useStore(
   onSaveError?: (msg: string) => void,
   userId?: string,
   orgLoading?: boolean,
+  onRemoteChange?: (module: string) => void,
 ) {
   const [firmalar, _setFirmalar] = useState<Firma[]>([]);
   const [personeller, _setPersoneller] = useState<Personel[]>([]);
@@ -117,15 +129,19 @@ export function useStore(
   const [ekipmanlar, _setEkipmanlar] = useState<Ekipman[]>([]);
   const [gorevler, _setGorevler] = useState<Gorev[]>([]);
   const [tutanaklar, _setTutanaklar] = useState<Tutanak[]>([]);
+  const [isIzinleri, _setIsIzinleri] = useState<IsIzni[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser>(defaultUser);
   const [dataLoading, setDataLoading] = useState(true);
 
   const uygRef = useRef<Uygunsuzluk[]>([]);
   const tutRef = useRef<Tutanak[]>([]);
+  const isIzRef = useRef<IsIzni[]>([]);
   const logFnRef = useRef(logFn);
   useEffect(() => { logFnRef.current = logFn; }, [logFn]);
   const onSaveErrorRef = useRef(onSaveError);
   useEffect(() => { onSaveErrorRef.current = onSaveError; }, [onSaveError]);
+  const onRemoteChangeRef = useRef(onRemoteChange);
+  useEffect(() => { onRemoteChangeRef.current = onRemoteChange; }, [onRemoteChange]);
 
   const orgIdRef = useRef(organizationId);
   const userIdRef = useRef(userId);
@@ -174,6 +190,13 @@ export function useStore(
       return next;
     });
   }, []);
+  const setIsIzinleri = useCallback((u: IsIzni[] | ((p: IsIzni[]) => IsIzni[])) => {
+    _setIsIzinleri(prev => {
+      const next = typeof u === 'function' ? u(prev) : u;
+      isIzRef.current = next;
+      return next;
+    });
+  }, []);
 
   // ── DB write helpers (use refs to always get latest ids) ──
   const saveToDb = useCallback(async (table: string, item: { id: string } & Record<string, unknown>) => {
@@ -217,7 +240,7 @@ export function useStore(
     if (!organizationId || !userId) {
       setFirmalar([]); setPersoneller([]); setEvraklar([]);
       setEgitimler([]); setMuayeneler([]); setUygunsuzluklar([]);
-      setEkipmanlar([]); setGorevler([]); setTutanaklar([]);
+      setEkipmanlar([]); setGorevler([]); setTutanaklar([]); setIsIzinleri([]);
       setDataLoading(false);
       return;
     }
@@ -227,7 +250,7 @@ export function useStore(
 
     const TABLES = [
       'firmalar', 'personeller', 'evraklar', 'egitimler',
-      'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar',
+      'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar', 'is_izinleri',
     ] as const;
 
     Promise.all(
@@ -244,7 +267,7 @@ export function useStore(
     ).then(results => {
       const [
         firmaRes, personelRes, evrakRes, egitimRes,
-        muayeneRes, uygRes, ekipmanRes, gorevRes, tutanakRes,
+        muayeneRes, uygRes, ekipmanRes, gorevRes, tutanakRes, isIzRes,
       ] = results;
 
       const getRows = <T>(res: typeof firmaRes): T[] => {
@@ -278,10 +301,74 @@ export function useStore(
       setEkipmanlar(getRows<Ekipman>(ekipmanRes));
       setGorevler(getRows<Gorev>(gorevRes));
       setTutanaklar(getRows<Tutanak>(tutanakRes));
+      setIsIzinleri(getRows<IsIzni>(isIzRes));
 
       console.log(`[ISG] Data loaded ✓ firms=${firmaRes.data?.length ?? 0} personnel=${personelRes.data?.length ?? 0}`);
       setDataLoading(false);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, userId, orgLoading]);
+
+  // ── Real-time subscription ──
+  useEffect(() => {
+    if (!organizationId || !userId || orgLoading) return;
+
+    const TABLE_MAP: Record<string, (rows: unknown[]) => void> = {
+      firmalar:       (rows) => setFirmalar(rows as Firma[]),
+      personeller:    (rows) => setPersoneller((rows as Personel[]).map(p => {
+        const KAN: Record<string, string> = { 'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-', 'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-' };
+        return { ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') };
+      })),
+      evraklar:       (rows) => setEvraklar((rows as Evrak[]).map(e => ({ ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? '') }))),
+      egitimler:      (rows) => setEgitimler(rows as Egitim[]),
+      muayeneler:     (rows) => setMuayeneler(rows as Muayene[]),
+      uygunsuzluklar: (rows) => setUygunsuzluklar((rows as Uygunsuzluk[]).map(u => ({ ...u, durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus }))),
+      ekipmanlar:     (rows) => setEkipmanlar(rows as Ekipman[]),
+      gorevler:       (rows) => setGorevler(rows as Gorev[]),
+      tutanaklar:     (rows) => setTutanaklar(rows as Tutanak[]),
+      is_izinleri:    (rows) => setIsIzinleri(rows as IsIzni[]),
+    };
+
+    const TABLES = Object.keys(TABLE_MAP);
+
+    const reloadTable = async (table: string) => {
+      const { data, error } = await supabase
+        .from(table)
+        .select('id, data, created_at')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false });
+      if (error || !data) return;
+      const rows = data.map(r => r.data as unknown);
+      TABLE_MAP[table]?.(rows);
+    };
+
+    let channel = supabase.channel(`isg_realtime_${organizationId}`);
+
+    TABLES.forEach(table => {
+      channel = channel.on(
+        'postgres_changes' as Parameters<typeof channel.on>[0],
+        { event: '*', schema: 'public', table, filter: `organization_id=eq.${organizationId}` } as Parameters<typeof channel.on>[1],
+        (payload: { eventType: string; new: { user_id?: string } }) => {
+          const remoteUserId = (payload.new as { user_id?: string })?.user_id;
+          if (remoteUserId && remoteUserId === userId) return; // skip own changes
+          reloadTable(table);
+          const MODULE_NAMES: Record<string, string> = {
+            firmalar: 'Firmalar', personeller: 'Personeller', evraklar: 'Evraklar',
+            egitimler: 'Eğitimler', muayeneler: 'Muayeneler', uygunsuzluklar: 'Saha Denetim',
+            ekipmanlar: 'Ekipmanlar', gorevler: 'Görevler', tutanaklar: 'Tutanaklar', is_izinleri: 'İş İzinleri',
+          };
+          onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
+        },
+      ) as typeof channel;
+    });
+
+    channel.subscribe((status) => {
+      console.log(`[ISG] Realtime ${status} for org=${organizationId}`);
+    });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, userId, orgLoading]);
 
@@ -726,6 +813,35 @@ export function useStore(
 
   const getTutanakFile = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'tutanak', id), []);
 
+  // ──────── İŞ İZNİ ────────
+  const addIsIzni = useCallback((iz: Omit<IsIzni, 'id' | 'izinNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
+    const now = new Date().toISOString();
+    const id = genId();
+    const izinNo = generateIsIzniNo(isIzRef.current);
+    const newIz: IsIzni = { ...iz, id, izinNo, olusturmaTarihi: now, guncellemeTarihi: now };
+    setIsIzinleri(prev => [...prev, newIz]);
+    saveToDb('is_izinleri', newIz as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('is_izni_created', 'İş İzinleri', id, izinNo, `${izinNo} iş izni oluşturuldu.`);
+    return newIz;
+  }, [setIsIzinleri, saveToDb]);
+
+  const updateIsIzni = useCallback((id: string, updates: Partial<IsIzni>) => {
+    let updated: IsIzni | null = null;
+    setIsIzinleri(prev => prev.map(iz => {
+      if (iz.id !== id) return iz;
+      updated = { ...iz, ...updates, guncellemeTarihi: new Date().toISOString() };
+      return updated;
+    }));
+    if (updated) saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('is_izni_updated', 'İş İzinleri', id, updates.izinNo, 'İş izni güncellendi.');
+  }, [setIsIzinleri, saveToDb]);
+
+  const deleteIsIzni = useCallback((id: string) => {
+    setIsIzinleri(prev => prev.filter(iz => iz.id !== id));
+    deleteFromDb('is_izinleri', id);
+    logFnRef.current?.('is_izni_deleted', 'İş İzinleri', id, undefined, 'İş izni silindi.');
+  }, [setIsIzinleri, deleteFromDb]);
+
   // ──────── LOGO ────────
   const getFirmaLogo = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'firmalogo', id), []);
   const setFirmaLogo = useCallback((id: string, logo: string) => saveFileData(orgIdRef.current ?? '', 'firmalogo', id, logo), []);
@@ -738,7 +854,7 @@ export function useStore(
 
   return {
     firmalar, personeller, evraklar, egitimler, muayeneler,
-    uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, currentUser,
+    uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, isIzinleri, currentUser,
     dataLoading,
     isSaving: false,
     addFirma, updateFirma, deleteFirma, restoreFirma, permanentDeleteFirma,
@@ -750,6 +866,7 @@ export function useStore(
     addEkipman, updateEkipman, deleteEkipman, getEkipmanFile,
     addGorev, updateGorev, deleteGorev,
     addTutanak, updateTutanak, deleteTutanak, getTutanakFile,
+    addIsIzni, updateIsIzni, deleteIsIzni,
     getFirmaLogo, setFirmaLogo, clearFirmaLogo,
     updateCurrentUser,
   };

@@ -10,17 +10,17 @@ const ROLE_MODULES: Record<string, string[]> = {
   admin: [
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'egitimler', 'muayeneler', 'tutanaklar',
-    'uygunsuzluklar', 'ekipmanlar', 'gorevler',
+    'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
     'raporlar', 'copkutusu', 'ayarlar',
   ],
   denetci: [
     'dashboard', 'firmalar', 'personeller',
-    'uygunsuzluklar', 'tutanaklar', 'raporlar',
+    'uygunsuzluklar', 'tutanaklar', 'is-izinleri', 'raporlar',
   ],
   member: [
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'egitimler', 'muayeneler', 'tutanaklar',
-    'uygunsuzluklar', 'ekipmanlar', 'gorevler',
+    'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
     'raporlar', 'copkutusu',
   ],
 };
@@ -48,6 +48,7 @@ const menuGroups = [
       { id: 'uygunsuzluklar', label: 'Saha Denetim', icon: 'ri-map-pin-user-line' },
       { id: 'ekipmanlar', label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },
       { id: 'gorevler', label: 'Görevler', icon: 'ri-task-line' },
+      { id: 'is-izinleri', label: 'İş İzni Takip', icon: 'ri-shield-keyhole-line' },
     ],
   },
   {
@@ -201,21 +202,21 @@ export default function Sidebar() {
           <div className="rounded-xl p-3 flex gap-3" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
             <div className="flex-1 text-center">
               <p className="text-sm font-bold" style={{ background: 'linear-gradient(135deg, #60A5FA, #818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {firmalar.length}
+                {firmalar.filter(f => !f.silinmis).length}
               </p>
               <p className="text-[10px] text-slate-600 mt-0.5">Firma</p>
             </div>
             <div className="w-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
             <div className="flex-1 text-center">
               <p className="text-sm font-bold" style={{ background: 'linear-gradient(135deg, #34D399, #10B981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {personeller.length}
+                {personeller.filter(p => !p.silinmis).length}
               </p>
               <p className="text-[10px] text-slate-600 mt-0.5">Personel</p>
             </div>
             <div className="w-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
             <div className="flex-1 text-center">
               <p className="text-sm font-bold" style={{ background: 'linear-gradient(135deg, #FCD34D, #F59E0B)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {evraklar.length}
+                {evraklar.filter(e => !e.silinmis).length}
               </p>
               <p className="text-[10px] text-slate-600 mt-0.5">Evrak</p>
             </div>

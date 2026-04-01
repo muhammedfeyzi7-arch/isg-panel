@@ -9,6 +9,7 @@ import Modal from '../../components/base/Modal';
 import { generateTutanakNo } from '../../store/useStore';
 import TutanakDetailModal from './components/TutanakDetailModal';
 import { printTutanakAsPdf } from './components/generatePdf';
+import { usePermissions } from '../../hooks/usePermissions';
 
 /* ── Durum renk konfig ──────────────────────────────────────── */
 const STS_CONFIG: Record<TutanakStatus, { color: string; bg: string; icon: string }> = {
@@ -184,10 +185,6 @@ async function generateWordDoc(
                 new TextRun({ text: 'Ad Soyad : ', size: 20, font: FONT, color: '6B7280' }),
                 new TextRun({ text: tutanak.olusturanKisi || '___________________________', size: 20, font: FONT, color: '111827' }),
               ],
-            }),
-            new Paragraph({
-              spacing: { before: 80, after: 80 },
-              children: [new TextRun({ text: 'İmza       :  ___________________________', size: 20, font: FONT, color: '6B7280' })],
             }),
             new Paragraph({
               spacing: { before: 80, after: 0 },
@@ -388,6 +385,7 @@ export default function TutanaklarPage() {
     getTutanakFile, getFirmaLogo, addToast,
     quickCreate, setQuickCreate,
   } = useApp();
+  const { canEdit, canCreate, canDelete, isReadOnly } = usePermissions();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -534,6 +532,16 @@ export default function TutanaklarPage() {
 
   return (
     <div className="space-y-5">
+      {/* Read-only Banner */}
+      {isReadOnly && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.25)' }}>
+          <i className="ri-search-eye-line flex-shrink-0" style={{ color: '#06B6D4' }} />
+          <p className="text-sm" style={{ color: '#06B6D4' }}>
+            <strong>Denetçi Modu:</strong> Tutanaklar yalnızca görüntüleme amaçlıdır. Değişiklik yapma yetkiniz bulunmamaktadır.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -542,9 +550,11 @@ export default function TutanaklarPage() {
             Firma bazlı tutanakları yönetin ve Word belgesi oluşturun
           </p>
         </div>
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
-          <i className="ri-add-line" /> Yeni Tutanak
-        </button>
+        {canCreate && (
+          <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
+            <i className="ri-add-line" /> Yeni Tutanak
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -617,7 +627,7 @@ export default function TutanaklarPage() {
           </div>
           <p className="font-semibold" style={{ color: 'var(--text-muted)' }}>Tutanak kaydı bulunamadı</p>
           <p className="text-sm mt-2" style={{ color: 'var(--text-faint)' }}>Yeni tutanak oluşturmak için butonu kullanın</p>
-          <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Yeni Tutanak</button>
+          {canCreate && <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Yeni Tutanak</button>}
         </div>
       ) : (
         <div className="isg-card rounded-xl overflow-hidden">
@@ -700,8 +710,8 @@ export default function TutanaklarPage() {
                             <i className="ri-eye-line" />
                             <span className="hidden lg:inline">Görüntüle</span>
                           </button>
-                          <TableBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(t)} title="Düzenle" />
-                          <TableBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteId(t.id)} title="Sil" />
+                          {canEdit && <TableBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(t)} title="Düzenle" />}
+                          {canDelete && <TableBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteId(t.id)} title="Sil" />}
                         </div>
                       </td>
                     </tr>

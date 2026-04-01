@@ -8,12 +8,14 @@ import DetailModal from './components/DetailModal';
 import ReportBuilder from './components/ReportBuilder';
 import DofImport from './components/DofImport';
 import Modal from '../../components/base/Modal';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function UygunsuzluklarPage() {
   const {
     uygunsuzluklar, firmalar, personeller,
     deleteUygunsuzluk, addUygunsuzluk, addToast, quickCreate, setQuickCreate,
   } = useApp();
+  const { canEdit, canCreate, canDelete, isReadOnly } = usePermissions();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -113,15 +115,16 @@ export default function UygunsuzluklarPage() {
           <p className="text-sm mt-1" style={{ color: '#64748B' }}>Uygunsuzlukları kaydedin, takip edin ve raporlayın</p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {isReadOnly && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'rgba(6,182,212,0.1)', color: '#06B6D4', border: '1px solid rgba(6,182,212,0.25)' }}>
+              <i className="ri-search-eye-line" /> Denetçi — Salt Okunur
+            </span>
+          )}
           <button onClick={() => setShowReport(true)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-chart-line mr-1" />DÖF Raporu
           </button>
-          <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
-            <i className="ri-file-excel-2-line mr-1" />Excel İçe Aktar
-          </button>
-          <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap">
-            <i className="ri-add-line mr-1" />Yeni Kayıt
-          </button>
+          {canCreate && <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap"><i className="ri-file-excel-2-line mr-1" />Excel İçe Aktar</button>}
+          {canCreate && <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap"><i className="ri-add-line mr-1" />Yeni Kayıt</button>}
         </div>
       </div>
 

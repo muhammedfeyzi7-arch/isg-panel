@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import type { Firma, TehlikeSinifi, FirmaStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getFirmaStatusColor, getTehlikeColor, getPersonelStatusColor } from '../../components/base/Badge';
@@ -60,6 +61,7 @@ export default function FirmalarPage() {
     addFirma, updateFirma, deleteFirma, addToast, quickCreate, setQuickCreate,
     getFirmaLogo, setFirmaLogo, getEvrakFile,
   } = useApp();
+  const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [tehlikeFilter, setTehlikeFilter] = useState('');
@@ -147,8 +149,9 @@ export default function FirmalarPage() {
   const f = (field: keyof typeof form) => form[field] as string;
   const set = (field: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
-  const aktifCount = firmalar.filter(f => f.durum === 'Aktif').length;
-  const cokTehlikeliCount = firmalar.filter(f => f.tehlikeSinifi === 'Çok Tehlikeli').length;
+  const aktifFirmalarSayisi = useMemo(() => firmalar.filter(f => !f.silinmis).length, [firmalar]);
+  const aktifCount = firmalar.filter(f => !f.silinmis && f.durum === 'Aktif').length;
+  const cokTehlikeliCount = firmalar.filter(f => !f.silinmis && f.tehlikeSinifi === 'Çok Tehlikeli').length;
 
 
 
@@ -159,7 +162,7 @@ export default function FirmalarPage() {
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Firmalar</h1>
           <div className="flex items-center gap-3 mt-1">
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{firmalar.length} firma kayıtlı</span>
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{aktifFirmalarSayisi} firma kayıtlı</span>
             <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
             <span className="text-xs font-medium" style={{ color: '#34D399' }}>{aktifCount} aktif</span>
             {cokTehlikeliCount > 0 && (
@@ -170,11 +173,24 @@ export default function FirmalarPage() {
             )}
           </div>
         </div>
-        <button onClick={openAdd} className="btn-primary">
-          <i className="ri-add-circle-line text-base" />
-          Yeni Firma Ekle
-        </button>
+        {canCreate && (
+          <button onClick={openAdd} className="btn-primary">
+            <i className="ri-add-circle-line text-base" />
+            Yeni Firma Ekle
+          </button>
+        )}
       </div>
+
+      {/* Read-only banner for Denetçi */}
+      {isReadOnly && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }}>
+          <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#06B6D4' }} />
+          <p className="text-sm" style={{ color: '#06B6D4' }}>
+            <strong>Denetçi modunda görüntülüyorsunuz</strong> — Bu sayfada yalnızca okuma yetkisine sahipsiniz.
+          </p>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
@@ -297,8 +313,8 @@ export default function FirmalarPage() {
                     <td>
                       <div className="flex items-center gap-1 justify-end">
                         <ActionBtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(firma.id)} title="Detay" />
-                        <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />
-                        <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />
+                        {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
+                        {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
                       </div>
                     </td>
                   </tr>

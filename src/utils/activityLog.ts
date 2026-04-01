@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabase';
+
 export interface ActivityLogPayload {
   organizationId: string;
   userId: string;
@@ -11,9 +13,30 @@ export interface ActivityLogPayload {
   description?: string;
 }
 
-// No-op in local mode — activity logging is disabled
-export async function logActivity(_payload: ActivityLogPayload): Promise<void> {
-  // Local mode: no activity logging
+/**
+ * Writes an activity log entry to the activity_logs table.
+ * Called by any user performing actions — all org members can see the unified log.
+ */
+export async function logActivity(payload: ActivityLogPayload): Promise<void> {
+  try {
+    const { error } = await supabase.from('activity_logs').insert({
+      organization_id: payload.organizationId,
+      user_id: payload.userId,
+      user_email: payload.userEmail,
+      user_name: payload.userName,
+      user_role: payload.userRole,
+      action_type: payload.actionType,
+      module: payload.module ?? null,
+      record_id: payload.recordId ?? null,
+      record_name: payload.recordName ?? null,
+      description: payload.description ?? null,
+    });
+    if (error) {
+      console.warn('[ISG] Activity log write failed:', error.message);
+    }
+  } catch (err) {
+    console.warn('[ISG] Activity log exception:', err);
+  }
 }
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -31,6 +54,8 @@ export const ACTION_LABELS: Record<string, string> = {
   tutanak_created: 'Tutanak Oluşturuldu',
   egitim_created: 'Eğitim Eklendi',
   gorev_created: 'Görev Oluşturuldu',
+  uygunsuzluk_created: 'Uygunsuzluk Oluşturuldu',
+  uygunsuzluk_closed: 'Uygunsuzluk Kapatıldı',
 };
 
 export const ACTION_COLORS: Record<string, { bg: string; color: string; icon: string }> = {
@@ -48,4 +73,6 @@ export const ACTION_COLORS: Record<string, { bg: string; color: string; icon: st
   tutanak_created: { bg: 'rgba(249,115,22,0.1)', color: '#FB923C', icon: 'ri-file-text-line' },
   egitim_created: { bg: 'rgba(20,184,166,0.1)', color: '#2DD4BF', icon: 'ri-graduation-cap-line' },
   gorev_created: { bg: 'rgba(251,191,36,0.1)', color: '#FCD34D', icon: 'ri-task-line' },
+  uygunsuzluk_created: { bg: 'rgba(239,68,68,0.1)', color: '#F87171', icon: 'ri-alert-line' },
+  uygunsuzluk_closed: { bg: 'rgba(16,185,129,0.1)', color: '#4ADE80', icon: 'ri-checkbox-circle-line' },
 };

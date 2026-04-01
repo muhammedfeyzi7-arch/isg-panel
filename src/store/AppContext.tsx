@@ -5,6 +5,7 @@ import type { User } from '@supabase/supabase-js';
 import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
 import { useOrganization } from '../hooks/useOrganization';
+import { logActivity } from '../utils/activityLog';
 import type { Toast } from '../types';
 
 export interface Bildirim {
@@ -91,19 +92,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   } = useOrganization(user);
 
   // Auto-create org when user has no org
-  // Uses a small delay to ensure the Supabase session token is fully active
-  // before the insert (prevents RLS auth.uid() = null race condition).
   const autoCreateAttemptedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!user || orgLoading || rawOrg) return;
     if (autoCreateAttemptedRef.current === user.id) return;
     autoCreateAttemptedRef.current = user.id;
-    // 500ms delay so the JWT session is fully stable before hitting RLS-protected insert
     const t = setTimeout(() => { autoCreateOrg(); }, 500);
     return () => clearTimeout(t);
   }, [user, orgLoading, rawOrg, autoCreateOrg]);
 
-  // Map rawOrg to OrgInfo with user display name
   const org = useMemo<OrgInfo | null>(() => {
     if (!rawOrg) return null;
     return {
@@ -126,12 +123,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  // ── Activity logging — writes to Supabase activity_logs table ──
+  const orgRef = useRef(org);
+  const userRef = useRef(user);
+  useEffect(() => { orgRef.current = org; }, [org]);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   const logAction = useCallback((
-    _actionType: string, _module: string, _recordId: string,
-    _recordName?: string, _description?: string,
+    actionType: string, module: string, recordId: string,
+    recordName?: string, description?: string,
   ) => {
-    // Activity logging — no-op for now
+    const currentOrg = orgRef.current;
+    const currentUser = userRef.current;
+    if (!currentUser || !currentOrg) return;
+    logActivity({
+      organizationId: currentOrg.id,
+      userId: currentUser.id,
+      userEmail: currentUser.email ?? '',
+      userName: currentOrg.displayName || getUserDisplayName(currentUser),
+      userRole: currentOrg.role,
+      actionType,
+      module,
+      recordId,
+      recordName,
+      description,
+    });
   }, []);
+
+  // ── Log user_login once per session ──
+  const loginLoggedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user || !org) return;
+    if (loginLoggedRef.current === user.id) return;
+    loginLoggedRef.current = user.id;
+    logActivity({
+      organizationId: org.id,
+      userId: user.id,
+      userEmail: user.email ?? '',
+      userName: org.displayName || getUserDisplayName(user),
+      userRole: org.role,
+      actionType: 'user_login',
+      module: 'Sistem',
+      recordId: user.id,
+      description: 'Sisteme giriş yapıldı.',
+    });
+  }, [user?.id, org?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const addToastRef = useRef(addToast);
   useEffect(() => { addToastRef.current = addToast; }, [addToast]);
@@ -142,6 +178,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useCallback((msg: string) => { addToastRef.current(msg, 'error'); }, []),
     user?.id,
     orgLoading,
+    useCallback((module: string) => {
+      addToastRef.current(`${module} modülünde başka bir kullanıcı değişiklik yaptı — veriler güncellendi.`, 'info');
+    }, []),
   );
 
   const [activeModule, setActiveModule] = useState('dashboard');

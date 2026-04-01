@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import type { Personel } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getPersonelStatusColor } from '../../components/base/Badge';
@@ -91,6 +92,7 @@ interface ImportResult {
 
 export default function PersonellerPage() {
   const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate } = useApp();
+  const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -278,9 +280,16 @@ export default function PersonellerPage() {
             {importLoading ? <><i className="ri-loader-4-line animate-spin text-base" />Yükleniyor...</> : <><i className="ri-upload-2-line text-base" />Excel İçe Aktar</>}
           </button>
           <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap"><i className="ri-file-excel-2-line text-base" />Excel İndir</button>
-          <button onClick={openAdd} className="btn-primary whitespace-nowrap"><i className="ri-user-add-line text-base" />Yeni Personel Ekle</button>
+          {canCreate && <button onClick={openAdd} className="btn-primary whitespace-nowrap"><i className="ri-user-add-line text-base" />Yeni Personel Ekle</button>}
         </div>
       </div>
+
+      {isReadOnly && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }}>
+          <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#06B6D4' }} />
+          <p className="text-sm" style={{ color: '#06B6D4' }}><strong>Denetçi modunda görüntülüyorsunuz</strong> — Bu sayfada yalnızca okuma yetkisine sahipsiniz.</p>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
         <div className="relative flex-1 min-w-[180px]">
@@ -352,8 +361,8 @@ export default function PersonellerPage() {
                     <td>
                       <div className="flex items-center gap-1 justify-end">
                         <ABtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(p.id)} title="Detay" />
-                        <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />
-                        <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />
+                        {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
+                        {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
                       </div>
                     </td>
                   </tr>

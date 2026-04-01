@@ -226,6 +226,33 @@ export interface CurrentUser {
   avatar?: string;
 }
 
+export type IsIzniTip = 'Sıcak Çalışma' | 'Yüksekte Çalışma' | 'Kapalı Alan' | 'Elektrikli Çalışma' | 'Kazı' | 'Genel';
+export type IsIzniStatus = 'Taslak' | 'Onay Bekliyor' | 'Onaylandı' | 'Aktif' | 'Tamamlandı' | 'İptal';
+
+export interface IsIzni {
+  id: string;
+  izinNo: string;
+  tip: IsIzniTip;
+  firmaId: string;
+  bolum: string;
+  sorumlu: string;
+  calisanlar: string;
+  calisanSayisi: number;
+  aciklama: string;
+  tehlikeler: string;
+  onlemler: string;
+  gerekliEkipman: string;
+  baslamaTarihi: string;
+  bitisTarihi: string;
+  durum: IsIzniStatus;
+  onaylayanKisi: string;
+  onayTarihi?: string;
+  notlar: string;
+  olusturanKisi: string;
+  olusturmaTarihi: string;
+  guncellemeTarihi: string;
+}
+
 export interface AppData {
   firmalar: Firma[];
   personeller: Personel[];
@@ -236,6 +263,7 @@ export interface AppData {
   ekipmanlar: Ekipman[];
   gorevler: Gorev[];
   tutanaklar: Tutanak[];
+  isIzinleri: IsIzni[];
   currentUser: CurrentUser;
 }
 
