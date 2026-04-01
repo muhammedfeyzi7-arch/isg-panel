@@ -31,14 +31,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Load existing session on mount
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
+    supabase.auth.getSession().then(({ data: { session: s }, error }) => {
+      if (error) {
+        // Geçersiz/süresi dolmuş token → oturumu temizle, login'e yönlendir
+        supabase.auth.signOut();
+        setSession(null);
+      } else {
+        setSession(s);
+      }
       setLoading(false);
     });
 
     // Subscribe to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        setSession(s);
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+      } else {
+        setSession(s);
+      }
     });
 
     return () => subscription.unsubscribe();
