@@ -235,9 +235,10 @@ export function useStore(
         supabase
           .from(table)
           .select('id, data, created_at')
-          .eq('user_id', userId)
-          // No organization_id filter — fetch ALL user data regardless of which org it's in.
-          // This prevents data loss when auto-org creation generates a new org ID.
+          // Filter by organization_id so ALL org members see the same shared data.
+          // This is the correct multi-tenant approach — any user in the org can access all org data.
+          // RLS "select_org" policies allow this for all organization members.
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false }),
       ),
     ).then(results => {

@@ -67,7 +67,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (!signInError) return { error: null };
 
-    // If sign-in failed, try sign-up to determine if user exists or not
+    // Detect "wrong credentials" errors — user exists but password wrong
+    // In this case, we must NOT attempt sign-up (would show "already registered")
+    const signInMsg = signInError.message.toLowerCase();
+    const isWrongCredentials =
+      signInMsg.includes('invalid login credentials') ||
+      signInMsg.includes('invalid credentials') ||
+      signInMsg.includes('invalid_credentials') ||
+      signInMsg.includes('email not confirmed') ||
+      signInMsg.includes('email_not_confirmed');
+
+    if (isWrongCredentials) {
+      return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
+    }
+
+    // For any other sign-in error, try sign-up — this handles brand-new users
     const displayName = email.split('@')[0]
       .replace(/[._-]/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase());
@@ -78,20 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { data: { full_name: displayName } },
     });
 
-    // If sign-up also failed → check why
+    // If sign-up also failed for any reason → always show friendly message (never raw Supabase error)
     if (signUpError) {
-      const errMsg = signUpError.message.toLowerCase();
-      // User already exists but wrong password (or other sign-in issue)
-      if (
-        errMsg.includes('already registered') ||
-        errMsg.includes('already been registered') ||
-        errMsg.includes('email_exists') ||
-        errMsg.includes('user already registered') ||
-        errMsg.includes('duplicate')
-      ) {
-        return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
-      }
-      return { error: signUpError.message };
+      return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
     }
 
     // Sign-up succeeded → new user was created, sign in immediately
