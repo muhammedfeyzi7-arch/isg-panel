@@ -6,6 +6,8 @@ import Modal from '../../components/base/Modal';
 import Badge, { getPersonelStatusColor } from '../../components/base/Badge';
 import * as XLSX from 'xlsx';
 import PersonelDetayModal from './components/PersonelDetayModal';
+import PersonelAvatar from '../../components/base/PersonelAvatar';
+import PersonelKartvizit from './components/PersonelKartvizit';
 
 const KAN_GRUPLARI = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', '0+', '0-'];
 
@@ -91,7 +93,7 @@ interface ImportResult {
 }
 
 export default function PersonellerPage() {
-  const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate } = useApp();
+  const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto } = useApp();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
 
   const [search, setSearch] = useState('');
@@ -99,12 +101,15 @@ export default function PersonellerPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [kartvizitId, setKartvizitId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyPersonel });
+  const [fotoVeri, setFotoVeri] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (quickCreate === 'personeller') {
@@ -238,15 +243,33 @@ export default function PersonellerPage() {
 
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
 
-  const openAdd = () => { setForm({ ...emptyPersonel }); setEditingId(null); setFormOpen(true); };
-  const openEdit = (p: Personel) => { setForm({ ...p }); setEditingId(p.id); setFormOpen(true); };
+  const openAdd = () => { setForm({ ...emptyPersonel }); setEditingId(null); setFotoVeri(null); setFormOpen(true); };
+  const openEdit = (p: Personel) => { setForm({ ...p }); setEditingId(p.id); setFotoVeri(null); setFormOpen(true); };
 
   const handleSave = () => {
     if (!form.adSoyad.trim()) { addToast('Ad Soyad zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
-    if (editingId) { updatePersonel(editingId, form); addToast('Personel güncellendi.', 'success'); }
-    else { addPersonel(form); addToast('Personel eklendi.', 'success'); }
+    if (editingId) {
+      updatePersonel(editingId, form);
+      if (fotoVeri) setPersonelFoto(editingId, fotoVeri);
+      addToast('Personel güncellendi.', 'success');
+    } else {
+      const newP = addPersonel(form);
+      if (fotoVeri) setPersonelFoto(newP.id, fotoVeri);
+      addToast('Personel eklendi.', 'success');
+    }
     setFormOpen(false);
+    setFotoVeri(null);
+  };
+
+  const handleFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { addToast('Lütfen bir resim dosyası seçin.', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => { setFotoVeri(ev.target?.result as string); };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleDelete = (id: string) => { deletePersonel(id); setDeleteConfirm(null); setDetailId(null); addToast('Personel silindi.', 'info'); };
@@ -264,6 +287,7 @@ export default function PersonellerPage() {
   return (
     <div className="space-y-5">
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileSelect} className="hidden" />
+      <input ref={fotoInputRef} type="file" accept="image/*" onChange={handleFotoSelect} className="hidden" />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -334,73 +358,125 @@ export default function PersonellerPage() {
                   <th className="text-left hidden lg:table-cell">Görev / Departman</th>
                   <th className="text-left hidden lg:table-cell">İletişim</th>
                   <th className="text-left">Durum</th>
-                  <th className="w-24 text-right">İşlemler</th>
+                  <th className="w-28 text-right">İşlemler</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p, idx) => (
-                  <tr key={p.id}>
-                    <td>
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-xs font-bold text-white" style={{ background: AVATAR_COLORS[idx % AVATAR_COLORS.length] }}>
-                          {p.adSoyad.charAt(0)}
+                {filtered.map(p => {
+                  const foto = getPersonelFoto(p.id);
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="sm" />
+                          <div>
+                            <button onClick={() => setDetailId(p.id)} className="text-sm font-semibold text-slate-200 hover:text-blue-400 transition-colors cursor-pointer block text-left">{p.adSoyad}</button>
+                            <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{p.tc || 'TC yok'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <button onClick={() => setDetailId(p.id)} className="text-sm font-semibold text-slate-200 hover:text-blue-400 transition-colors cursor-pointer block text-left">{p.adSoyad}</button>
-                          <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{p.tc || 'TC yok'}</p>
+                      </td>
+                      <td className="hidden md:table-cell"><p className="text-sm text-slate-300">{getFirmaAd(p.firmaId)}</p></td>
+                      <td className="hidden lg:table-cell">
+                        <p className="text-sm text-slate-400">{p.gorev || '—'}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#334155' }}>{p.departman || ''}</p>
+                      </td>
+                      <td className="hidden lg:table-cell"><p className="text-sm text-slate-400">{p.telefon || '—'}</p></td>
+                      <td><Badge label={p.durum} color={getPersonelStatusColor(p.durum)} /></td>
+                      <td>
+                        <div className="flex items-center gap-1 justify-end">
+                          <ABtn icon="ri-contacts-book-2-line" color="#818CF8" onClick={() => setKartvizitId(p.id)} title="Kartvizit" />
+                          <ABtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(p.id)} title="Detay" />
+                          {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
+                          {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
                         </div>
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell"><p className="text-sm text-slate-300">{getFirmaAd(p.firmaId)}</p></td>
-                    <td className="hidden lg:table-cell">
-                      <p className="text-sm text-slate-400">{p.gorev || '—'}</p>
-                      <p className="text-xs mt-0.5" style={{ color: '#334155' }}>{p.departman || ''}</p>
-                    </td>
-                    <td className="hidden lg:table-cell"><p className="text-sm text-slate-400">{p.telefon || '—'}</p></td>
-                    <td><Badge label={p.durum} color={getPersonelStatusColor(p.durum)} /></td>
-                    <td>
-                      <div className="flex items-center gap-1 justify-end">
-                        <ABtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(p.id)} title="Detay" />
-                        {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
-                        {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editingId ? 'Personel Düzenle' : 'Yeni Personel Ekle'} size="xl" icon="ri-user-line"
+      {/* ── Form Modal ── */}
+      <Modal open={formOpen} onClose={() => { setFormOpen(false); setFotoVeri(null); }} title={editingId ? 'Personel Düzenle' : 'Yeni Personel Ekle'} size="xl" icon="ri-user-line"
         footer={<><button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button><button onClick={handleSave} className="btn-primary"><i className="ri-save-line" /> Kaydet</button></>}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FF label="Ad Soyad *" value={f('adSoyad')} onChange={v => set('adSoyad', v)} placeholder="Personelin tam adı" />
-          <FF label="TC Kimlik No" value={f('tc')} onChange={v => set('tc', v)} placeholder="12345678901" />
-          <FF label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0555 000 00 00" />
-          <FF label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="personel@email.com" type="email" />
-          <FF label="Doğum Tarihi" value={f('dogumTarihi')} onChange={v => set('dogumTarihi', v)} type="date" />
-          <FF label="İşe Giriş Tarihi" value={f('iseGirisTarihi')} onChange={v => set('iseGirisTarihi', v)} type="date" />
-          <FF label="Görev / Unvan" value={f('gorev')} onChange={v => set('gorev', v)} placeholder="Operatör, Mühendis..." />
-          <FF label="Departman" value={f('departman')} onChange={v => set('departman', v)} placeholder="Üretim, Kalite..." />
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Firma *</label>
-            <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer">
-              <option value="">Firma Seçin...</option>
-              {firmalar.filter(fi => !fi.silinmis).map(firma => <option key={firma.id} value={firma.id}>{firma.ad}</option>)}
-            </select>
-            {firmalar.filter(fi => !fi.silinmis).length === 0 && <p className="text-xs mt-1" style={{ color: '#F59E0B' }}>Önce firma eklemeniz gerekmektedir.</p>}
+        <div className="space-y-4">
+          {/* Photo upload section */}
+          <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
+            <div className="flex-shrink-0">
+              {(() => {
+                const displayFoto = fotoVeri || (editingId ? getPersonelFoto(editingId) : null);
+                return (
+                  <PersonelAvatar
+                    adSoyad={form.adSoyad || '?'}
+                    fotoUrl={displayFoto}
+                    size="lg"
+                    ring
+                  />
+                );
+              })()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Profil Fotoğrafı</p>
+              <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>İsteğe bağlı. Yüklenmezse isim baş harfleri gösterilir.</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => fotoInputRef.current?.click()}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-all whitespace-nowrap"
+                  style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', color: '#818CF8' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.25)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.15)'; }}
+                >
+                  <i className="ri-upload-2-line" />
+                  {fotoVeri || (editingId && getPersonelFoto(editingId)) ? 'Fotoğrafı Değiştir' : 'Fotoğraf Yükle'}
+                </button>
+                {(fotoVeri) && (
+                  <button
+                    type="button"
+                    onClick={() => setFotoVeri(null)}
+                    className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg cursor-pointer"
+                    style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}
+                  >
+                    <i className="ri-close-line" /> Kaldır
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-          <FS label="Çalışma Durumu" value={f('durum')} onChange={v => set('durum', v)} options={['Aktif', 'Pasif', 'Ayrıldı']} />
-          <FS label="Kan Grubu" value={f('kanGrubu')} onChange={v => set('kanGrubu', v)} options={['', ...KAN_GRUPLARI]} />
-          <FF label="Acil Durum Kişisi" value={f('acilKisi')} onChange={v => set('acilKisi', v)} placeholder="Yakınının adı soyadı" />
-          <FF label="Acil Durum Telefonu" value={f('acilTelefon')} onChange={v => set('acilTelefon', v)} placeholder="0555 000 00 00" />
-          <div className="md:col-span-2"><FF label="İkamet Adresi" value={f('adres')} onChange={v => set('adres', v)} placeholder="Açık adres" /></div>
+
+          {/* Existing fields grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FF label="Ad Soyad *" value={f('adSoyad')} onChange={v => set('adSoyad', v)} placeholder="Personelin tam adı" />
+            <FF label="TC Kimlik No" value={f('tc')} onChange={v => set('tc', v)} placeholder="12345678901" />
+            <FF label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0555 000 00 00" />
+            <FF label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="personel@email.com" type="email" />
+            <FF label="Doğum Tarihi" value={f('dogumTarihi')} onChange={v => set('dogumTarihi', v)} type="date" />
+            <FF label="İşe Giriş Tarihi" value={f('iseGirisTarihi')} onChange={v => set('iseGirisTarihi', v)} type="date" />
+            <FF label="Görev / Unvan" value={f('gorev')} onChange={v => set('gorev', v)} placeholder="Operatör, Mühendis..." />
+            <FF label="Departman" value={f('departman')} onChange={v => set('departman', v)} placeholder="Üretim, Kalite..." />
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Firma *</label>
+              <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer">
+                <option value="">Firma Seçin...</option>
+                {firmalar.filter(fi => !fi.silinmis).map(firma => <option key={firma.id} value={firma.id}>{firma.ad}</option>)}
+              </select>
+              {firmalar.filter(fi => !fi.silinmis).length === 0 && <p className="text-xs mt-1" style={{ color: '#F59E0B' }}>Önce firma eklemeniz gerekmektedir.</p>}
+            </div>
+            <FS label="Çalışma Durumu" value={f('durum')} onChange={v => set('durum', v)} options={['Aktif', 'Pasif', 'Ayrıldı']} />
+            <FS label="Kan Grubu" value={f('kanGrubu')} onChange={v => set('kanGrubu', v)} options={['', ...KAN_GRUPLARI]} />
+            <FF label="Acil Durum Kişisi" value={f('acilKisi')} onChange={v => set('acilKisi', v)} placeholder="Yakınının adı soyadı" />
+            <FF label="Acil Durum Telefonu" value={f('acilTelefon')} onChange={v => set('acilTelefon', v)} placeholder="0555 000 00 00" />
+            <div className="md:col-span-2"><FF label="İkamet Adresi" value={f('adres')} onChange={v => set('adres', v)} placeholder="Açık adres" /></div>
+          </div>
         </div>
       </Modal>
 
       <PersonelDetayModal personelId={detailId} onClose={() => setDetailId(null)} />
+
+      <PersonelKartvizit personelId={kartvizitId} onClose={() => setKartvizitId(null)} />
 
       <Modal open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="Personeli Sil" size="sm" icon="ri-delete-bin-line"
         footer={<><button onClick={() => setDeleteConfirm(null)} className="btn-secondary">İptal</button><button onClick={() => handleDelete(deleteConfirm!)} className="btn-danger"><i className="ri-delete-bin-line" /> Evet, Sil</button></>}>

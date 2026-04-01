@@ -92,14 +92,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   } = useOrganization(user);
 
   // Auto-create org when user has no org
+  // IMPORTANT: autoCreateOrgRef prevents the effect from re-firing every time
+  // autoCreateOrg gets a new reference (which would reset the 500ms timer indefinitely).
   const autoCreateAttemptedRef = useRef<string | null>(null);
+  const autoCreateOrgRef = useRef(autoCreateOrg);
+  useEffect(() => { autoCreateOrgRef.current = autoCreateOrg; }, [autoCreateOrg]);
+
   useEffect(() => {
     if (!user || orgLoading || rawOrg) return;
     if (autoCreateAttemptedRef.current === user.id) return;
     autoCreateAttemptedRef.current = user.id;
-    const t = setTimeout(() => { autoCreateOrg(); }, 500);
+    const t = setTimeout(() => { autoCreateOrgRef.current(); }, 500);
     return () => clearTimeout(t);
-  }, [user, orgLoading, rawOrg, autoCreateOrg]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, orgLoading, rawOrg]);
 
   const org = useMemo<OrgInfo | null>(() => {
     if (!rawOrg) return null;

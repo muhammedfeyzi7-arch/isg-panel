@@ -160,7 +160,7 @@ export function useOrganization(user: User | null) {
     }
   };
 
-  const autoCreateOrg = async (): Promise<void> => {
+  const autoCreateOrg = useCallback(async (): Promise<void> => {
     if (!user) return;
     if (autoCreateInProgressRef.current) {
       console.log('[ISG] autoCreateOrg already in progress, skipping');
@@ -254,7 +254,7 @@ export function useOrganization(user: User | null) {
     } finally {
       autoCreateInProgressRef.current = false;
     }
-  };
+  }, [user, loadOrg]);
 
   const joinOrg = async (inviteCode: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Kullanıcı bulunamadı.' };

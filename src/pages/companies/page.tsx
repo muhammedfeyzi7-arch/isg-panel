@@ -579,12 +579,12 @@ function EmptyState({ icon, title, description, onAction, actionLabel }: {
     <div className="rounded-2xl p-16 flex flex-col items-center text-center isg-card">
       <div
         className="w-16 h-16 flex items-center justify-center rounded-2xl mb-4"
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+        style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}
       >
-        <i className={`${icon} text-3xl`} style={{ color: '#1E293B' }} />
+        <i className={`${icon} text-3xl`} style={{ color: 'rgba(96,165,250,0.6)' }} />
       </div>
-      <p className="text-base font-bold text-slate-400">{title}</p>
-      <p className="text-sm mt-1 max-w-sm" style={{ color: '#334155' }}>{description}</p>
+      <p className="text-base font-bold" style={{ color: 'var(--text-secondary)' }}>{title}</p>
+      <p className="text-sm mt-1.5 max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>{description}</p>
       {onAction && actionLabel && (
         <button onClick={onAction} className="btn-primary mt-5">
           <i className="ri-add-circle-line" /> {actionLabel}
@@ -597,8 +597,11 @@ function EmptyState({ icon, title, description, onAction, actionLabel }: {
 function PDetayEmpty({ icon, text }: { icon: string; text: string }) {
   return (
     <div className="text-center py-8">
-      <i className={`${icon} text-3xl`} style={{ color: '#1E293B' }} />
-      <p className="text-sm mt-2" style={{ color: '#334155' }}>{text}</p>
+      <div className="w-12 h-12 flex items-center justify-center rounded-xl mx-auto mb-3"
+        style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.12)' }}>
+        <i className={`${icon} text-xl`} style={{ color: 'rgba(96,165,250,0.6)' }} />
+      </div>
+      <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{text}</p>
     </div>
   );
 }

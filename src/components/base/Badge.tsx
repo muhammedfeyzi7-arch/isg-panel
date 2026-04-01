@@ -1,16 +1,20 @@
 interface BadgeProps {
   label: string;
-  color?: 'green' | 'red' | 'amber' | 'sky' | 'gray' | 'purple' | 'orange';
+  color?: 'green' | 'red' | 'amber' | 'sky' | 'gray' | 'purple' | 'orange' | 'teal' | 'pink';
+  size?: 'sm' | 'md';
+  dot?: boolean;
 }
 
-const colorMap: Record<string, string> = {
-  green: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  red: 'bg-red-500/15 text-red-400 border-red-500/30',
-  amber: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  sky: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-  gray: 'bg-gray-500/15 text-gray-400 border-gray-500/30',
-  purple: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-  orange: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+const colorMap: Record<string, { base: string; dot: string }> = {
+  green:  { base: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',   dot: 'bg-emerald-400' },
+  red:    { base: 'bg-red-500/10 text-red-400 border-red-500/20',               dot: 'bg-red-400' },
+  amber:  { base: 'bg-amber-500/10 text-amber-400 border-amber-500/20',         dot: 'bg-amber-400' },
+  sky:    { base: 'bg-sky-500/10 text-sky-400 border-sky-500/20',               dot: 'bg-sky-400' },
+  gray:   { base: 'bg-slate-500/10 text-slate-400 border-slate-500/20',         dot: 'bg-slate-400' },
+  purple: { base: 'bg-violet-500/10 text-violet-400 border-violet-500/20',      dot: 'bg-violet-400' },
+  orange: { base: 'bg-orange-500/10 text-orange-400 border-orange-500/20',      dot: 'bg-orange-400' },
+  teal:   { base: 'bg-teal-500/10 text-teal-400 border-teal-500/20',            dot: 'bg-teal-400' },
+  pink:   { base: 'bg-pink-500/10 text-pink-400 border-pink-500/20',            dot: 'bg-pink-400' },
 };
 
 export function getFirmaStatusColor(s: string): BadgeProps['color'] {
@@ -51,9 +55,19 @@ export function getEgitimStatusColor(s: string): BadgeProps['color'] {
   return 'gray';
 }
 
-export default function Badge({ label, color = 'gray' }: BadgeProps) {
+export default function Badge({ label, color = 'gray', size = 'md', dot = false }: BadgeProps) {
+  const c = colorMap[color] ?? colorMap.gray;
+  const sizeClass = size === 'sm'
+    ? 'px-2 py-0.5 text-[10px] gap-1'
+    : 'px-2.5 py-[3px] text-[11px] gap-1.5';
+
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${colorMap[color]}`}>
+    <span
+      className={`inline-flex items-center rounded-full font-semibold border whitespace-nowrap tracking-wide ${sizeClass} ${c.base}`}
+    >
+      {dot && (
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.dot}`} />
+      )}
       {label}
     </span>
   );

@@ -847,6 +847,10 @@ export function useStore(
   const setFirmaLogo = useCallback((id: string, logo: string) => saveFileData(orgIdRef.current ?? '', 'firmalogo', id, logo), []);
   const clearFirmaLogo = useCallback((id: string) => removeFileData(orgIdRef.current ?? '', 'firmalogo', id), []);
 
+  // ──────── PERSONEL FOTO ────────
+  const getPersonelFoto = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'personelfoto', id), []);
+  const setPersonelFoto = useCallback((id: string, foto: string) => saveFileData(orgIdRef.current ?? '', 'personelfoto', id, foto), []);
+
   // ──────── CURRENT USER ────────
   const updateCurrentUser = useCallback((updates: Partial<CurrentUser>) => {
     setCurrentUser(prev => ({ ...prev, ...updates }));
@@ -868,6 +872,7 @@ export function useStore(
     addTutanak, updateTutanak, deleteTutanak, getTutanakFile,
     addIsIzni, updateIsIzni, deleteIsIzni,
     getFirmaLogo, setFirmaLogo, clearFirmaLogo,
+    getPersonelFoto, setPersonelFoto,
     updateCurrentUser,
   };
 }

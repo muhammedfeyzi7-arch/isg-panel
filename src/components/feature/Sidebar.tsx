@@ -121,7 +121,7 @@ export default function Sidebar() {
         {!sidebarCollapsed && (
           <div>
             <h1 className="text-sm font-bold text-white tracking-wide leading-tight">ISG Denetim</h1>
-            <p className="text-[10px] mt-0.5 font-medium" style={{ color: '#06B6D4' }}>
+            <p className="text-[10px] mt-0.5 font-semibold" style={{ color: '#06B6D4', letterSpacing: '0.02em' }}>
               Yönetim Sistemi
             </p>
           </div>
@@ -132,7 +132,7 @@ export default function Sidebar() {
       {!sidebarCollapsed && (
         <div className="px-4 pt-3 pb-1">
           <div
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide"
             style={{ background: roleInfo.bg, color: roleInfo.color }}
           >
             <i className={`text-[10px] ${userRole === 'admin' ? 'ri-shield-star-line' : userRole === 'denetci' ? 'ri-search-eye-line' : 'ri-user-line'}`} />
@@ -146,10 +146,14 @@ export default function Sidebar() {
         {filteredGroups.map(group => (
           <div key={group.label}>
             {!sidebarCollapsed && (
-              <p className="text-[10px] font-bold uppercase px-3 mb-2 select-none" style={{ color: '#3D4E63', letterSpacing: '0.08em' }}>
+              <p
+                className="text-[9.5px] font-extrabold uppercase px-3 mb-2 select-none"
+                style={{ color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em' }}
+              >
                 {group.label}
               </p>
             )}
+            {sidebarCollapsed && <div className="h-px mx-2 mb-2" style={{ background: 'rgba(255,255,255,0.06)' }} />}
             <ul className="space-y-0.5">
               {group.items.map(item => {
                 const isActive = activeModule === item.id;
@@ -165,16 +169,16 @@ export default function Sidebar() {
                     >
                       {isActive && (
                         <span
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full"
-                          style={{ background: 'linear-gradient(180deg, #3B82F6, #6366F1)' }}
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                          style={{ background: 'linear-gradient(180deg, #60A5FA, #818CF8)' }}
                         />
                       )}
-                      <span className={`w-5 h-5 flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'text-blue-400' : ''}`}>
-                        <i className={`${item.icon} text-base`} />
+                      <span className={`w-5 h-5 flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'text-blue-400' : 'group-hover:text-slate-300'}`}>
+                        <i className={`${item.icon} text-[15px]`} />
                       </span>
                       {!sidebarCollapsed && (
                         <>
-                          <span className={`text-sm font-medium flex-1 ${isActive ? 'text-blue-300' : ''}`}>
+                          <span className={`text-[13px] font-medium flex-1 transition-colors ${isActive ? 'text-blue-300 font-semibold' : 'group-hover:text-slate-200'}`}>
                             {item.label}
                           </span>
                           {badge != null && badge > 0 && (
@@ -199,26 +203,20 @@ export default function Sidebar() {
       {/* Mini Stats */}
       {!sidebarCollapsed && (
         <div className="px-3 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="rounded-xl p-3 flex gap-3" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
+          <div className="rounded-xl p-3 flex gap-3" style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.12)' }}>
             <div className="flex-1 text-center">
-              <p className="text-sm font-bold" style={{ background: 'linear-gradient(135deg, #60A5FA, #818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {firmalar.filter(f => !f.silinmis).length}
-              </p>
-              <p className="text-[10px] text-slate-600 mt-0.5">Firma</p>
+              <p className="text-sm font-bold text-gradient-blue">{firmalar.filter(f => !f.silinmis).length}</p>
+              <p className="text-[10px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Firma</p>
             </div>
             <div className="w-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
             <div className="flex-1 text-center">
-              <p className="text-sm font-bold" style={{ background: 'linear-gradient(135deg, #34D399, #10B981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {personeller.filter(p => !p.silinmis).length}
-              </p>
-              <p className="text-[10px] text-slate-600 mt-0.5">Personel</p>
+              <p className="text-sm font-bold text-gradient-green">{personeller.filter(p => !p.silinmis).length}</p>
+              <p className="text-[10px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Personel</p>
             </div>
             <div className="w-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
             <div className="flex-1 text-center">
-              <p className="text-sm font-bold" style={{ background: 'linear-gradient(135deg, #FCD34D, #F59E0B)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {evraklar.filter(e => !e.silinmis).length}
-              </p>
-              <p className="text-[10px] text-slate-600 mt-0.5">Evrak</p>
+              <p className="text-sm font-bold text-gradient-amber">{evraklar.filter(e => !e.silinmis).length}</p>
+              <p className="text-[10px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Evrak</p>
             </div>
           </div>
         </div>
@@ -238,16 +236,16 @@ export default function Sidebar() {
         {!sidebarCollapsed && (
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-slate-300 truncate">{currentUser.ad || 'Kullanıcı'}</p>
-            <p className="text-[10px] truncate" style={{ color: roleInfo.color }}>{roleInfo.label}</p>
+            <p className="text-[10px] font-medium truncate" style={{ color: roleInfo.color }}>{roleInfo.label}</p>
           </div>
         )}
         <button
           onClick={logout}
           title="Çıkış Yap"
-          className={`flex items-center justify-center cursor-pointer transition-colors rounded-lg ${sidebarCollapsed ? 'w-7 h-7' : 'w-6 h-6'}`}
-          style={{ color: '#475569' }}
+          className={`flex items-center justify-center cursor-pointer transition-all rounded-lg ${sidebarCollapsed ? 'w-7 h-7' : 'w-6 h-6'}`}
+          style={{ color: 'rgba(255,255,255,0.25)' }}
           onMouseEnter={e => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'transparent'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.25)'; e.currentTarget.style.background = 'transparent'; }}
         >
           <i className="ri-logout-box-r-line text-sm" />
         </button>
