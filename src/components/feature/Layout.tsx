@@ -3,9 +3,11 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useApp } from '../../store/AppContext';
 
+
 export default function Layout({ children }: { children: ReactNode }) {
-  const { sidebarCollapsed } = useApp();
+  const { sidebarCollapsed, theme } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isDark = theme === 'dark';
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-app)', transition: 'background 0.3s ease' }}>
@@ -24,7 +26,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <Sidebar onMobileClose={() => setMobileOpen(false)} />
+        <Sidebar onMobileClose={() => setMobileOpen(false)} isDark={isDark} />
       </div>
 
       {/* Header */}

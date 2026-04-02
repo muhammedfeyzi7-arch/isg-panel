@@ -127,8 +127,8 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const headerBg = isDark ? 'rgba(6,10,18,0.95)' : 'rgba(255,255,255,0.97)';
   const headerBorder = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.08)';
   const textColor = isDark ? '#475569' : '#64748B';
-  const inputBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)';
-  const inputBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.1)';
+  const inputBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.04)';
+  const inputBorder = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.1)';
   const iconBtnBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)';
   const iconBtnBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.1)';
   const nameColor = isDark ? '#E2E8F0' : '#0F172A';
@@ -207,10 +207,10 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             onChange={e => setSearch(e.target.value)}
             onFocus={() => setSearchFocus(true)}
             placeholder="Ara..."
-            className="w-48 pl-8 pr-3 py-1.5 text-[12.5px] rounded-lg outline-none transition-all duration-200"
-            style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: isDark ? '#94A3B8' : '#334155' }}
-            onFocus={e => { setSearchFocus(true); e.currentTarget.style.background = 'rgba(59,130,246,0.06)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.35)'; e.currentTarget.style.width = '220px'; }}
-            onBlur={e => { e.currentTarget.style.background = inputBg; e.currentTarget.style.borderColor = inputBorder; e.currentTarget.style.width = ''; }}
+            className={`w-48 pl-8 pr-3 py-1.5 text-[12.5px] rounded-lg outline-none transition-all duration-200 ${isDark ? 'search-dark' : 'search-light'}`}
+            style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: isDark ? '#e5e7eb' : '#334155' }}
+            onFocus={e => { setSearchFocus(true); e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(59,130,246,0.04)'; e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.2)'; e.currentTarget.style.width = '220px'; }}
+            onBlur={e => { e.currentTarget.style.background = inputBg; e.currentTarget.style.borderColor = inputBorder; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.width = ''; }}
           />
           {showSearchDropdown && (
             <div

@@ -1,23 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
-import WelcomeAnimation from './components/WelcomeAnimation';
 import MonthlyStats from './components/MonthlyStats';
+import StatCard from './components/StatCard';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, CartesianGrid,
 } from 'recharts';
 
-interface DashboardProps { skipWelcome?: boolean; }
-
-export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
-  const [welcomeDone, setWelcomeDone] = useState(false);
-  const [showWelcome] = useState(() => {
-    if (skipWelcome) return false;
-    const flag = sessionStorage.getItem('isg_show_welcome');
-    if (flag === 'true') { sessionStorage.removeItem('isg_show_welcome'); return true; }
-    return false;
-  });
+export default function DashboardPage() {
 
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
@@ -122,33 +113,34 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
 
   const statCards = [
-    { label: 'Toplam Firma', value: aktifFirmalar.length, icon: 'ri-building-2-line', sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`, trend: stats.firmaTrend, trendLabel: `Son 30g: +${stats.firmaLast30}`, gradient: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(99,102,241,0.05))', border: 'rgba(59,130,246,0.18)', iconBg: 'linear-gradient(135deg, #3B82F6, #6366F1)', valueColor: 'linear-gradient(135deg, #60A5FA, #818CF8)' },
-    { label: 'Toplam Personel', value: aktifPersoneller.length, icon: 'ri-team-line', sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`, trend: stats.personelTrend, trendLabel: `Son 30g: +${stats.personelLast30}`, gradient: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(5,150,105,0.05))', border: 'rgba(16,185,129,0.18)', iconBg: 'linear-gradient(135deg, #10B981, #059669)', valueColor: 'linear-gradient(135deg, #34D399, #10B981)' },
-    { label: 'Eksik / Süresi Dolmuş', value: stats.eksik, icon: 'ri-file-warning-line', sub: `${stats.yaklaşan} evrak 30 gün içinde`, trend: null, trendLabel: null, gradient: stats.eksik > 0 ? 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(220,38,38,0.05))' : 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(5,150,105,0.05))', border: stats.eksik > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.18)', iconBg: stats.eksik > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', valueColor: stats.eksik > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #34D399, #10B981)' },
-    { label: 'Açık Uygunsuzluk', value: stats.acikU, icon: 'ri-alert-line', sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, trend: null, trendLabel: null, gradient: stats.acikU > 0 ? 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(220,38,38,0.05))' : 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(5,150,105,0.05))', border: stats.acikU > 0 ? 'rgba(239,68,68,0.22)' : 'rgba(16,185,129,0.18)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #34D399, #10B981)' },
+    { label: 'Toplam Firma', value: aktifFirmalar.length, icon: 'ri-building-2-line', sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`, trend: stats.firmaTrend, trendLabel: `Son 30g: +${stats.firmaLast30}`, gradient: 'linear-gradient(145deg, rgba(59,130,246,0.1) 0%, rgba(99,102,241,0.04) 100%)', border: 'rgba(59,130,246,0.15)', iconBg: 'linear-gradient(135deg, #3B82F6, #6366F1)', valueColor: 'linear-gradient(135deg, #93C5FD, #A5B4FC)' },
+    { label: 'Toplam Personel', value: aktifPersoneller.length, icon: 'ri-team-line', sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`, trend: stats.personelTrend, trendLabel: `Son 30g: +${stats.personelLast30}`, gradient: 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)', border: 'rgba(16,185,129,0.15)', iconBg: 'linear-gradient(135deg, #10B981, #059669)', valueColor: 'linear-gradient(135deg, #6EE7B7, #34D399)' },
+    { label: 'Eksik / Süresi Dolmuş', value: stats.eksik, icon: 'ri-file-warning-line', sub: `${stats.yaklaşan} evrak 30 gün içinde`, trend: null, trendLabel: null, gradient: stats.eksik > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)', border: stats.eksik > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.15)', iconBg: stats.eksik > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', valueColor: stats.eksik > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #6EE7B7, #34D399)' },
+    { label: 'Açık Uygunsuzluk', value: stats.acikU, icon: 'ri-alert-line', sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, trend: null, trendLabel: null, gradient: stats.acikU > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)', border: stats.acikU > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.15)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #6EE7B7, #34D399)' },
   ];
 
   return (
     <>
-      {showWelcome && !welcomeDone && <WelcomeAnimation onDone={() => setWelcomeDone(true)} />}
-      <div className="space-y-5" style={showWelcome && !welcomeDone ? { opacity: 0, pointerEvents: 'none' } : undefined}>
+      <div className="space-y-6">
 
         {/* ── Page Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
           <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Kontrol Paneli</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            <h1 className="text-[22px] font-extrabold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+              Kontrol Paneli
+            </h1>
+            <p className="text-[12px] mt-1 font-medium" style={{ color: 'var(--text-muted)' }}>
               {new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold"
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold"
               style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)', color: '#34D399' }}>
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
               Sistem Aktif
             </div>
             {stats.acikGorev > 0 && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold"
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold"
                 style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)', color: '#F59E0B' }}>
                 <i className="ri-task-line text-[11px]" />{stats.acikGorev} açık görev
               </div>
@@ -196,43 +188,33 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
         )}
 
         {/* ── Stat Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {statCards.map((card) => (
-            <div key={card.label} className="stat-card rounded-xl p-4" style={{ background: card.gradient, border: `1px solid ${card.border}` }}>
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: card.iconBg }}>
-                  <i className={`${card.icon} text-white text-base`} />
-                </div>
-                {card.trend && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ background: card.trend.dir === 'up' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: card.trend.dir === 'up' ? '#34D399' : '#F87171' }}>
-                    <i className={card.trend.dir === 'up' ? 'ri-arrow-up-line' : 'ri-arrow-down-line'} />
-                    {card.trend.pct}%
-                  </span>
-                )}
-              </div>
-              <div>
-                <p className="text-3xl font-extrabold" style={{ background: card.valueColor, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}>{card.value}</p>
-                <p className="text-[12.5px] font-semibold mt-1.5" style={{ color: 'var(--text-primary)' }}>{card.label}</p>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{card.sub}</p>
-                {card.trendLabel && (
-                  <p className="text-[10px] mt-1 font-medium" style={{ color: 'var(--text-faint, #64748B)' }}>
-                    <i className="ri-time-line mr-1" />{card.trendLabel}
-                  </p>
-                )}
-              </div>
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {statCards.map((card, idx) => (
+            <StatCard
+              key={card.label}
+              label={card.label}
+              value={card.value}
+              icon={card.icon}
+              sub={card.sub}
+              trend={card.trend}
+              trendLabel={card.trendLabel}
+              gradient={card.gradient}
+              border={card.border}
+              iconBg={card.iconBg}
+              valueColor={card.valueColor}
+              delay={idx * 120}
+            />
           ))}
         </div>
 
         {/* ── Smart Insights + Monthly Stats ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Insights */}
-          <div className="rounded-xl p-4 isg-card">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-4 rounded-full" style={{ background: 'linear-gradient(180deg, #6366F1, #8B5CF6)' }} />
-              <h2 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Akıllı Özet</h2>
-              <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
+          <div className="rounded-2xl p-5 isg-card">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #6366F1, #8B5CF6)' }} />
+              <h2 className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>Akıllı Özet</h2>
+              <span className="ml-auto text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#A5B4FC', border: '1px solid rgba(99,102,241,0.15)' }}>
                 {insights.filter(i => i.priority >= 2).length > 0 ? `${insights.filter(i => i.priority >= 2).length} uyarı` : 'Temiz'}
               </span>
             </div>
@@ -252,9 +234,9 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
 
           {/* Monthly Stats spans 2 cols */}
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-4 rounded-full" style={{ background: 'linear-gradient(180deg, #10B981, #059669)' }} />
-              <h2 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #10B981, #059669)' }} />
+              <h2 className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
             </div>
             <MonthlyStats />
           </div>
@@ -262,7 +244,7 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
 
         {/* ── Open Nonconformities ── */}
         {acikUygunsuzluklar.length > 0 && (
-          <div className="rounded-xl p-4 isg-card" style={{ borderLeft: '3px solid #EF4444' }}>
+          <div className="rounded-2xl p-5 isg-card" style={{ borderLeft: '3px solid #EF4444' }}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 flex items-center justify-center rounded-lg" style={{ background: 'rgba(239,68,68,0.12)' }}>
@@ -298,7 +280,7 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
 
         {/* ── Charts ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 rounded-xl p-4 isg-card">
+          <div className="lg:col-span-2 rounded-2xl p-5 isg-card">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
               <div>
                 <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Büyüme Trendi</h3>
@@ -328,9 +310,9 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
               </ResponsiveContainer>
             )}
           </div>
-          <div className="rounded-xl p-4 isg-card">
+          <div className="rounded-2xl p-5 isg-card">
             <div className="mb-4">
-              <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Durumları</h3>
+              <h3 className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Durumları</h3>
               <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Toplam {aktifEvraklar.length} evrak</p>
             </div>
             {evrakPie.length > 0 ? (
@@ -352,7 +334,7 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
         {/* ── Upcoming + Recent Activity ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Yaklaşan Süreler */}
-          <div className="rounded-xl p-4 isg-card">
+          <div className="rounded-2xl p-5 isg-card">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Süreler</h3>
@@ -395,7 +377,7 @@ export default function DashboardPage({ skipWelcome }: DashboardProps = {}) {
           </div>
 
           {/* Son Aktiviteler */}
-          <div className="rounded-xl p-4 isg-card">
+          <div className="rounded-2xl p-5 isg-card">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Son Aktiviteler</h3>

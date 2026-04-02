@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { AppProvider, useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ToastContainer from '../../components/base/ToastContainer';
-import WelcomeAnimation from '../dashboard/components/WelcomeAnimation';
 import DashboardPage from '../dashboard/page';
 import FirmalarPage from '../companies/page';
 import PersonellerPage from '../personnel/page';
@@ -21,20 +20,9 @@ import IsIzniPage from '../is-izni/page';
 function AppContent() {
   const { activeModule, dataLoading, orgLoading, orgError, org } = useApp();
 
-  const [showWelcome, setShowWelcome] = useState(() => {
-    const flag = sessionStorage.getItem('isg_show_welcome');
-    if (flag === 'true') { sessionStorage.removeItem('isg_show_welcome'); return true; }
-    return false;
-  });
-  const [welcomeDone, setWelcomeDone] = useState(false);
-
   const isLoading = (orgLoading || (dataLoading && !org));
 
-  useEffect(() => {
-    if (!isLoading && showWelcome && !welcomeDone) {
-      // data ready, let animation finish naturally
-    }
-  }, [isLoading, showWelcome, welcomeDone]);
+  useEffect(() => {}, [isLoading]);
 
   if (orgError && !org) {
     return (
@@ -50,12 +38,6 @@ function AppContent() {
           </button>
         </div>
       </div>
-    );
-  }
-
-  if (showWelcome && !welcomeDone) {
-    return (
-      <WelcomeAnimation onDone={() => setWelcomeDone(true)} />
     );
   }
 
@@ -90,7 +72,7 @@ function AppContent() {
       case 'raporlar': return <RaporlarPage />;
       case 'copkutusu': return <CopKutusuPage />;
       case 'ayarlar': return <SettingsPage />;
-      default: return <DashboardPage skipWelcome />;
+      default: return <DashboardPage />;
     }
   };
 
