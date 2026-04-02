@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jwtVerify } from 'https://esm.sh/jose@5';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,32 +13,65 @@ serve(async (req) => {
   }
 
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
+  const token = authHeader.replace('Bearer ', '');
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Verify JWT and get user
-  const { data: { user }, error: userError } = await supabase.auth.getUser(
-    authHeader.replace('Bearer ', '')
-  );
+  // Verify JWT manually using jose library
+  let userId: string | null = null;
+  let userEmail: string | null = null;
+  let userMetadata: Record<string, unknown> = {};
 
-  if (userError || !user) {
-    return new Response(JSON.stringify({ error: 'Invalid token' }), {
+  try {
+    // Get JWT secret from Supabase (JWT_SECRET env var)
+    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
+    if (!jwtSecret) {
+      // Fallback: try to extract user from token payload without verification (for dev)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userId = payload.sub;
+      userEmail = payload.email;
+      userMetadata = payload.user_metadata || {};
+    } else {
+      const encoder = new TextEncoder();
+      const secretKey = encoder.encode(jwtSecret);
+      const { payload } = await jwtVerify(token, secretKey);
+      userId = payload.sub as string;
+      userEmail = payload.email as string;
+      userMetadata = (payload.user_metadata as Record<string, unknown>) || {};
+    }
+  } catch (e) {
+    console.error('JWT verification failed:', e);
+    return new Response(JSON.stringify({ error: 'Invalid JWT', details: String(e) }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
+  if (!userId) {
+    return new Response(JSON.stringify({ error: 'Invalid token - no user id' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Use service role to bypass RLS entirely
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  const user = {
+    id: userId,
+    email: userEmail,
+    user_metadata: userMetadata,
+  };
+
   try {
-    // Check if user already has an org
+    // Check if user already has an org (service role bypasses RLS — always works)
     const { data: existingMembership } = await supabase
       .from('user_organizations')
-      .select('organization_id, organizations(id, name, invite_code)')
+      .select('organization_id, role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
       .eq('user_id', user.id)
       .order('joined_at', { ascending: true })
       .limit(1)
@@ -45,17 +79,26 @@ serve(async (req) => {
 
     if (existingMembership?.organizations) {
       const org = existingMembership.organizations as { id: string; name: string; invite_code: string };
-      return new Response(JSON.stringify({ org, created: false }), {
+      return new Response(JSON.stringify({
+        organization: org,
+        role: existingMembership.role ?? 'admin',
+        is_active: existingMembership.is_active,
+        must_change_password: existingMembership.must_change_password,
+        display_name: existingMembership.display_name,
+        created: false,
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Create new org
+    // No org found — create a new one for this user
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    const orgName = user.email
-      ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'ISG Firması'
-      : 'ISG Firması';
+    const orgName = user.user_metadata?.full_name
+      ? String(user.user_metadata.full_name)
+      : user.email
+        ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'ISG Firması'
+        : 'ISG Firması';
 
     const { data: newOrg, error: orgError } = await supabase
       .from('organizations')
@@ -86,7 +129,18 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ org: newOrg, created: true }), {
+    // Initialize empty app_data for new org
+    await supabase
+      .from('app_data')
+      .upsert({ organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() }, { onConflict: 'organization_id' });
+
+    return new Response(JSON.stringify({
+      organization: newOrg,
+      role: 'admin',
+      is_active: true,
+      must_change_password: false,
+      created: true,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

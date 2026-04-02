@@ -16,12 +16,13 @@ const ROLE_MODULES: Record<string, string[]> = {
   denetci: [
     'dashboard', 'firmalar', 'personeller',
     'uygunsuzluklar', 'tutanaklar', 'is-izinleri', 'raporlar',
+    'ayarlar',
   ],
   member: [
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'egitimler', 'muayeneler', 'tutanaklar',
     'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
-    'raporlar', 'copkutusu',
+    'raporlar', 'copkutusu', 'ayarlar',
   ],
 };
 

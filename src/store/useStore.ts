@@ -58,7 +58,7 @@ export function generateIsIzniNo(existing: { izinNo: string }[]): string {
   return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
 }
 
-const defaultUser: CurrentUser = { id: 'u1', ad: '', email: '', rol: 'Admin' };
+const defaultUser: CurrentUser = { id: 'u1', ad: '', email: '', rol: 'Admin' }; // v2
 
 export type LogFn = (
   actionType: string, module: string, recordId: string, recordName?: string, description?: string,

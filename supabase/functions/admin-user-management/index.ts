@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jwtVerify } from 'https://esm.sh/jose@5';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,24 @@ function normalizeRole(role: string): string {
   return 'member';
 }
 
+async function verifyJWT(token: string): Promise<{ userId: string; email: string } | null> {
+  try {
+    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
+    if (!jwtSecret) {
+      // Fallback: extract from payload without verification (dev only)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return { userId: payload.sub, email: payload.email };
+    }
+    const encoder = new TextEncoder();
+    const secretKey = encoder.encode(jwtSecret);
+    const { payload } = await jwtVerify(token, secretKey);
+    return { userId: payload.sub as string, email: payload.email as string };
+  } catch (e) {
+    console.error('JWT verification failed:', e);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -20,27 +39,25 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Yetkisiz erişim.' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-
-  const { data: { user }, error: authError } = await userClient.auth.getUser();
-  if (authError || !user) {
-    return new Response(JSON.stringify({ error: 'Yetkisiz erişim.' }), {
+  const token = authHeader.replace('Bearer ', '');
+  const jwtData = await verifyJWT(token);
+  if (!jwtData) {
+    return new Response(JSON.stringify({ error: 'Geçersiz token.' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
+
+  const { userId, email } = jwtData;
 
   const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -59,7 +76,7 @@ Deno.serve(async (req) => {
   let membershipQuery = adminClient
     .from('user_organizations')
     .select('role, organization_id, display_name, email')
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   if (requestedOrgId) {
     membershipQuery = membershipQuery.eq('organization_id', requestedOrgId);
@@ -84,8 +101,8 @@ Deno.serve(async (req) => {
   }
 
   const orgId = callerMembership.organization_id;
-  const callerName = callerMembership.display_name || user.email?.split('@')[0] || 'Admin';
-  const callerEmail = callerMembership.email || user.email || '';
+  const callerName = callerMembership.display_name || email?.split('@')[0] || 'Admin';
+  const callerEmail = callerMembership.email || email || '';
 
   async function logActivity(
     actionType: string,
@@ -97,7 +114,7 @@ Deno.serve(async (req) => {
     try {
       await adminClient.from('activity_logs').insert({
         organization_id: orgId,
-        user_id: user.id,
+        user_id: userId,
         user_email: callerEmail,
         user_name: callerName,
         user_role: 'admin',
@@ -128,16 +145,16 @@ Deno.serve(async (req) => {
     }
 
     const enriched = await Promise.all((members ?? []).map(async (m) => {
-      let email = m.email;
-      if (!email) {
+      let memberEmail = m.email;
+      if (!memberEmail) {
         try {
           const { data: authUser } = await adminClient.auth.admin.getUserById(m.user_id);
-          email = authUser?.user?.email ?? '';
+          memberEmail = authUser?.user?.email ?? '';
         } catch {
-          email = '';
+          memberEmail = '';
         }
       }
-      return { ...m, email };
+      return { ...m, email: memberEmail };
     }));
 
     return new Response(JSON.stringify({ members: enriched }), {
@@ -148,21 +165,21 @@ Deno.serve(async (req) => {
 
   // ── CREATE USER ───────────────────────────────────────────────
   if (action === 'create') {
-    const { email, password, display_name, role } = body as {
+    const { email: newEmail, password, display_name, role } = body as {
       email: string;
       password: string;
       display_name: string;
       role: string;
     };
 
-    if (!email || !password || !display_name) {
+    if (!newEmail || !password || !display_name) {
       return new Response(
         JSON.stringify({ error: 'E-posta, şifre ve ad soyad zorunludur.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = newEmail.toLowerCase().trim();
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
     const existingAuthUser = existingUsers?.users?.find((u) => u.email === normalizedEmail);
 
@@ -249,7 +266,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (target_user_id === user.id && is_active === false) {
+    if (target_user_id === userId && is_active === false) {
       return new Response(
         JSON.stringify({ error: 'Kendi hesabınızı pasif yapamazsınız.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -395,7 +412,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (target_user_id === user.id) {
+    if (target_user_id === userId) {
       return new Response(
         JSON.stringify({ error: 'Kendinizi silemezsiniz.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

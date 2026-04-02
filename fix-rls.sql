@@ -1,221 +1,182 @@
 -- ============================================================
--- ISG Denetim — RLS FIX SCRIPT
--- Run this in Supabase SQL Editor: https://app.supabase.com/project/_/sql
---
--- ROOT CAUSE: Old SELECT policies used "auth.uid() = user_id"
--- which blocked org members from seeing each other's records.
--- FIX: SELECT now allows ANY org member to read ALL org data.
--- INSERT/UPDATE/DELETE still properly scoped.
+-- ISG DENETİM — RLS & POLICY FIX (v4 - FINAL)
+-- Supabase SQL Editor'da çalıştır:
+-- https://app.supabase.com/project/_/sql/new
 -- ============================================================
 
--- ── 1. FIX ENTITY TABLE POLICIES ──────────────────────────────
+-- ─── 1. SECURITY DEFINER helper fonksiyonlar (recursion önler) ───────────────
+
+CREATE OR REPLACE FUNCTION public.get_my_org_id()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT organization_id
+  FROM public.user_organizations
+  WHERE user_id = auth.uid()
+  ORDER BY joined_at ASC
+  LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_org_admin(org_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_organizations
+    WHERE user_id = auth.uid()
+      AND organization_id = org_id
+      AND role = 'admin'
+  );
+$$;
+
+-- ─── 2. user_organizations — tüm eski policy'leri sil, yeniden yaz ───────────
+
+ALTER TABLE public.user_organizations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "user_orgs_select"          ON public.user_organizations;
+DROP POLICY IF EXISTS "user_orgs_insert"          ON public.user_organizations;
+DROP POLICY IF EXISTS "user_orgs_update"          ON public.user_organizations;
+DROP POLICY IF EXISTS "user_orgs_delete"          ON public.user_organizations;
+DROP POLICY IF EXISTS "users_own_org_select"      ON public.user_organizations;
+DROP POLICY IF EXISTS "users_own_org_insert"      ON public.user_organizations;
+DROP POLICY IF EXISTS "users_own_org_update"      ON public.user_organizations;
+DROP POLICY IF EXISTS "admin_select_org_members"  ON public.user_organizations;
+
+-- SELECT: kendi satırını VEYA aynı org'daki satırları görebilir
+-- get_my_org_id() SECURITY DEFINER olduğu için recursion olmaz
+CREATE POLICY "user_orgs_select" ON public.user_organizations
+  FOR SELECT USING (
+    user_id = auth.uid()
+    OR organization_id = public.get_my_org_id()
+  );
+
+-- INSERT: kendi satırını ekleyebilir VEYA admin org'una ekleyebilir
+CREATE POLICY "user_orgs_insert" ON public.user_organizations
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid()
+    OR public.is_org_admin(organization_id)
+  );
+
+-- UPDATE: kendi satırını güncelleyebilir VEYA admin
+CREATE POLICY "user_orgs_update" ON public.user_organizations
+  FOR UPDATE USING (
+    user_id = auth.uid()
+    OR public.is_org_admin(organization_id)
+  );
+
+-- DELETE: sadece admin silebilir
+CREATE POLICY "user_orgs_delete" ON public.user_organizations
+  FOR DELETE USING (
+    public.is_org_admin(organization_id)
+  );
+
+-- ─── 3. organizations tablosu ─────────────────────────────────────────────────
+
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "orgs_select"        ON public.organizations;
+DROP POLICY IF EXISTS "orgs_insert"        ON public.organizations;
+DROP POLICY IF EXISTS "orgs_update"        ON public.organizations;
+DROP POLICY IF EXISTS "org_member_select"  ON public.organizations;
+DROP POLICY IF EXISTS "org_creator_insert" ON public.organizations;
+DROP POLICY IF EXISTS "org_admin_update"   ON public.organizations;
+
+CREATE POLICY "orgs_select" ON public.organizations
+  FOR SELECT USING (id = public.get_my_org_id());
+
+CREATE POLICY "orgs_insert" ON public.organizations
+  FOR INSERT WITH CHECK (created_by = auth.uid());
+
+CREATE POLICY "orgs_update" ON public.organizations
+  FOR UPDATE USING (public.is_org_admin(id));
+
+-- ─── 4. app_data tablosu ──────────────────────────────────────────────────────
+
+ALTER TABLE public.app_data ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "app_data_select" ON public.app_data;
+DROP POLICY IF EXISTS "app_data_insert" ON public.app_data;
+DROP POLICY IF EXISTS "app_data_update" ON public.app_data;
+DROP POLICY IF EXISTS "app_data_upsert" ON public.app_data;
+
+CREATE POLICY "app_data_select" ON public.app_data
+  FOR SELECT USING (organization_id = public.get_my_org_id());
+
+CREATE POLICY "app_data_insert" ON public.app_data
+  FOR INSERT WITH CHECK (organization_id = public.get_my_org_id());
+
+CREATE POLICY "app_data_update" ON public.app_data
+  FOR UPDATE USING (organization_id = public.get_my_org_id());
+
+-- ─── 5. activity_logs tablosu ─────────────────────────────────────────────────
+
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "activity_logs_select" ON public.activity_logs;
+DROP POLICY IF EXISTS "activity_logs_insert" ON public.activity_logs;
+DROP POLICY IF EXISTS "al_select_org"        ON public.activity_logs;
+DROP POLICY IF EXISTS "al_insert_own"        ON public.activity_logs;
+
+CREATE POLICY "activity_logs_select" ON public.activity_logs
+  FOR SELECT USING (organization_id = public.get_my_org_id());
+
+CREATE POLICY "activity_logs_insert" ON public.activity_logs
+  FOR INSERT WITH CHECK (organization_id = public.get_my_org_id());
+
+-- ─── 6. Diğer entity tabloları ────────────────────────────────────────────────
+
 DO $$
 DECLARE
-  tbl TEXT;
-  tables TEXT[] := ARRAY[
-    'firmalar','personeller','evraklar','egitimler',
-    'muayeneler','uygunsuzluklar','ekipmanlar',
-    'gorevler','tutanaklar','is_izinleri'
+  tbl text;
+  tables text[] := ARRAY[
+    'personeller', 'firmalar', 'evraklar', 'egitimler',
+    'muayeneler', 'tutanaklar', 'uygunsuzluklar', 'ekipmanlar',
+    'gorevler', 'is_izinleri'
   ];
 BEGIN
   FOREACH tbl IN ARRAY tables LOOP
-    -- Remove all old policies
-    EXECUTE format('DROP POLICY IF EXISTS "select_own"       ON %I', tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "insert_own"       ON %I', tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "update_own"       ON %I', tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "delete_own"       ON %I', tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "select_org"       ON %I', tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "insert_org"       ON %I', tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "update_org"       ON %I', tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "delete_org"       ON %I', tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "Users can manage own org data" ON %I', tbl);
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tbl);
 
-    -- SELECT: ANY member of the organization can read all org rows
-    -- Removed "auth.uid() = user_id" - this was the bug blocking shared data
-    EXECUTE format('
-      CREATE POLICY "select_org" ON %I FOR SELECT
-      USING (
-        organization_id IN (
-          SELECT organization_id
-          FROM user_organizations
-          WHERE user_id = auth.uid()
-            AND is_active = true
-        )
-      )
-    ', tbl);
+    -- Eski policy'leri temizle
+    EXECUTE format('DROP POLICY IF EXISTS "%s_select" ON public.%I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_insert" ON public.%I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_update" ON public.%I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_delete" ON public.%I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "select_own" ON public.%I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "insert_own" ON public.%I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "update_own" ON public.%I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "delete_own" ON public.%I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "select_org" ON public.%I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "insert_org" ON public.%I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "update_org" ON public.%I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "delete_org" ON public.%I', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "Users can manage own org data" ON public.%I', tbl);
 
-    -- INSERT: user can insert into their org, must use their own user_id
-    EXECUTE format('
-      CREATE POLICY "insert_org" ON %I FOR INSERT
-      WITH CHECK (
-        auth.uid() = user_id
-        AND organization_id IN (
-          SELECT organization_id
-          FROM user_organizations
-          WHERE user_id = auth.uid()
-            AND is_active = true
-        )
-      )
-    ', tbl);
-
-    -- UPDATE: any active org member can update org records
-    EXECUTE format('
-      CREATE POLICY "update_org" ON %I FOR UPDATE
-      USING (
-        organization_id IN (
-          SELECT organization_id
-          FROM user_organizations
-          WHERE user_id = auth.uid()
-            AND is_active = true
-        )
-      )
-    ', tbl);
-
-    -- DELETE: any active org member can delete org records
-    EXECUTE format('
-      CREATE POLICY "delete_org" ON %I FOR DELETE
-      USING (
-        organization_id IN (
-          SELECT organization_id
-          FROM user_organizations
-          WHERE user_id = auth.uid()
-            AND is_active = true
-        )
-      )
-    ', tbl);
+    -- Yeni doğru policy'ler
+    EXECUTE format(
+      'CREATE POLICY "%s_select" ON public.%I FOR SELECT USING (organization_id = public.get_my_org_id())',
+      tbl, tbl
+    );
+    EXECUTE format(
+      'CREATE POLICY "%s_insert" ON public.%I FOR INSERT WITH CHECK (organization_id = public.get_my_org_id())',
+      tbl, tbl
+    );
+    EXECUTE format(
+      'CREATE POLICY "%s_update" ON public.%I FOR UPDATE USING (organization_id = public.get_my_org_id())',
+      tbl, tbl
+    );
+    EXECUTE format(
+      'CREATE POLICY "%s_delete" ON public.%I FOR DELETE USING (organization_id = public.get_my_org_id())',
+      tbl, tbl
+    );
   END LOOP;
 END $$;
 
--- ── 2. FIX user_organizations TABLE RLS ──────────────────────
--- Ensure users can only read their own org memberships
--- (This fixes the autoCreateOrg duplicate org bug on different devices)
-
-ALTER TABLE user_organizations ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "users_own_org_select" ON user_organizations;
-DROP POLICY IF EXISTS "users_own_org_insert" ON user_organizations;
-DROP POLICY IF EXISTS "users_own_org_update" ON user_organizations;
-
--- Users can read their own membership rows
-CREATE POLICY "users_own_org_select" ON user_organizations
-  FOR SELECT USING (user_id = auth.uid());
-
--- Users can insert their own membership (for join via invite code)
-CREATE POLICY "users_own_org_insert" ON user_organizations
-  FOR INSERT WITH CHECK (user_id = auth.uid());
-
--- Users can update their own membership (for clearMustChangePassword etc.)
-CREATE POLICY "users_own_org_update" ON user_organizations
-  FOR UPDATE USING (user_id = auth.uid());
-
--- Admins in the same org can also SELECT (to list members)
-DROP POLICY IF EXISTS "admin_select_org_members" ON user_organizations;
-CREATE POLICY "admin_select_org_members" ON user_organizations
-  FOR SELECT USING (
-    organization_id IN (
-      SELECT organization_id FROM user_organizations
-      WHERE user_id = auth.uid() AND role = 'admin'
-    )
-  );
-
--- ── 3. FIX organizations TABLE RLS ───────────────────────────
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "org_member_select" ON organizations;
-DROP POLICY IF EXISTS "org_creator_insert" ON organizations;
-DROP POLICY IF EXISTS "org_admin_update" ON organizations;
-
-CREATE POLICY "org_member_select" ON organizations
-  FOR SELECT USING (
-    id IN (
-      SELECT organization_id FROM user_organizations WHERE user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "org_creator_insert" ON organizations
-  FOR INSERT WITH CHECK (created_by = auth.uid());
-
-CREATE POLICY "org_admin_update" ON organizations
-  FOR UPDATE USING (
-    id IN (
-      SELECT organization_id FROM user_organizations
-      WHERE user_id = auth.uid() AND role = 'admin'
-    )
-  );
-
--- ── 4. ENSURE is_izinleri TABLE EXISTS WITH RLS ──────────────
-CREATE TABLE IF NOT EXISTS is_izinleri (
-  id              TEXT PRIMARY KEY,
-  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  organization_id UUID NOT NULL,
-  data            JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS is_izinleri_user_org_idx ON is_izinleri (user_id, organization_id);
-CREATE INDEX IF NOT EXISTS is_izinleri_org_idx ON is_izinleri (organization_id);
-
-ALTER TABLE is_izinleri ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "select_own" ON is_izinleri;
-DROP POLICY IF EXISTS "insert_own" ON is_izinleri;
-DROP POLICY IF EXISTS "update_own" ON is_izinleri;
-DROP POLICY IF EXISTS "delete_own" ON is_izinleri;
-DROP POLICY IF EXISTS "select_org" ON is_izinleri;
-DROP POLICY IF EXISTS "insert_org" ON is_izinleri;
-DROP POLICY IF EXISTS "update_org" ON is_izinleri;
-DROP POLICY IF EXISTS "delete_org" ON is_izinleri;
-
-CREATE POLICY "select_org" ON is_izinleri FOR SELECT
-  USING (organization_id IN (
-    SELECT organization_id FROM user_organizations WHERE user_id = auth.uid() AND is_active = true
-  ));
-
-CREATE POLICY "insert_org" ON is_izinleri FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id
-    AND organization_id IN (
-      SELECT organization_id FROM user_organizations WHERE user_id = auth.uid() AND is_active = true
-    )
-  );
-
-CREATE POLICY "update_org" ON is_izinleri FOR UPDATE
-  USING (organization_id IN (
-    SELECT organization_id FROM user_organizations WHERE user_id = auth.uid() AND is_active = true
-  ));
-
-CREATE POLICY "delete_org" ON is_izinleri FOR DELETE
-  USING (organization_id IN (
-    SELECT organization_id FROM user_organizations WHERE user_id = auth.uid() AND is_active = true
-  ));
-
--- ── 5. ENSURE activity_logs TABLE RLS ───────────────────────
-ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "al_select_org" ON activity_logs;
-DROP POLICY IF EXISTS "al_insert_own" ON activity_logs;
-
-CREATE POLICY "al_select_org" ON activity_logs FOR SELECT
-  USING (organization_id IN (
-    SELECT organization_id FROM user_organizations WHERE user_id = auth.uid()
-  ));
-
-CREATE POLICY "al_insert_own" ON activity_logs FOR INSERT
-  WITH CHECK (user_id = auth.uid());
-
--- ── 6. VERIFY: List all policies ─────────────────────────────
-SELECT
-  schemaname,
-  tablename,
-  policyname,
-  cmd,
-  qual
-FROM pg_policies
-WHERE schemaname = 'public'
-  AND tablename IN (
-    'firmalar','personeller','evraklar','egitimler',
-    'muayeneler','uygunsuzluklar','ekipmanlar',
-    'gorevler','tutanaklar','is_izinleri',
-    'user_organizations','organizations','activity_logs'
-  )
-ORDER BY tablename, cmd;
+-- ─── Tamamlandı ───────────────────────────────────────────────────────────────
+SELECT 'RLS policies v4 fixed successfully!' as result;

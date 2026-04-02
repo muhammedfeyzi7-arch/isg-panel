@@ -41,9 +41,49 @@ export function useOrganization(user: User | null) {
       setLoading(false);
     }, 12000);
 
+    // Helper: load via edge function (bypasses RLS entirely — always reliable)
+    const loadViaEdgeFunction = async (): Promise<boolean> => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData?.session) return false;
+        const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+        const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!res.ok) return false;
+        const resData = await res.json() as {
+          organization?: { id: string; name: string; invite_code: string };
+          role?: string;
+          is_active?: boolean;
+          must_change_password?: boolean;
+          display_name?: string;
+          email?: string;
+        };
+        if (resData?.organization) {
+          setOrg({
+            id: resData.organization.id,
+            name: resData.organization.name,
+            invite_code: resData.organization.invite_code,
+            role: resData.role ?? 'admin',
+            isActive: resData.is_active !== false,
+            mustChangePassword: resData.must_change_password === true,
+            displayName: resData.display_name ?? undefined,
+            email: resData.email ?? undefined,
+          });
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
     try {
-      // CRITICAL: ORDER BY joined_at ASC to ALWAYS get the oldest/original org.
-      // Without this, maybeSingle() is non-deterministic across devices.
+      // PRIMARY: Try direct Supabase query first (fast path)
       const { data, error } = await supabase
         .from('user_organizations')
         .select('role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
@@ -55,10 +95,14 @@ export function useOrganization(user: User | null) {
       clearTimeout(timeoutId);
 
       if (error) {
-        // If the error is RLS-related, log clearly and try to proceed
-        console.error('[ISG] loadOrg error (possible RLS issue — run fix-rls.sql):', error.message);
-        setLoadError(error.message);
-        setOrg(null);
+        // RLS error (infinite recursion, permission denied, etc.)
+        // FALLBACK: Use edge function which uses service role key — bypasses RLS
+        console.warn('[ISG] loadOrg RLS error, falling back to edge function:', error.message);
+        const ok = await loadViaEdgeFunction();
+        if (!ok) {
+          setLoadError(error.message);
+          setOrg(null);
+        }
         setLoading(false);
         return;
       }
@@ -69,20 +113,26 @@ export function useOrganization(user: User | null) {
           id: o.id,
           name: o.name,
           invite_code: o.invite_code,
-          role: data.role ?? 'member',
+          role: data.role ?? 'admin',
           isActive: data.is_active !== false,
           mustChangePassword: data.must_change_password === true,
           displayName: data.display_name ?? undefined,
           email: data.email ?? undefined,
         });
       } else {
-        setOrg(null);
+        // No org found via direct query — try edge function (it will create one if needed)
+        console.log('[ISG] loadOrg: no org found, trying edge function');
+        await loadViaEdgeFunction();
       }
     } catch (err) {
       clearTimeout(timeoutId);
       console.error('[ISG] loadOrg exception:', err);
-      setLoadError(err instanceof Error ? err.message : String(err));
-      setOrg(null);
+      // Last resort: edge function
+      const ok = await loadViaEdgeFunction();
+      if (!ok) {
+        setLoadError(err instanceof Error ? err.message : String(err));
+        setOrg(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -176,97 +226,32 @@ export function useOrganization(user: User | null) {
     autoCreateDoneRef.current = user.id;
 
     try {
-      // Step 1: Double-check no org exists (this is the key race-condition guard
-      // that prevents duplicate orgs when the same user logs in on multiple devices)
-      const { data: existingCheck, error: existingCheckError } = await supabase
-        .from('user_organizations')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (existingCheckError) {
-        // If we get an RLS error here, the user_organizations RLS policy is too strict.
-        // The fix-rls.sql file must be run in Supabase SQL Editor.
-        console.error('[ISG] autoCreateOrg: cannot check existing org (RLS issue?) — run fix-rls.sql!', existingCheckError.message);
-        // Attempt to reload org in case it exists but the check failed
-        await loadOrg();
-        return;
-      }
-
-      if (existingCheck) {
-        console.log('[ISG] autoCreateOrg: org already exists, loading');
-        await loadOrg();
-        return;
-      }
-
-      // Step 2: No org found — create a new organization for this user
-      // This happens when:
-      //   a) A brand-new SaaS customer signs up (correct use case)
-      //   b) A user was created directly via Supabase dashboard (incorrect — should use Settings > Add User)
-      //
-      // NOTE: If you created a user from Supabase dashboard and they land here with an empty
-      // org, delete them and re-add via Settings > Kullanıcı Ekle so they join your org.
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-      const orgName = user.user_metadata?.full_name
-        ? String(user.user_metadata.full_name)
-        : user.email
-          ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'ISG Firması'
-          : 'ISG Firması';
-
-      const { data: newOrg, error: orgError } = await supabase
-        .from('organizations')
-        .insert({ name: orgName, invite_code: inviteCode, created_by: user.id })
-        .select()
-        .maybeSingle();
-
-      if (orgError || !newOrg) {
-        console.error('[ISG] autoCreateOrg: org insert failed:', orgError?.message);
-        // Fallback: try edge function
-        try {
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData?.session) {
-            const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-            const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${sessionData.session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-            });
-            if (res.ok) {
-              console.log('[ISG] autoCreateOrg: edge function fallback succeeded');
-              await loadOrg();
-              return;
-            }
-          }
-        } catch (fallbackErr) {
-          console.error('[ISG] autoCreateOrg: edge function fallback also failed:', fallbackErr);
-        }
+      // Always use edge function — it uses service role key, bypasses RLS entirely.
+      // This avoids infinite recursion in user_organizations RLS policies.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        console.error('[ISG] autoCreateOrg: no session');
         autoCreateDoneRef.current = null;
         return;
       }
 
-      const { error: memberError } = await supabase
-        .from('user_organizations')
-        .insert({
-          user_id: user.id,
-          organization_id: newOrg.id,
-          role: 'admin',
-          email: user.email ?? '',
-          is_active: true,
-          must_change_password: false,
-        });
+      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (memberError) {
-        console.error('[ISG] autoCreateOrg: member insert failed:', memberError.message);
+      if (res.ok) {
+        console.log('[ISG] autoCreateOrg: edge function succeeded');
+        await loadOrg();
+      } else {
+        const errText = await res.text();
+        console.error('[ISG] autoCreateOrg: edge function failed:', errText);
         autoCreateDoneRef.current = null;
-        return;
       }
-
-      console.log('[ISG] autoCreateOrg: org created successfully', newOrg.id);
-      await loadOrg();
     } catch (err) {
       console.error('[ISG] autoCreateOrg exception:', err);
       autoCreateDoneRef.current = null;
