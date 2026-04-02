@@ -10,11 +10,12 @@ import type { Toast } from '../types';
 
 export interface Bildirim {
   id: string;
-  tip: 'evrak_surecek' | 'evrak_dolmus';
+  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek';
   mesaj: string;
   detay: string;
   tarih: string;
   okundu: boolean;
+  kalanGun: number;
 }
 
 export type Theme = 'dark' | 'light';
@@ -224,41 +225,111 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const bildirimler = useMemo<Bildirim[]>(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const in7 = new Date(today.getTime() + 7 * 86400000);
+    const in60 = new Date(today.getTime() + 60 * 86400000);
     const result: Bildirim[] = [];
 
+    const getDaysRemaining = (dateStr: string): number => {
+      const d = new Date(dateStr);
+      d.setHours(0, 0, 0, 0);
+      return Math.ceil((d.getTime() - today.getTime()) / 86400000);
+    };
+
+    // ── Evraklar ──
     store.evraklar.forEach(e => {
       if (!e.gecerlilikTarihi || e.silinmis) return;
       const d = new Date(e.gecerlilikTarihi);
       d.setHours(0, 0, 0, 0);
-      if (d >= today && d <= in7) {
-        const kalanGun = Math.ceil((d.getTime() - today.getTime()) / 86400000);
-        const personel = e.personelId ? store.personeller.find(p => p.id === e.personelId) : null;
-        const firma = store.firmalar.find(f => f.id === e.firmaId);
+      const kalanGun = getDaysRemaining(e.gecerlilikTarihi);
+      const personel = e.personelId ? store.personeller.find(p => p.id === e.personelId) : null;
+      const firma = store.firmalar.find(f => f.id === e.firmaId);
+      const detayBase = `${personel ? personel.adSoyad + ' — ' : ''}${firma?.ad || ''}`;
+
+      if (d >= today && d <= in60) {
         result.push({
-          id: `bildirim_${e.id}`,
+          id: `evrak_surecek_${e.id}`,
           tip: 'evrak_surecek',
-          mesaj: `${e.ad} evrakının süresi dolmak üzere`,
-          detay: `${personel ? personel.adSoyad + ' — ' : ''}${firma?.ad || ''} — ${kalanGun === 0 ? 'Bugün dolacak!' : `${kalanGun} gün kaldı`}`,
+          mesaj: `${e.ad} evrakının süresi yaklaşıyor`,
+          detay: `${detayBase}${detayBase ? ' — ' : ''}${kalanGun === 0 ? 'Bugün dolacak!' : `${kalanGun} gün kaldı`}`,
           tarih: e.gecerlilikTarihi,
-          okundu: okunanlar.has(`bildirim_${e.id}`),
+          okundu: okunanlar.has(`evrak_surecek_${e.id}`),
+          kalanGun,
         });
       } else if (d < today) {
-        const personel = e.personelId ? store.personeller.find(p => p.id === e.personelId) : null;
-        const firma = store.firmalar.find(f => f.id === e.firmaId);
         result.push({
-          id: `dolmus_${e.id}`,
+          id: `evrak_dolmus_${e.id}`,
           tip: 'evrak_dolmus',
           mesaj: `${e.ad} evrakının süresi dolmuş`,
-          detay: `${personel ? personel.adSoyad + ' — ' : ''}${firma?.ad || ''} — ${d.toLocaleDateString('tr-TR')} tarihinde doldu`,
+          detay: `${detayBase}${detayBase ? ' — ' : ''}${d.toLocaleDateString('tr-TR')} tarihinde doldu`,
           tarih: e.gecerlilikTarihi,
-          okundu: okunanlar.has(`dolmus_${e.id}`),
+          okundu: okunanlar.has(`evrak_dolmus_${e.id}`),
+          kalanGun,
         });
       }
     });
 
-    return result.sort((a, b) => new Date(a.tarih).getTime() - new Date(b.tarih).getTime());
-  }, [store.evraklar, store.personeller, store.firmalar, okunanlar]);
+    // ── Ekipman kontrolleri ──
+    store.ekipmanlar.forEach(ek => {
+      if (!ek.sonrakiKontrolTarihi || ek.silinmis) return;
+      const d = new Date(ek.sonrakiKontrolTarihi);
+      d.setHours(0, 0, 0, 0);
+      const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi);
+      if (kalanGun < 0 || kalanGun > 60) return;
+      const firma = store.firmalar.find(f => f.id === ek.firmaId);
+      result.push({
+        id: `ekipman_${ek.id}`,
+        tip: 'ekipman_kontrol',
+        mesaj: `${ek.ad} kontrolü yaklaşıyor`,
+        detay: `${firma?.ad ? firma.ad + ' — ' : ''}${kalanGun === 0 ? 'Bugün kontrol edilmeli!' : `${kalanGun} gün kaldı`}`,
+        tarih: ek.sonrakiKontrolTarihi,
+        okundu: okunanlar.has(`ekipman_${ek.id}`),
+        kalanGun,
+      });
+    });
+
+    // ── Eğitimler (tarih + gecerlilikSuresi gün ekleyerek bitiş tarihi hesapla) ──
+    store.egitimler.forEach(eg => {
+      if (eg.silinmis || !eg.tarih) return;
+      const suresi = eg.gecerlilikSuresi ?? 0;
+      if (suresi <= 0) return;
+      const bitis = new Date(eg.tarih);
+      bitis.setDate(bitis.getDate() + suresi);
+      bitis.setHours(0, 0, 0, 0);
+      const tarih = bitis.toISOString().split('T')[0];
+      const kalanGun = getDaysRemaining(tarih);
+      if (kalanGun < 0 || kalanGun > 60) return;
+      const firma = store.firmalar.find(f => f.id === eg.firmaId);
+      result.push({
+        id: `egitim_${eg.id}`,
+        tip: 'egitim_surecek',
+        mesaj: `${eg.ad} eğitiminin geçerlilik süresi yaklaşıyor`,
+        detay: `${firma?.ad ? firma.ad + ' — ' : ''}${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`,
+        tarih,
+        okundu: okunanlar.has(`egitim_${eg.id}`),
+        kalanGun,
+      });
+    });
+
+    // ── Sağlık muayeneleri ──
+    store.muayeneler.forEach(m => {
+      if (m.silinmis) return;
+      const tarih = m.sonrakiTarih || m.muayeneTarihi;
+      if (!tarih) return;
+      const kalanGun = getDaysRemaining(tarih);
+      if (kalanGun < 0 || kalanGun > 60) return;
+      const personel = store.personeller.find(p => p.id === m.personelId);
+      result.push({
+        id: `saglik_${m.id}`,
+        tip: 'saglik_surecek',
+        mesaj: `${personel?.adSoyad || 'Personel'} muayene tarihi yaklaşıyor`,
+        detay: `Periyodik Muayene — ${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`,
+        tarih,
+        okundu: okunanlar.has(`saglik_${m.id}`),
+        kalanGun,
+      });
+    });
+
+    return result.sort((a, b) => a.kalanGun - b.kalanGun);
+  }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar]);
 
   const okunmamisBildirimSayisi = useMemo(
     () => bildirimler.filter(b => !b.okundu).length,

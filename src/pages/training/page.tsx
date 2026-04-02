@@ -1,5 +1,4 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import * as XLSX from 'xlsx';
 import { useApp } from '../../store/AppContext';
 import type { Egitim, EgitimStatus } from '../../types';
 import Modal from '../../components/base/Modal';
@@ -164,85 +163,6 @@ export default function EgitimlerPage() {
 
   const detailEgitim = egitimler.find(e => e.id === detailId);
 
-  /* ── Excel Şablon İndir ── */
-  const handleTemplateDownload = () => {
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['Eğitim Türü *', 'Firma Adı *', 'Tarih (YYYY-MM-DD)', 'Açıklama', 'Notlar'],
-      ['İSG Temel Eğitimi', 'Örnek Firma A.Ş.', '2024-01-15', 'Temel ISG kuralları eğitimi', ''],
-    ]);
-    ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 30 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Eğitim Evrakları');
-    XLSX.writeFile(wb, 'egitim_sablon.xlsx');
-    addToast('Şablon indirildi.', 'success');
-  };
-
-  /* ── Excel Export ── */
-  const handleExcelExport = () => {
-    if (filtered.length === 0) { addToast('Dışa aktarılacak kayıt yok.', 'warning'); return; }
-    const rows = filtered.map(eg => ({
-      'Eğitim Türü': eg.ad,
-      'Firma': getFirmaAd(eg.firmaId),
-      'Tarih': eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—',
-      'Katılımcı Sayısı': eg.katilimciIds.length,
-      'Belge Mevcut': eg.belgeMevcut ? 'Evet' : 'Hayır',
-      'Belge Adı': eg.belgeDosyaAdi || '—',
-      'Açıklama': eg.aciklama || '',
-      'Notlar': eg.notlar || '',
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 40 }, { wch: 30 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Eğitim Evrakları');
-    XLSX.writeFile(wb, `egitim_evraklari_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    addToast(`${filtered.length} kayıt Excel'e aktarıldı.`, 'success');
-  };
-
-  /* ── Excel Import ── */
-  const excelImportRef = useRef<HTMLInputElement>(null);
-  const handleExcelImport = (file?: File) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
-        let added = 0;
-        rows.forEach(row => {
-          const ad = (row['Eğitim Türü'] || '').trim();
-          if (!ad) return;
-          const firmaAdi = (row['Firma Adı'] || '').trim();
-          const firma = firmalar.find(f => f.ad.toLowerCase() === firmaAdi.toLowerCase() && !f.silinmis);
-          addEgitim({
-            ad,
-            firmaId: firma?.id || '',
-            katilimciIds: [],
-            tarih: row['Tarih (YYYY-MM-DD)'] || row['Tarih'] || '',
-            gecerlilikSuresi: 12,
-            egitmen: '',
-            yer: '',
-            sure: 0,
-            durum: 'Eksik',
-            belgeMevcut: false,
-            aciklama: row['Açıklama'] || '',
-            belgeDosyaAdi: '',
-            belgeDosyaBoyutu: 0,
-            belgeDosyaTipi: '',
-            belgeDosyaVeri: '',
-            notlar: row['Notlar'] || '',
-          });
-          added++;
-        });
-        addToast(`${added} eğitim evrakı içe aktarıldı.`, 'success');
-      } catch {
-        addToast('Excel dosyası okunamadı. Lütfen şablonu kullanın.', 'error');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -252,19 +172,6 @@ export default function EgitimlerPage() {
           <p className="text-sm mt-1" style={{ color: '#475569' }}>Personellerin eğitim evraklarını yükleyin ve takip edin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleTemplateDownload} className="btn-secondary whitespace-nowrap">
-            <i className="ri-download-2-line text-base" />
-            Şablon
-          </button>
-          <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap" style={{ color: '#22C55E', borderColor: 'rgba(34,197,94,0.3)' }}>
-            <i className="ri-file-excel-2-line text-base" />
-            Excel İndir
-          </button>
-          <button onClick={() => excelImportRef.current?.click()} className="btn-secondary whitespace-nowrap" style={{ color: '#F59E0B', borderColor: 'rgba(245,158,11,0.3)' }}>
-            <i className="ri-upload-2-line text-base" />
-            Excel İçe Aktar
-          </button>
-          <input ref={excelImportRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => handleExcelImport(e.target.files?.[0])} />
           <button onClick={openAdd} className="btn-primary whitespace-nowrap">
             <i className="ri-add-circle-line text-base" />
             Eğitim Evrakı Ekle
@@ -434,19 +341,9 @@ export default function EgitimlerPage() {
           </div>
 
           {/* Tarih */}
-          <div>
+          <div className="sm:col-span-2">
             <label className="form-label">Eğitim Tarihi</label>
             <input type="date" value={form.tarih} onChange={e => setForm(p => ({ ...p, tarih: e.target.value }))} className="isg-input" />
-          </div>
-
-          {/* Durum */}
-          <div>
-            <label className="form-label">Durum</label>
-            <select value={form.durum} onChange={e => setForm(p => ({ ...p, durum: e.target.value as EgitimStatus }))} className="isg-input">
-              <option value="Tamamlandı">Evrak Yüklendi</option>
-              <option value="Eksik">Evrak Eksik</option>
-              <option value="Planlandı">Bekliyor</option>
-            </select>
           </div>
 
           {/* Açıklama */}

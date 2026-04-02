@@ -1,4 +1,5 @@
 import { useCountUp } from '@/hooks/useCountUp';
+import { useApp } from '@/store/AppContext';
 
 interface StatCardProps {
   label: string;
@@ -19,22 +20,32 @@ export default function StatCard({
   gradient, border, iconBg, valueColor, delay = 0,
 }: StatCardProps) {
   const animatedValue = useCountUp(value, 900, delay);
+  const { theme } = useApp();
+  const isDark = theme === 'dark';
+
+  // Light mode overrides
+  const cardBg = isDark ? gradient : 'var(--bg-card)';
+  const cardBorder = isDark ? border : 'var(--border-main)';
+  const shadowBase = isDark ? '0 1px 3px rgba(0,0,0,0.2)' : '0 1px 4px rgba(15,23,42,0.06)';
+  const shadowHover = isDark
+    ? `0 12px 32px rgba(0,0,0,0.25), 0 0 0 1px ${border}`
+    : `0 8px 24px rgba(15,23,42,0.1), 0 0 0 1px ${border}`;
 
   return (
     <div
       className="rounded-2xl p-5 transition-all duration-200 cursor-default"
       style={{
-        background: gradient,
-        border: `1px solid ${border}`,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        background: cardBg,
+        border: `1px solid ${cardBorder}`,
+        boxShadow: shadowBase,
       }}
       onMouseEnter={e => {
         (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = `0 12px 32px rgba(0,0,0,0.25), 0 0 0 1px ${border}`;
+        (e.currentTarget as HTMLDivElement).style.boxShadow = shadowHover;
       }}
       onMouseLeave={e => {
         (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = shadowBase;
       }}
     >
       <div className="flex items-start justify-between mb-5">
@@ -43,7 +54,7 @@ export default function StatCard({
           className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
           style={{
             background: iconBg,
-            boxShadow: `0 6px 20px ${border}`,
+            boxShadow: isDark ? `0 6px 20px ${border}` : 'none',
           }}
         >
           <i className={`${icon} text-white text-[15px]`} />
@@ -83,7 +94,7 @@ export default function StatCard({
         </p>
         <p className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{sub}</p>
         {trendLabel && (
-          <p className="text-[10px] mt-2 font-medium flex items-center gap-1" style={{ color: 'var(--text-faint, #475569)' }}>
+          <p className="text-[10px] mt-2 font-medium flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
             <i className="ri-time-line" />{trendLabel}
           </p>
         )}

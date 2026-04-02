@@ -3,30 +3,30 @@ import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
 
 const moduleTitles: Record<string, { label: string; icon: string }> = {
-  dashboard: { label: 'Kontrol Paneli', icon: 'ri-dashboard-3-line' },
-  firmalar: { label: 'Firmalar', icon: 'ri-building-2-line' },
-  personeller: { label: 'Personeller', icon: 'ri-team-line' },
-  evraklar: { label: 'Evrak Takibi', icon: 'ri-file-list-3-line' },
-  egitimler: { label: 'Eğitim Yönetimi', icon: 'ri-graduation-cap-line' },
-  muayeneler: { label: 'Sağlık Evrakları', icon: 'ri-heart-pulse-line' },
-  tutanaklar: { label: 'Tutanaklar', icon: 'ri-article-line' },
-  uygunsuzluklar: { label: 'Saha Denetim', icon: 'ri-map-pin-user-line' },
-  ekipmanlar: { label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },
-  gorevler: { label: 'Görevler', icon: 'ri-task-line' },
-  raporlar: { label: 'Raporlar & Analiz', icon: 'ri-bar-chart-2-line' },
-  ayarlar: { label: 'Ayarlar', icon: 'ri-settings-4-line' },
+  dashboard:      { label: 'Kontrol Paneli',     icon: 'ri-dashboard-3-line' },
+  firmalar:       { label: 'Firmalar',            icon: 'ri-building-2-line' },
+  personeller:    { label: 'Personeller',         icon: 'ri-team-line' },
+  evraklar:       { label: 'Evrak Takibi',        icon: 'ri-file-list-3-line' },
+  egitimler:      { label: 'Eğitim Yönetimi',    icon: 'ri-graduation-cap-line' },
+  muayeneler:     { label: 'Sağlık Evrakları',   icon: 'ri-heart-pulse-line' },
+  tutanaklar:     { label: 'Tutanaklar',          icon: 'ri-article-line' },
+  uygunsuzluklar: { label: 'Saha Denetim',       icon: 'ri-map-pin-user-line' },
+  ekipmanlar:     { label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },
+  gorevler:       { label: 'Görevler',            icon: 'ri-task-line' },
+  raporlar:       { label: 'Raporlar & Analiz',  icon: 'ri-bar-chart-2-line' },
+  ayarlar:        { label: 'Ayarlar',             icon: 'ri-settings-4-line' },
 };
 
 const quickCards = [
-  { id: 'firma', label: 'Firma Ekle', desc: 'Yeni firma kaydı', icon: 'ri-building-2-line', gradient: 'linear-gradient(135deg, #1D4ED8, #3B82F6)', accent: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)', module: 'firmalar' },
-  { id: 'personel', label: 'Personel Ekle', desc: 'Çalışan kaydı', icon: 'ri-user-add-line', gradient: 'linear-gradient(135deg, #065F46, #10B981)', accent: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)', module: 'personeller' },
-  { id: 'evrak', label: 'Evrak Ekle', desc: 'Belge yükle', icon: 'ri-file-add-line', gradient: 'linear-gradient(135deg, #92400E, #F59E0B)', accent: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', module: 'evraklar' },
-  { id: 'egitim', label: 'Eğitim Ekle', desc: 'Eğitim planı', icon: 'ri-graduation-cap-line', gradient: 'linear-gradient(135deg, #3730A3, #6366F1)', accent: '#6366F1', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.2)', module: 'egitimler' },
-  { id: 'muayene', label: 'Sağlık Evrakı', desc: 'Sağlık belgesi', icon: 'ri-heart-pulse-line', gradient: 'linear-gradient(135deg, #9F1239, #F43F5E)', accent: '#F43F5E', bg: 'rgba(244,63,94,0.08)', border: 'rgba(244,63,94,0.2)', module: 'muayeneler' },
-  { id: 'tutanak', label: 'Tutanak Ekle', desc: 'Tutanak oluştur', icon: 'ri-article-line', gradient: 'linear-gradient(135deg, #0F766E, #14B8A6)', accent: '#14B8A6', bg: 'rgba(20,184,166,0.08)', border: 'rgba(20,184,166,0.2)', module: 'tutanaklar' },
-  { id: 'sahadenetim', label: 'Saha Denetim', desc: 'Denetim kaydı', icon: 'ri-map-pin-user-line', gradient: 'linear-gradient(135deg, #7C2D12, #EA580C)', accent: '#EA580C', bg: 'rgba(234,88,12,0.08)', border: 'rgba(234,88,12,0.2)', module: 'uygunsuzluklar' },
-  { id: 'ekipman', label: 'Ekipman Kontrolü', desc: 'Kontrol kaydı', icon: 'ri-tools-line', gradient: 'linear-gradient(135deg, #134E4A, #14B8A6)', accent: '#0D9488', bg: 'rgba(13,148,136,0.08)', border: 'rgba(13,148,136,0.2)', module: 'ekipmanlar' },
-  { id: 'gorev', label: 'Görev Ekle', desc: 'Yeni görev', icon: 'ri-task-line', gradient: 'linear-gradient(135deg, #4C1D95, #8B5CF6)', accent: '#8B5CF6', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.2)', module: 'gorevler' },
+  { id: 'firma',       label: 'Firma Ekle',       desc: 'Yeni firma kaydı oluştur',    icon: 'ri-building-2-line',     accent: '#3B82F6', primary: true,  module: 'firmalar' },
+  { id: 'personel',    label: 'Personel Ekle',    desc: 'Çalışan kaydı ekle',          icon: 'ri-user-add-line',       accent: '#10B981', primary: true,  module: 'personeller' },
+  { id: 'evrak',       label: 'Evrak Ekle',       desc: 'Belge yükle',                 icon: 'ri-file-add-line',       accent: '#F59E0B', primary: false, module: 'evraklar' },
+  { id: 'egitim',      label: 'Eğitim Ekle',      desc: 'Eğitim planı oluştur',        icon: 'ri-graduation-cap-line', accent: '#A78BFA', primary: false, module: 'egitimler' },
+  { id: 'muayene',     label: 'Sağlık Evrakı',    desc: 'Sağlık belgesi ekle',         icon: 'ri-heart-pulse-line',    accent: '#F43F5E', primary: false, module: 'muayeneler' },
+  { id: 'tutanak',     label: 'Tutanak Ekle',      desc: 'Tutanak oluştur',             icon: 'ri-article-line',        accent: '#14B8A6', primary: false, module: 'tutanaklar' },
+  { id: 'sahadenetim', label: 'Saha Denetim',      desc: 'Denetim kaydı aç',            icon: 'ri-map-pin-user-line',   accent: '#FB923C', primary: false, module: 'uygunsuzluklar' },
+  { id: 'ekipman',     label: 'Ekipman Kontrolü', desc: 'Kontrol kaydı oluştur',       icon: 'ri-tools-line',          accent: '#34D399', primary: false, module: 'ekipmanlar' },
+  { id: 'gorev',       label: 'Görev Ekle',        desc: 'Yeni görev tanımla',          icon: 'ri-task-line',           accent: '#C084FC', primary: false, module: 'gorevler' },
 ];
 
 interface SearchResult {
@@ -48,26 +48,27 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   } = useApp();
   const { logout, user } = useAuth();
 
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [quickOpen, setQuickOpen]     = useState(false);
+  const [notifOpen, setNotifOpen]     = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch]           = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const searchRef = useRef<HTMLDivElement>(null);
+  const searchRef  = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const notifRef   = useRef<HTMLDivElement>(null);
 
   const isDark = theme === 'dark';
 
-  // ── Smart status message ──
+  // ── Status badge ──
   const statusInfo = (() => {
-    const kritikEvrak = evraklar.filter(e => !e.silinmis && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
+    const kritikEvrak    = evraklar.filter(e => !e.silinmis && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
     const acikUygunsuzluk = uygunsuzluklar.filter(u => !u.silinmis && u.durum === 'Açık').length;
-    const gecikmiş = gorevler.filter(g => !g.silinmis && g.durum !== 'Tamamlandı' && g.bitisTarihi && new Date(g.bitisTarihi) < new Date()).length;
+    const gecikmiş       = gorevler.filter(g => !g.silinmis && g.durum !== 'Tamamlandı' && g.bitisTarihi && new Date(g.bitisTarihi) < new Date()).length;
     const total = kritikEvrak + acikUygunsuzluk + gecikmiş;
-    if (total === 0) return { text: 'Bugün her şey yolunda', color: '#34D399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)', icon: 'ri-checkbox-circle-line', pulse: false };
-    if (total <= 2) return { text: `${total} dikkat gerektiren işlem`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', icon: 'ri-error-warning-line', pulse: false };
-    return { text: `${total} kritik işlem var`, color: '#F87171', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', icon: 'ri-alarm-warning-line', pulse: true };
+    if (total === 0) return { text: 'Sistem sağlıklı', color: '#34D399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)', icon: 'ri-checkbox-circle-line' };
+    if (total <= 2)  return { text: `${total} dikkat gerektiren`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', icon: 'ri-error-warning-line' };
+    return { text: `${total} kritik işlem`, color: '#F87171', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', icon: 'ri-alarm-warning-line' };
   })();
 
   const runSearch = useCallback((q: string) => {
@@ -96,8 +97,9 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchFocus(false);
+      if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setSearchFocus(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+      if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setNotifOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -106,8 +108,8 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (quickOpen) { e.stopPropagation(); setQuickOpen(false); }
-      else if (notifOpen) { e.stopPropagation(); setNotifOpen(false); }
+      if (quickOpen)   { e.stopPropagation(); setQuickOpen(false); }
+      else if (notifOpen)   { e.stopPropagation(); setNotifOpen(false); }
       else if (profileOpen) { e.stopPropagation(); setProfileOpen(false); }
       else if (searchFocus) { e.stopPropagation(); setSearch(''); setSearchFocus(false); }
     };
@@ -124,43 +126,53 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const currentModule = moduleTitles[activeModule];
   const showSearchDropdown = searchFocus && (searchResults.length > 0 || search.trim().length > 0);
 
-  const headerBg = isDark ? 'rgba(6,10,18,0.95)' : 'rgba(255,255,255,0.97)';
+  // ── Theme tokens ──
+  const headerBg     = isDark ? 'rgba(6,10,18,0.96)'    : 'rgba(255,255,255,0.98)';
   const headerBorder = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.08)';
-  const textColor = isDark ? '#475569' : '#64748B';
-  const inputBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.04)';
-  const inputBorder = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.1)';
-  const iconBtnBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)';
-  const iconBtnBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.1)';
-  const nameColor = isDark ? '#E2E8F0' : '#0F172A';
-  const dropdownBg = isDark ? 'rgba(8,12,20,0.99)' : 'rgba(255,255,255,0.99)';
+  const textMuted    = isDark ? '#475569'                : '#64748B';
+  const inputBg      = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.04)';
+  const inputBorder  = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.1)';
+  const iconBtnBg    = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)';
+  const iconBtnBorder= isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.1)';
+  const nameColor    = isDark ? '#E2E8F0'                : '#0F172A';
+  const dropdownBg   = isDark ? 'rgba(8,12,20,0.99)'    : 'rgba(255,255,255,0.99)';
   const dropdownBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)';
+  const dropdownItemHover = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)';
 
-  const urgentBildirimleri = bildirimler.filter(b => b.tip === 'evrak_surecek').slice(0, 5);
-  const dolmusBildirimleri = bildirimler.filter(b => b.tip === 'evrak_dolmus').slice(0, 3);
-  const displayBildirimler = [...urgentBildirimleri, ...dolmusBildirimleri].slice(0, 8);
+  const displayBildirimler = bildirimler.slice(0, 10);
 
-  // Greeting
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar';
+  const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; badge: string; badgeBg: string }> = {
+    evrak_surecek:  { icon: 'ri-file-warning-line',   color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', badge: 'Evrak',    badgeBg: 'rgba(148,163,184,0.12)' },
+    evrak_dolmus:   { icon: 'ri-file-damage-line',     color: '#F87171', bg: 'rgba(248,113,113,0.12)', badge: 'Evrak',    badgeBg: 'rgba(248,113,113,0.12)' },
+    ekipman_kontrol:{ icon: 'ri-tools-line',           color: '#FB923C', bg: 'rgba(251,146,60,0.12)',  badge: 'Ekipman',  badgeBg: 'rgba(251,146,60,0.12)' },
+    egitim_surecek: { icon: 'ri-graduation-cap-line',  color: '#60A5FA', bg: 'rgba(96,165,250,0.12)',  badge: 'Eğitim',   badgeBg: 'rgba(96,165,250,0.12)' },
+    saglik_surecek: { icon: 'ri-heart-pulse-line',     color: '#34D399', bg: 'rgba(52,211,153,0.12)',  badge: 'Sağlık',   badgeBg: 'rgba(52,211,153,0.12)' },
+  };
+
+  const hour      = new Date().getHours();
+  const greeting  = hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar';
   const firstName = (currentUser.ad || '').split(' ')[0] || 'Kullanıcı';
 
   return (
     <>
+      {/* ══════════════════════════════════════════════════════
+          HEADER
+      ══════════════════════════════════════════════════════ */}
       <header
-        className={`fixed top-0 right-0 z-30 h-16 flex items-center px-5 gap-3 transition-all duration-300 ${sidebarCollapsed ? 'left-[68px]' : 'left-[260px]'}`}
+        className={`fixed top-0 right-0 z-30 h-16 flex items-center px-4 gap-2.5 left-0 ${sidebarCollapsed ? 'lg:left-[68px]' : 'lg:left-[252px]'}`}
         style={{
           background: headerBg,
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           borderBottom: `1px solid ${headerBorder}`,
-          transition: 'left 0.3s cubic-bezier(0.4,0,0.2,1), background 0.3s ease',
+          transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1), background 0.3s ease',
         }}
       >
         {/* Mobile hamburger */}
         <button
           onClick={onMobileMenuToggle}
-          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 lg:hidden"
-          style={{ color: textColor, background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
+          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 lg:hidden flex-shrink-0"
+          style={{ color: textMuted, background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
         >
           <i className="ri-menu-line text-sm" />
         </button>
@@ -168,16 +180,16 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         {/* Desktop sidebar toggle */}
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="w-8 h-8 items-center justify-center rounded-lg cursor-pointer transition-all duration-200 hidden lg:flex"
-          style={{ color: textColor, background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
+          className="w-8 h-8 items-center justify-center rounded-lg cursor-pointer transition-all duration-200 hidden lg:flex flex-shrink-0"
+          style={{ color: textMuted, background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
           onMouseEnter={e => { e.currentTarget.style.color = isDark ? '#94A3B8' : '#334155'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = textColor; }}
+          onMouseLeave={e => { e.currentTarget.style.color = textMuted; }}
         >
           <i className={`${sidebarCollapsed ? 'ri-menu-unfold-line' : 'ri-menu-fold-line'} text-sm`} />
         </button>
 
         {/* Breadcrumb */}
-        <div className="hidden sm:flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
           <div className="w-5 h-5 flex items-center justify-center">
             <i className={`${currentModule?.icon || 'ri-home-line'} text-xs`} style={{ color: '#3B82F6' }} />
           </div>
@@ -190,27 +202,47 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
 
         <div className="flex-1" />
 
-        {/* ── Greeting ── */}
-        <div className="hidden lg:flex items-center gap-2">
+        {/* Greeting */}
+        <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
           <p className="text-[12px] font-semibold leading-tight" style={{ color: nameColor }}>
             {greeting}, <span style={{ color: '#60A5FA' }}>{firstName}</span>
           </p>
         </div>
 
-        <div className="hidden lg:block w-px h-4" style={{ background: headerBorder }} />
+        {/* Status badge */}
+        <div
+          className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-semibold flex-shrink-0"
+          style={{ background: statusInfo.bg, border: `1px solid ${statusInfo.border}`, color: statusInfo.color }}
+        >
+          <i className={`${statusInfo.icon} text-[10px]`} />
+          {statusInfo.text}
+        </div>
+
+        <div className="hidden lg:block w-px h-4 flex-shrink-0" style={{ background: headerBorder }} />
 
         {/* Global Search */}
-        <div className="relative hidden md:flex items-center" ref={searchRef}>
+        <div className="relative hidden md:flex items-center flex-shrink-0" ref={searchRef}>
           <i className="ri-search-line absolute left-3 text-xs z-10" style={{ color: '#475569' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             onFocus={() => setSearchFocus(true)}
             placeholder="Ara..."
-            className={`w-48 pl-8 pr-3 py-1.5 text-[12.5px] rounded-lg outline-none transition-all duration-200 ${isDark ? 'search-dark' : 'search-light'}`}
+            className={`w-44 pl-8 pr-3 py-1.5 text-[12.5px] rounded-lg outline-none transition-all duration-200 ${isDark ? 'search-dark' : 'search-light'}`}
             style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: isDark ? '#e5e7eb' : '#334155' }}
-            onFocus={e => { setSearchFocus(true); e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(59,130,246,0.04)'; e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.2)'; e.currentTarget.style.width = '220px'; }}
-            onBlur={e => { e.currentTarget.style.background = inputBg; e.currentTarget.style.borderColor = inputBorder; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.width = ''; }}
+            onFocus={e => {
+              setSearchFocus(true);
+              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(59,130,246,0.04)';
+              e.currentTarget.style.borderColor = '#3b82f6';
+              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.2)';
+              e.currentTarget.style.width = '210px';
+            }}
+            onBlur={e => {
+              e.currentTarget.style.background = inputBg;
+              e.currentTarget.style.borderColor = inputBorder;
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.width = '';
+            }}
           />
           {showSearchDropdown && (
             <div
@@ -228,9 +260,11 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                     <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#475569' }}>{searchResults.length} sonuç</p>
                   </div>
                   {searchResults.map(result => (
-                    <button key={result.id} onClick={() => { setActiveModule(result.module); setSearch(''); setSearchFocus(false); }}
+                    <button
+                      key={result.id}
+                      onClick={() => { setActiveModule(result.module); setSearch(''); setSearchFocus(false); }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all duration-150 text-left"
-                      onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(59,130,246,0.05)'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = dropdownItemHover; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                     >
                       <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${result.color}18` }}>
@@ -254,200 +288,411 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
-          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0"
           title={isDark ? 'Açık Tema' : 'Koyu Tema'}
           style={{ background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
+          onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = iconBtnBg; }}
         >
           <i className={`${isDark ? 'ri-sun-line' : 'ri-moon-line'} text-sm`} style={{ color: isDark ? '#F59E0B' : '#475569' }} />
         </button>
 
         {/* Quick Add */}
         <button
-          onClick={() => { setQuickOpen(true); setNotifOpen(false); }}
-          className="btn-primary"
+          onClick={() => { setQuickOpen(true); setNotifOpen(false); setProfileOpen(false); }}
+          className="btn-primary flex-shrink-0"
           style={{ padding: '7px 14px', fontSize: '12.5px', borderRadius: '8px' }}
         >
           <i className="ri-add-line text-sm" />
           <span className="hidden sm:inline">Hızlı Ekle</span>
         </button>
 
-        {/* Notifications */}
-        <div className="relative">
+        {/* ── Notifications ── */}
+        <div className="relative flex-shrink-0" ref={notifRef}>
           <button
-            onClick={() => { setNotifOpen(!notifOpen); setQuickOpen(false); }}
+            onClick={() => { setNotifOpen(v => !v); setQuickOpen(false); setProfileOpen(false); }}
             className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 relative"
-            style={{ background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
+            style={{
+              background: notifOpen ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)') : iconBtnBg,
+              border: `1px solid ${notifOpen ? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.14)') : iconBtnBorder}`,
+            }}
+            onMouseEnter={e => { if (!notifOpen) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)'; }}
+            onMouseLeave={e => { if (!notifOpen) e.currentTarget.style.background = iconBtnBg; }}
           >
-            <i className="ri-notification-3-line text-sm" style={{ color: textColor }} />
+            <i className="ri-notification-3-line text-sm" style={{ color: notifOpen ? (isDark ? '#E2E8F0' : '#0F172A') : textMuted }} />
             {okunmamisBildirimSayisi > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full px-1"
-                style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)', boxShadow: '0 0 6px rgba(239,68,68,0.5)' }}>
+              <span
+                className="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full px-1 notif-badge-enter"
+                style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)', boxShadow: '0 0 6px rgba(239,68,68,0.5)' }}
+              >
                 {okunmamisBildirimSayisi > 9 ? '9+' : okunmamisBildirimSayisi}
               </span>
             )}
           </button>
+
           {notifOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
-              <div className="absolute right-0 top-11 z-50 w-80 animate-slide-up overflow-hidden"
-                style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '14px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)', backdropFilter: 'blur(20px)' }}>
-                <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[13px] font-semibold" style={{ color: nameColor }}>Bildirimler</p>
-                    {okunmamisBildirimSayisi > 0 && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171' }}>{okunmamisBildirimSayisi}</span>
-                    )}
+            <div
+              className="absolute right-0 top-11 z-50 w-[340px] animate-slide-up overflow-hidden"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '16px', boxShadow: isDark ? '0 25px 60px rgba(0,0,0,0.6)' : '0 20px 50px rgba(15,23,42,0.15)', backdropFilter: 'blur(20px)' }}
+            >
+              {/* Header */}
+              <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(59,130,246,0.1)' }}>
+                    <i className="ri-notification-3-line text-xs" style={{ color: '#60A5FA' }} />
                   </div>
+                  <p className="text-[13px] font-bold" style={{ color: nameColor }}>Bildirimler</p>
                   {okunmamisBildirimSayisi > 0 && (
-                    <button onClick={tumunuOku} className="text-[11px] cursor-pointer font-medium" style={{ color: '#60A5FA' }}>Tümünü okundu işaretle</button>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171', border: '1px solid rgba(239,68,68,0.15)' }}>
+                      {okunmamisBildirimSayisi} yeni
+                    </span>
                   )}
                 </div>
-                {displayBildirimler.length === 0 ? (
-                  <div className="py-10 px-4 text-center">
-                    <div className="w-10 h-10 flex items-center justify-center rounded-xl mx-auto mb-3" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                      <i className="ri-check-double-line text-lg" style={{ color: '#10B981' }} />
-                    </div>
-                    <p className="text-[13px] font-medium" style={{ color: isDark ? '#E2E8F0' : '#334155' }}>Tüm evraklar güncel</p>
-                  </div>
-                ) : (
-                  <div className="max-h-72 overflow-y-auto">
-                    {displayBildirimler.map(b => (
-                      <div key={b.id} className="px-4 py-3 cursor-pointer transition-all" style={{ borderBottom: `1px solid ${dropdownBorder}`, opacity: b.okundu ? 0.55 : 1 }}
-                        onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(59,130,246,0.04)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                        onClick={() => bildirimOku(b.id)}>
-                        <div className="flex items-start gap-3">
-                          <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0 mt-0.5"
-                            style={{ background: b.tip === 'evrak_surecek' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)' }}>
-                            <i className={b.tip === 'evrak_surecek' ? 'ri-timer-line' : 'ri-error-warning-line'}
-                              style={{ color: b.tip === 'evrak_surecek' ? '#F59E0B' : '#EF4444', fontSize: '12px' }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-[12px] font-semibold truncate" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{b.mesaj}</p>
-                              {!b.okundu && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#3B82F6' }} />}
-                            </div>
-                            <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: '#64748B' }}>{b.detay}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                {okunmamisBildirimSayisi > 0 && (
+                  <button
+                    onClick={tumunuOku}
+                    className="text-[11px] cursor-pointer font-semibold px-2.5 py-1 rounded-lg transition-all"
+                    style={{ color: '#60A5FA', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.14)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.08)'; }}
+                  >
+                    Tümünü okundu işaretle
+                  </button>
                 )}
               </div>
-            </>
+
+              {/* Body */}
+              {displayBildirimler.length === 0 ? (
+                <div className="py-10 px-4 text-center">
+                  <div className="w-12 h-12 flex items-center justify-center rounded-2xl mx-auto mb-3" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                    <i className="ri-check-double-line text-xl" style={{ color: '#10B981' }} />
+                  </div>
+                  <p className="text-[13px] font-semibold" style={{ color: isDark ? '#E2E8F0' : '#334155' }}>Her şey yolunda</p>
+                  <p className="text-[11px] mt-1" style={{ color: '#64748B' }}>Sistemde yaklaşan veya geciken işlem bulunmuyor</p>
+                </div>
+              ) : (
+                <>
+                  {/* Summary chips */}
+                  <div className="px-4 py-2.5 flex flex-wrap gap-1.5" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
+                    {(['evrak_surecek','evrak_dolmus','ekipman_kontrol','egitim_surecek','saglik_surecek'] as const).map(tip => {
+                      const count = bildirimler.filter(b => b.tip === tip).length;
+                      if (count === 0) return null;
+                      const cfg = TYPE_CONFIG[tip];
+                      return (
+                        <span key={tip} className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          style={{ background: cfg.badgeBg, color: cfg.color, border: `1px solid ${cfg.color}25` }}>
+                          <i className={`${cfg.icon} text-[9px]`} />
+                          {cfg.badge} ({count})
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {displayBildirimler.map((b, idx) => {
+                      const cfg = TYPE_CONFIG[b.tip] ?? TYPE_CONFIG['evrak_surecek'];
+                      return (
+                        <div
+                          key={b.id}
+                          className="px-4 py-3 cursor-pointer transition-all"
+                          style={{
+                            borderBottom: idx < displayBildirimler.length - 1 ? `1px solid ${dropdownBorder}` : 'none',
+                            opacity: b.okundu ? 0.45 : 1,
+                            background: !b.okundu ? (isDark ? 'rgba(59,130,246,0.03)' : 'rgba(59,130,246,0.02)') : 'transparent',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = dropdownItemHover; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = !b.okundu ? (isDark ? 'rgba(59,130,246,0.03)' : 'rgba(59,130,246,0.02)') : 'transparent'; }}
+                          onClick={() => bildirimOku(b.id)}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 mt-0.5" style={{ background: cfg.bg }}>
+                              <i className={cfg.icon} style={{ color: cfg.color, fontSize: '13px' }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                                  style={{ background: cfg.badgeBg, color: cfg.color }}>{cfg.badge}</span>
+                                <p className="text-[12px] font-semibold truncate flex-1" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{b.mesaj}</p>
+                                {!b.okundu && (
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#3B82F6' }} />
+                                )}
+                              </div>
+                              <p className="text-[11px] leading-relaxed" style={{ color: '#64748B' }}>{b.detay}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Footer */}
+              {displayBildirimler.length > 0 && (
+                <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: `1px solid ${dropdownBorder}` }}>
+                  <p className="text-[10.5px]" style={{ color: '#475569' }}>
+                    {bildirimler.length > 10 ? `${bildirimler.length - 10} daha var` : `${bildirimler.length} toplam uyarı`}
+                  </p>
+                  <button
+                    onClick={() => { setActiveModule('dashboard'); setNotifOpen(false); }}
+                    className="text-[11.5px] font-semibold cursor-pointer transition-all flex items-center gap-1.5"
+                    style={{ color: '#60A5FA' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#93C5FD'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#60A5FA'; }}
+                  >
+                    Panele Git
+                    <i className="ri-arrow-right-line text-[11px]" />
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Profile */}
-        <div className="relative" ref={profileRef}>
+        {/* ── Profile ── */}
+        <div className="relative flex-shrink-0" ref={profileRef}>
           <button
-            onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); setQuickOpen(false); }}
-            className="flex items-center gap-2 cursor-pointer transition-all duration-200 rounded-lg py-1 px-2"
+            onClick={() => { setProfileOpen(v => !v); setNotifOpen(false); setQuickOpen(false); }}
+            className="flex items-center gap-2 cursor-pointer transition-all duration-200 rounded-xl py-1.5 px-2"
             style={{
-              background: profileOpen ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)') : 'transparent',
-              border: `1px solid ${profileOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)') : 'transparent'}`,
+              background: profileOpen ? (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.06)') : 'transparent',
+              border: `1px solid ${profileOpen ? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)') : 'transparent'}`,
             }}
+            onMouseEnter={e => { if (!profileOpen) { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'; e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'; } }}
+            onMouseLeave={e => { if (!profileOpen) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
           >
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
+            {/* Avatar */}
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}
+            >
               {(currentUser.ad || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="hidden md:block text-left">
               <p className="text-[12px] font-semibold leading-tight" style={{ color: nameColor }}>{currentUser.ad || 'Kullanıcı'}</p>
             </div>
-            <i className={`ri-arrow-down-s-line text-xs hidden md:block transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} style={{ color: '#475569' }} />
+            <i
+              className={`ri-arrow-down-s-line text-xs hidden md:block transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`}
+              style={{ color: '#475569' }}
+            />
           </button>
+
           {profileOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
-              <div className="absolute right-0 top-11 z-50 w-52 animate-slide-up overflow-hidden"
-                style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '14px', boxShadow: '0 25px 60px rgba(0,0,0,0.45)', backdropFilter: 'blur(20px)' }}>
-                <div className="px-4 py-3" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                      style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
-                      {(currentUser.ad || 'U').charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[12.5px] font-bold truncate" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{currentUser.ad || 'Kullanıcı'}</p>
-                      <p className="text-[10px] truncate mt-0.5" style={{ color: '#64748B' }}>{user?.email || currentUser.email}</p>
-                    </div>
+            <div
+              className="absolute right-0 top-12 z-50 w-56 animate-slide-up overflow-hidden"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '16px', boxShadow: isDark ? '0 25px 60px rgba(0,0,0,0.55)' : '0 20px 50px rgba(15,23,42,0.15)', backdropFilter: 'blur(20px)' }}
+            >
+              {/* Profile header */}
+              <div className="px-4 py-3.5" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
+                  >
+                    {(currentUser.ad || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-bold truncate" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{currentUser.ad || 'Kullanıcı'}</p>
+                    <p className="text-[10.5px] truncate mt-0.5" style={{ color: '#64748B' }}>{user?.email || currentUser.email}</p>
                   </div>
                 </div>
-                <div className="py-1.5">
-                  <button onClick={() => { setActiveModule('ayarlar'); setProfileOpen(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
-                    onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                    <div className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0" style={{ background: 'rgba(59,130,246,0.1)' }}>
-                      <i className="ri-settings-4-line text-xs" style={{ color: '#3B82F6' }} />
-                    </div>
-                    <span className="text-[12.5px] font-medium" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>Ayarlar</span>
-                  </button>
-                  <div className="mx-3 my-1" style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)' }} />
-                  <button onClick={() => { setProfileOpen(false); logout(); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                    <div className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0" style={{ background: 'rgba(239,68,68,0.1)' }}>
-                      <i className="ri-logout-box-r-line text-xs" style={{ color: '#EF4444' }} />
-                    </div>
-                    <span className="text-[12.5px] font-medium" style={{ color: '#EF4444' }}>Oturumu Kapat</span>
-                  </button>
-                </div>
               </div>
-            </>
+
+              {/* Menu items */}
+              <div className="py-1.5">
+                <button
+                  onClick={() => { setActiveModule('ayarlar'); setProfileOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
+                  onMouseEnter={e => { e.currentTarget.style.background = dropdownItemHover; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(59,130,246,0.1)' }}>
+                    <i className="ri-settings-4-line text-xs" style={{ color: '#3B82F6' }} />
+                  </div>
+                  <span className="text-[12.5px] font-medium" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>Ayarlar</span>
+                  <i className="ri-arrow-right-s-line text-xs ml-auto" style={{ color: '#475569' }} />
+                </button>
+
+                <button
+                  onClick={() => { setActiveModule('raporlar'); setProfileOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
+                  onMouseEnter={e => { e.currentTarget.style.background = dropdownItemHover; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                    <i className="ri-bar-chart-2-line text-xs" style={{ color: '#10B981' }} />
+                  </div>
+                  <span className="text-[12.5px] font-medium" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>Raporlar</span>
+                  <i className="ri-arrow-right-s-line text-xs ml-auto" style={{ color: '#475569' }} />
+                </button>
+
+                <div className="mx-3 my-1.5" style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)' }} />
+
+                <button
+                  onClick={() => { setProfileOpen(false); logout(); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                    <i className="ri-logout-box-r-line text-xs" style={{ color: '#EF4444' }} />
+                  </div>
+                  <span className="text-[12.5px] font-semibold" style={{ color: '#EF4444' }}>Oturumu Kapat</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </header>
 
-      {/* ── Quick Add Modal ── */}
+      {/* ══════════════════════════════════════════════════════
+          QUICK ADD MODAL
+      ══════════════════════════════════════════════════════ */}
       {quickOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setQuickOpen(false); }}>
-          <div className="w-full max-w-2xl animate-slide-up"
-            style={{ background: isDark ? '#0A0F1C' : '#FFFFFF', border: `1px solid ${dropdownBorder}`, borderRadius: '20px', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
-                  <i className="ri-add-line text-white text-base" />
-                </div>
-                <div>
-                  <h2 className="text-[14px] font-bold" style={{ color: nameColor }}>Hızlı Ekle</h2>
-                  <p className="text-[11px] mt-0.5" style={{ color: '#64748B' }}>Sisteme hızlı kayıt ekleyin</p>
-                </div>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setQuickOpen(false); }}
+        >
+          <div
+            className="w-full max-w-[580px] animate-slide-up"
+            style={{
+              background: isDark ? '#0C1120' : '#FAFAFA',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)'}`,
+              borderRadius: '20px',
+              boxShadow: isDark ? '0 40px 80px rgba(0,0,0,0.7)' : '0 30px 70px rgba(15,23,42,0.18)',
+            }}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-6 py-5"
+              style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}` }}
+            >
+              <div>
+                <h2 className="text-[16px] font-bold tracking-tight" style={{ color: nameColor }}>Hızlı Ekle</h2>
+                <p className="text-[12px] mt-0.5" style={{ color: isDark ? '#475569' : '#94A3B8' }}>
+                  Hangi kaydı oluşturmak istiyorsunuz?
+                </p>
               </div>
-              <button onClick={() => setQuickOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                style={{ background: iconBtnBg, border: `1px solid ${iconBtnBorder}`, color: '#64748B' }}>
+              <button
+                onClick={() => setQuickOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+                style={{ color: isDark ? '#475569' : '#94A3B8', background: 'transparent', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#475569' : '#94A3B8'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'; }}
+              >
                 <i className="ri-close-line text-sm" />
               </button>
             </div>
-            <div className="p-4 grid grid-cols-3 gap-2.5">
-              {quickCards.map(card => (
-                <button key={card.id} onClick={() => handleQuickCard(card)}
-                  className="group flex flex-col items-start gap-2.5 p-3.5 rounded-xl text-left cursor-pointer transition-all duration-200"
-                  style={{ background: card.bg, border: `1px solid ${card.border}` }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = card.accent; e.currentTarget.style.background = `${card.accent}12`; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = card.border; e.currentTarget.style.background = card.bg; }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: card.gradient }}>
-                    <i className={`${card.icon} text-white text-sm`} />
-                  </div>
-                  <div>
-                    <p className="text-[12.5px] font-semibold leading-tight" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{card.label}</p>
-                    <p className="text-[10.5px] mt-0.5" style={{ color: '#64748B' }}>{card.desc}</p>
-                  </div>
-                  <div className="flex items-center gap-1 text-[10.5px] font-semibold mt-auto" style={{ color: card.accent }}>
-                    <span>Ekle</span><i className="ri-arrow-right-line text-[10px]" />
-                  </div>
-                </button>
-              ))}
+
+            {/* Primary Cards */}
+            <div className="px-5 pt-5 pb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: isDark ? '#334155' : '#CBD5E1' }}>
+                Temel İşlemler
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {quickCards.filter(c => c.primary).map(card => (
+                  <button
+                    key={card.id}
+                    onClick={() => handleQuickCard(card)}
+                    className="flex items-center gap-4 px-4 py-4 rounded-2xl text-left cursor-pointer transition-all duration-200"
+                    style={{
+                      background: isDark
+                        ? `linear-gradient(135deg, ${card.accent}18, ${card.accent}0a)`
+                        : `linear-gradient(135deg, ${card.accent}10, ${card.accent}06)`,
+                      border: `1px solid ${card.accent}30`,
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = 'translateY(-3px)';
+                      e.currentTarget.style.boxShadow = `0 12px 32px ${card.accent}22`;
+                      e.currentTarget.style.borderColor = `${card.accent}55`;
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.borderColor = `${card.accent}30`;
+                    }}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: `${card.accent}20`, border: `1px solid ${card.accent}35` }}
+                    >
+                      <i className={`${card.icon} text-base`} style={{ color: card.accent }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-bold leading-tight" style={{ color: nameColor }}>{card.label}</p>
+                      <p className="text-[11px] mt-0.5 truncate" style={{ color: isDark ? '#475569' : '#94A3B8' }}>{card.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="px-5 py-3 flex items-center justify-end" style={{ borderTop: `1px solid ${dropdownBorder}` }}>
-              <button onClick={() => setQuickOpen(false)} className="btn-secondary" style={{ fontSize: '12.5px', padding: '7px 14px' }}>Kapat</button>
+
+            {/* Divider */}
+            <div className="px-5 pb-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: isDark ? '#334155' : '#CBD5E1' }}>
+                Diğer İşlemler
+              </p>
+              {/* Secondary Cards */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {quickCards.filter(c => !c.primary).map(card => (
+                  <button
+                    key={card.id}
+                    onClick={() => handleQuickCard(card)}
+                    className="flex flex-col items-center gap-2.5 px-3 py-3.5 rounded-xl text-center cursor-pointer transition-all duration-200"
+                    style={{
+                      background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)',
+                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}`,
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.background = isDark ? `${card.accent}12` : `${card.accent}0d`;
+                      e.currentTarget.style.borderColor = `${card.accent}35`;
+                      e.currentTarget.style.boxShadow = `0 8px 24px ${card.accent}18`;
+                      const icon = e.currentTarget.querySelector('i');
+                      if (icon) icon.style.color = card.accent;
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)';
+                      e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)';
+                      e.currentTarget.style.boxShadow = 'none';
+                      const icon = e.currentTarget.querySelector('i');
+                      if (icon) icon.style.color = isDark ? '#475569' : '#94A3B8';
+                    }}
+                  >
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)' }}
+                    >
+                      <i className={`${card.icon} text-sm transition-colors duration-200`} style={{ color: isDark ? '#475569' : '#94A3B8' }} />
+                    </div>
+                    <p className="text-[11.5px] font-semibold leading-tight" style={{ color: isDark ? '#94A3B8' : '#475569' }}>{card.label}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              className="px-5 py-3.5 flex items-center justify-between"
+              style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}` }}
+            >
+              <p className="text-[11px]" style={{ color: isDark ? '#334155' : '#CBD5E1' }}>
+                <i className="ri-keyboard-line mr-1.5" />
+                ESC ile kapat
+              </p>
+              <button
+                onClick={() => setQuickOpen(false)}
+                className="text-[12px] font-semibold px-4 py-1.5 rounded-lg cursor-pointer transition-all duration-200"
+                style={{
+                  color: isDark ? '#475569' : '#94A3B8',
+                  background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = isDark ? '#94A3B8' : '#475569'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = isDark ? '#475569' : '#94A3B8'; }}
+              >
+                Kapat
+              </button>
             </div>
           </div>
         </div>

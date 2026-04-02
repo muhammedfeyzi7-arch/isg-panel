@@ -796,20 +796,6 @@ export default function TutanaklarPage() {
               />
             </div>
 
-            {/* Durum */}
-            <div>
-              <label className="form-label">Durum</label>
-              <select
-                value={form.durum}
-                onChange={e => sf('durum', e.target.value as TutanakStatus)}
-                className={inp}
-              >
-                {(Object.keys(STS_CONFIG) as TutanakStatus[]).map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-
             {/* Oluşturan Kişi */}
             <div>
               <label className="form-label">Oluşturan Kişi</label>

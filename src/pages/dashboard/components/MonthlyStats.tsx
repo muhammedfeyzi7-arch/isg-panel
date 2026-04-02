@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../store/AppContext';
 
 export default function MonthlyStats() {
-  const { personeller, egitimler, gorevler, muayeneler } = useApp();
+  const { personeller, egitimler, gorevler, muayeneler, theme } = useApp();
   const navigate = useNavigate();
+  const isDark = theme === 'dark';
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -12,15 +13,19 @@ export default function MonthlyStats() {
   const next30 = new Date(now.getTime() + 30 * 86400000);
   const next7 = new Date(now.getTime() + 7 * 86400000);
 
+  // ── Theme tokens ──
+  const itemBg = isDark ? 'rgba(255,255,255,0.03)' : 'var(--bg-item)';
+  const itemBorder = isDark ? 'rgba(255,255,255,0.05)' : 'var(--bg-item-border)';
+  const urgentItemBg = isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.04)';
+  const urgentItemBorder = isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.12)';
+
   const stats = useMemo(() => {
-    // Bu ay eklenen personeller
     const buAyPersonel = personeller.filter(p => {
       if (p.silinmis) return false;
       const t = new Date(p.olusturmaTarihi);
       return t >= monthStart && t <= monthEnd;
     });
 
-    // Bu ay eklenen personellerin departman dağılımı (top 3)
     const deptMap: Record<string, number> = {};
     buAyPersonel.forEach(p => {
       const dept = p.departman || 'Belirtilmemiş';
@@ -30,7 +35,6 @@ export default function MonthlyStats() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
 
-    // Yaklaşan eğitimler (sonraki 30 gün)
     const yaklaşanEgitimler = egitimler.filter(e => {
       if (e.silinmis || e.durum === 'Tamamlandı') return false;
       if (!e.tarih) return false;
@@ -38,13 +42,11 @@ export default function MonthlyStats() {
       return t >= now && t <= next30;
     }).sort((a, b) => new Date(a.tarih!).getTime() - new Date(b.tarih!).getTime());
 
-    // Acil eğitimler (7 gün içinde)
     const acilEgitimler = yaklaşanEgitimler.filter(e => {
       if (!e.tarih) return false;
       return new Date(e.tarih) <= next7;
     });
 
-    // Bekleyen/açık görevler
     const acikGorevler = gorevler.filter(g => {
       if (g.silinmis) return false;
       return g.durum !== 'Tamamlandı';
@@ -55,7 +57,6 @@ export default function MonthlyStats() {
       return new Date(g.bitisTarihi) < now;
     }).length;
 
-    // Bu ay yapılan muayeneler
     const buAyMuayene = muayeneler.filter(m => {
       if (m.silinmis) return false;
       const t = new Date(m.muayeneTarihi || m.olusturmaTarihi);
@@ -78,7 +79,7 @@ export default function MonthlyStats() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      {/* Bu Ay Personel */}
+      {/* ── Bu Ay Personel ── */}
       <div className="rounded-2xl p-5 isg-card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -93,30 +94,28 @@ export default function MonthlyStats() {
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{ayAdi}</p>
             </div>
           </div>
-          <span
-            className="text-2xl font-extrabold"
-            style={{ color: '#34D399' }}
-          >
+          <span className="text-2xl font-extrabold" style={{ color: '#34D399' }}>
             {stats.buAyPersonel.length}
           </span>
         </div>
 
         {stats.buAyPersonel.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-2">
-            <i className="ri-user-line text-2xl" style={{ color: '#1E293B' }} />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
+              <i className="ri-user-line text-lg" style={{ color: 'rgba(16,185,129,0.4)' }} />
+            </div>
             <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
               Bu ay henüz personel eklenmedi
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Son eklenenler */}
             <div className="space-y-1.5">
               {stats.buAyPersonel.slice(0, 4).map(p => (
                 <div
                   key={p.id}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+                  style={{ background: itemBg, border: `1px solid ${itemBorder}` }}
                 >
                   <div
                     className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
@@ -150,7 +149,6 @@ export default function MonthlyStats() {
               )}
             </div>
 
-            {/* Departman dağılımı */}
             {stats.topDepts.length > 0 && (
               <div
                 className="px-3 py-2.5 rounded-xl space-y-1.5"
@@ -171,7 +169,7 @@ export default function MonthlyStats() {
         )}
       </div>
 
-      {/* Yaklaşan Eğitimler */}
+      {/* ── Yaklaşan Eğitimler ── */}
       <div className="rounded-2xl p-5 isg-card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -195,10 +193,7 @@ export default function MonthlyStats() {
                 {stats.acilEgitimler} acil
               </span>
             )}
-            <span
-              className="text-xl font-extrabold"
-              style={{ color: '#F59E0B' }}
-            >
+            <span className="text-xl font-extrabold" style={{ color: '#F59E0B' }}>
               {stats.yaklaşanEgitimler.length}
             </span>
           </div>
@@ -206,7 +201,9 @@ export default function MonthlyStats() {
 
         {stats.yaklaşanEgitimler.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-2">
-            <i className="ri-graduation-cap-line text-2xl" style={{ color: '#1E293B' }} />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.12)' }}>
+              <i className="ri-graduation-cap-line text-lg" style={{ color: 'rgba(245,158,11,0.4)' }} />
+            </div>
             <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
               Önümüzdeki 30 gün içinde eğitim yok
             </p>
@@ -224,8 +221,8 @@ export default function MonthlyStats() {
                   key={eg.id}
                   className="flex items-start gap-3 px-3 py-2.5 rounded-xl"
                   style={{
-                    background: isUrgent ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)'}`,
+                    background: isUrgent ? urgentItemBg : itemBg,
+                    border: `1px solid ${isUrgent ? urgentItemBorder : itemBorder}`,
                   }}
                 >
                   <div
@@ -268,6 +265,8 @@ export default function MonthlyStats() {
                 border: '1px solid rgba(245,158,11,0.15)',
                 color: '#F59E0B',
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.14)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.08)'; }}
             >
               <i className="ri-arrow-right-line mr-1" />
               Tüm Eğitimlere Git
@@ -276,7 +275,7 @@ export default function MonthlyStats() {
         )}
       </div>
 
-      {/* Bekleyen Görevler */}
+      {/* ── Bekleyen Görevler ── */}
       <div className="rounded-2xl p-5 isg-card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -288,7 +287,7 @@ export default function MonthlyStats() {
             </div>
             <div>
               <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bekleyen Görevler</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Açık & devam eden</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Açık &amp; devam eden</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -311,33 +310,35 @@ export default function MonthlyStats() {
 
         {stats.acikGorevler.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-2">
-            <i className="ri-check-double-line text-2xl" style={{ color: '#10B981' }} />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
+              <i className="ri-check-double-line text-lg" style={{ color: '#10B981' }} />
+            </div>
             <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
               Tüm görevler tamamlandı!
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {/* Görev öncelik özeti */}
+            {/* Öncelik özeti */}
             <div className="grid grid-cols-3 gap-2">
               {[
                 {
                   label: 'Yüksek',
                   count: stats.acikGorevler.filter(g => g.oncelik === 'Yüksek' || g.oncelik === 'Kritik').length,
                   color: '#EF4444',
-                  bg: 'rgba(239,68,68,0.1)',
+                  bg: isDark ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.07)',
                 },
                 {
                   label: 'Orta',
                   count: stats.acikGorevler.filter(g => g.oncelik === 'Orta').length,
                   color: '#F59E0B',
-                  bg: 'rgba(245,158,11,0.1)',
+                  bg: isDark ? 'rgba(245,158,11,0.1)' : 'rgba(245,158,11,0.07)',
                 },
                 {
                   label: 'Düşük',
                   count: stats.acikGorevler.filter(g => g.oncelik === 'Düşük' || !g.oncelik).length,
-                  color: '#64748B',
-                  bg: 'rgba(100,116,139,0.1)',
+                  color: isDark ? '#64748B' : '#94A3B8',
+                  bg: isDark ? 'rgba(100,116,139,0.1)' : 'rgba(100,116,139,0.07)',
                 },
               ].map(item => (
                 <div
@@ -360,8 +361,8 @@ export default function MonthlyStats() {
                     key={g.id}
                     className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
                     style={{
-                      background: isGecikmis ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${isGecikmis ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)'}`,
+                      background: isGecikmis ? urgentItemBg : itemBg,
+                      border: `1px solid ${isGecikmis ? urgentItemBorder : itemBorder}`,
                     }}
                   >
                     <div
@@ -399,6 +400,8 @@ export default function MonthlyStats() {
                 border: '1px solid rgba(99,102,241,0.15)',
                 color: '#818CF8',
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.14)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; }}
             >
               <i className="ri-arrow-right-line mr-1" />
               Görev Yönetimine Git
@@ -409,3 +412,7 @@ export default function MonthlyStats() {
     </div>
   );
 }
+
+// Suppress unused import warning
+const _Fragment = Fragment;
+void _Fragment;

@@ -291,38 +291,26 @@ export default function MuayenelerPage() {
         )}
       </div>
 
-      {/* ── Sağlık Evrakları (EK-2, Sağlık Raporu vb.) ──────────── */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(248,113,113,0.12)' }}>
-            <i className="ri-file-text-line text-sm" style={{ color: '#F87171' }} />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Sağlık Evrakları</h3>
-            <p className="text-xs" style={{ color: '#64748B' }}>EK-2, Sağlık Raporu ve sağlık kategorisindeki tüm belgeler</p>
-          </div>
-          <span
-            className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
-            style={{ background: 'rgba(248,113,113,0.12)', color: '#F87171', border: '1px solid rgba(248,113,113,0.2)' }}
-          >
-            {filteredSaglikEvraklar.length}
-          </span>
-        </div>
-
-        <div className="isg-card rounded-xl overflow-hidden">
-          {filteredSaglikEvraklar.length === 0 ? (
-            <div className="py-10 text-center">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)' }}>
-                <i className="ri-file-text-line text-2xl" style={{ color: '#F87171' }} />
-              </div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-                {search || firmaFilter ? 'Filtreyle eşleşen sağlık evrakı yok' : 'Henüz sağlık kategorisinde evrak eklenmedi'}
-              </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>
-                Evrak modülünde EK-2 veya Sağlık Raporu türünde evrak eklendiğinde burada görünür
-              </p>
+      {/* ── Sağlık Evrakları (EK-2, Sağlık Raporu vb.) — sadece veri varsa göster ── */}
+      {filteredSaglikEvraklar.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(248,113,113,0.12)' }}>
+              <i className="ri-file-text-line text-sm" style={{ color: '#F87171' }} />
             </div>
-          ) : (
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Sağlık Evrakları</h3>
+              <p className="text-xs" style={{ color: '#64748B' }}>EK-2, Sağlık Raporu ve sağlık kategorisindeki tüm belgeler</p>
+            </div>
+            <span
+              className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(248,113,113,0.12)', color: '#F87171', border: '1px solid rgba(248,113,113,0.2)' }}
+            >
+              {filteredSaglikEvraklar.length}
+            </span>
+          </div>
+
+          <div className="isg-card rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="table-premium w-full">
                 <thead>
@@ -371,9 +359,9 @@ export default function MuayenelerPage() {
                 </tbody>
               </table>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Modal */}
       <Modal
