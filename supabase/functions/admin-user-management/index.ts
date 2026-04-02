@@ -18,13 +18,13 @@ async function verifyJWT(token: string): Promise<{ userId: string; email: string
   try {
     const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
     if (!jwtSecret) {
-      // Fallback: extract from payload without verification (dev only)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return { userId: payload.sub, email: payload.email };
+      console.error('SUPABASE_JWT_SECRET is not set - rejecting request for security');
+      return null;
     }
     const encoder = new TextEncoder();
     const secretKey = encoder.encode(jwtSecret);
     const { payload } = await jwtVerify(token, secretKey);
+    if (!payload.sub) return null;
     return { userId: payload.sub as string, email: payload.email as string };
   } catch (e) {
     console.error('JWT verification failed:', e);
@@ -75,8 +75,9 @@ Deno.serve(async (req) => {
 
   let membershipQuery = adminClient
     .from('user_organizations')
-    .select('role, organization_id, display_name, email')
-    .eq('user_id', userId);
+    .select('role, organization_id, display_name, email, is_active')
+    .eq('user_id', userId)
+    .eq('is_active', true);
 
   if (requestedOrgId) {
     membershipQuery = membershipQuery.eq('organization_id', requestedOrgId);
@@ -175,6 +176,13 @@ Deno.serve(async (req) => {
     if (!newEmail || !password || !display_name) {
       return new Response(
         JSON.stringify({ error: 'E-posta, şifre ve ad soyad zorunludur.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (password.length < 8) {
+      return new Response(
+        JSON.stringify({ error: 'Şifre en az 8 karakter olmalıdır.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -367,7 +375,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update password via admin API
     const { error: pwError } = await adminClient.auth.admin.updateUserById(target_user_id, {
       password: new_password,
     });
@@ -379,7 +386,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Mark must_change_password = true so they are forced to change on next login
     await adminClient
       .from('user_organizations')
       .update({ must_change_password: true })

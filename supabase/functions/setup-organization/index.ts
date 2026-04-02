@@ -1,4 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { jwtVerify } from 'https://esm.sh/jose@5';
 
@@ -7,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -23,28 +22,25 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-  // Verify JWT manually using jose library
   let userId: string | null = null;
   let userEmail: string | null = null;
   let userMetadata: Record<string, unknown> = {};
 
   try {
-    // Get JWT secret from Supabase (JWT_SECRET env var)
     const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
     if (!jwtSecret) {
-      // Fallback: try to extract user from token payload without verification (for dev)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      userId = payload.sub;
-      userEmail = payload.email;
-      userMetadata = payload.user_metadata || {};
-    } else {
-      const encoder = new TextEncoder();
-      const secretKey = encoder.encode(jwtSecret);
-      const { payload } = await jwtVerify(token, secretKey);
-      userId = payload.sub as string;
-      userEmail = payload.email as string;
-      userMetadata = (payload.user_metadata as Record<string, unknown>) || {};
+      console.error('SUPABASE_JWT_SECRET is not set - rejecting for security');
+      return new Response(JSON.stringify({ error: 'Server misconfiguration' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+    const encoder = new TextEncoder();
+    const secretKey = encoder.encode(jwtSecret);
+    const { payload } = await jwtVerify(token, secretKey);
+    if (!payload.sub) throw new Error('No sub in JWT');
+    userId = payload.sub as string;
+    userEmail = payload.email as string;
+    userMetadata = (payload.user_metadata as Record<string, unknown>) || {};
   } catch (e) {
     console.error('JWT verification failed:', e);
     return new Response(JSON.stringify({ error: 'Invalid JWT', details: String(e) }), {
@@ -58,21 +54,16 @@ serve(async (req) => {
     });
   }
 
-  // Use service role to bypass RLS entirely
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const user = {
-    id: userId,
-    email: userEmail,
-    user_metadata: userMetadata,
-  };
+  const user = { id: userId, email: userEmail, user_metadata: userMetadata };
 
   try {
-    // Check if user already has an org (service role bypasses RLS — always works)
     const { data: existingMembership } = await supabase
       .from('user_organizations')
       .select('organization_id, role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
       .eq('user_id', user.id)
+      .eq('is_active', true)
       .order('joined_at', { ascending: true })
       .limit(1)
       .maybeSingle();
@@ -86,12 +77,10 @@ serve(async (req) => {
         must_change_password: existingMembership.must_change_password,
         display_name: existingMembership.display_name,
         created: false,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // No org found — create a new one for this user
+    // No active org — create a new one
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const orgName = user.user_metadata?.full_name
@@ -129,7 +118,6 @@ serve(async (req) => {
       });
     }
 
-    // Initialize empty app_data for new org
     await supabase
       .from('app_data')
       .upsert({ organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() }, { onConflict: 'organization_id' });
@@ -140,9 +128,8 @@ serve(async (req) => {
       is_active: true,
       must_change_password: false,
       created: true,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
