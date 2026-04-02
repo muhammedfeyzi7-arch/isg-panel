@@ -156,86 +156,74 @@ export default function FirmalarPage() {
 
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Firmalar</h1>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{aktifFirmalarSayisi} firma kayıtlı</span>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Firmalar</h1>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{aktifFirmalarSayisi} firma kayıtlı</span>
             <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
-            <span className="text-xs font-medium" style={{ color: '#34D399' }}>{aktifCount} aktif</span>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>{aktifCount} aktif</span>
             {cokTehlikeliCount > 0 && (
-              <>
-                <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
-                <span className="text-xs font-medium" style={{ color: '#F87171' }}>{cokTehlikeliCount} çok tehlikeli</span>
-              </>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171' }}>{cokTehlikeliCount} çok tehlikeli</span>
             )}
           </div>
         </div>
         {canCreate && (
-          <button onClick={openAdd} className="btn-primary">
-            <i className="ri-add-circle-line text-base" />
+          <button onClick={openAdd} className="btn-primary" style={{ fontSize: '12.5px', padding: '7px 14px' }}>
+            <i className="ri-add-line text-sm" />
             Yeni Firma Ekle
           </button>
         )}
       </div>
 
-      {/* Read-only banner for Denetçi */}
+      {/* Read-only banner */}
       {isReadOnly && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-          style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }}>
-          <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#06B6D4' }} />
-          <p className="text-sm" style={{ color: '#06B6D4' }}>
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
+          style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.15)' }}>
+          <i className="ri-eye-line text-xs flex-shrink-0" style={{ color: '#06B6D4' }} />
+          <p className="text-[12px]" style={{ color: '#06B6D4' }}>
             <strong>Denetçi modunda görüntülüyorsunuz</strong> — Bu sayfada yalnızca okuma yetkisine sahipsiniz.
           </p>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
+      {/* ── Filters ── */}
+      <div className="flex flex-wrap gap-2.5 px-4 py-3 rounded-xl isg-card">
         <div className="relative flex-1 min-w-[180px]">
-          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
+          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'var(--text-muted)' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Firma adı, yetkili kişi veya vergi no..."
-            className="isg-input pl-9"
+            className="isg-input pl-8 text-[12.5px]"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="isg-input"
-          style={{ width: 'auto', minWidth: '150px' }}
-        >
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '140px' }}>
           <option value="">Tüm Durumlar</option>
           <option value="Aktif">Aktif</option>
           <option value="Pasif">Pasif</option>
           <option value="Askıda">Askıda</option>
         </select>
-        <select
-          value={tehlikeFilter}
-          onChange={e => setTehlikeFilter(e.target.value)}
-          className="isg-input"
-          style={{ width: 'auto', minWidth: '170px' }}
-        >
+        <select value={tehlikeFilter} onChange={e => setTehlikeFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '160px' }}>
           <option value="">Tüm Tehlike Sınıfları</option>
           <option value="Az Tehlikeli">Az Tehlikeli</option>
           <option value="Tehlikeli">Tehlikeli</option>
           <option value="Çok Tehlikeli">Çok Tehlikeli</option>
         </select>
         {(search || statusFilter || tehlikeFilter) && (
-          <button
-            onClick={() => { setSearch(''); setStatusFilter(''); setTehlikeFilter(''); }}
-            className="btn-secondary"
-          >
-            <i className="ri-filter-off-line" /> Temizle
+          <button onClick={() => { setSearch(''); setStatusFilter(''); setTehlikeFilter(''); }} className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>
+            <i className="ri-filter-off-line text-xs" /> Temizle
           </button>
         )}
+        <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <i className="ri-list-check text-xs" />
+          {filtered.length} sonuç
+        </div>
       </div>
 
-      {/* Table */}
+      {/* ── Table ── */}
       {filtered.length === 0 ? (
         <EmptyState
           icon="ri-building-2-line"
@@ -247,7 +235,7 @@ export default function FirmalarPage() {
           actionLabel="Yeni Firma Ekle"
         />
       ) : (
-        <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="rounded-xl overflow-hidden isg-card">
           <div className="overflow-x-auto">
             <table className="w-full table-premium">
               <thead>
@@ -265,39 +253,34 @@ export default function FirmalarPage() {
                 {filtered.map((firma) => (
                   <tr key={firma.id}>
                     <td>
-                      <button
-                        onClick={() => setDetailId(firma.id)}
-                        className="group cursor-pointer text-left"
-                      >
-                        <div className="flex items-center gap-3">
+                      <button onClick={() => setDetailId(firma.id)} className="group cursor-pointer text-left">
+                        <div className="flex items-center gap-2.5">
                           {(() => {
                             const logoUrl = getFirmaLogo(firma.id);
                             return logoUrl ? (
-                              <div className="w-9 h-9 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                              <div className="w-8 h-8 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <img src={logoUrl} alt={firma.ad} className="w-full h-full object-contain p-0.5" />
                               </div>
                             ) : (
-                              <div
-                                className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-xs font-bold text-white"
-                                style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}
-                              >
+                              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-[11px] font-bold text-white"
+                                style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
                                 {firma.ad.charAt(0).toUpperCase()}
                               </div>
                             );
                           })()}
                           <div>
-                            <p className="text-sm font-semibold text-slate-200 group-hover:text-blue-400 transition-colors">{firma.ad}</p>
-                            {firma.sgkSicil && <p className="text-xs mt-0.5" style={{ color: '#475569' }}>SGK: {firma.sgkSicil}</p>}
+                            <p className="text-[12.5px] font-semibold group-hover:text-blue-400 transition-colors" style={{ color: 'var(--text-primary)' }}>{firma.ad}</p>
+                            {firma.sgkSicil && <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>SGK: {firma.sgkSicil}</p>}
                           </div>
                         </div>
                       </button>
                     </td>
                     <td className="hidden md:table-cell">
-                      <p className="text-sm text-slate-300">{firma.yetkiliKisi || '—'}</p>
+                      <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{firma.yetkiliKisi || '—'}</p>
                     </td>
                     <td className="hidden lg:table-cell">
-                      <p className="text-sm text-slate-400">{firma.telefon || '—'}</p>
-                      <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{firma.email || ''}</p>
+                      <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{firma.telefon || '—'}</p>
+                      <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{firma.email || ''}</p>
                     </td>
                     <td className="hidden md:table-cell">
                       <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
@@ -306,7 +289,7 @@ export default function FirmalarPage() {
                       <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
                     </td>
                     <td className="hidden lg:table-cell">
-                      <p className="text-sm text-slate-400">
+                      <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
                         {firma.sozlesmeBit ? new Date(firma.sozlesmeBit).toLocaleDateString('tr-TR') : '—'}
                       </p>
                     </td>

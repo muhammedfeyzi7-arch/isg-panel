@@ -183,48 +183,38 @@ export default function EvraklarPage() {
   }), [evraklarWithDurum]);
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Takibi</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{evraklar.length} toplam evrak — durum otomatik hesaplanır</p>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Evrak Takibi</h1>
+          <p className="text-[12px] mt-1" style={{ color: 'var(--text-muted)' }}>{evraklar.length} toplam evrak — durum otomatik hesaplanır</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={openAdd} className="btn-primary">
-            <i className="ri-file-add-line text-base" />
+          <button onClick={openAdd} className="btn-primary" style={{ fontSize: '12.5px', padding: '7px 14px' }}>
+            <i className="ri-file-add-line text-sm" />
             Yeni Evrak
           </button>
           <button
             onClick={() => setBulkOpen(true)}
-            className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 cursor-pointer"
-            style={{
-              background: 'linear-gradient(135deg, #10B981, #059669)',
-              boxShadow: '0 4px 12px rgba(16,185,129,0.3)',
-            }}
+            className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-[7px] rounded-xl text-[12.5px] font-semibold text-white transition-all duration-200 cursor-pointer"
+            style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
           >
-            <i className="ri-upload-cloud-2-line text-base" />
+            <i className="ri-upload-cloud-2-line text-sm" />
             Toplu Yükle
           </button>
           <button
-            onClick={() => {
-              setOtoDefaultPersonelId('');
-              setOtoDefaultFirmaId('');
-              setOtoEvrakOpen(true);
-            }}
-            className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 cursor-pointer"
-            style={{
-              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-              boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
-            }}
+            onClick={() => { setOtoDefaultPersonelId(''); setOtoDefaultFirmaId(''); setOtoEvrakOpen(true); }}
+            className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-[7px] rounded-xl text-[12.5px] font-semibold text-white transition-all duration-200 cursor-pointer"
+            style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}
           >
-            <i className="ri-magic-line text-base" />
-            Oto Evrak Oluştur
+            <i className="ri-magic-line text-sm" />
+            Oto Evrak
           </button>
         </div>
       </div>
 
-      {/* Status Stats */}
+      {/* ── Status Stats ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {(Object.keys(statusCounts) as Array<keyof typeof statusCounts>).map(key => {
           const cfg = statusConfig[key];
@@ -232,68 +222,67 @@ export default function EvraklarPage() {
           return (
             <div
               key={key}
-              className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
+              className="rounded-xl p-3.5 flex items-center gap-3 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
               style={{
                 background: cfg.bg,
                 border: `1px solid ${isActive ? cfg.color : cfg.border}`,
-                boxShadow: isActive ? `0 0 0 2px ${cfg.color}30` : 'none',
+                boxShadow: isActive ? `0 0 0 2px ${cfg.color}25` : 'none',
               }}
               onClick={() => setStatusFilter(statusFilter === key ? '' : key)}
             >
-              <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${cfg.color}20` }}>
-                <i className={`${cfg.icon} text-base`} style={{ color: cfg.color }} />
+              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${cfg.color}20` }}>
+                <i className={`${cfg.icon} text-sm`} style={{ color: cfg.color }} />
               </div>
               <div>
-                <p className="text-xl font-extrabold" style={{ color: 'var(--text-primary)' }}>{statusCounts[key]}</p>
-                <p className="text-xs font-medium" style={{ color: cfg.color }}>{key}</p>
+                <p className="text-lg font-extrabold" style={{ color: 'var(--text-primary)' }}>{statusCounts[key]}</p>
+                <p className="text-[10.5px] font-medium" style={{ color: cfg.color }}>{key}</p>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
+      {/* ── Filters ── */}
+      <div className="flex flex-wrap gap-2.5 px-4 py-3 rounded-xl isg-card">
         <div className="relative flex-1 min-w-[160px]">
-          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Evrak adı veya tür ara..."
-            className="isg-input pl-9"
-          />
+          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'var(--text-muted)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Evrak adı veya tür ara..." className="isg-input pl-8 text-[12.5px]" />
         </div>
-        <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
+        <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '150px' }}>
           <option value="">Tüm Firmalar</option>
           {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
         </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '150px' }}>
           <option value="">Tüm Durumlar</option>
           {['Yüklü', 'Eksik', 'Süre Yaklaşıyor', 'Süre Dolmuş'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={turFilter} onChange={e => setTurFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
+        <select value={turFilter} onChange={e => setTurFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '150px' }}>
           <option value="">Tüm Türler</option>
           {EVRAK_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         {(search || firmaFilter || statusFilter || turFilter) && (
-          <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); setTurFilter(''); }} className="btn-secondary">
-            <i className="ri-filter-off-line" /> Temizle
+          <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); setTurFilter(''); }} className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>
+            <i className="ri-filter-off-line text-xs" /> Temizle
           </button>
         )}
+        <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <i className="ri-list-check text-xs" />
+          {filtered.length} sonuç
+        </div>
       </div>
 
-      {/* Table */}
+      {/* ── Table ── */}
       {filtered.length === 0 ? (
-        <div className="rounded-2xl p-16 flex flex-col items-center text-center isg-card">
-          <div className="w-16 h-16 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
-            <i className="ri-file-list-3-line text-3xl" style={{ color: 'var(--text-faint)' }} />
+        <div className="rounded-xl p-14 flex flex-col items-center text-center isg-card">
+          <div className="w-14 h-14 flex items-center justify-center rounded-xl mb-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+            <i className="ri-file-list-3-line text-2xl" style={{ color: 'var(--text-faint)' }} />
           </div>
-          <p className="text-base font-bold" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm font-bold" style={{ color: 'var(--text-muted)' }}>
             {search || firmaFilter || statusFilter || turFilter ? 'Filtrelerle eşleşen evrak yok' : 'Henüz evrak eklenmedi'}
           </p>
         </div>
       ) : (
-        <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="rounded-xl overflow-hidden isg-card">
           <div className="overflow-x-auto">
             <table className="w-full table-premium">
               <thead>
@@ -310,21 +299,21 @@ export default function EvraklarPage() {
                 {filtered.map(ev => (
                   <tr key={ev.id}>
                     <td>
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                          <i className="ri-file-text-line text-sm" style={{ color: '#60A5FA' }} />
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.15)' }}>
+                          <i className="ri-file-text-line text-xs" style={{ color: '#60A5FA' }} />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-slate-200">{ev.ad}</p>
-                          <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{ev.tur}</p>
+                          <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
+                          <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="hidden md:table-cell"><p className="text-sm text-slate-300">{getFirmaAd(ev.firmaId)}</p></td>
-                    <td className="hidden lg:table-cell"><p className="text-sm text-slate-400">{getPersonelAd(ev.personelId)}</p></td>
+                    <td className="hidden md:table-cell"><p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(ev.firmaId)}</p></td>
+                    <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{getPersonelAd(ev.personelId)}</p></td>
                     <td><Badge label={ev.durum} color={getEvrakStatusColor(ev.durum)} /></td>
                     <td className="hidden lg:table-cell">
-                      <p className="text-sm text-slate-400">
+                      <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
                         {ev.gecerlilikTarihi ? new Date(ev.gecerlilikTarihi).toLocaleDateString('tr-TR') : '—'}
                       </p>
                     </td>

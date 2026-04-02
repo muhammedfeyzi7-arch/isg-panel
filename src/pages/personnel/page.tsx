@@ -285,70 +285,85 @@ export default function PersonellerPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileSelect} className="hidden" />
       <input ref={fotoInputRef} type="file" accept="image/*" onChange={handleFotoSelect} className="hidden" />
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Personeller</h1>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{personeller.filter(p => !p.silinmis).length} personel kayıtlı</span>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Personeller</h1>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{personeller.filter(p => !p.silinmis).length} personel kayıtlı</span>
             <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
-            <span className="text-xs font-medium" style={{ color: '#34D399' }}>{aktifCount} aktif</span>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>{aktifCount} aktif</span>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleDownloadTemplate} className="btn-secondary whitespace-nowrap"><i className="ri-download-2-line text-base" />Şablon İndir</button>
-          <button onClick={() => fileInputRef.current?.click()} disabled={importLoading} className="btn-secondary whitespace-nowrap">
-            {importLoading ? <><i className="ri-loader-4-line animate-spin text-base" />Yükleniyor...</> : <><i className="ri-upload-2-line text-base" />Excel İçe Aktar</>}
+          <button onClick={handleDownloadTemplate} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
+            <i className="ri-download-2-line text-xs" />Şablon İndir
           </button>
-          <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap"><i className="ri-file-excel-2-line text-base" />Excel İndir</button>
-          {canCreate && <button onClick={openAdd} className="btn-primary whitespace-nowrap"><i className="ri-user-add-line text-base" />Yeni Personel Ekle</button>}
+          <button onClick={() => fileInputRef.current?.click()} disabled={importLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
+            {importLoading ? <><i className="ri-loader-4-line animate-spin text-xs" />Yükleniyor...</> : <><i className="ri-upload-2-line text-xs" />Excel İçe Aktar</>}
+          </button>
+          <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
+            <i className="ri-file-excel-2-line text-xs" />Excel İndir
+          </button>
+          {canCreate && (
+            <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12.5px', padding: '7px 14px' }}>
+              <i className="ri-user-add-line text-sm" />Yeni Personel Ekle
+            </button>
+          )}
         </div>
       </div>
 
       {isReadOnly && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)' }}>
-          <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#06B6D4' }} />
-          <p className="text-sm" style={{ color: '#06B6D4' }}><strong>Denetçi modunda görüntülüyorsunuz</strong> — Bu sayfada yalnızca okuma yetkisine sahipsiniz.</p>
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl" style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.15)' }}>
+          <i className="ri-eye-line text-xs flex-shrink-0" style={{ color: '#06B6D4' }} />
+          <p className="text-[12px]" style={{ color: '#06B6D4' }}><strong>Denetçi modunda görüntülüyorsunuz</strong> — Bu sayfada yalnızca okuma yetkisine sahipsiniz.</p>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
+      {/* ── Filters ── */}
+      <div className="flex flex-wrap gap-2.5 px-4 py-3 rounded-xl isg-card">
         <div className="relative flex-1 min-w-[180px]">
-          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ad, TC kimlik veya görev ara..." className="isg-input pl-9" />
+          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'var(--text-muted)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ad, TC kimlik veya görev ara..." className="isg-input pl-8 text-[12.5px]" />
         </div>
-        <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '160px' }}>
+        <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '150px' }}>
           <option value="">Tüm Firmalar</option>
           {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
         </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ width: 'auto', minWidth: '140px' }}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '130px' }}>
           <option value="">Tüm Durumlar</option>
           <option value="Aktif">Aktif</option>
           <option value="Pasif">Pasif</option>
           <option value="Ayrıldı">Ayrıldı</option>
         </select>
         {(search || firmaFilter || statusFilter) && (
-          <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); }} className="btn-secondary">
-            <i className="ri-filter-off-line" /> Temizle
+          <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); }} className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>
+            <i className="ri-filter-off-line text-xs" /> Temizle
           </button>
         )}
+        <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <i className="ri-list-check text-xs" />
+          {filtered.length} sonuç
+        </div>
       </div>
 
+      {/* ── Table ── */}
       {filtered.length === 0 ? (
-        <div className="rounded-2xl p-16 flex flex-col items-center text-center isg-card">
-          <div className="w-16 h-16 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
-            <i className="ri-team-line text-3xl" style={{ color: 'var(--text-faint)' }} />
+        <div className="rounded-xl p-14 flex flex-col items-center text-center isg-card">
+          <div className="w-14 h-14 flex items-center justify-center rounded-xl mb-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+            <i className="ri-team-line text-2xl" style={{ color: 'var(--text-faint)' }} />
           </div>
-          <p className="text-base font-bold" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm font-bold" style={{ color: 'var(--text-muted)' }}>
             {search || firmaFilter || statusFilter ? 'Sonuç bulunamadı' : 'Henüz personel eklenmedi'}
           </p>
-          {firmalar.filter(f => !f.silinmis).length === 0 && <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Önce bir firma eklemeniz gerekmektedir.</p>}
+          {firmalar.filter(f => !f.silinmis).length === 0 && <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Önce bir firma eklemeniz gerekmektedir.</p>}
         </div>
       ) : (
-        <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="rounded-xl overflow-hidden isg-card">
           <div className="overflow-x-auto">
             <table className="w-full table-premium">
               <thead>
@@ -367,20 +382,20 @@ export default function PersonellerPage() {
                   return (
                     <tr key={p.id}>
                       <td>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2.5">
                           <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="sm" />
                           <div>
-                            <button onClick={() => setDetailId(p.id)} className="text-sm font-semibold text-slate-200 hover:text-blue-400 transition-colors cursor-pointer block text-left">{p.adSoyad}</button>
-                            <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{p.tc || 'TC yok'}</p>
+                            <button onClick={() => setDetailId(p.id)} className="text-[12.5px] font-semibold hover:text-blue-400 transition-colors cursor-pointer block text-left" style={{ color: 'var(--text-primary)' }}>{p.adSoyad}</button>
+                            <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.tc || 'TC yok'}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="hidden md:table-cell"><p className="text-sm text-slate-300">{getFirmaAd(p.firmaId)}</p></td>
+                      <td className="hidden md:table-cell"><p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(p.firmaId)}</p></td>
                       <td className="hidden lg:table-cell">
-                        <p className="text-sm text-slate-400">{p.gorev || '—'}</p>
-                        <p className="text-xs mt-0.5" style={{ color: '#334155' }}>{p.departman || ''}</p>
+                        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.gorev || '—'}</p>
+                        <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{p.departman || ''}</p>
                       </td>
-                      <td className="hidden lg:table-cell"><p className="text-sm text-slate-400">{p.telefon || '—'}</p></td>
+                      <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.telefon || '—'}</p></td>
                       <td><Badge label={p.durum} color={getPersonelStatusColor(p.durum)} /></td>
                       <td>
                         <div className="flex items-center gap-1 justify-end">

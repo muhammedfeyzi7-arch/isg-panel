@@ -2,10 +2,6 @@ import { useEffect } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
 
-// ─── Role-based access control ──────────────────────────────────────────────
-// admin    → full access
-// denetci  → only audit/report related modules
-// member   → everything except settings (ayarlar)
 const ROLE_MODULES: Record<string, string[]> = {
   admin: [
     'dashboard', 'firmalar', 'personeller',
@@ -32,7 +28,7 @@ function getAllowedModules(role: string): string[] {
 
 const menuGroups = [
   {
-    label: 'ANA MODÜLLER',
+    label: 'GENEL',
     items: [
       { id: 'dashboard', label: 'Kontrol Paneli', icon: 'ri-dashboard-3-line' },
       { id: 'firmalar', label: 'Firmalar', icon: 'ri-building-2-line' },
@@ -62,10 +58,10 @@ const menuGroups = [
   },
 ];
 
-const ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  admin: { label: 'Admin', color: '#F59E0B', bg: 'rgba(245,158,11,0.15)' },
-  denetci: { label: 'Denetçi', color: '#06B6D4', bg: 'rgba(6,182,212,0.15)' },
-  member: { label: 'Kullanıcı', color: '#818CF8', bg: 'rgba(99,102,241,0.15)' },
+const ROLE_LABELS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+  admin: { label: 'Admin', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', icon: 'ri-shield-star-line' },
+  denetci: { label: 'Denetçi', color: '#06B6D4', bg: 'rgba(6,182,212,0.12)', icon: 'ri-search-eye-line' },
+  member: { label: 'Kullanıcı', color: '#818CF8', bg: 'rgba(99,102,241,0.12)', icon: 'ri-user-line' },
 };
 
 export default function Sidebar() {
@@ -76,7 +72,6 @@ export default function Sidebar() {
   const allowedModules = getAllowedModules(userRole);
   const roleInfo = ROLE_LABELS[userRole] ?? ROLE_LABELS.member;
 
-  // If current active module is not allowed for this role, redirect to dashboard
   useEffect(() => {
     if (!allowedModules.includes(activeModule)) {
       setActiveModule('dashboard');
@@ -86,7 +81,6 @@ export default function Sidebar() {
   const eksikEvrak = evraklar.filter(e => e.durum === 'Eksik' || e.durum === 'Süre Dolmuş').length;
   const badges: Record<string, number> = { evraklar: eksikEvrak };
 
-  // Filter groups to only show allowed modules
   const filteredGroups = menuGroups
     .map(group => ({
       ...group,
@@ -96,20 +90,24 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen flex flex-col transition-all duration-300 z-40 ${sidebarCollapsed ? 'w-[68px]' : 'w-[260px]'}`}
-      style={{ background: 'var(--bg-sidebar)', borderRight: '1px solid rgba(255,255,255,0.06)', transition: 'width 0.3s ease, background 0.3s ease' }}
+      className={`fixed left-0 top-0 h-screen flex flex-col z-40 ${sidebarCollapsed ? 'w-[68px]' : 'w-[260px]'}`}
+      style={{
+        background: 'var(--bg-sidebar)',
+        borderRight: '1px solid rgba(255,255,255,0.05)',
+        transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
+      }}
     >
-      {/* Logo */}
+      {/* ── Logo ── */}
       <div
         className={`flex items-center gap-3 py-4 ${sidebarCollapsed ? 'px-3 justify-center' : 'px-4'}`}
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
       >
         <div
           className="flex-shrink-0 flex items-center justify-center"
           style={{
-            width: sidebarCollapsed ? '36px' : '44px',
-            height: sidebarCollapsed ? '36px' : '44px',
-            filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))',
+            width: sidebarCollapsed ? '34px' : '40px',
+            height: sidebarCollapsed ? '34px' : '40px',
+            filter: 'drop-shadow(0 0 10px rgba(6,182,212,0.45))',
             transition: 'width 0.3s ease, height 0.3s ease',
           }}
         >
@@ -120,41 +118,43 @@ export default function Sidebar() {
           />
         </div>
         {!sidebarCollapsed && (
-          <div>
-            <h1 className="text-sm font-bold text-white tracking-wide leading-tight">ISG Denetim</h1>
-            <p className="text-[10px] mt-0.5 font-semibold" style={{ color: '#06B6D4', letterSpacing: '0.02em' }}>
+          <div className="min-w-0">
+            <h1 className="text-[13px] font-bold text-white tracking-tight leading-tight">ISG Denetim</h1>
+            <p className="text-[10px] mt-0.5 font-medium" style={{ color: 'rgba(6,182,212,0.8)', letterSpacing: '0.03em' }}>
               Yönetim Sistemi
             </p>
           </div>
         )}
       </div>
 
-      {/* Role badge (visible only when not collapsed) */}
+      {/* ── Role badge ── */}
       {!sidebarCollapsed && (
-        <div className="px-4 pt-3 pb-1">
+        <div className="px-3 pt-3 pb-1">
           <div
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide"
-            style={{ background: roleInfo.bg, color: roleInfo.color }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold w-fit"
+            style={{ background: roleInfo.bg, color: roleInfo.color, border: `1px solid ${roleInfo.color}20` }}
           >
-            <i className={`text-[10px] ${userRole === 'admin' ? 'ri-shield-star-line' : userRole === 'denetci' ? 'ri-search-eye-line' : 'ri-user-line'}`} />
+            <i className={`${roleInfo.icon} text-[10px]`} />
             {roleInfo.label}
           </div>
         </div>
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
+      {/* ── Navigation ── */}
+      <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-4">
         {filteredGroups.map(group => (
           <div key={group.label}>
             {!sidebarCollapsed && (
               <p
-                className="text-[9.5px] font-extrabold uppercase px-3 mb-2 select-none"
-                style={{ color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em' }}
+                className="text-[9px] font-bold uppercase px-2 mb-1.5 select-none tracking-widest"
+                style={{ color: 'rgba(255,255,255,0.18)' }}
               >
                 {group.label}
               </p>
             )}
-            {sidebarCollapsed && <div className="h-px mx-2 mb-2" style={{ background: 'rgba(255,255,255,0.06)' }} />}
+            {sidebarCollapsed && (
+              <div className="h-px mx-2 mb-2" style={{ background: 'rgba(255,255,255,0.05)' }} />
+            )}
             <ul className="space-y-0.5">
               {group.items.map(item => {
                 const isActive = activeModule === item.id;
@@ -164,27 +164,61 @@ export default function Sidebar() {
                     <button
                       onClick={() => setActiveModule(item.id)}
                       title={sidebarCollapsed ? item.label : ''}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left cursor-pointer group relative transition-all duration-200 ${
-                        isActive ? 'sidebar-active' : 'text-slate-500 sidebar-hover'
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left cursor-pointer group relative transition-all duration-150 ${
+                        isActive ? '' : ''
                       }`}
+                      style={
+                        isActive
+                          ? {
+                              background: 'rgba(59,130,246,0.14)',
+                              border: '1px solid rgba(59,130,246,0.22)',
+                            }
+                          : {
+                              background: 'transparent',
+                              border: '1px solid transparent',
+                            }
+                      }
+                      onMouseEnter={e => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.borderColor = 'transparent';
+                        }
+                      }}
                     >
+                      {/* Active indicator */}
                       {isActive && (
                         <span
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full"
                           style={{ background: 'linear-gradient(180deg, #60A5FA, #818CF8)' }}
                         />
                       )}
-                      <span className={`w-5 h-5 flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'text-blue-400' : 'group-hover:text-slate-300'}`}>
-                        <i className={`${item.icon} text-[15px]`} />
+
+                      {/* Icon */}
+                      <span
+                        className={`w-[18px] h-[18px] flex items-center justify-center flex-shrink-0 transition-colors duration-150`}
+                        style={{ color: isActive ? '#93C5FD' : 'rgba(255,255,255,0.35)' }}
+                      >
+                        <i className={`${item.icon} text-[14px]`} />
                       </span>
+
+                      {/* Label */}
                       {!sidebarCollapsed && (
                         <>
-                          <span className={`text-[13px] font-medium flex-1 transition-colors ${isActive ? 'text-blue-300 font-semibold' : 'group-hover:text-slate-200'}`}>
+                          <span
+                            className="text-[12.5px] flex-1 transition-colors duration-150 font-medium"
+                            style={{ color: isActive ? '#BFDBFE' : 'rgba(255,255,255,0.45)' }}
+                          >
                             {item.label}
                           </span>
                           {badge != null && badge > 0 && (
                             <span
-                              className="text-[10px] font-bold text-white rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0"
+                              className="text-[9px] font-bold text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 flex-shrink-0"
                               style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}
                             >
                               {badge > 9 ? '9+' : badge}
@@ -201,52 +235,64 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Mini Stats */}
+      {/* ── Mini Stats ── */}
       {!sidebarCollapsed && (
-        <div className="px-3 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="rounded-xl p-3 flex gap-3" style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.12)' }}>
-            <div className="flex-1 text-center">
-              <p className="text-sm font-bold text-gradient-blue">{firmalar.filter(f => !f.silinmis).length}</p>
-              <p className="text-[10px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Firma</p>
-            </div>
-            <div className="w-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
-            <div className="flex-1 text-center">
-              <p className="text-sm font-bold text-gradient-green">{personeller.filter(p => !p.silinmis).length}</p>
-              <p className="text-[10px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Personel</p>
-            </div>
-            <div className="w-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
-            <div className="flex-1 text-center">
-              <p className="text-sm font-bold text-gradient-amber">{evraklar.filter(e => !e.silinmis).length}</p>
-              <p className="text-[10px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Evrak</p>
-            </div>
+        <div className="px-3 py-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div
+            className="rounded-xl p-2.5 flex gap-2"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            {[
+              { value: firmalar.filter(f => !f.silinmis).length, label: 'Firma', color: '#60A5FA' },
+              { value: personeller.filter(p => !p.silinmis).length, label: 'Personel', color: '#34D399' },
+              { value: evraklar.filter(e => !e.silinmis).length, label: 'Evrak', color: '#FCD34D' },
+            ].map((stat, i) => (
+              <>
+                {i > 0 && <div key={`div-${i}`} className="w-px self-stretch" style={{ background: 'rgba(255,255,255,0.06)' }} />}
+                <div key={stat.label} className="flex-1 text-center">
+                  <p className="text-sm font-bold" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="text-[9px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>{stat.label}</p>
+                </div>
+              </>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Profile */}
+      {/* ── Profile ── */}
       <div
-        className={`px-3 py-3 flex items-center gap-3 ${sidebarCollapsed ? 'justify-center' : ''}`}
-        style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+        className={`px-3 py-3 flex items-center gap-2.5 ${sidebarCollapsed ? 'justify-center' : ''}`}
+        style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
       >
         <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
-          style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 2px 10px rgba(99,102,241,0.4)' }}
+          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
+          style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}
         >
           {(currentUser.ad || 'U').charAt(0).toUpperCase()}
         </div>
         {!sidebarCollapsed && (
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-300 truncate">{currentUser.ad || 'Kullanıcı'}</p>
-            <p className="text-[10px] font-medium truncate" style={{ color: roleInfo.color }}>{roleInfo.label}</p>
+            <p className="text-[12px] font-semibold truncate" style={{ color: 'rgba(255,255,255,0.75)' }}>
+              {currentUser.ad || 'Kullanıcı'}
+            </p>
+            <p className="text-[10px] font-medium truncate" style={{ color: roleInfo.color }}>
+              {roleInfo.label}
+            </p>
           </div>
         )}
         <button
           onClick={logout}
           title="Çıkış Yap"
-          className={`flex items-center justify-center cursor-pointer transition-all rounded-lg ${sidebarCollapsed ? 'w-7 h-7' : 'w-6 h-6'}`}
-          style={{ color: 'rgba(255,255,255,0.25)' }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.25)'; e.currentTarget.style.background = 'transparent'; }}
+          className="flex items-center justify-center cursor-pointer transition-all rounded-lg w-6 h-6 flex-shrink-0"
+          style={{ color: 'rgba(255,255,255,0.2)', background: 'transparent', border: 'none' }}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = '#EF4444';
+            e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.2)';
+            e.currentTarget.style.background = 'transparent';
+          }}
         >
           <i className="ri-logout-box-r-line text-sm" />
         </button>
