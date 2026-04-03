@@ -353,7 +353,8 @@ export default function EkipmanlarPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Ekipman, 'id' | 'olusturmaTarihi'>>(defaultForm);
   const [showImport, setShowImport] = useState(false);
-  const [importText, setImportText] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<{ row: number; ad: string; status: 'ok' | 'error'; message: string }[] | null>(null);
   const [importing, setImporting] = useState(false);
   const [qrEkipman, setQrEkipman] = useState<Ekipman | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -467,45 +468,183 @@ export default function EkipmanlarPage() {
     setDeleteId(null);
   };
 
-  const handleImportFile = (file?: File) => {
+  const handleImportFile = async (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImportText(e.target?.result as string);
-    };
-    reader.readAsText(file, 'UTF-8');
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      addToast('Lütfen .xlsx, .xls veya .csv uzantılı dosya seçin.', 'error');
+      return;
+    }
+    setImportFile(file);
+
+    // Önizleme için ilk 5 satırı parse et
+    try {
+      const { parseImportFile } = await import('../../utils/importParser');
+      const { rows: dataRows, validCount } = await parseImportFile(file);
+
+      // Header satırını ayrıca oku
+      const XLSX = (await import('xlsx-js-style')).default;
+      const rawBuffer = await file.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(rawBuffer), { type: 'array', cellDates: false });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
+      const headerRow = (allRows[0] as unknown[]).map(h => String(h ?? '').trim());
+
+      // Header bazlı kolon eşleştirme
+      const colMap: Record<string, number> = {};
+      const findCol = (keywords: string[]): number => {
+        for (let i = 0; i < headerRow.length; i++) {
+          const h = headerRow[i].toLowerCase();
+          for (const kw of keywords) {
+            if (h.includes(kw.toLowerCase())) return i;
+          }
+        }
+        return -1;
+      };
+
+      colMap['ad'] = findCol(['ekipman ad', 'ad', 'isim', 'name']);
+      colMap['tur'] = findCol(['tür', 'tur', 'tip', 'type', 'cins']);
+      colMap['firma'] = findCol(['firma ad', 'firma', 'company', 'şirket']);
+
+      const getCell = (row: string[], key: string): string => {
+        const idx = colMap[key];
+        return idx >= 0 ? (row[idx] ?? '').trim() : '';
+      };
+
+      const preview = dataRows.slice(0, 5).map((row, i) => {
+        const ad = getCell(row, 'ad');
+        const firma = getCell(row, 'firma');
+        const hasError = !ad || !firma;
+        return {
+          row: i + 2,
+          ad: ad || '(Boş)',
+          status: (hasError ? 'error' : 'ok') as 'ok' | 'error',
+          message: hasError ? `Eksik: ${!ad ? 'Ad ' : ''}${!firma ? 'Firma' : ''}` : 'Hazır',
+        };
+      });
+
+      setImportPreview(preview);
+      addToast(`${validCount} satır tespit edildi. İlk 5 satır önizlemede.`, 'info');
+    } catch (err) {
+      console.error('[Preview] Hata:', err);
+      addToast('Dosya önizlemesi yapılamadı.', 'warning');
+    }
   };
 
-  const handleImport = () => {
-    if (!importText.trim()) { addToast('Dosya içeriği boş.', 'error'); return; }
+  const handleImport = async () => {
+    if (!importFile) { addToast('Lütfen bir dosya seçin.', 'error'); return; }
     setImporting(true);
     try {
-      // Remove BOM if present
-      const clean = importText.replace(/^\uFEFF/, '');
-      const lines = clean.split('\n').filter(l => l.trim());
-      if (lines.length < 2) { addToast('Dosya geçerli veri içermiyor.', 'error'); setImporting(false); return; }
-      // Skip header row (index 0)
+      // Global utility: boş satırları ve not satırlarını otomatik filtreler
+      const { parseImportFile } = await import('../../utils/importParser');
+      const { rows: dataRows, validCount } = await parseImportFile(importFile);
+
+      if (validCount === 0) {
+        addToast('Dosyada geçerli veri bulunamadı. Boş satırlar ve not satırları otomatik atlandı.', 'warning');
+        return;
+      }
+
+      // Header satırını ayrıca oku — kolon eşleştirme için
+      const XLSX = (await import('xlsx-js-style')).default;
+      const rawBuffer = await importFile.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(rawBuffer), { type: 'array', cellDates: false });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
+      const headerRow = (allRows[0] as unknown[]).map(h => String(h ?? '').trim());
+
+      // Header bazlı kolon eşleştirme
+      const colMap: Record<string, number> = {};
+      const findCol = (keywords: string[]): number => {
+        for (let i = 0; i < headerRow.length; i++) {
+          const h = headerRow[i].toLowerCase();
+          for (const kw of keywords) {
+            if (h.includes(kw.toLowerCase())) return i;
+          }
+        }
+        return -1;
+      };
+
+      colMap['ad'] = findCol(['ekipman ad', 'ad', 'isim', 'name']);
+      colMap['tur'] = findCol(['tür', 'tur', 'tip', 'type', 'cins']);
+      colMap['firma'] = findCol(['firma ad', 'firma', 'company', 'şirket']);
+      colMap['alan'] = findCol(['alan', 'bölge', 'lokasyon', 'location', 'bulunduğu']);
+      colMap['seriNo'] = findCol(['seri', 'serino', 'serial', 'no']);
+      colMap['marka'] = findCol(['marka', 'brand', 'üretici']);
+      colMap['model'] = findCol(['model', 'tip']);
+      colMap['sonKontrol'] = findCol(['son kontrol', 'sonkontrol', 'ilk kontrol']);
+      colMap['sonrakiKontrol'] = findCol(['sonraki kontrol', 'sonrakikontrol', 'gelecek kontrol']);
+      colMap['durum'] = findCol(['durum', 'status', 'statü', 'kondisyon']);
+      colMap['aciklama'] = findCol(['açıklama', 'aciklama', 'not', 'note', 'açıkl']);
+
+      // Zorunlu kolon kontrolü
+      if (colMap['ad'] < 0) {
+        addToast('"Ekipman Adı" kolonu bulunamadı. Lütfen şablonu kontrol edin.', 'error');
+        return;
+      }
+
+      const getCell = (row: string[], key: string): string => {
+        const idx = colMap[key];
+        return idx >= 0 ? (row[idx] ?? '').trim() : '';
+      };
+
       let count = 0;
-      for (let i = 1; i < lines.length; i++) {
-        const cells = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
-        const [ad, tur, firmaAd, alan, seriNo, marka, model, sonKontrol, sonrakiKontrol, durum, aciklama] = cells;
-        if (!ad) continue;
+      const errors: string[] = [];
+
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        const rowNum = i + 2; // Header = 1, data = 2+
+
+        const ad = getCell(row, 'ad');
+        if (!ad) {
+          errors.push(`Satır ${rowNum}: Ekipman adı boş`);
+          continue;
+        }
+
+        const firmaAd = getCell(row, 'firma');
+        if (!firmaAd) {
+          errors.push(`Satır ${rowNum}: Firma adı boş`);
+          continue;
+        }
+
         const firma = firmalar.find(f => !f.silinmis && f.ad.toLowerCase() === firmaAd.toLowerCase());
-        const durumTyped: EkipmanStatus = ['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'].includes(durum) ? (durum as EkipmanStatus) : 'Uygun';
+        if (!firma) {
+          errors.push(`Satır ${rowNum}: "${firmaAd}" firması bulunamadı`);
+          continue;
+        }
+
+        const durumVal = getCell(row, 'durum');
+        const durumTyped: EkipmanStatus = ['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'].includes(durumVal) ? (durumVal as EkipmanStatus) : 'Uygun';
+
         addEkipman({
-          ad, tur: tur || '', firmaId: firma?.id ?? '',
-          bulunduguAlan: alan || '', seriNo: seriNo || '',
-          marka: marka || '', model: model || '',
-          sonKontrolTarihi: parseTrDate(sonKontrol || ''),
-          sonrakiKontrolTarihi: parseTrDate(sonrakiKontrol || ''),
-          durum: durumTyped, aciklama: aciklama || '',
-          belgeMevcut: false, dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '', notlar: '',
+          ad,
+          tur: getCell(row, 'tur') || '',
+          firmaId: firma.id,
+          bulunduguAlan: getCell(row, 'alan') || '',
+          seriNo: getCell(row, 'seriNo') || '',
+          marka: getCell(row, 'marka') || '',
+          model: getCell(row, 'model') || '',
+          sonKontrolTarihi: parseTrDate(getCell(row, 'sonKontrol')),
+          sonrakiKontrolTarihi: parseTrDate(getCell(row, 'sonrakiKontrol')),
+          durum: durumTyped,
+          aciklama: getCell(row, 'aciklama') || '',
+          belgeMevcut: false,
+          dosyaAdi: '',
+          dosyaBoyutu: 0,
+          dosyaTipi: '',
+          dosyaVeri: '',
+          notlar: '',
         });
         count++;
       }
-      addToast(`${count} ekipman başarıyla içe aktarıldı.`, 'success');
+
+      if (count > 0) addToast(`${count} ekipman başarıyla içe aktarıldı.`, 'success');
+      if (errors.length > 0) addToast(`${errors.length} satırda hata oluştu.`, 'warning');
+
       setShowImport(false);
-      setImportText('');
+      setImportFile(null);
+      setImportPreview(null);
+    } catch (err) {
+      console.error('[Import] Hata:', err);
+      addToast('Dosya okunurken hata oluştu.', 'error');
     } finally {
       setImporting(false);
     }
@@ -942,12 +1081,12 @@ export default function EkipmanlarPage() {
       <QrModal ekipman={qrEkipman} onClose={() => setQrEkipman(null)} />
 
       {/* Import Modal */}
-      <Modal isOpen={showImport} onClose={() => { setShowImport(false); setImportText(''); }} title="Excel / CSV İçe Aktar" size="md" icon="ri-upload-2-line"
+      <Modal isOpen={showImport} onClose={() => { setShowImport(false); setImportFile(null); setImportPreview(null); }} title="Excel / CSV İçe Aktar" size="md" icon="ri-upload-2-line"
         footer={
           <>
             <button onClick={downloadEkipmanTemplate} className="btn-secondary whitespace-nowrap"><i className="ri-download-line mr-1" />Şablon İndir</button>
-            <button onClick={() => { setShowImport(false); setImportText(''); }} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleImport} disabled={!importText || importing} className="btn-primary whitespace-nowrap disabled:opacity-50">
+            <button onClick={() => { setShowImport(false); setImportFile(null); setImportPreview(null); }} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleImport} disabled={!importFile || importing} className="btn-primary whitespace-nowrap disabled:opacity-50">
               <i className="ri-check-line mr-1" />{importing ? 'Aktarılıyor...' : 'İçe Aktar'}
             </button>
           </>
@@ -958,38 +1097,67 @@ export default function EkipmanlarPage() {
             <p className="text-xs font-semibold mb-1" style={{ color: '#60A5FA' }}>Kullanım Kılavuzu</p>
             <ul className="text-xs space-y-1" style={{ color: '#94A3B8' }}>
               <li>• Önce <strong style={{ color: '#60A5FA' }}>Şablon İndir</strong> ile Excel şablonunu indirin</li>
-              <li>• Şablonu Excel&apos;de doldurun, CSV olarak kaydedin</li>
+              <li>• Şablonu doldurun (Excel veya CSV olarak kaydedin)</li>
               <li>• Durum değerleri: Uygun / Uygun Değil / Bakımda / Hurda</li>
               <li>• Tarih formatı: GG.AA.YYYY (örn: 15.03.2025)</li>
               <li>• Firma adı sistemdeki firma adıyla birebir eşleşmeli</li>
             </ul>
           </div>
-          <div
-            className="rounded-xl p-6 text-center cursor-pointer transition-all"
-            style={{ border: '2px dashed var(--border-main)', background: 'var(--bg-item)' }}
-            onClick={() => importFileRef.current?.click()}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.4)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-main)'; }}
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => { e.preventDefault(); handleImportFile(e.dataTransfer.files[0]); }}
-          >
-            {importText ? (
-              <div className="flex items-center justify-center gap-3">
-                <i className="ri-file-check-line text-2xl" style={{ color: '#34D399' }} />
-                <div className="text-left">
-                  <p className="text-sm font-semibold" style={{ color: '#34D399' }}>Dosya yüklendi</p>
-                  <p className="text-xs" style={{ color: '#64748B' }}>{importText.split('\n').length - 1} satır tespit edildi</p>
+
+          {!importFile ? (
+            <div
+              className="rounded-xl p-6 text-center cursor-pointer transition-all"
+              style={{ border: '2px dashed var(--border-main)', background: 'var(--bg-item)' }}
+              onClick={() => importFileRef.current?.click()}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.4)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-main)'; }}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); void handleImportFile(e.dataTransfer.files[0]); }}
+            >
+              <i className="ri-file-excel-2-line text-3xl mb-2" style={{ color: '#475569' }} />
+              <p className="text-sm font-medium" style={{ color: '#64748B' }}>Excel/CSV dosyanızı sürükleyin veya tıklayın</p>
+              <p className="text-xs mt-1" style={{ color: '#334155' }}>.xlsx, .xls veya .csv formatı desteklenir</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                <i className="ri-file-check-line text-xl" style={{ color: '#34D399' }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: '#34D399' }}>{importFile.name}</p>
+                  <p className="text-xs" style={{ color: '#64748B' }}>{importPreview ? `Önizleme: ${importPreview.length} satır` : 'Yükleniyor...'}</p>
                 </div>
+                <button onClick={() => { setImportFile(null); setImportPreview(null); }} className="text-xs px-2 py-1 rounded" style={{ color: '#EF4444' }}>Kaldır</button>
               </div>
-            ) : (
-              <>
-                <i className="ri-file-excel-2-line text-3xl mb-2" style={{ color: '#475569' }} />
-                <p className="text-sm font-medium" style={{ color: '#64748B' }}>CSV dosyanızı sürükleyin veya tıklayın</p>
-                <p className="text-xs mt-1" style={{ color: '#334155' }}>Excel&apos;den CSV olarak kaydedilmiş dosyalar desteklenir</p>
-              </>
-            )}
-          </div>
-          <input ref={importFileRef} type="file" accept=".csv,.txt" className="hidden" onChange={e => handleImportFile(e.target.files?.[0])} />
+
+              {importPreview && importPreview.length > 0 && (
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-main)' }}>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr style={{ background: 'var(--bg-item)' }}>
+                        <th className="px-3 py-2 text-left">Satır</th>
+                        <th className="px-3 py-2 text-left">Ekipman</th>
+                        <th className="px-3 py-2 text-left">Durum</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.map((p, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid var(--border-main)' }}>
+                          <td className="px-3 py-2" style={{ color: 'var(--text-muted)' }}>{p.row}</td>
+                          <td className="px-3 py-2">{p.ad}</td>
+                          <td className="px-3 py-2">
+                            <span style={{ color: p.status === 'ok' ? '#34D399' : '#EF4444' }}>
+                              {p.status === 'ok' ? <i className="ri-check-line" /> : <i className="ri-close-line" />} {p.message}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+          <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void handleImportFile(f); e.target.value = ''; }} />
         </div>
       </Modal>
     </div>

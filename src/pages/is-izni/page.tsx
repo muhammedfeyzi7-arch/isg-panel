@@ -5,6 +5,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { generateIsIzniNo } from '@/store/useStore';
 import Modal from '@/components/base/Modal';
 import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
+import IsIzniImport from './components/IsIzniImport';
 
 const TIP_CONFIG: Record<IsIzniTip, { color: string; bg: string; icon: string }> = {
   'Sıcak Çalışma':      { color: '#F97316', bg: 'rgba(249,115,22,0.12)',   icon: 'ri-fire-line' },
@@ -63,6 +64,7 @@ export default function IsIzniPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [showBelgeModal, setShowBelgeModal] = useState(false);
   const [savedIsIzni, setSavedIsIzni] = useState<IsIzni | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const aktivFirmalar = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
 
@@ -195,7 +197,10 @@ export default function IsIzniPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Sıcak çalışma, yüksekte çalışma ve diğer iş izinlerini yönetin</p>
         </div>
         {canCreate && (
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
+              <i className="ri-file-excel-2-line mr-1" />Excel İçe Aktar
+            </button>
             <button onClick={openAdd} className="btn-primary whitespace-nowrap">
               <i className="ri-add-line" /> Yeni İş İzni
             </button>
@@ -650,6 +655,29 @@ export default function IsIzniPage() {
           <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
         </div>
       </Modal>
+
+      <IsIzniImport
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        firmalar={aktivFirmalar}
+        onImport={(rows) => {
+          let count = 0;
+          rows.forEach(row => {
+            addIsIzni({
+              tip: row.tip, firmaId: row.firmaId, bolum: row.bolum,
+              sorumlu: row.sorumlu, calisanlar: row.calisanlar,
+              calisanSayisi: row.calisanSayisi, aciklama: row.aciklama,
+              tehlikeler: row.tehlikeler, onlemler: row.onlemler,
+              gerekliEkipman: row.gerekliEkipman, baslamaTarihi: row.baslamaTarihi,
+              bitisTarihi: row.bitisTarihi, durum: row.durum,
+              onaylayanKisi: row.onaylayanKisi, onayTarihi: row.onayTarihi,
+              notlar: row.notlar, olusturanKisi: row.olusturanKisi,
+            });
+            count++;
+          });
+          addToast(`${count} iş izni başarıyla içe aktarıldı.`, 'success');
+        }}
+      />
 
     </div>
   );

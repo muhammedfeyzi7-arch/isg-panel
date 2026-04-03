@@ -8,6 +8,7 @@ import XLSXStyle from 'xlsx-js-style';
 import PersonelDetayModal from './components/PersonelDetayModal';
 import PersonelAvatar from '../../components/base/PersonelAvatar';
 import PersonelKartvizit from './components/PersonelKartvizit';
+import { parseImportFile } from '../../utils/importParser';
 
 const KAN_GRUPLARI = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', '0+', '0-'];
 
@@ -346,83 +347,142 @@ export default function PersonellerPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.name.match(/\.(xlsx|xls)$/i)) { addToast('Lütfen .xlsx veya .xls uzantılı dosya seçin.', 'error'); return; }
-    processImport(file);
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) { addToast('Lütfen .xlsx, .xls veya .csv uzantılı dosya seçin.', 'error'); return; }
+    void processImport(file);
     e.target.value = '';
   };
 
-  const processImport = (file: File) => {
+  const processImport = async (file: File) => {
     setImportLoading(true);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const data = ev.target?.result;
-        const wb = XLSXStyle.read(data, { type: 'array', cellDates: false });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSXStyle.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
-        if (rows.length < 2) { addToast('Excel dosyası boş veya yalnızca başlık satırı içeriyor.', 'warning'); setImportLoading(false); return; }
+    try {
+      // Global utility: boş satırları, not satırlarını ve header'ı otomatik filtreler
+      const { rows: dataRows, validCount } = await parseImportFile(file);
 
-        const headerRow = (rows[0] as unknown[]).map(h => String(h ?? '').trim());
-        const colIndex: Record<string, number> = {};
-        EXCEL_COLUMNS.forEach(col => { const idx = headerRow.findIndex(h => normalize(h) === normalize(col)); colIndex[col] = idx; });
+      if (validCount === 0) {
+        addToast('Excel dosyası boş veya yalnızca başlık/not satırı içeriyor.', 'warning');
+        return;
+      }
 
-        const aktivFirmalar = firmalar.filter(f => !f.silinmis);
-        const firmaMapSoft = new Map<string, string>(aktivFirmalar.map(f => [normalize(f.ad), f.id]));
-        const firmaMapStrict = new Map<string, string>(aktivFirmalar.map(f => [strictNorm(f.ad), f.id]));
-        const firmaNormList = aktivFirmalar.map(f => ({ ad: f.ad, id: f.id, soft: normalize(f.ad), strict: strictNorm(f.ad), tokens: tokenSet(strictNorm(f.ad)) }));
+      // Header satırını ayrıca oku — colIndex için
+      const rawBuffer = await file.arrayBuffer();
+      const wb = XLSXStyle.read(new Uint8Array(rawBuffer), { type: 'array', cellDates: false });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const allRows = XLSXStyle.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
+      const headerRow = (allRows[0] as unknown[]).map(h => String(h ?? '').trim());
 
-        const findFirmaId = (raw: string): { id: string | null; hint: string } => {
-          const softRaw = normalize(raw); const strictRaw = strictNorm(raw);
-          if (!softRaw) return { id: null, hint: '' };
-          const s1 = firmaMapSoft.get(softRaw); if (s1) return { id: s1, hint: '' };
-          const s2 = firmaMapStrict.get(strictRaw); if (s2) return { id: s2, hint: '' };
-          const partial = firmaNormList.find(f => f.strict.includes(strictRaw) || strictRaw.includes(f.strict));
-          if (partial) return { id: partial.id, hint: `(Eşleşti: "${partial.ad}")` };
-          const inputTokens = tokenSet(strictRaw);
-          if (inputTokens.size > 0) {
-            const scored = firmaNormList.map(f => { let matched = 0; inputTokens.forEach(t => { if (f.tokens.has(t)) matched++; }); const score = matched / Math.max(inputTokens.size, f.tokens.size, 1); return { ...f, score }; }).filter(f => f.score >= 0.4).sort((a, b) => b.score - a.score);
-            if (scored.length > 0 && scored[0].score >= 0.7) return { id: scored[0].id, hint: `(Eşleşti: "${scored[0].ad}")` };
-          }
-          return { id: null, hint: `Sistemdeki firmalar: ${aktivFirmalar.slice(0, 5).map(f => `"${f.ad}"`).join(', ')}` };
+      // Header bazlı kolon eşleştirme — normalize ile Türkçe karakter uyumu
+      const colIndex: Record<string, number> = {};
+      EXCEL_COLUMNS.forEach(col => {
+        const idx = headerRow.findIndex(h => normalize(h) === normalize(col));
+        colIndex[col] = idx;
+      });
+
+      // Kolon bulunamadıysa uyar
+      const missingCols = EXCEL_COLUMNS.filter(c => colIndex[c] < 0);
+      if (missingCols.length > 0) {
+        console.warn('[Import] Bulunamayan kolonlar:', missingCols);
+      }
+
+      const aktivFirmalar = firmalar.filter(f => !f.silinmis);
+      const firmaMapSoft = new Map<string, string>(aktivFirmalar.map(f => [normalize(f.ad), f.id]));
+      const firmaMapStrict = new Map<string, string>(aktivFirmalar.map(f => [strictNorm(f.ad), f.id]));
+      const firmaNormList = aktivFirmalar.map(f => ({ ad: f.ad, id: f.id, soft: normalize(f.ad), strict: strictNorm(f.ad), tokens: tokenSet(strictNorm(f.ad)) }));
+
+      const findFirmaId = (raw: string): { id: string | null; hint: string } => {
+        const softRaw = normalize(raw); const strictRaw = strictNorm(raw);
+        if (!softRaw) return { id: null, hint: '' };
+        const s1 = firmaMapSoft.get(softRaw); if (s1) return { id: s1, hint: '' };
+        const s2 = firmaMapStrict.get(strictRaw); if (s2) return { id: s2, hint: '' };
+        const partial = firmaNormList.find(f => f.strict.includes(strictRaw) || strictRaw.includes(f.strict));
+        if (partial) return { id: partial.id, hint: `(Eşleşti: "${partial.ad}")` };
+        const inputTokens = tokenSet(strictRaw);
+        if (inputTokens.size > 0) {
+          const scored = firmaNormList.map(f => { let matched = 0; inputTokens.forEach(t => { if (f.tokens.has(t)) matched++; }); const score = matched / Math.max(inputTokens.size, f.tokens.size, 1); return { ...f, score }; }).filter(f => f.score >= 0.4).sort((a, b) => b.score - a.score);
+          if (scored.length > 0 && scored[0].score >= 0.7) return { id: scored[0].id, hint: `(Eşleşti: "${scored[0].ad}")` };
+        }
+        return { id: null, hint: `Sistemdeki firmalar: ${aktivFirmalar.slice(0, 5).map(f => `"${f.ad}"`).join(', ')}` };
+      };
+
+      const durumMap: Record<string, 'Aktif' | 'Pasif' | 'Ayrıldı'> = { aktif: 'Aktif', active: 'Aktif', pasif: 'Pasif', inactive: 'Pasif', ayrildi: 'Ayrıldı', ayrilmis: 'Ayrıldı', left: 'Ayrıldı' };
+      const kanMap: Record<string, string> = {};
+      KAN_GRUPLARI.forEach(k => { kanMap[normalize(k)] = k; });
+      Object.assign(kanMap, { 'a rh+': 'A+', 'a rh-': 'A-', 'b rh+': 'B+', 'b rh-': 'B-', 'ab rh+': 'AB+', 'ab rh-': 'AB-', '0 rh+': '0+', '0 rh-': '0-' });
+
+      const existingTCs = new Set(personeller.filter(p => !p.silinmis && p.tc).map(p => p.tc.replace(/\D/g, '')));
+      const result: ImportResult = { successCount: 0, duplicateCount: 0, errorCount: 0, rows: [] };
+
+      // dataRows: global utility'den gelen temiz satırlar (boş + not satırları filtrelenmiş)
+      dataRows.forEach((row, idx) => {
+        const rowNum = idx + 2; // header = satır 1, data = satır 2+
+
+        // Header bazlı get: colIndex ile kolon bul, yoksa index bazlı fallback
+        const get = (col: typeof EXCEL_COLUMNS[number]): string => {
+          const ci = colIndex[col];
+          if (ci !== undefined && ci >= 0) return String(row[ci] ?? '').trim();
+          // Fallback: EXCEL_COLUMNS sırasına göre index
+          const fallbackIdx = EXCEL_COLUMNS.indexOf(col);
+          return fallbackIdx >= 0 ? String(row[fallbackIdx] ?? '').trim() : '';
         };
 
-        const durumMap: Record<string, 'Aktif' | 'Pasif' | 'Ayrıldı'> = { aktif: 'Aktif', active: 'Aktif', pasif: 'Pasif', inactive: 'Pasif', ayrildi: 'Ayrıldı', ayrilmis: 'Ayrıldı', left: 'Ayrıldı' };
-        const kanMap: Record<string, string> = {};
-        KAN_GRUPLARI.forEach(k => { kanMap[normalize(k)] = k; });
-        Object.assign(kanMap, { 'a rh+': 'A+', 'a rh-': 'A-', 'b rh+': 'B+', 'b rh-': 'B-', 'ab rh+': 'AB+', 'ab rh-': 'AB-', '0 rh+': '0+', '0 rh-': '0-' });
+        const adSoyad = get('Ad Soyad');
+        const tcRaw = get('TC Kimlik No');
+        const firmaAdi = get('Firma Adı');
 
-        const existingTCs = new Set(personeller.filter(p => !p.silinmis && p.tc).map(p => p.tc.replace(/\D/g, '')));
-        const result: ImportResult = { successCount: 0, duplicateCount: 0, errorCount: 0, rows: [] };
+        // Tamamen boş satır — atla
+        if (!adSoyad && !tcRaw && !firmaAdi) return;
 
-        rows.slice(1).forEach((rawRow, idx) => {
-          const rowNum = idx + 2;
-          const row = rawRow as unknown[];
-          const get = (col: typeof EXCEL_COLUMNS[number]): string => { const ci = colIndex[col]; if (ci === undefined || ci < 0) return ''; return String(row[ci] ?? '').trim(); };
-          const adSoyad = get('Ad Soyad'); const tcRaw = get('TC Kimlik No'); const firmaAdi = get('Firma Adı');
-          if (!adSoyad && !tcRaw && !firmaAdi) return;
-          const errors: string[] = [];
-          if (!adSoyad) errors.push('"Ad Soyad" sütunu boş — bu alan zorunludur');
-          let firmaId: string | null = null;
-          if (!firmaAdi) { errors.push('"Firma Adı" sütunu boş — bu alan zorunludur'); } else { const match = findFirmaId(firmaAdi); firmaId = match.id; if (!firmaId) errors.push(`"Firma Adı": "${firmaAdi}" sistemde bulunamadı. ${match.hint}`); }
-          const tc = tcRaw.replace(/\D/g, '');
-          if (tcRaw && tc.length !== 11) errors.push(`"TC Kimlik No": "${tcRaw}" geçersiz (${tc.length} rakam — 11 olmalı)`);
-          if (errors.length > 0) { result.errorCount++; result.rows.push({ row: rowNum, adSoyad: adSoyad || '(İsimsiz)', status: 'error', message: errors.join(' • ') }); return; }
-          if (tc && existingTCs.has(tc)) { result.duplicateCount++; result.rows.push({ row: rowNum, adSoyad, status: 'duplicate', message: `TC No ${tc} zaten sistemde kayıtlı` }); return; }
-          const durum: 'Aktif' | 'Pasif' | 'Ayrıldı' = durumMap[normalize(get('Durum'))] ?? 'Aktif';
-          const kanGrubu = kanMap[normalize(get('Kan Grubu'))] ?? '';
-          addPersonel({ adSoyad: adSoyad.trim(), tc, telefon: get('Telefon'), email: get('E-posta'), dogumTarihi: parseTrDate(get('Doğum Tarihi')), iseGirisTarihi: parseTrDate(get('İşe Giriş Tarihi')), gorev: get('Görev'), departman: get('Departman'), firmaId: firmaId!, durum, kanGrubu, acilKisi: get('Acil Durum Kişisi'), acilTelefon: get('Acil Durum Telefonu'), adres: get('Adres') });
-          if (tc) existingTCs.add(tc);
-          result.successCount++;
-          result.rows.push({ row: rowNum, adSoyad, status: 'success', message: `Başarıyla eklendi${durum !== 'Aktif' ? ` (Durum: ${durum})` : ''}` });
+        const errors: string[] = [];
+        if (!adSoyad) errors.push('"Ad Soyad" sütunu boş — bu alan zorunludur');
+
+        let firmaId: string | null = null;
+        if (!firmaAdi) {
+          errors.push('"Firma Adı" sütunu boş — bu alan zorunludur');
+        } else {
+          const match = findFirmaId(firmaAdi);
+          firmaId = match.id;
+          if (!firmaId) errors.push(`"Firma Adı": "${firmaAdi}" sistemde bulunamadı. ${match.hint}`);
+        }
+
+        const tc = tcRaw.replace(/\D/g, '');
+        if (tcRaw && tc.length !== 11) errors.push(`"TC Kimlik No": "${tcRaw}" geçersiz (${tc.length} rakam — 11 olmalı)`);
+
+        if (errors.length > 0) {
+          result.errorCount++;
+          result.rows.push({ row: rowNum, adSoyad: adSoyad || '(İsimsiz)', status: 'error', message: errors.join(' • ') });
+          return;
+        }
+
+        if (tc && existingTCs.has(tc)) {
+          result.duplicateCount++;
+          result.rows.push({ row: rowNum, adSoyad, status: 'duplicate', message: `TC No ${tc} zaten sistemde kayıtlı` });
+          return;
+        }
+
+        const durum: 'Aktif' | 'Pasif' | 'Ayrıldı' = durumMap[normalize(get('Durum'))] ?? 'Aktif';
+        const kanGrubu = kanMap[normalize(get('Kan Grubu'))] ?? '';
+
+        addPersonel({
+          adSoyad: adSoyad.trim(), tc, telefon: get('Telefon'), email: get('E-posta'),
+          dogumTarihi: parseTrDate(get('Doğum Tarihi')), iseGirisTarihi: parseTrDate(get('İşe Giriş Tarihi')),
+          gorev: get('Görev'), departman: get('Departman'), firmaId: firmaId!,
+          durum, kanGrubu, acilKisi: get('Acil Durum Kişisi'),
+          acilTelefon: get('Acil Durum Telefonu'), adres: get('Adres'),
         });
+        if (tc) existingTCs.add(tc);
+        result.successCount++;
+        result.rows.push({ row: rowNum, adSoyad, status: 'success', message: `Başarıyla eklendi${durum !== 'Aktif' ? ` (Durum: ${durum})` : ''}` });
+      });
 
-        setImportResult(result);
-        if (result.successCount > 0) addToast(`${result.successCount} personel başarıyla içe aktarıldı.`, 'success');
-        if (result.duplicateCount > 0) addToast(`${result.duplicateCount} tekrar kayıt atlandı.`, 'warning');
-        if (result.errorCount > 0) addToast(`${result.errorCount} satırda hata — detayları inceleyin.`, 'error');
-      } catch { addToast('Excel dosyası okunurken hata oluştu.', 'error'); } finally { setImportLoading(false); }
-    };
-    reader.readAsArrayBuffer(file);
+      setImportResult(result);
+      if (result.successCount > 0) addToast(`${result.successCount} personel başarıyla içe aktarıldı.`, 'success');
+      if (result.duplicateCount > 0) addToast(`${result.duplicateCount} tekrar kayıt atlandı.`, 'warning');
+      if (result.errorCount > 0) addToast(`${result.errorCount} satırda hata — detayları inceleyin.`, 'error');
+    } catch (err) {
+      console.error('[Import] Hata:', err);
+      addToast('Excel dosyası okunurken hata oluştu.', 'error');
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   const filtered = useMemo(() => personeller

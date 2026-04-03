@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import XLSXStyle from 'xlsx-js-style';
-const XLSX = XLSXStyle;
 import Modal from '../../../components/base/Modal';
+import { parseImportFile, parseExcelDate } from '../../../utils/importParser';
 
 interface DofRow {
   baslik: string;
@@ -108,26 +108,6 @@ function downloadTemplate() {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
 }
 
-function parseExcelDate(val: unknown): string {
-  if (!val) return '';
-  if (typeof val === 'number') {
-    // Excel serial date
-    const d = XLSX.SSF.parse_date_code(val);
-    if (d) {
-      const month = String(d.m).padStart(2, '0');
-      const day = String(d.d).padStart(2, '0');
-      return `${d.y}-${month}-${day}`;
-    }
-  }
-  const str = String(val).trim();
-  // Try YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  // Try DD.MM.YYYY
-  const m = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  return str;
-}
-
 function normalizeSeverity(val: string): string {
   const v = val?.toLowerCase().trim() ?? '';
   if (v.includes('krit')) return 'Kritik';
@@ -143,66 +123,45 @@ export default function DofImport({ isOpen, onClose, onImport }: DofImportProps)
   const [step, setStep] = useState<'upload' | 'preview'>('upload');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     setParseError('');
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: 'array', cellDates: false });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { header: 1, defval: '' }) as unknown[][];
+    try {
+      const { rows, validCount } = await parseImportFile(file);
 
-        if (rows.length < 2) {
-          setParseError('Excel dosyasında yeterli veri bulunamadı.');
-          return;
-        }
-
-        // Skip header row
-        const dataRows = rows.slice(1).filter(r => {
-          const row = r as unknown[];
-          return row.some(c => String(c).trim() !== '');
-        });
-
-        if (dataRows.length === 0) {
-          setParseError('İçe aktarılacak veri satırı bulunamadı.');
-          return;
-        }
-
-        const parsed: DofRow[] = dataRows.map(r => {
-          const row = r as unknown[];
-          return {
-            baslik: String(row[0] ?? '').trim(),
-            aciklama: String(row[1] ?? '').trim(),
-            tarih: parseExcelDate(row[2]),
-            firmaAd: String(row[3] ?? '').trim(),
-            personelAd: String(row[4] ?? '').trim(),
-            severity: normalizeSeverity(String(row[5] ?? '')),
-            bolum: String(row[6] ?? '').trim(),
-            notlar: String(row[7] ?? '').trim(),
-          };
-        });
-
-        const validRows = parsed.filter(r => r.baslik);
-        if (validRows.length === 0) {
-          setParseError('Başlık alanı dolu satır bulunamadı. Lütfen şablonu kontrol edin.');
-          return;
-        }
-
-        setPreview(validRows);
-        setFileName(file.name);
-        setStep('preview');
-      } catch {
-        setParseError('Dosya okunurken hata oluştu. Excel formatında (.xlsx) kaydettiğinizden emin olun.');
+      if (validCount === 0) {
+        setParseError('İçe aktarılacak veri satırı bulunamadı. Boş satırlar ve şablon notları otomatik atlandı.');
+        return;
       }
-    };
-    reader.readAsArrayBuffer(file);
+
+      const parsed: DofRow[] = rows.map(row => ({
+        baslik: row[0] ?? '',
+        aciklama: row[1] ?? '',
+        tarih: parseExcelDate(row[2]),
+        firmaAd: row[3] ?? '',
+        personelAd: row[4] ?? '',
+        severity: normalizeSeverity(row[5] ?? ''),
+        bolum: row[6] ?? '',
+        notlar: row[7] ?? '',
+      }));
+
+      const validRows = parsed.filter(r => r.baslik.trim() !== '');
+      if (validRows.length === 0) {
+        setParseError('Başlık alanı dolu satır bulunamadı. Lütfen şablonu kontrol edin.');
+        return;
+      }
+
+      setPreview(validRows);
+      setFileName(file.name);
+      setStep('preview');
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'Dosya okunurken hata oluştu. Excel (.xlsx) veya CSV formatında olduğundan emin olun.');
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
+    if (file) void handleFile(file);
   };
 
   const handleConfirm = () => {
@@ -304,7 +263,7 @@ export default function DofImport({ isOpen, onClose, onImport }: DofImportProps)
                 type="file"
                 accept=".xlsx,.xls,.csv"
                 className="hidden"
-                onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
+                onChange={e => { if (e.target.files?.[0]) void handleFile(e.target.files[0]); }}
               />
             </div>
           </div>

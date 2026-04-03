@@ -76,35 +76,57 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
     setSaving(true);
     try {
       if (editRecord) {
+        // Önce fotoğrafı yükle (varsa), sonra URL ile birlikte kaydet
+        let acilisFotoUrl: string | undefined = editRecord.acilisFotoUrl;
+
+        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
+          // Yeni base64 seçildi — Storage'a yükle
+          const url = await setUygunsuzlukPhoto(editRecord.id, 'acilis', form.acilisFoto);
+          if (url) {
+            acilisFotoUrl = url;
+          } else {
+            addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
+            return;
+          }
+        } else if (!form.acilisFoto) {
+          // Fotoğraf silindi
+          acilisFotoUrl = undefined;
+        }
+
         updateUygunsuzluk(editRecord.id, {
           baslik: form.baslik.trim(), aciklama: form.aciklama.trim(), onlem: form.onlem.trim(),
           firmaId: form.firmaId, personelId: form.personelId || undefined, tarih: form.tarih,
           severity: form.severity, sorumlu: form.sorumlu.trim(), hedefTarih: form.hedefTarih,
-          notlar: form.notlar.trim(), acilisFotoMevcut: !!form.acilisFoto,
+          notlar: form.notlar.trim(),
+          acilisFotoMevcut: !!acilisFotoUrl,
+          acilisFotoUrl,
         });
-        // Sadece yeni base64 yüklendiyse Storage'a at
-        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
-          const url = await setUygunsuzlukPhoto(editRecord.id, 'acilis', form.acilisFoto);
-          if (url) updateUygunsuzluk(editRecord.id, { acilisFotoUrl: url });
-        }
-        // Fotoğraf silindiyse URL'yi de temizle
-        if (!form.acilisFoto) {
-          updateUygunsuzluk(editRecord.id, { acilisFotoUrl: undefined, acilisFotoMevcut: false });
-        }
         logAction('uygunsuzluk_updated', 'Uygunsuzluklar', editRecord.id, form.baslik, 'Uygunsuzluk güncellendi.');
         addToast('Uygunsuzluk güncellendi.', 'success');
       } else {
-        const rec = addUygunsuzluk({
+        // Yeni kayıt: önce geçici ID ile oluştur, sonra fotoğrafı yükle
+        const tempId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+        let acilisFotoUrl: string | undefined;
+
+        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
+          const url = await setUygunsuzlukPhoto(tempId, 'acilis', form.acilisFoto);
+          if (url) {
+            acilisFotoUrl = url;
+          } else {
+            addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
+            return;
+          }
+        }
+
+        addUygunsuzluk({
           baslik: form.baslik.trim(), aciklama: form.aciklama.trim(), onlem: form.onlem.trim(),
           firmaId: form.firmaId, personelId: form.personelId || undefined, tarih: form.tarih,
           severity: form.severity, sorumlu: form.sorumlu.trim(), hedefTarih: form.hedefTarih,
           notlar: form.notlar.trim(), durum: 'Açık',
-          acilisFotoMevcut: !!form.acilisFoto, kapatmaFotoMevcut: false,
+          acilisFotoMevcut: !!acilisFotoUrl,
+          acilisFotoUrl,
+          kapatmaFotoMevcut: false,
         });
-        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
-          const url = await setUygunsuzlukPhoto(rec.id, 'acilis', form.acilisFoto);
-          if (url) updateUygunsuzluk(rec.id, { acilisFotoUrl: url });
-        }
         addToast('Uygunsuzluk kaydı oluşturuldu.', 'success');
       }
       onClose();

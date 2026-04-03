@@ -27,11 +27,25 @@ export default function KapatmaModal({ record, onClose }: Props) {
     setSaving(true);
     try {
       const now = new Date().toISOString();
-      const url = await setUygunsuzlukPhoto(record.id, 'kapatma', foto);
+
+      // Önce fotoğrafı Storage'a yükle, URL al, sonra kaydet
+      let kapatmaFotoUrl: string | undefined;
+      if (foto.startsWith('data:')) {
+        const url = await setUygunsuzlukPhoto(record.id, 'kapatma', foto);
+        if (!url) {
+          addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
+          return;
+        }
+        kapatmaFotoUrl = url;
+      } else if (foto.startsWith('http')) {
+        // Zaten URL — değişmemiş
+        kapatmaFotoUrl = foto;
+      }
+
       updateUygunsuzluk(record.id, {
         kapatmaAciklama: aciklama.trim() || undefined,
         kapatmaFotoMevcut: true,
-        kapatmaFotoUrl: url ?? undefined,
+        kapatmaFotoUrl,
         kapatmaTarihi: now,
         durum: 'Kapandı',
       });

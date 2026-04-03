@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import Modal from '@/components/base/Modal';
 import type { IsIzniTip, IsIzniStatus, Firma } from '@/types';
 import XLSXStyle from 'xlsx-js-style';
+import { parseImportFile } from '@/utils/importParser';
 
 interface ImportRow {
   tip: IsIzniTip;
@@ -33,84 +34,51 @@ interface Props {
 const TIPLER: IsIzniTip[] = ['Sıcak Çalışma', 'Yüksekte Çalışma', 'Kapalı Alan', 'Elektrikli Çalışma', 'Kazı', 'Genel'];
 const DURUMLAR: IsIzniStatus[] = ['Onay Bekliyor', 'Onaylandı', 'Reddedildi'];
 
-const TEMPLATE_HEADERS = [
-  'tip', 'firmaAd', 'bolum', 'sorumlu', 'calisanlar', 'calisanSayisi',
-  'aciklama', 'tehlikeler', 'onlemler', 'gerekliEkipman',
-  'baslamaTarihi', 'bitisTarihi', 'durum', 'onaylayanKisi', 'onayTarihi', 'notlar',
-];
-
-function parseCsv(text: string): string[][] {
-  return text.trim().split('\n').map(line => {
-    const result: string[] = [];
-    let cur = '';
-    let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
-      else { cur += ch; }
-    }
-    result.push(cur.trim());
-    return result;
-  });
-}
-
 export default function IsIzniImport({ open, onClose, firmalar, onImport }: Props) {
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [step, setStep] = useState<'upload' | 'preview'>('upload');
+  const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const lines = parseCsv(text);
-      if (lines.length < 2) { setErrors(['Dosya boş veya geçersiz.']); return; }
+  const handleFile = async (file: File) => {
+    setErrors([]);
+    try {
+      const { rows: dataRows, validCount } = await parseImportFile(file);
+      if (validCount === 0) {
+        setErrors(['Dosya boş veya geçersiz. Dolu satır bulunamadı.']);
+        return;
+      }
 
-      const headers = lines[0].map(h => h.toLowerCase().trim());
       const errs: string[] = [];
-      const parsed: ImportRow[] = [];
-
-      lines.slice(1).forEach((cols, idx) => {
-        const row: Record<string, string> = {};
-        headers.forEach((h, i) => { row[h] = cols[i] ?? ''; });
-
+      const parsed: ImportRow[] = dataRows.map((cols, idx) => {
         const rowNum = idx + 2;
-        const tip = TIPLER.find(t => t.toLowerCase() === (row['tip'] ?? '').toLowerCase()) ?? 'Genel';
-        const durum = DURUMLAR.find(d => d.toLowerCase() === (row['durum'] ?? '').toLowerCase()) ?? 'Onay Bekliyor';
-        const firmaAd = (row['firmaad'] ?? '').trim();
+        const tip = TIPLER.find(t => t.toLowerCase() === (cols[0] ?? '').toLowerCase()) ?? 'Genel';
+        const durum = DURUMLAR.find(d => d.toLowerCase() === (cols[12] ?? '').toLowerCase()) ?? 'Onay Bekliyor';
+        const firmaAd = (cols[1] ?? '').trim();
         const firma = firmalar.find(f => f.ad.toLowerCase() === firmaAd.toLowerCase());
-        if (!firma) errs.push(`Satır ${rowNum}: "${firmaAd}" firması bulunamadı.`);
-        if (!row['aciklama']?.trim()) errs.push(`Satır ${rowNum}: Açıklama zorunludur.`);
-        if (!row['baslamatarihi']?.trim()) errs.push(`Satır ${rowNum}: Başlama tarihi zorunludur.`);
-
-        parsed.push({
-          tip,
-          firmaId: firma?.id ?? '',
-          bolum: row['bolum'] ?? '',
-          sorumlu: row['sorumlu'] ?? '',
-          calisanlar: row['calisanlar'] ?? '',
-          calisanSayisi: parseInt(row['calisansayisi'] ?? '1') || 1,
-          aciklama: row['aciklama'] ?? '',
-          tehlikeler: row['tehlikeler'] ?? '',
-          onlemler: row['onlemler'] ?? '',
-          gerekliEkipman: row['gerekliEkipman'] ?? row['gerekliEkipman'.toLowerCase()] ?? '',
-          baslamaTarihi: row['baslamatarihi'] ?? '',
-          bitisTarihi: row['bitistarihi'] ?? '',
-          durum,
-          onaylayanKisi: row['onaylayankisi'] ?? '',
-          onayTarihi: row['onaytarihi'] ?? '',
-          notlar: row['notlar'] ?? '',
-          olusturanKisi: row['olusturankisi'] ?? '',
-        });
+        if (!firma && firmaAd) errs.push(`Satır ${rowNum}: "${firmaAd}" firması bulunamadı.`);
+        if (!(cols[6] ?? '').trim()) errs.push(`Satır ${rowNum}: Açıklama zorunludur.`);
+        if (!(cols[10] ?? '').trim()) errs.push(`Satır ${rowNum}: Başlama tarihi zorunludur.`);
+        return {
+          tip, firmaId: firma?.id ?? '',
+          bolum: cols[2] ?? '', sorumlu: cols[3] ?? '',
+          calisanlar: cols[4] ?? '', calisanSayisi: parseInt(cols[5] ?? '1') || 1,
+          aciklama: cols[6] ?? '', tehlikeler: cols[7] ?? '',
+          onlemler: cols[8] ?? '', gerekliEkipman: cols[9] ?? '',
+          baslamaTarihi: cols[10] ?? '', bitisTarihi: cols[11] ?? '',
+          durum, onaylayanKisi: cols[13] ?? '',
+          onayTarihi: cols[14] ?? '', notlar: cols[15] ?? '',
+          olusturanKisi: '',
+        };
       });
 
       setErrors(errs);
       setRows(parsed);
       setStep('preview');
-    };
-    reader.readAsText(file, 'UTF-8');
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : 'Dosya okunamadı.']);
+    }
   };
 
   const downloadTemplate = () => {
@@ -128,8 +96,8 @@ export default function IsIzniImport({ open, onClose, firmalar, onImport }: Prop
     const exampleRow = ['Sicak Calisma', 'Firma A.S.', 'Uretim Alani', 'Ahmet Yilmaz', 'Mehmet Kaya', '3', 'Kaynak islemi yapilacak', 'Yangin riski', 'Yangin tupu hazir', 'Baret,Eldiven', '2026-04-10', '2026-04-10', 'Onay Bekliyor', 'Mudur Adi', '', 'Ek not'];
     const notlar = [
       ['KULLANIM NOTLARI:'],
-      ['1. Tip degerleri: Sicak Calisma / Yuksekte Calisma / Kapali Alan / Elektrikli Calisma / Kazi / Genel'],
-      ['2. Durum degerleri: Onay Bekliyor / Onaylandi / Reddedildi'],
+      ['1. Tip: Sicak Calisma / Yuksekte Calisma / Kapali Alan / Elektrikli Calisma / Kazi / Genel'],
+      ['2. Durum: Onay Bekliyor / Onaylandi / Reddedildi'],
       ['3. Tarih formati: YYYY-AA-GG (ornek: 2026-04-10)'],
       ['4. Firma adi sistemdeki kayitla birebir eslesmelidir.'],
     ];
@@ -143,13 +111,9 @@ export default function IsIzniImport({ open, onClose, firmalar, onImport }: Prop
 
     const wb = XLSXStyle.utils.book_new();
     const ws = XLSXStyle.utils.aoa_to_sheet(wsData);
-
     if (!ws['!merges']) ws['!merges'] = [];
     ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: DISPLAY_HEADERS.length - 1 } });
-    notlar.forEach((_, ri) => {
-      ws['!merges']!.push({ s: { r: ri + 3, c: 0 }, e: { r: ri + 3, c: DISPLAY_HEADERS.length - 1 } });
-    });
-
+    notlar.forEach((_, ri) => { ws['!merges']!.push({ s: { r: ri + 3, c: 0 }, e: { r: ri + 3, c: DISPLAY_HEADERS.length - 1 } }); });
     wsData.forEach((row, ri) => {
       (row as string[]).forEach((_, ci) => {
         const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
@@ -163,48 +127,58 @@ export default function IsIzniImport({ open, onClose, firmalar, onImport }: Prop
         (ws[addr] as XLSXStyle.CellObject).s = s;
       });
     });
-
     ws['!cols'] = [{ wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 30 }, { wch: 24 }, { wch: 24 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 24 }];
     if (!ws['!rows']) ws['!rows'] = [];
     (ws['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 30 };
     (ws['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 26 };
     (ws['!rows'] as XLSXStyle.RowInfo[])[2] = { hpt: 22 };
-
     XLSXStyle.utils.book_append_sheet(wb, ws, 'Is Izni Sablonu');
     const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `${new Date().toLocaleDateString('tr-TR')} İş İzni Şablonu.xlsx`; a.click();
-    URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = `${new Date().toLocaleDateString('tr-TR')} İş İzni Şablonu.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
   };
 
   const handleImport = () => {
     const valid = rows.filter(r => r.firmaId && r.aciklama && r.baslamaTarihi);
-    onImport(valid);
-    setRows([]); setErrors([]); setStep('upload');
-    onClose();
+    if (valid.length === 0) return;
+    setImporting(true);
+    try {
+      onImport(valid);
+      setRows([]); setErrors([]); setStep('upload');
+      onClose();
+    } finally {
+      setImporting(false);
+    }
   };
 
   const reset = () => { setRows([]); setErrors([]); setStep('upload'); };
+  const validCount = rows.filter(r => r.firmaId && r.aciklama && r.baslamaTarihi).length;
 
   return (
     <Modal
       open={open}
       onClose={() => { reset(); onClose(); }}
-      title="İş İzni Aktarımı (CSV)"
+      title={step === 'upload' ? 'İş İzni Excel/CSV İçe Aktarma' : `Önizleme — ${validCount} geçerli kayıt`}
       size="lg"
       icon="ri-upload-cloud-2-line"
       footer={
         step === 'preview' ? (
           <>
-            <button onClick={reset} className="btn-secondary whitespace-nowrap"><i className="ri-arrow-left-line" /> Geri</button>
+            <button onClick={reset} className="btn-secondary whitespace-nowrap"><i className="ri-arrow-left-line mr-1" />Geri</button>
             <button
               onClick={handleImport}
-              disabled={rows.filter(r => r.firmaId && r.aciklama).length === 0}
+              disabled={validCount === 0 || importing}
               className="btn-primary whitespace-nowrap"
             >
-              <i className="ri-check-line" /> {rows.filter(r => r.firmaId && r.aciklama).length} Kaydı Aktar
+              {importing
+                ? <><i className="ri-loader-4-line animate-spin mr-1" />Aktarılıyor...</>
+                : <><i className="ri-check-line mr-1" />{validCount} Kaydı Aktar</>}
             </button>
           </>
         ) : (
@@ -217,13 +191,13 @@ export default function IsIzniImport({ open, onClose, firmalar, onImport }: Prop
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
             <i className="ri-information-line flex-shrink-0" style={{ color: '#60A5FA' }} />
             <div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>CSV formatında iş izni aktarımı</p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Şablonu indirip doldurun, ardından yükleyin. Firma adı sistemdeki firma adıyla eşleşmelidir.</p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Excel veya CSV formatında iş izni aktarımı</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Şablonu indirip doldurun, ardından yükleyin. Boş satırlar ve notlar otomatik atlanır.</p>
             </div>
           </div>
 
-          <button onClick={downloadTemplate} className="btn-secondary w-full">
-            <i className="ri-download-line" /> CSV Şablonunu İndir
+          <button onClick={downloadTemplate} className="btn-secondary w-full whitespace-nowrap">
+            <i className="ri-download-line mr-1" />Excel Şablonunu İndir
           </button>
 
           <div
@@ -231,24 +205,32 @@ export default function IsIzniImport({ open, onClose, firmalar, onImport }: Prop
             style={{ borderColor: 'rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.03)' }}
             onClick={() => fileRef.current?.click()}
             onDragOver={e => e.preventDefault()}
-            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) void handleFile(f); }}
           >
             <div className="w-14 h-14 flex items-center justify-center rounded-2xl mx-auto mb-3" style={{ background: 'rgba(96,165,250,0.1)' }}>
               <i className="ri-file-upload-line text-2xl" style={{ color: '#60A5FA' }} />
             </div>
-            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>CSV dosyasını sürükleyin veya tıklayın</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Yalnızca .csv formatı desteklenir</p>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Dosyayı sürükleyin veya tıklayın</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>.xlsx, .xls veya .csv formatı desteklenir</p>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); e.target.value = ''; }} />
           </div>
+
+          {errors.length > 0 && (
+            <div className="flex items-start gap-3 rounded-xl p-3.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <i className="ri-error-warning-line flex-shrink-0 mt-0.5" style={{ color: '#EF4444' }} />
+              <p className="text-sm" style={{ color: '#FCA5A5' }}>{errors[0]}</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
           {errors.length > 0 && (
             <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
               <p className="text-sm font-semibold mb-2" style={{ color: '#EF4444' }}>
-                <i className="ri-error-warning-line mr-1" /> {errors.length} Uyarı
+                <i className="ri-error-warning-line mr-1" />{errors.length} Uyarı
               </p>
-              <ul className="space-y-1">
+              <ul className="space-y-1 max-h-32 overflow-y-auto">
                 {errors.map((e, i) => <li key={i} className="text-xs" style={{ color: '#EF4444' }}>• {e}</li>)}
               </ul>
             </div>
@@ -257,16 +239,17 @@ export default function IsIzniImport({ open, onClose, firmalar, onImport }: Prop
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
             <i className="ri-checkbox-circle-line" style={{ color: '#34D399' }} />
             <p className="text-sm" style={{ color: '#34D399' }}>
-              <strong>{rows.filter(r => r.firmaId && r.aciklama).length}</strong> geçerli kayıt aktarılmaya hazır
+              <strong>{validCount}</strong> geçerli kayıt aktarılmaya hazır
+              {rows.length > validCount && <span style={{ color: '#94A3B8' }}> ({rows.length - validCount} geçersiz atlandı)</span>}
             </p>
           </div>
 
-          <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border-color)' }}>
+          <div className="overflow-x-auto rounded-xl max-h-80 overflow-y-auto" style={{ border: '1px solid var(--border-color)' }}>
             <table className="w-full text-xs">
-              <thead>
+              <thead style={{ position: 'sticky', top: 0 }}>
                 <tr style={{ background: 'var(--bg-item)' }}>
-                  {['Tip', 'Firma', 'Bölüm', 'Sorumlu', 'Başlama', 'Durum', 'Durum'].map(h => (
-                    <th key={h} className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                  {['#', 'Tip', 'Firma', 'Bölüm', 'Sorumlu', 'Başlama', 'Durum', ''].map((h, i) => (
+                    <th key={i} className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-muted)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -275,6 +258,7 @@ export default function IsIzniImport({ open, onClose, firmalar, onImport }: Prop
                   const valid = r.firmaId && r.aciklama && r.baslamaTarihi;
                   return (
                     <tr key={i} style={{ borderTop: '1px solid var(--border-color)', background: valid ? undefined : 'rgba(239,68,68,0.04)' }}>
+                      <td className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
                       <td className="px-3 py-2">{r.tip}</td>
                       <td className="px-3 py-2">{firmalar.find(f => f.id === r.firmaId)?.ad ?? <span style={{ color: '#EF4444' }}>Bulunamadı</span>}</td>
                       <td className="px-3 py-2">{r.bolum || '—'}</td>

@@ -767,14 +767,15 @@ export function useStore(
   }, []);
 
   const getUygunsuzlukPhoto = useCallback((id: string, type: 'acilis' | 'kapatma'): string | undefined => {
-    // Önce Supabase Storage URL'ini kontrol et (uygunsuzluklar state'inden)
+    // Supabase Storage public URL'ini döndür (tüm cihazlardan erişilebilir)
     const record = uygRef.current.find(u => u.id === id);
     if (record) {
       const url = type === 'acilis' ? record.acilisFotoUrl : record.kapatmaFotoUrl;
       if (url) return url;
     }
-    // Fallback: localStorage (eski kayıtlar için geriye dönük uyumluluk)
-    return getFileData(orgIdRef.current ?? '', `uyg_${type}`, id);
+    // localStorage fallback kaldırıldı — başka cihazlarda çalışmıyor
+    // Eski kayıtlar için URL yoksa undefined döner, UI "Fotoğraf yok" gösterir
+    return undefined;
   }, []);
 
   const setUygunsuzlukPhoto = useCallback(async (id: string, type: 'acilis' | 'kapatma', base64: string): Promise<string | null> => {
@@ -785,7 +786,7 @@ export function useStore(
       const [meta, data] = base64.split(',');
       const mimeMatch = meta.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-      const ext = mime.split('/')[1] ?? 'jpg';
+      const ext = mime.split('/')[1]?.split('+')[0] ?? 'jpg';
       const byteString = atob(data);
       const ab = new ArrayBuffer(byteString.length);
       const ia = new Uint8Array(ab);
@@ -793,6 +794,7 @@ export function useStore(
       const blob = new Blob([ab], { type: mime });
 
       const orgId = orgIdRef.current ?? 'unknown';
+      // Benzersiz dosya adı — aynı ID için üzerine yaz (upsert)
       const filePath = `uygunsuzluk/${orgId}/${type}/${id}.${ext}`;
 
       const { error } = await supabase.storage
@@ -801,19 +803,16 @@ export function useStore(
 
       if (error) {
         console.error('[ISG] Storage upload error:', error);
-        // Fallback: localStorage'a kaydet
-        saveFileData(orgId, `uyg_${type}`, id, base64);
         return null;
       }
 
+      // Public URL al — cache buster ekle (tarayıcı eski versiyonu cache'lemesini önler)
       const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
       const publicUrl = urlData?.publicUrl ?? null;
       console.log(`[ISG] Photo uploaded to Storage: ${publicUrl}`);
       return publicUrl;
     } catch (err) {
       console.error('[ISG] setUygunsuzlukPhoto error:', err);
-      // Fallback: localStorage
-      saveFileData(orgIdRef.current ?? '', `uyg_${type}`, id, base64);
       return null;
     }
   }, [ensureUploadsBucket]);
