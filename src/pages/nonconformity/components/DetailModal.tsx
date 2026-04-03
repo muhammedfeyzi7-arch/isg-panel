@@ -13,14 +13,13 @@ interface Props {
 
 export default function DetailModal({ record, onClose, onKapat, onEdit }: Props) {
   const { firmalar, personeller, getUygunsuzlukPhoto } = useApp();
-  const [acilisFoto, setAcilisFoto] = useState<string | null>(null);
-  const [kapatmaFoto, setKapatmaFoto] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!record) { setAcilisFoto(null); setKapatmaFoto(null); return; }
-    setAcilisFoto(getUygunsuzlukPhoto(record.id, 'acilis') ?? null);
-    setKapatmaFoto(getUygunsuzlukPhoto(record.id, 'kapatma') ?? null);
-  }, [record, getUygunsuzlukPhoto]);
+  // Fotoğrafları doğrudan record'dan al (Storage URL öncelikli, localStorage fallback)
+  const acilisFoto = record ? (getUygunsuzlukPhoto(record.id, 'acilis') ?? null) : null;
+  const kapatmaFoto = record ? (getUygunsuzlukPhoto(record.id, 'kapatma') ?? null) : null;
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  useEffect(() => {}, [record]);
 
   if (!record) return null;
 

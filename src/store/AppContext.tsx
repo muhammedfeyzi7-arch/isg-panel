@@ -31,6 +31,7 @@ export interface OrgInfo {
   email?: string;
 }
 
+// StoreType zaten restoreEgitim, permanentDeleteEgitim, restoreMuayene, permanentDeleteMuayene içeriyor
 interface AppContextType extends StoreType {
   toasts: Toast[];
   addToast: (message: string, type?: Toast['type']) => void;
@@ -228,18 +229,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const in60 = new Date(today.getTime() + 60 * 86400000);
     const result: Bildirim[] = [];
 
-    const getDaysRemaining = (dateStr: string): number => {
+    // Tarih string'ini güvenli şekilde parse et — geçersizse null döner
+    const parseDate = (dateStr: string | null | undefined): Date | null => {
+      if (!dateStr || !dateStr.trim()) return null;
       const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
       d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    // Sadece geçerli tarih için gün hesapla — geçersizse null döner
+    const getDaysRemaining = (dateStr: string | null | undefined): number | null => {
+      const d = parseDate(dateStr);
+      if (!d) return null;
       return Math.ceil((d.getTime() - today.getTime()) / 86400000);
     };
 
     // ── Evraklar ──
     store.evraklar.forEach(e => {
-      if (!e.gecerlilikTarihi || e.silinmis) return;
-      const d = new Date(e.gecerlilikTarihi);
-      d.setHours(0, 0, 0, 0);
-      const kalanGun = getDaysRemaining(e.gecerlilikTarihi);
+      if (e.silinmis) return;
+      // Geçerlilik tarihi yoksa veya geçersizse → uyarı üretme
+      const d = parseDate(e.gecerlilikTarihi);
+      if (!d) return;
+      const kalanGun = getDaysRemaining(e.gecerlilikTarihi)!;
       const personel = e.personelId ? store.personeller.find(p => p.id === e.personelId) : null;
       const firma = store.firmalar.find(f => f.id === e.firmaId);
       const detayBase = `${personel ? personel.adSoyad + ' — ' : ''}${firma?.ad || ''}`;
@@ -250,7 +262,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           tip: 'evrak_surecek',
           mesaj: `${e.ad} evrakının süresi yaklaşıyor`,
           detay: `${detayBase}${detayBase ? ' — ' : ''}${kalanGun === 0 ? 'Bugün dolacak!' : `${kalanGun} gün kaldı`}`,
-          tarih: e.gecerlilikTarihi,
+          tarih: e.gecerlilikTarihi!,
           okundu: okunanlar.has(`evrak_surecek_${e.id}`),
           kalanGun,
         });
@@ -260,7 +272,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           tip: 'evrak_dolmus',
           mesaj: `${e.ad} evrakının süresi dolmuş`,
           detay: `${detayBase}${detayBase ? ' — ' : ''}${d.toLocaleDateString('tr-TR')} tarihinde doldu`,
-          tarih: e.gecerlilikTarihi,
+          tarih: e.gecerlilikTarihi!,
           okundu: okunanlar.has(`evrak_dolmus_${e.id}`),
           kalanGun,
         });
@@ -269,10 +281,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // ── Ekipman kontrolleri ──
     store.ekipmanlar.forEach(ek => {
-      if (!ek.sonrakiKontrolTarihi || ek.silinmis) return;
-      const d = new Date(ek.sonrakiKontrolTarihi);
-      d.setHours(0, 0, 0, 0);
-      const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi);
+      if (ek.silinmis) return;
+      const d = parseDate(ek.sonrakiKontrolTarihi);
+      if (!d) return; // Kontrol tarihi yoksa → uyarı üretme
+      const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi)!;
       if (kalanGun < 0 || kalanGun > 60) return;
       const firma = store.firmalar.find(f => f.id === ek.firmaId);
       result.push({
@@ -286,24 +298,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    // ── Eğitimler (tarih + gecerlilikSuresi gün ekleyerek bitiş tarihi hesapla) ──
+    // ── Eğitimler ──
+    // Sadece gecerlilikSuresi > 0 olan eğitimler hesaplanır.
+    // Toolbox, seminer gibi "süresiz" eğitimler (gecerlilikSuresi = 0 veya null) → uyarı üretmez.
     store.egitimler.forEach(eg => {
-      if (eg.silinmis || !eg.tarih) return;
+      if (eg.silinmis) return;
+      const egitimTarihi = parseDate(eg.tarih);
+      if (!egitimTarihi) return; // Eğitim tarihi geçersizse atla
       const suresi = eg.gecerlilikSuresi ?? 0;
-      if (suresi <= 0) return;
-      const bitis = new Date(eg.tarih);
+      if (suresi <= 0) return; // Geçerlilik süresi tanımlanmamış → uyarı üretme
+      const bitis = new Date(egitimTarihi);
       bitis.setDate(bitis.getDate() + suresi);
       bitis.setHours(0, 0, 0, 0);
-      const tarih = bitis.toISOString().split('T')[0];
-      const kalanGun = getDaysRemaining(tarih);
-      if (kalanGun < 0 || kalanGun > 60) return;
+      if (isNaN(bitis.getTime())) return; // Hesaplama sonucu geçersizse atla
+      const tarihStr = bitis.toISOString().split('T')[0];
+      const kalanGun = getDaysRemaining(tarihStr);
+      if (kalanGun === null || kalanGun < 0 || kalanGun > 60) return;
       const firma = store.firmalar.find(f => f.id === eg.firmaId);
       result.push({
         id: `egitim_${eg.id}`,
         tip: 'egitim_surecek',
         mesaj: `${eg.ad} eğitiminin geçerlilik süresi yaklaşıyor`,
         detay: `${firma?.ad ? firma.ad + ' — ' : ''}${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`,
-        tarih,
+        tarih: tarihStr,
         okundu: okunanlar.has(`egitim_${eg.id}`),
         kalanGun,
       });
@@ -312,9 +329,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // ── Sağlık muayeneleri ──
     store.muayeneler.forEach(m => {
       if (m.silinmis) return;
-      const tarih = m.sonrakiTarih || m.muayeneTarihi;
-      if (!tarih) return;
-      const kalanGun = getDaysRemaining(tarih);
+      // sonrakiTarih öncelikli; yoksa muayeneTarihi kullan
+      const tarihStr = m.sonrakiTarih || m.muayeneTarihi;
+      const d = parseDate(tarihStr);
+      if (!d) return; // Geçerli tarih yoksa → uyarı üretme
+      const kalanGun = getDaysRemaining(tarihStr)!;
       if (kalanGun < 0 || kalanGun > 60) return;
       const personel = store.personeller.find(p => p.id === m.personelId);
       result.push({
@@ -322,7 +341,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tip: 'saglik_surecek',
         mesaj: `${personel?.adSoyad || 'Personel'} muayene tarihi yaklaşıyor`,
         detay: `Periyodik Muayene — ${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`,
-        tarih,
+        tarih: tarihStr!,
         okundu: okunanlar.has(`saglik_${m.id}`),
         kalanGun,
       });

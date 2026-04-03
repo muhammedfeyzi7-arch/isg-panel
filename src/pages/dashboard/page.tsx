@@ -7,6 +7,15 @@ import {
   PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
 } from 'recharts';
 
+// Güvenli tarih parse — geçersiz/boş tarihler için null döner
+function parseValidDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr || !dateStr.trim()) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
@@ -30,66 +39,54 @@ export default function DashboardPage() {
     const in7  = new Date(today.getTime() + 7  * 86400000);
     const in30 = new Date(today.getTime() + 30 * 86400000);
 
-    // Geciken evraklar
+    // Geciken evraklar — sadece geçerli tarihi olanlar
     const gecikmisBelge = aktifEvraklar.filter(e => {
-      if (!e.gecerlilikTarihi) return false;
-      const d = new Date(e.gecerlilikTarihi); d.setHours(0,0,0,0);
-      return d < today;
+      const d = parseValidDate(e.gecerlilikTarihi);
+      return d !== null && d < today;
     }).length;
 
-    // Geciken ekipman kontrolleri
+    // Geciken ekipman kontrolleri — sadece geçerli tarihi olanlar
     const gecikmisEkipman = aktifEkipmanlar.filter(e => {
-      if (!e.sonrakiKontrolTarihi) return false;
-      const d = new Date(e.sonrakiKontrolTarihi); d.setHours(0,0,0,0);
-      return d < today;
+      const d = parseValidDate(e.sonrakiKontrolTarihi);
+      return d !== null && d < today;
     }).length;
 
-    // Geciken muayeneler
+    // Geciken muayeneler — sadece geçerli tarihi olanlar
     const gecikmisMuayene = aktifMuayeneler.filter(m => {
-      const tarih = m.sonrakiTarih || m.muayeneTarihi;
-      if (!tarih) return false;
-      const d = new Date(tarih); d.setHours(0,0,0,0);
-      return d < today;
+      const d = parseValidDate(m.sonrakiTarih || m.muayeneTarihi);
+      return d !== null && d < today;
     }).length;
 
     // 7 gün içinde yaklaşanlar
     const yaklasan7Belge = aktifEvraklar.filter(e => {
-      if (!e.gecerlilikTarihi) return false;
-      const d = new Date(e.gecerlilikTarihi); d.setHours(0,0,0,0);
-      return d >= today && d <= in7;
+      const d = parseValidDate(e.gecerlilikTarihi);
+      return d !== null && d >= today && d <= in7;
     }).length;
 
     const yaklasan7Ekipman = aktifEkipmanlar.filter(e => {
-      if (!e.sonrakiKontrolTarihi) return false;
-      const d = new Date(e.sonrakiKontrolTarihi); d.setHours(0,0,0,0);
-      return d >= today && d <= in7;
+      const d = parseValidDate(e.sonrakiKontrolTarihi);
+      return d !== null && d >= today && d <= in7;
     }).length;
 
     const yaklasan7Muayene = aktifMuayeneler.filter(m => {
-      const tarih = m.sonrakiTarih || m.muayeneTarihi;
-      if (!tarih) return false;
-      const d = new Date(tarih); d.setHours(0,0,0,0);
-      return d >= today && d <= in7;
+      const d = parseValidDate(m.sonrakiTarih || m.muayeneTarihi);
+      return d !== null && d >= today && d <= in7;
     }).length;
 
     // 30 gün içinde yaklaşanlar
     const yaklasan30Belge = aktifEvraklar.filter(e => {
-      if (!e.gecerlilikTarihi) return false;
-      const d = new Date(e.gecerlilikTarihi); d.setHours(0,0,0,0);
-      return d >= today && d <= in30;
+      const d = parseValidDate(e.gecerlilikTarihi);
+      return d !== null && d >= today && d <= in30;
     }).length;
 
     const yaklasan30Ekipman = aktifEkipmanlar.filter(e => {
-      if (!e.sonrakiKontrolTarihi) return false;
-      const d = new Date(e.sonrakiKontrolTarihi); d.setHours(0,0,0,0);
-      return d >= today && d <= in30;
+      const d = parseValidDate(e.sonrakiKontrolTarihi);
+      return d !== null && d >= today && d <= in30;
     }).length;
 
     const yaklasan30Muayene = aktifMuayeneler.filter(m => {
-      const tarih = m.sonrakiTarih || m.muayeneTarihi;
-      if (!tarih) return false;
-      const d = new Date(tarih); d.setHours(0,0,0,0);
-      return d >= today && d <= in30;
+      const d = parseValidDate(m.sonrakiTarih || m.muayeneTarihi);
+      return d !== null && d >= today && d <= in30;
     }).length;
 
     const toplamGecikme = gecikmisBelge + gecikmisEkipman + gecikmisMuayene;

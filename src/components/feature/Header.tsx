@@ -44,7 +44,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
     activeModule, setActiveModule, sidebarCollapsed, setSidebarCollapsed,
     currentUser, setQuickCreate, theme, toggleTheme,
     bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
-    firmalar, personeller, evraklar, tutanaklar, uygunsuzluklar, gorevler,
+    firmalar, personeller, evraklar, tutanaklar,
   } = useApp();
   const { logout, user } = useAuth();
 
@@ -60,15 +60,12 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
 
   const isDark = theme === 'dark';
 
-  // ── Status badge ──
+  // ── Status badge — bildirim sayısına göre sistem durumu ──
   const statusInfo = (() => {
-    const kritikEvrak    = evraklar.filter(e => !e.silinmis && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
-    const acikUygunsuzluk = uygunsuzluklar.filter(u => !u.silinmis && u.durum === 'Açık').length;
-    const gecikmiş       = gorevler.filter(g => !g.silinmis && g.durum !== 'Tamamlandı' && g.bitisTarihi && new Date(g.bitisTarihi) < new Date()).length;
-    const total = kritikEvrak + acikUygunsuzluk + gecikmiş;
+    const total = okunmamisBildirimSayisi;
     if (total === 0) return { text: 'Sistem sağlıklı', color: '#34D399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)', icon: 'ri-checkbox-circle-line' };
-    if (total <= 2)  return { text: `${total} dikkat gerektiren`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', icon: 'ri-error-warning-line' };
-    return { text: `${total} kritik işlem`, color: '#F87171', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', icon: 'ri-alarm-warning-line' };
+    if (total <= 3)  return { text: `${total} yaklaşan işlem`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', icon: 'ri-timer-line' };
+    return { text: `${total} uyarı var`, color: '#F87171', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', icon: 'ri-alarm-warning-line' };
   })();
 
   const runSearch = useCallback((q: string) => {

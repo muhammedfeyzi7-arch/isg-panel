@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import Modal from '../../../components/base/Modal';
 import type { Tutanak, Firma } from '../../../types';
 import type { TutanakStatus } from '../../../types';
@@ -15,9 +14,10 @@ interface Props {
   firma: Firma | undefined;
   dosyaVeri?: string;
   onClose: () => void;
+  onEdit?: (t: Tutanak) => void;
   onWordDownload: (t: Tutanak) => void;
-  onPdfDownload: (t: Tutanak) => void;
   wordLoading: string | null;
+  canEdit?: boolean;
 }
 
 function InfoRow({ label, value, icon }: { label: string; value: string; icon?: string }) {
@@ -40,23 +40,19 @@ function InfoRow({ label, value, icon }: { label: string; value: string; icon?: 
   );
 }
 
-export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose, onWordDownload, onPdfDownload, wordLoading }: Props) {
-  const [pdfLoading, setPdfLoading] = useState(false);
-
+export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose, onEdit, onWordDownload, wordLoading, canEdit }: Props) {
   if (!tutanak) return null;
-
-  const handlePdf = () => {
-    setPdfLoading(true);
-    // Kısa gecikme: buton geri bildirimini kullanıcı görsün
-    setTimeout(() => {
-      onPdfDownload(tutanak);
-      setTimeout(() => setPdfLoading(false), 800);
-    }, 150);
-  };
 
   const stc = STS_CONFIG[tutanak.durum];
   const tarihStr = tutanak.tarih ? new Date(tutanak.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
   const olusturmaTarih = new Date(tutanak.olusturmaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit(tutanak);
+      onClose();
+    }
+  };
 
   return (
     <Modal
@@ -73,18 +69,17 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
           >
             Kapat
           </button>
-          <button
-            onClick={handlePdf}
-            disabled={pdfLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all whitespace-nowrap"
-            style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)', opacity: pdfLoading ? 0.7 : 1 }}
-            onMouseEnter={e => { if (!pdfLoading) e.currentTarget.style.background = 'rgba(239,68,68,0.18)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
-          >
-            {pdfLoading
-              ? <><i className="ri-loader-line animate-spin text-base" />Hazırlanıyor...</>
-              : <><i className="ri-file-pdf-line text-base" />PDF İndir</>}
-          </button>
+          {canEdit && onEdit && (
+            <button
+              onClick={handleEdit}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all whitespace-nowrap"
+              style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.18)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.1)'; }}
+            >
+              <i className="ri-edit-line text-base" />Düzenle
+            </button>
+          )}
           <button
             onClick={() => onWordDownload(tutanak)}
             disabled={wordLoading === tutanak.id}

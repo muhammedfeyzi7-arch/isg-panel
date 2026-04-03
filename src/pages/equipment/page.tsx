@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import Modal from '../../components/base/Modal';
+import QrModal from './components/QrModal';
 import type { Ekipman, EkipmanStatus } from '../../types';
 const EKIPMAN_TURLERI = [
   'İş Makinesi', 'Kaldırma Ekipmanı', 'Basınçlı Kap', 'Elektrikli Ekipman',
@@ -116,6 +117,7 @@ export default function EkipmanlarPage() {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
+  const [qrEkipman, setQrEkipman] = useState<Ekipman | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -428,6 +430,7 @@ export default function EkipmanlarPage() {
                           {ekipman.dosyaAdi && (
                             <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Belgeyi İndir"><i className="ri-download-2-line text-sm" /></button>
                           )}
+                          <button onClick={() => setQrEkipman(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(168,85,247,0.1)', color: '#A855F7' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.1)'; }} title="QR Kod"><i className="ri-qr-code-line text-sm" /></button>
                           <button onClick={() => openEdit(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>
                           <button onClick={() => setDeleteId(ekipman.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>
                         </div>
@@ -681,6 +684,9 @@ export default function EkipmanlarPage() {
           <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
         </div>
       </Modal>
+
+      {/* QR Modal */}
+      <QrModal ekipman={qrEkipman} onClose={() => setQrEkipman(null)} />
 
       {/* Import Modal */}
       <Modal isOpen={showImport} onClose={() => { setShowImport(false); setImportText(''); }} title="Excel / CSV İçe Aktar" size="md" icon="ri-upload-2-line"

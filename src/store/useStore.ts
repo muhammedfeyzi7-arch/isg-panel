@@ -648,6 +648,28 @@ export function useStore(
   }, [setEgitimler, saveToDb]);
 
   const deleteEgitim = useCallback((id: string) => {
+    // Soft-delete: is_deleted = true → çöp kutusuna gider
+    let updated: Egitim | null = null;
+    setEgitimler(prev => prev.map(e => {
+      if (e.id !== id) return e;
+      updated = { ...e, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      return updated;
+    }));
+    if (updated) saveToDb('egitimler', updated as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('egitim_deleted', 'Eğitimler', id, undefined, 'Eğitim silindi.');
+  }, [setEgitimler, saveToDb]);
+
+  const restoreEgitim = useCallback((id: string) => {
+    let updated: Egitim | null = null;
+    setEgitimler(prev => prev.map(e => {
+      if (e.id !== id) return e;
+      updated = { ...e, silinmis: false as const, silinmeTarihi: undefined };
+      return updated;
+    }));
+    if (updated) saveToDb('egitimler', updated as unknown as { id: string } & Record<string, unknown>);
+  }, [setEgitimler, saveToDb]);
+
+  const permanentDeleteEgitim = useCallback((id: string) => {
     removeFileData(orgIdRef.current ?? '', 'egitim', id);
     setEgitimler(prev => prev.filter(e => e.id !== id));
     deleteFromDb('egitimler', id);
@@ -674,6 +696,28 @@ export function useStore(
   }, [setMuayeneler, saveToDb]);
 
   const deleteMuayene = useCallback((id: string) => {
+    // Soft-delete: is_deleted = true → çöp kutusuna gider
+    let updated: Muayene | null = null;
+    setMuayeneler(prev => prev.map(m => {
+      if (m.id !== id) return m;
+      updated = { ...m, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      return updated;
+    }));
+    if (updated) saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('muayene_deleted', 'Sağlık', id, undefined, 'Sağlık evrakı silindi.');
+  }, [setMuayeneler, saveToDb]);
+
+  const restoreMuayene = useCallback((id: string) => {
+    let updated: Muayene | null = null;
+    setMuayeneler(prev => prev.map(m => {
+      if (m.id !== id) return m;
+      updated = { ...m, silinmis: false as const, silinmeTarihi: undefined };
+      return updated;
+    }));
+    if (updated) saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
+  }, [setMuayeneler, saveToDb]);
+
+  const permanentDeleteMuayene = useCallback((id: string) => {
     setMuayeneler(prev => prev.filter(m => m.id !== id));
     deleteFromDb('muayeneler', id);
   }, [setMuayeneler, deleteFromDb]);
@@ -712,13 +756,67 @@ export function useStore(
     deleteFromDb('uygunsuzluklar', id);
   }, [setUygunsuzluklar, deleteFromDb]);
 
-  const getUygunsuzlukPhoto = useCallback((id: string, type: 'acilis' | 'kapatma') =>
-    getFileData(orgIdRef.current ?? '', `uyg_${type}`, id), []);
+  // ── Uygunsuzluk fotoğrafları: Supabase Storage üzerinden kalıcı saklama ──
+  const ensureUploadsBucket = useCallback(async () => {
+    // Bucket zaten Supabase'de oluşturuldu (public: true), bu kontrol sadece güvenlik için
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const exists = buckets?.some(b => b.id === 'uploads');
+    if (!exists) {
+      await supabase.storage.createBucket('uploads', { public: true, fileSizeLimit: 10485760 });
+    }
+  }, []);
+
+  const getUygunsuzlukPhoto = useCallback((id: string, type: 'acilis' | 'kapatma'): string | undefined => {
+    // Önce Supabase Storage URL'ini kontrol et (uygunsuzluklar state'inden)
+    const record = uygRef.current.find(u => u.id === id);
+    if (record) {
+      const url = type === 'acilis' ? record.acilisFotoUrl : record.kapatmaFotoUrl;
+      if (url) return url;
+    }
+    // Fallback: localStorage (eski kayıtlar için geriye dönük uyumluluk)
+    return getFileData(orgIdRef.current ?? '', `uyg_${type}`, id);
+  }, []);
 
   const setUygunsuzlukPhoto = useCallback(async (id: string, type: 'acilis' | 'kapatma', base64: string): Promise<string | null> => {
-    saveFileData(orgIdRef.current ?? '', `uyg_${type}`, id, base64);
-    return null;
-  }, []);
+    try {
+      await ensureUploadsBucket();
+
+      // base64'ü Blob'a çevir
+      const [meta, data] = base64.split(',');
+      const mimeMatch = meta.match(/data:([^;]+);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const ext = mime.split('/')[1] ?? 'jpg';
+      const byteString = atob(data);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const blob = new Blob([ab], { type: mime });
+
+      const orgId = orgIdRef.current ?? 'unknown';
+      const filePath = `uygunsuzluk/${orgId}/${type}/${id}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, blob, { upsert: true, contentType: mime });
+
+      if (error) {
+        console.error('[ISG] Storage upload error:', error);
+        // Fallback: localStorage'a kaydet
+        saveFileData(orgId, `uyg_${type}`, id, base64);
+        return null;
+      }
+
+      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
+      const publicUrl = urlData?.publicUrl ?? null;
+      console.log(`[ISG] Photo uploaded to Storage: ${publicUrl}`);
+      return publicUrl;
+    } catch (err) {
+      console.error('[ISG] setUygunsuzlukPhoto error:', err);
+      // Fallback: localStorage
+      saveFileData(orgIdRef.current ?? '', `uyg_${type}`, id, base64);
+      return null;
+    }
+  }, [ensureUploadsBucket]);
 
   // ──────── EKİPMAN ────────
   const addEkipman = useCallback((e: Omit<Ekipman, 'id' | 'olusturmaTarihi'>) => {
@@ -864,8 +962,8 @@ export function useStore(
     addFirma, updateFirma, deleteFirma, restoreFirma, permanentDeleteFirma,
     addPersonel, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
     addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak, getEvrakFile,
-    addEgitim, updateEgitim, deleteEgitim, getEgitimFile,
-    addMuayene, updateMuayene, deleteMuayene,
+    addEgitim, updateEgitim, deleteEgitim, restoreEgitim, permanentDeleteEgitim, getEgitimFile,
+    addMuayene, updateMuayene, deleteMuayene, restoreMuayene, permanentDeleteMuayene,
     addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, getUygunsuzlukPhoto, setUygunsuzlukPhoto,
     addEkipman, updateEkipman, deleteEkipman, getEkipmanFile,
     addGorev, updateGorev, deleteGorev,

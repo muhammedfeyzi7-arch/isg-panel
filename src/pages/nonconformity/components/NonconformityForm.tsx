@@ -40,6 +40,8 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
   useEffect(() => {
     if (!isOpen) return;
     if (editRecord) {
+      // Storage URL öncelikli, localStorage fallback
+      const existingPhoto = getUygunsuzlukPhoto(editRecord.id, 'acilis') ?? null;
       setForm({
         baslik: editRecord.baslik,
         aciklama: editRecord.aciklama,
@@ -51,7 +53,7 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
         sorumlu: editRecord.sorumlu ?? '',
         hedefTarih: editRecord.hedefTarih ?? '',
         notlar: editRecord.notlar ?? '',
-        acilisFoto: getUygunsuzlukPhoto(editRecord.id, 'acilis') ?? null,
+        acilisFoto: existingPhoto,
       });
     } else {
       setForm(defaultForm);
@@ -80,9 +82,14 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
           severity: form.severity, sorumlu: form.sorumlu.trim(), hedefTarih: form.hedefTarih,
           notlar: form.notlar.trim(), acilisFotoMevcut: !!form.acilisFoto,
         });
+        // Sadece yeni base64 yüklendiyse Storage'a at
         if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
           const url = await setUygunsuzlukPhoto(editRecord.id, 'acilis', form.acilisFoto);
           if (url) updateUygunsuzluk(editRecord.id, { acilisFotoUrl: url });
+        }
+        // Fotoğraf silindiyse URL'yi de temizle
+        if (!form.acilisFoto) {
+          updateUygunsuzluk(editRecord.id, { acilisFotoUrl: undefined, acilisFotoMevcut: false });
         }
         logAction('uygunsuzluk_updated', 'Uygunsuzluklar', editRecord.id, form.baslik, 'Uygunsuzluk güncellendi.');
         addToast('Uygunsuzluk güncellendi.', 'success');
@@ -94,7 +101,7 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
           notlar: form.notlar.trim(), durum: 'Açık',
           acilisFotoMevcut: !!form.acilisFoto, kapatmaFotoMevcut: false,
         });
-        if (form.acilisFoto) {
+        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
           const url = await setUygunsuzlukPhoto(rec.id, 'acilis', form.acilisFoto);
           if (url) updateUygunsuzluk(rec.id, { acilisFotoUrl: url });
         }
