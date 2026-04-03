@@ -1,9 +1,10 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
+import { supabase } from '../../lib/supabase';
 import Modal from '../../components/base/Modal';
 import ImageUpload from '../nonconformity/components/ImageUpload';
-import type { EkipmanStatus, UygunsuzlukSeverity } from '../../types';
+import type { Ekipman, EkipmanStatus, UygunsuzlukSeverity } from '../../types';
 
 const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: string; border: string; icon: string }> = {
   'Uygun':       { label: 'Uygun',       color: '#34D399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)',  icon: 'ri-checkbox-circle-line' },
@@ -21,8 +22,8 @@ function getDaysUntil(dateStr: string): number {
 
 // ── Kontrol Yap Modal ──
 function KontrolModal({
-  open, onClose, ekipmanAd, firmaId, ekipmanId,
-}: { open: boolean; onClose: () => void; ekipmanAd: string; firmaId: string; ekipmanId: string }) {
+  open, onClose, ekipmanAd, ekipmanId, onSaved,
+}: { open: boolean; onClose: () => void; ekipmanAd: string; ekipmanId: string; onSaved: () => void }) {
   const { updateEkipman, addToast, currentUser } = useApp();
   const [durum, setDurum] = useState<EkipmanStatus>('Uygun');
   const [notlar, setNotlar] = useState('');
@@ -41,6 +42,8 @@ function KontrolModal({
       });
       addToast('Kontrol kaydedildi.', 'success');
       onClose();
+      // Supabase'e yazıldıktan sonra güncel veriyi çek
+      setTimeout(() => onSaved(), 600);
     } finally {
       setSaving(false);
     }
@@ -207,7 +210,6 @@ function FotoModal({
     if (!foto) { addToast('Fotoğraf seçiniz.', 'error'); return; }
     setSaving(true);
     try {
-      // Fotoğrafı uygunsuzluk kaydı olarak ekle (QR fotoğraf kaydı)
       const rec = addUygunsuzluk({
         baslik: `${ekipmanAd} — Saha Fotoğrafı`,
         aciklama: aciklama.trim() || `QR ile yüklenen saha fotoğrafı`,
@@ -259,58 +261,166 @@ function FotoModal({
   );
 }
 
+// ── Evrak Görüntüle Modal ──
+function EvrakModal({
+  open, onClose, dosyaVeri, dosyaAdi, dosyaTipi,
+}: { open: boolean; onClose: () => void; dosyaVeri: string; dosyaAdi: string; dosyaTipi: string }) {
+  const isImage = dosyaTipi?.startsWith('image/');
+  const isPdf = dosyaTipi === 'application/pdf';
+
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = dosyaVeri;
+    link.download = dosyaAdi || 'ekipman-belgesi';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <Modal isOpen={open} onClose={onClose} title={dosyaAdi || 'Belge'} size="lg" icon="ri-file-text-line"
+      footer={
+        <>
+          <button onClick={onClose} className="btn-secondary whitespace-nowrap">Kapat</button>
+          <button onClick={handleDownload} className="btn-primary whitespace-nowrap">
+            <i className="ri-download-2-line mr-1" />İndir
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col items-center gap-4">
+        {isImage && (
+          <img src={dosyaVeri} alt={dosyaAdi} className="max-w-full rounded-xl object-contain" style={{ maxHeight: '60vh' }} />
+        )}
+        {isPdf && (
+          <iframe src={dosyaVeri} title={dosyaAdi} className="w-full rounded-xl" style={{ height: '60vh', border: 'none' }} />
+        )}
+        {!isImage && !isPdf && (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 flex items-center justify-center rounded-2xl mx-auto mb-4" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
+              <i className="ri-file-line text-3xl" style={{ color: '#34D399' }} />
+            </div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{dosyaAdi}</p>
+            <p className="text-xs mt-1" style={{ color: '#64748B' }}>Bu dosya türü önizlenemiyor. İndirmek için butona tıklayın.</p>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ── Ana Sayfa ──
 export default function QrDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { ekipmanlar, firmalar, org, dataLoading } = useApp();
+  const { ekipmanlar, firmalar, org, dataLoading, getEkipmanFile, evraklar } = useApp();
 
+  // Local ekipman state — Supabase'den direkt çekilen güncel veri
+  const [localEkipman, setLocalEkipman] = useState<Ekipman | null | undefined>(undefined);
+  const [localLoading, setLocalLoading] = useState(true);
   const [showKontrol, setShowKontrol] = useState(false);
   const [showUygunsuzluk, setShowUygunsuzluk] = useState(false);
   const [showFoto, setShowFoto] = useState(false);
-  // Force re-render key after actions to show updated data immediately
-  const [refreshKey, setRefreshKey] = useState(0);
-  const prevEkipmanRef = useRef<string>('');
+  const [showEvrak, setShowEvrak] = useState(false);
+  const [evrakVeri, setEvrakVeri] = useState('');
+  const [evrakAdi, setEvrakAdi] = useState('');
+  const [evrakTipi, setEvrakTipi] = useState('');
+  const fetchedRef = useRef(false);
 
-  // Detect when ekipman data changes (after updateEkipman) and trigger visual refresh
-  const ekipman = useMemo(() => ekipmanlar.find(e => e.id === id && !e.silinmis), [ekipmanlar, id, refreshKey]);
-
-  useEffect(() => {
-    const snapshot = JSON.stringify(ekipman);
-    if (snapshot !== prevEkipmanRef.current) {
-      prevEkipmanRef.current = snapshot;
+  // Supabase'den ekipmanı direkt çek — en güncel veriyi al
+  const fetchEkipmanFromDb = useCallback(async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('ekipmanlar')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) {
+        console.error('[QR] Ekipman fetch error:', error);
+        setLocalEkipman(null);
+      } else {
+        setLocalEkipman(data as Ekipman | null);
+      }
+    } catch {
+      setLocalEkipman(null);
+    } finally {
+      setLocalLoading(false);
     }
-  }, [ekipman]);
+  }, [id]);
 
-  const handleKontrolClose = () => {
-    setShowKontrol(false);
-    setRefreshKey(k => k + 1);
+  // İlk yüklemede Supabase'den çek
+  useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    fetchEkipmanFromDb();
+  }, [fetchEkipmanFromDb]);
+
+  // dataLoading bitince store'dan da kontrol et (fallback)
+  useEffect(() => {
+    if (dataLoading || localEkipman !== undefined) return;
+    const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
+    if (fromStore) {
+      setLocalEkipman(fromStore);
+      setLocalLoading(false);
+    }
+  }, [dataLoading, ekipmanlar, id, localEkipman]);
+
+  // Store'daki ekipman güncellenince local state'i de güncelle
+  useEffect(() => {
+    if (!id || localEkipman === undefined) return;
+    const fromStore = ekipmanlar.find(e => e.id === id);
+    if (fromStore && localEkipman) {
+      // Sadece daha yeni bir güncelleme varsa uygula
+      const storeTime = fromStore.olusturmaTarihi || '';
+      const localTime = localEkipman.olusturmaTarihi || '';
+      if (storeTime >= localTime) {
+        setLocalEkipman(fromStore);
+      }
+    }
+  }, [ekipmanlar, id, localEkipman]);
+
+  // Kontrol kaydedildikten sonra Supabase'den taze veri çek
+  const handleAfterSave = useCallback(() => {
+    fetchEkipmanFromDb();
+  }, [fetchEkipmanFromDb]);
+
+  const handleKontrolClose = () => setShowKontrol(false);
+  const handleUygunsuzlukClose = () => setShowUygunsuzluk(false);
+  const handleFotoClose = () => setShowFoto(false);
+
+  // Ekipmanın evraklarını bul (store'dan)
+  const ekipmanEvraklari = evraklar.filter(
+    e => !e.silinmis && e.firmaId === localEkipman?.firmaId && e.ad?.toLowerCase().includes(localEkipman?.ad?.toLowerCase() ?? '')
+  );
+
+  // Ekipmanın kendi belgesi
+  const handleOpenBelge = () => {
+    if (!localEkipman) return;
+    const veri = getEkipmanFile(localEkipman.id);
+    if (!veri) return;
+    setEvrakVeri(veri);
+    setEvrakAdi(localEkipman.dosyaAdi || 'Ekipman Belgesi');
+    setEvrakTipi(localEkipman.dosyaTipi || '');
+    setShowEvrak(true);
   };
 
-  const handleUygunsuzlukClose = () => {
-    setShowUygunsuzluk(false);
-    setRefreshKey(k => k + 1);
-  };
+  const firma = firmalar.find(f => f.id === localEkipman?.firmaId);
 
-  const handleFotoClose = () => {
-    setShowFoto(false);
-    setRefreshKey(k => k + 1);
-  };
-
-  const firma = useMemo(() => firmalar.find(f => f.id === ekipman?.firmaId), [firmalar, ekipman]);
-
-  if (dataLoading) {
+  // Yükleniyor
+  if (localLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-main)' }}>
         <div className="text-center">
           <div className="w-12 h-12 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4" style={{ borderColor: 'rgba(100,116,139,0.4)', borderTopColor: '#64748B' }} />
-          <p className="text-sm" style={{ color: '#64748B' }}>Yükleniyor...</p>
+          <p className="text-sm" style={{ color: '#64748B' }}>Ekipman yükleniyor...</p>
         </div>
       </div>
     );
   }
 
-  if (!ekipman) {
+  // Bulunamadı
+  if (!localEkipman || localEkipman.silinmis) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg-main)' }}>
         <div className="text-center max-w-sm">
@@ -330,10 +440,11 @@ export default function QrDetailPage() {
     );
   }
 
-  const sc = STATUS_CONFIG[ekipman.durum];
-  const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
+  const sc = STATUS_CONFIG[localEkipman.durum];
+  const days = getDaysUntil(localEkipman.sonrakiKontrolTarihi);
   const isOverdue = days < 0;
   const isUrgent = days >= 0 && days <= 30;
+  const hasBelge = !!(localEkipman.dosyaAdi && getEkipmanFile(localEkipman.id));
 
   const InfoRow = ({ icon, label, value, valueColor }: { icon: string; label: string; value?: string | null; valueColor?: string }) => (
     <div className="flex items-start gap-3 py-3" style={{ borderBottom: '1px solid rgba(51,65,85,0.25)' }}>
@@ -374,16 +485,16 @@ export default function QrDetailPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  {ekipman.seriNo && (
+                  {localEkipman.seriNo && (
                     <span className="text-xs font-mono font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
-                      {ekipman.seriNo}
+                      {localEkipman.seriNo}
                     </span>
                   )}
                   <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(51,65,85,0.4)', color: '#64748B' }}>
-                    {ekipman.tur || 'Ekipman'}
+                    {localEkipman.tur || 'Ekipman'}
                   </span>
                 </div>
-                <h1 className="text-xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</h1>
+                <h1 className="text-xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{localEkipman.ad}</h1>
                 {firma && <p className="text-sm mt-1" style={{ color: '#64748B' }}>{firma.ad}</p>}
               </div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex-shrink-0" style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
@@ -405,13 +516,71 @@ export default function QrDetailPage() {
           {/* Bilgi satırları */}
           <div className="px-5">
             <InfoRow icon="ri-building-line" label="Firma" value={firma?.ad} />
-            <InfoRow icon="ri-map-pin-line" label="Bulunduğu Alan" value={ekipman.bulunduguAlan} />
-            <InfoRow icon="ri-price-tag-3-line" label="Marka / Model" value={[ekipman.marka, ekipman.model].filter(Boolean).join(' / ') || null} />
-            <InfoRow icon="ri-calendar-check-line" label="Son Kontrol" value={ekipman.sonKontrolTarihi ? new Date(ekipman.sonKontrolTarihi).toLocaleDateString('tr-TR') : null} />
-            <InfoRow icon="ri-calendar-2-line" label="Sonraki Kontrol" value={ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : null} valueColor={isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : undefined} />
-            {ekipman.aciklama && <InfoRow icon="ri-file-text-line" label="Açıklama" value={ekipman.aciklama} />}
+            <InfoRow icon="ri-map-pin-line" label="Bulunduğu Alan" value={localEkipman.bulunduguAlan} />
+            <InfoRow icon="ri-price-tag-3-line" label="Marka / Model" value={[localEkipman.marka, localEkipman.model].filter(Boolean).join(' / ') || null} />
+            <InfoRow icon="ri-calendar-check-line" label="Son Kontrol" value={localEkipman.sonKontrolTarihi ? new Date(localEkipman.sonKontrolTarihi).toLocaleDateString('tr-TR') : null} />
+            <InfoRow icon="ri-calendar-2-line" label="Sonraki Kontrol" value={localEkipman.sonrakiKontrolTarihi ? new Date(localEkipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : null} valueColor={isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : undefined} />
+            {localEkipman.aciklama && <InfoRow icon="ri-file-text-line" label="Açıklama" value={localEkipman.aciklama} />}
           </div>
         </div>
+
+        {/* ── BELGELER ── */}
+        {(hasBelge || ekipmanEvraklari.length > 0) && (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-3 px-1" style={{ color: '#475569' }}>
+              <i className="ri-folder-open-line mr-1.5" />Belgeler
+            </p>
+            <div className="isg-card rounded-2xl overflow-hidden">
+              {/* Ekipmanın kendi belgesi */}
+              {hasBelge && (
+                <button
+                  onClick={handleOpenBelge}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-all text-left"
+                  style={{ borderBottom: ekipmanEvraklari.length > 0 ? '1px solid rgba(51,65,85,0.3)' : 'none' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.05)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                    <i className="ri-file-check-line text-base" style={{ color: '#34D399' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{localEkipman.dosyaAdi || 'Ekipman Belgesi'}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
+                      {localEkipman.dosyaBoyutu ? `${(localEkipman.dosyaBoyutu / 1024).toFixed(1)} KB` : 'Ekipman belgesi'} — Görüntüle / İndir
+                    </p>
+                  </div>
+                  <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#34D399' }} />
+                </button>
+              )}
+
+              {/* Evrak modülündeki ilgili evraklar */}
+              {ekipmanEvraklari.map((evrak, idx) => (
+                <div
+                  key={evrak.id}
+                  className="flex items-center gap-3 px-4 py-3.5"
+                  style={{ borderBottom: idx < ekipmanEvraklari.length - 1 ? '1px solid rgba(51,65,85,0.3)' : 'none' }}
+                >
+                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                    <i className="ri-file-text-line text-base" style={{ color: '#60A5FA' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{evrak.ad}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
+                      {evrak.tur || 'Evrak'}
+                      {evrak.gecerlilikTarihi && ` — ${new Date(evrak.gecerlilikTarihi).toLocaleDateString('tr-TR')} tarihine kadar geçerli`}
+                    </p>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded-lg whitespace-nowrap flex-shrink-0" style={{
+                    background: evrak.durum === 'Yüklü' ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
+                    color: evrak.durum === 'Yüklü' ? '#34D399' : '#F87171',
+                  }}>
+                    {evrak.durum}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── SAHA AKSİYONLARI ── */}
         <div>
@@ -484,21 +653,28 @@ export default function QrDetailPage() {
       <KontrolModal
         open={showKontrol}
         onClose={handleKontrolClose}
-        ekipmanAd={ekipman.ad}
-        firmaId={ekipman.firmaId}
-        ekipmanId={ekipman.id}
+        ekipmanAd={localEkipman.ad}
+        ekipmanId={localEkipman.id}
+        onSaved={handleAfterSave}
       />
       <UygunsuzlukModal
         open={showUygunsuzluk}
         onClose={handleUygunsuzlukClose}
-        ekipmanAd={ekipman.ad}
-        firmaId={ekipman.firmaId}
+        ekipmanAd={localEkipman.ad}
+        firmaId={localEkipman.firmaId}
       />
       <FotoModal
         open={showFoto}
         onClose={handleFotoClose}
-        ekipmanAd={ekipman.ad}
-        ekipmanId={ekipman.id}
+        ekipmanAd={localEkipman.ad}
+        ekipmanId={localEkipman.id}
+      />
+      <EvrakModal
+        open={showEvrak}
+        onClose={() => setShowEvrak(false)}
+        dosyaVeri={evrakVeri}
+        dosyaAdi={evrakAdi}
+        dosyaTipi={evrakTipi}
       />
     </div>
   );
