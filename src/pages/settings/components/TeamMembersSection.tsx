@@ -52,8 +52,18 @@ export default function TeamMembersSection() {
   const [resetError, setResetError] = useState<string | null>(null);
 
   const getAuthHeader = useCallback(async (): Promise<string> => {
+    // First try to refresh the session to get a fresh token
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshData.session?.access_token) {
+      return `Bearer ${refreshData.session.access_token}`;
+    }
+    // Fallback to current session
     const { data } = await supabase.auth.getSession();
-    return `Bearer ${data.session?.access_token ?? ''}`;
+    const token = data.session?.access_token ?? '';
+    if (!token) {
+      console.error('[AUTH] No access token available - user may need to re-login');
+    }
+    return `Bearer ${token}`;
   }, []);
 
   const fetchMembers = useCallback(async () => {
