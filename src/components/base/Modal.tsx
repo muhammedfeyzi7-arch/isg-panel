@@ -19,7 +19,16 @@ const sizeClasses = {
   xl: 'max-w-5xl',
 };
 
-export default function Modal({ open, isOpen, onClose, title, children, size = 'md', footer, icon }: ModalProps) {
+export default function Modal({
+  open,
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = 'md',
+  footer,
+  icon,
+}: ModalProps) {
   const visible = open ?? isOpen ?? false;
   let theme: 'dark' | 'light' = 'dark';
   try {
@@ -30,14 +39,15 @@ export default function Modal({ open, isOpen, onClose, title, children, size = '
 
   useEffect(() => {
     if (!visible) return;
+    document.body.style.overflow = 'hidden';
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
     };
     document.addEventListener('keydown', handler, true);
-    return () => document.removeEventListener('keydown', handler, true);
+    return () => {
+      document.removeEventListener('keydown', handler, true);
+      document.body.style.overflow = '';
+    };
   }, [visible, onClose]);
 
   if (!visible) return null;
@@ -46,51 +56,101 @@ export default function Modal({ open, isOpen, onClose, title, children, size = '
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+      }}
     >
+      {/* Backdrop */}
       <div
-        className="absolute inset-0"
-        style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-      />
-      <div
-        className={`relative w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col animate-slide-up`}
         style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+        }}
+        onClick={onClose}
+      />
+
+      {/* Modal panel */}
+      <div
+        className={`w-full ${sizeClasses[size]} animate-slide-up`}
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: 'calc(100vh - 32px)',
           background: isDark ? 'rgba(11,16,27,0.98)' : 'rgba(255,255,255,0.99)',
           border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.12)'}`,
           borderRadius: '20px',
           boxShadow: isDark
-            ? '0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)'
-            : '0 40px 100px rgba(0,0,0,0.15), 0 0 0 1px rgba(15,23,42,0.06)',
-          backdropFilter: 'blur(20px)',
-          transition: 'background 0.3s ease',
+            ? '0 40px 100px rgba(0,0,0,0.8)'
+            : '0 40px 100px rgba(0,0,0,0.15)',
         }}
       >
+        {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 flex-shrink-0"
-          style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)'}` }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 24px',
+            flexShrink: 0,
+            borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)'}`,
+            borderRadius: '20px 20px 0 0',
+          }}
         >
-          <div className="flex items-center gap-3">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {icon && (
               <div
-                className="w-8 h-8 flex items-center justify-center rounded-xl"
                 style={{
+                  width: 32,
+                  height: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '10px',
                   background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(99,102,241,0.1))',
                   border: '1px solid rgba(99,102,241,0.2)',
+                  flexShrink: 0,
                 }}
               >
                 <i className={`${icon} text-sm`} style={{ color: '#60A5FA' }} />
               </div>
             )}
-            <h2 className="text-base font-bold" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{title}</h2>
+            <h2
+              style={{
+                fontSize: '15px',
+                fontWeight: 700,
+                color: isDark ? '#E2E8F0' : '#0F172A',
+                margin: 0,
+              }}
+            >
+              {title}
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 hover:scale-105"
             style={{
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '10px',
+              cursor: 'pointer',
               background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)'}`,
-              color: isDark ? '#64748B' : '#64748B',
+              color: '#64748B',
+              flexShrink: 0,
+              transition: 'all 0.2s ease',
             }}
             onMouseEnter={e => {
               e.currentTarget.style.color = isDark ? '#E2E8F0' : '#0F172A';
@@ -101,18 +161,37 @@ export default function Modal({ open, isOpen, onClose, title, children, size = '
               e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)';
             }}
           >
-            <i className="ri-close-line text-base" />
+            <i className="ri-close-line" style={{ fontSize: '15px' }} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>
+        {/* Scrollable content */}
+        <div
+          style={{
+            flex: '1 1 auto',
+            overflowY: 'auto',
+            padding: '20px 24px',
+            minHeight: 0,
+            color: isDark ? '#E2E8F0' : '#0F172A',
+          }}
+        >
           {children}
         </div>
 
+        {/* Footer */}
         {footer && (
           <div
-            className="px-6 py-4 flex items-center justify-end gap-3 flex-shrink-0"
-            style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)'}` }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              padding: '16px 24px',
+              flexShrink: 0,
+              flexWrap: 'wrap',
+              borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)'}`,
+              borderRadius: '0 0 20px 20px',
+            }}
           >
             {footer}
           </div>

@@ -467,6 +467,16 @@ export default function EkipmanlarPage() {
         onClose={() => setShowModal(false)}
         title={editId ? 'Ekipman Düzenle' : 'Yeni Ekipman Ekle'}
         size="lg"
+        icon="ri-tools-line"
+        footer={
+          <>
+            <button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleSave} className="btn-primary whitespace-nowrap">
+              <i className={editId ? 'ri-save-line' : 'ri-add-line'} />
+              {editId ? 'Güncelle' : 'Ekle'}
+            </button>
+          </>
+        }
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Ekipman Adı */}
@@ -665,21 +675,6 @@ export default function EkipmanlarPage() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 mt-5 pt-4" style={{ borderTop: '1px solid var(--border-main)' }}>
-          <button
-            onClick={() => setShowModal(false)}
-            className="btn-secondary whitespace-nowrap"
-          >
-            İptal
-          </button>
-          <button
-            onClick={handleSave}
-            className="btn-primary whitespace-nowrap"
-          >
-            <i className={editId ? 'ri-save-line' : 'ri-add-line'} />
-            {editId ? 'Güncelle' : 'Ekle'}
-          </button>
-        </div>
       </Modal>
 
       {/* Delete Confirm */}
@@ -688,17 +683,20 @@ export default function EkipmanlarPage() {
         onClose={() => setDeleteId(null)}
         title="Ekipmanı Sil"
         size="sm"
+        icon="ri-delete-bin-line"
+        footer={
+          <>
+            <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
+          </>
+        }
       >
-        <div className="text-center py-4">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-delete-bin-line text-2xl text-red-400" />
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu ekipmanı silmek istediğinizden emin misiniz?</p>
           <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
-        </div>
-        <div className="flex justify-center gap-3 mt-4">
-          <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
-          <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
         </div>
       </Modal>
 
