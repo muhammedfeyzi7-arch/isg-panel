@@ -3,6 +3,7 @@ import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
 import TeamMembersSection from './components/TeamMembersSection';
 import ActivityLogSection from './components/ActivityLogSection';
+import RestoreBackup from './components/RestoreBackup';
 
 interface NotifState {
   type: 'success' | 'error';
@@ -584,6 +585,9 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* ─── Yedekten Geri Yükle ─── */}
+      <RestoreBackup />
 
       {/* ─── Sistem Bilgisi ─── */}
       <div style={cardStyle} className="p-6">

@@ -5,7 +5,6 @@ import type { Evrak, EvrakStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import { getEvrakKategori, KATEGORI_META } from '../../utils/evrakKategori';
-import OtoEvrakModal from './components/OtoEvrakModal';
 import BulkEvrakUpload from './components/BulkEvrakUpload';
 
 const EVRAK_TURLERI = ['Kimlik', 'EK-2', 'Sağlık Raporu', 'Sürücü Belgesi', 'SRC', 'Sertifika / MYK / Diploma', 'Oryantasyon Eğitimi', 'İşbaşı Eğitimi', 'İş Sözleşmesi', 'Diğer'];
@@ -47,9 +46,6 @@ export default function EvraklarPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyEvrak });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [otoEvrakOpen, setOtoEvrakOpen] = useState(false);
-  const [otoDefaultPersonelId, setOtoDefaultPersonelId] = useState('');
-  const [otoDefaultFirmaId, setOtoDefaultFirmaId] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -209,14 +205,7 @@ export default function EvraklarPage() {
             <i className="ri-upload-cloud-2-line text-sm" />
             Toplu Yükle
           </button>
-          <button
-            onClick={() => { setOtoDefaultPersonelId(''); setOtoDefaultFirmaId(''); setOtoEvrakOpen(true); }}
-            className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-[7px] rounded-xl text-[12.5px] font-semibold text-white transition-all duration-200 cursor-pointer"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}
-          >
-            <i className="ri-magic-line text-sm" />
-            Oto Evrak
-          </button>
+
         </div>
       </div>
 
@@ -491,13 +480,6 @@ export default function EvraklarPage() {
       </Modal>
       {/* Bulk Upload Modal */}
       <BulkEvrakUpload open={bulkOpen} onClose={() => setBulkOpen(false)} />
-      {/* Oto Evrak Modal */}
-      <OtoEvrakModal
-        open={otoEvrakOpen}
-        onClose={() => setOtoEvrakOpen(false)}
-        defaultPersonelId={otoDefaultPersonelId}
-        defaultFirmaId={otoDefaultFirmaId}
-      />
     </div>
   );
 }
