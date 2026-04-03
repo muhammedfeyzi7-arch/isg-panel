@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import Modal from '@/components/base/Modal';
 import type { IsIzniTip, IsIzniStatus, Firma } from '@/types';
+import XLSXStyle from 'xlsx-js-style';
 
 interface ImportRow {
   tip: IsIzniTip;
@@ -113,18 +114,68 @@ export default function IsIzniImport({ open, onClose, firmalar, onImport }: Prop
   };
 
   const downloadTemplate = () => {
-    const bom = '\uFEFF';
-    const header = TEMPLATE_HEADERS.join(',');
-    const example = [
-      'Sıcak Çalışma', 'Firma Adı', 'Üretim Alanı', 'Ahmet Yılmaz', 'Mehmet Kaya',
-      '3', 'Kaynak işlemi yapılacak', 'Yangın riski', 'Yangın tüpü hazır', 'Baret,Eldiven',
-      '2026-04-10', '2026-04-10', 'Onay Bekliyor', 'Müdür Adı', '', 'Ek not',
-    ].join(',');
-    const csv = bom + header + '\n' + example;
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const HEADER_BG = '1E293B'; const HEADER_FG = 'FFFFFF'; const TITLE_BG = '0F172A';
+    const ROW_ALT = 'F1F5F9'; const ROW_NORMAL = 'FFFFFF'; const BC = 'CBD5E1';
+    const thinB = { top: { style: 'thin', color: { rgb: BC } }, bottom: { style: 'thin', color: { rgb: BC } }, left: { style: 'thin', color: { rgb: BC } }, right: { style: 'thin', color: { rgb: BC } } };
+    const medB = { top: { style: 'medium', color: { rgb: '94A3B8' } }, bottom: { style: 'medium', color: { rgb: '94A3B8' } }, left: { style: 'medium', color: { rgb: '94A3B8' } }, right: { style: 'medium', color: { rgb: '94A3B8' } } };
+    const titleS = { font: { bold: true, sz: 13, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: TITLE_BG } }, alignment: { horizontal: 'left', vertical: 'center' }, border: medB };
+    const headerS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: HEADER_BG } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: thinB };
+    const cellS = (ri: number) => ({ font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB });
+    const noteS = { font: { sz: 9, color: { rgb: '475569' }, italic: true, name: 'Calibri' }, fill: { fgColor: { rgb: 'FFF7ED' } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB };
+    const noteTitleS = { font: { bold: true, sz: 10, color: { rgb: 'EA580C' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'FFF7ED' } }, alignment: { horizontal: 'left', vertical: 'center' }, border: thinB };
+
+    const DISPLAY_HEADERS = ['Tip', 'Firma Adi', 'Bolum', 'Sorumlu', 'Calisanlar', 'Calisan Sayisi', 'Aciklama', 'Tehlikeler', 'Onlemler', 'Gerekli Ekipman', 'Baslama Tarihi', 'Bitis Tarihi', 'Durum', 'Onaylayan Kisi', 'Onay Tarihi', 'Notlar'];
+    const exampleRow = ['Sicak Calisma', 'Firma A.S.', 'Uretim Alani', 'Ahmet Yilmaz', 'Mehmet Kaya', '3', 'Kaynak islemi yapilacak', 'Yangin riski', 'Yangin tupu hazir', 'Baret,Eldiven', '2026-04-10', '2026-04-10', 'Onay Bekliyor', 'Mudur Adi', '', 'Ek not'];
+    const notlar = [
+      ['KULLANIM NOTLARI:'],
+      ['1. Tip degerleri: Sicak Calisma / Yuksekte Calisma / Kapali Alan / Elektrikli Calisma / Kazi / Genel'],
+      ['2. Durum degerleri: Onay Bekliyor / Onaylandi / Reddedildi'],
+      ['3. Tarih formati: YYYY-AA-GG (ornek: 2026-04-10)'],
+      ['4. Firma adi sistemdeki kayitla birebir eslesmelidir.'],
+    ];
+
+    const wsData = [
+      ['ISG Is Izni - Ice Aktarma Sablonu', ...Array(DISPLAY_HEADERS.length - 1).fill('')],
+      DISPLAY_HEADERS,
+      exampleRow,
+      ...notlar.map(n => [...n, ...Array(DISPLAY_HEADERS.length - 1).fill('')]),
+    ];
+
+    const wb = XLSXStyle.utils.book_new();
+    const ws = XLSXStyle.utils.aoa_to_sheet(wsData);
+
+    if (!ws['!merges']) ws['!merges'] = [];
+    ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: DISPLAY_HEADERS.length - 1 } });
+    notlar.forEach((_, ri) => {
+      ws['!merges']!.push({ s: { r: ri + 3, c: 0 }, e: { r: ri + 3, c: DISPLAY_HEADERS.length - 1 } });
+    });
+
+    wsData.forEach((row, ri) => {
+      (row as string[]).forEach((_, ci) => {
+        const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+        if (!ws[addr]) return;
+        let s: object;
+        if (ri === 0) s = titleS;
+        else if (ri === 1) s = headerS;
+        else if (ri === 2) s = cellS(0);
+        else if (ri === 3) s = noteTitleS;
+        else s = noteS;
+        (ws[addr] as XLSXStyle.CellObject).s = s;
+      });
+    });
+
+    ws['!cols'] = [{ wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 30 }, { wch: 24 }, { wch: 24 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 24 }];
+    if (!ws['!rows']) ws['!rows'] = [];
+    (ws['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 30 };
+    (ws['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 26 };
+    (ws['!rows'] as XLSXStyle.RowInfo[])[2] = { hpt: 22 };
+
+    XLSXStyle.utils.book_append_sheet(wb, ws, 'Is Izni Sablonu');
+    const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'is_izni_sablonu.csv'; a.click();
+    a.href = url; a.download = `${new Date().toLocaleDateString('tr-TR')} İş İzni Şablonu.xlsx`; a.click();
     URL.revokeObjectURL(url);
   };
 

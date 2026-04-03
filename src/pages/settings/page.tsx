@@ -172,6 +172,14 @@ export default function SettingsPage() {
     setProfileLoading(true);
     setProfileNotif(null);
     try {
+      // Supabase Auth user_metadata'ya kaydet — kalıcı olur, sayfa yenilenince de gelir
+      const { supabase } = await import('../../lib/supabase');
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: profileData.ad.trim(), role: profileData.rol },
+      });
+      if (error) throw error;
+
+      // In-memory state'i de güncelle
       updateCurrentUser({ ...currentUser, ...profileData });
       setProfileNotif({ type: 'success', message: 'Profil bilgileri başarıyla güncellendi.', target: 'profile' });
       addToast('Profil bilgileri güncellendi.', 'success');

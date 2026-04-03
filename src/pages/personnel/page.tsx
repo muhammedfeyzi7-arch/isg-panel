@@ -4,7 +4,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import type { Personel } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getPersonelStatusColor } from '../../components/base/Badge';
-import * as XLSX from 'xlsx';
+import XLSXStyle from 'xlsx-js-style';
 import PersonelDetayModal from './components/PersonelDetayModal';
 import PersonelAvatar from '../../components/base/PersonelAvatar';
 import PersonelKartvizit from './components/PersonelKartvizit';
@@ -63,7 +63,7 @@ function parseTrDate(raw: unknown): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
   if (!isNaN(Number(str))) {
     try {
-      const d = XLSX.SSF.parse_date_code(Number(str));
+      const d = XLSXStyle.SSF.parse_date_code(Number(str));
       if (d) return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
     } catch { /* ignore */ }
   }
@@ -118,37 +118,229 @@ export default function PersonellerPage() {
   }, [quickCreate, setQuickCreate]);
 
   const handleExcelExport = () => {
-    const headerRow = [...EXCEL_COLUMNS];
-    const dataRows = filtered.map(p => {
+    const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '-';
+    const aktif = filtered;
+    const wb = XLSXStyle.utils.book_new();
+    const tarih = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
+    const aktifSayisi = aktif.filter(p => p.durum === 'Aktif').length;
+    const pasifSayisi = aktif.filter(p => p.durum === 'Pasif').length;
+    const ayrildiSayisi = aktif.filter(p => p.durum === 'Ayrıldı').length;
+
+    // ── Stil tanımları ──
+    const HEADER_BG = '1E293B'; const HEADER_FG = 'FFFFFF'; const TITLE_BG = '0F172A';
+    const ROW_ALT = 'F1F5F9'; const ROW_NORMAL = 'FFFFFF'; const BORDER_COLOR = 'CBD5E1';
+    const thinB = { top: { style: 'thin', color: { rgb: BORDER_COLOR } }, bottom: { style: 'thin', color: { rgb: BORDER_COLOR } }, left: { style: 'thin', color: { rgb: BORDER_COLOR } }, right: { style: 'thin', color: { rgb: BORDER_COLOR } } };
+    const medB = { top: { style: 'medium', color: { rgb: '94A3B8' } }, bottom: { style: 'medium', color: { rgb: '94A3B8' } }, left: { style: 'medium', color: { rgb: '94A3B8' } }, right: { style: 'medium', color: { rgb: '94A3B8' } } };
+    const titleS = { font: { bold: true, sz: 13, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: TITLE_BG } }, alignment: { horizontal: 'left', vertical: 'center' }, border: medB };
+    const headerS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: HEADER_BG } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+    const subHeaderS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: '334155' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+    const cellS = (ri: number, align: 'left' | 'center' | 'right' = 'left') => ({ font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: align, vertical: 'center', wrapText: true }, border: thinB });
+    const numS = (ri: number) => ({ font: { sz: 10, color: { rgb: '64748B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB });
+    const totalS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: '334155' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: medB };
+    const sumValS = { font: { bold: true, sz: 11, color: { rgb: '1E40AF' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'EFF6FF' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+    const statusS = (s: string) => {
+      const sl = s.toLowerCase();
+      let fg = '64748B'; let bg = 'F1F5F9';
+      if (sl === 'aktif') { fg = '16A34A'; bg = 'DCFCE7'; }
+      else if (sl === 'pasif') { fg = 'D97706'; bg = 'FEF3C7'; }
+      else if (sl === 'ayrıldı') { fg = 'DC2626'; bg = 'FEE2E2'; }
+      return { font: { bold: true, sz: 10, color: { rgb: fg }, name: 'Calibri' }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+    };
+
+    // ── Sayfa 1: Personel Listesi ──
+    const COLS1 = ['#', 'Ad Soyad', 'TC Kimlik No', 'Telefon', 'E-posta', 'Doğum Tarihi', 'İşe Giriş Tarihi', 'Görev / Unvan', 'Departman', 'Firma', 'Durum', 'Kan Grubu', 'Acil Durum Kişisi', 'Acil Durum Tel.', 'Adres'];
+    const dataRows1 = aktif.map((p, i) => {
       const firma = firmalar.find(f => f.id === p.firmaId);
-      return [p.adSoyad, p.tc, p.telefon, p.email, p.dogumTarihi ? new Date(p.dogumTarihi).toLocaleDateString('tr-TR') : '', p.iseGirisTarihi ? new Date(p.iseGirisTarihi).toLocaleDateString('tr-TR') : '', p.gorev, p.departman, firma?.ad || '', p.durum, p.kanGrubu, p.acilKisi, p.acilTelefon, p.adres];
+      return [i + 1, p.adSoyad, p.tc || '-', p.telefon || '-', p.email || '-', fmtDate(p.dogumTarihi), fmtDate(p.iseGirisTarihi), p.gorev || '-', p.departman || '-', firma?.ad || '-', p.durum, p.kanGrubu || '-', p.acilKisi || '-', p.acilTelefon || '-', p.adres || '-'];
     });
-    const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
-    ws['!cols'] = [{ wch: 26 }, { wch: 15 }, { wch: 16 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 20 }, { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Personeller');
-    const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const summaryRow = ['Toplam', 'Aktif', 'Pasif', 'Ayrıldı', '', '', '', '', '', '', '', '', '', '', ''];
+    const summaryVal = [aktif.length, aktifSayisi, pasifSayisi, ayrildiSayisi, '', '', '', '', '', '', '', '', '', '', ''];
+    const ws1Rows = [
+      [`ISG PERSONEL LİSTESİ RAPORU — ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`, ...Array(COLS1.length - 1).fill('')],
+      summaryRow,
+      summaryVal,
+      COLS1,
+      ...dataRows1,
+    ];
+    const ws1 = XLSXStyle.utils.aoa_to_sheet(ws1Rows);
+    if (!ws1['!merges']) ws1['!merges'] = [];
+    ws1['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS1.length - 1 } });
+    ws1Rows.forEach((row, ri) => {
+      (row as (string | number)[]).forEach((val, ci) => {
+        const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+        if (!ws1[addr]) ws1[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+        let s: object = cellS(ri - 4);
+        if (ri === 0) s = titleS;
+        else if (ri === 1) s = subHeaderS;
+        else if (ri === 2) s = sumValS;
+        else if (ri === 3) s = headerS;
+        else {
+          const dataRi = ri - 4;
+          if (ci === 0) s = numS(dataRi);
+          else if (ci === 10) s = statusS(String(val ?? ''));
+          else if (ci >= 5 && ci <= 6) s = cellS(dataRi, 'center');
+          else s = cellS(dataRi);
+        }
+        (ws1[addr] as XLSXStyle.CellObject).s = s;
+      });
+    });
+    ws1['!cols'] = [{ wch: 4 }, { wch: 26 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 26 }, { wch: 10 }, { wch: 10 }, { wch: 22 }, { wch: 16 }, { wch: 36 }];
+    if (!ws1['!rows']) ws1['!rows'] = [];
+    (ws1['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 30 };
+    (ws1['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+    (ws1['!rows'] as XLSXStyle.RowInfo[])[2] = { hpt: 22 };
+    (ws1['!rows'] as XLSXStyle.RowInfo[])[3] = { hpt: 24 };
+    XLSXStyle.utils.book_append_sheet(wb, ws1, 'Personel Listesi');
+
+    // ── Sayfa 2: Firma Bazlı Özet ──
+    const firmaOzet = firmalar.filter(f => !f.silinmis).map(f => {
+      const fps = aktif.filter(p => p.firmaId === f.id);
+      return [f.ad, fps.length, fps.filter(p => p.durum === 'Aktif').length, fps.filter(p => p.durum === 'Pasif').length, fps.filter(p => p.durum === 'Ayrıldı').length];
+    }).filter(r => (r[1] as number) > 0).sort((a, b) => (b[1] as number) - (a[1] as number));
+    const COLS2 = ['Firma Adı', 'Toplam', 'Aktif', 'Pasif', 'Ayrıldı'];
+    const ws2Rows = [
+      ['FİRMA BAZLI PERSONEL ÖZETİ', '', '', '', ''],
+      COLS2,
+      ...firmaOzet,
+      ['TOPLAM', aktif.length, aktifSayisi, pasifSayisi, ayrildiSayisi],
+      ['', '', '', '', ''],
+      ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR'), '', '', ''],
+    ];
+    const ws2 = XLSXStyle.utils.aoa_to_sheet(ws2Rows);
+    if (!ws2['!merges']) ws2['!merges'] = [];
+    ws2['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+    ws2Rows.forEach((row, ri) => {
+      (row as (string | number)[]).forEach((val, ci) => {
+        const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+        if (!ws2[addr]) ws2[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+        const totalRowIdx = 2 + firmaOzet.length;
+        let s: object = cellS(ri - 2);
+        if (ri === 0) s = titleS;
+        else if (ri === 1) s = headerS;
+        else if (ri === totalRowIdx) s = totalS;
+        else if (ri > 1 && ri < totalRowIdx) {
+          const dataRi = ri - 2;
+          if (ci === 0) s = cellS(dataRi);
+          else s = { ...cellS(dataRi, 'center'), font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: dataRi % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, border: thinB };
+        }
+        (ws2[addr] as XLSXStyle.CellObject).s = s;
+      });
+    });
+    ws2['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+    if (!ws2['!rows']) ws2['!rows'] = [];
+    (ws2['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
+    (ws2['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+    XLSXStyle.utils.book_append_sheet(wb, ws2, 'Firma Özeti');
+
+    // ── Sayfa 3: Yaklaşan Yıldönümleri ──
+    const today = new Date();
+    const yildonumleri = aktif.filter(p => p.iseGirisTarihi && p.durum === 'Aktif').map(p => {
+      const giris = new Date(p.iseGirisTarihi);
+      const thisYear = new Date(today.getFullYear(), giris.getMonth(), giris.getDate());
+      if (thisYear < today) thisYear.setFullYear(today.getFullYear() + 1);
+      const diff = Math.ceil((thisYear.getTime() - today.getTime()) / 86400000);
+      const yil = today.getFullYear() - giris.getFullYear();
+      const firma = firmalar.find(f => f.id === p.firmaId);
+      return { p, diff, yil, firma };
+    }).filter(x => x.diff <= 30).sort((a, b) => a.diff - b.diff);
+    const COLS3 = ['Ad Soyad', 'Firma', 'Görev', 'İşe Giriş', 'Yıldönümü', 'Kalan Gün', 'Çalışma Yılı'];
+    const yilData = yildonumleri.map(x => [x.p.adSoyad, x.firma?.ad || '-', x.p.gorev || '-', fmtDate(x.p.iseGirisTarihi), `${new Date(x.p.iseGirisTarihi).getDate()}.${new Date(x.p.iseGirisTarihi).getMonth() + 1}`, x.diff === 0 ? 'BUGÜN' : `${x.diff} gün`, `${x.yil}. yıl`]);
+    const ws3Rows = [
+      ['YAKLAŞAN İŞE GİRİŞ YILDÖNÜMLERİ (30 Gün İçinde)', '', '', '', '', '', ''],
+      COLS3,
+      ...(yilData.length > 0 ? yilData : [['30 gün içinde yıldönümü bulunmuyor.', '', '', '', '', '', '']]),
+    ];
+    const ws3 = XLSXStyle.utils.aoa_to_sheet(ws3Rows);
+    if (!ws3['!merges']) ws3['!merges'] = [];
+    ws3['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS3.length - 1 } });
+    ws3Rows.forEach((row, ri) => {
+      (row as (string | number)[]).forEach((val, ci) => {
+        const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+        if (!ws3[addr]) ws3[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+        let s: object = cellS(ri - 2);
+        if (ri === 0) s = titleS;
+        else if (ri === 1) s = headerS;
+        else {
+          const dataRi = ri - 2;
+          if (ci === 5) {
+            const v = String(val ?? '');
+            s = v === 'BUGÜN' ? { font: { bold: true, sz: 10, color: { rgb: '16A34A' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'DCFCE7' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB } : cellS(dataRi, 'center');
+          } else if (ci >= 3) s = cellS(dataRi, 'center');
+          else s = cellS(dataRi);
+        }
+        (ws3[addr] as XLSXStyle.CellObject).s = s;
+      });
+    });
+    ws3['!cols'] = [{ wch: 26 }, { wch: 24 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+    if (!ws3['!rows']) ws3['!rows'] = [];
+    (ws3['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
+    (ws3['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+    XLSXStyle.utils.book_append_sheet(wb, ws3, 'Yıldönümleri');
+
+    const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const tarih = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
-    link.href = url; link.download = `ISG_Personeller_${tarih}.xlsx`;
+    link.href = url;
+    link.download = `${new Date().toLocaleDateString('tr-TR')} Personel Listesi Raporu.xlsx`;
     document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-    addToast(`${dataRows.length} personel Excel olarak indirildi.`, 'success');
+    addToast(`${aktif.length} personel Excel olarak indirildi.`, 'success');
   };
 
   const handleDownloadTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([[...EXCEL_COLUMNS]]);
+    const HEADER_BG = '1E293B'; const HEADER_FG = 'FFFFFF'; const BC = 'CBD5E1';
+    const thinB = { top: { style: 'thin', color: { rgb: BC } }, bottom: { style: 'thin', color: { rgb: BC } }, left: { style: 'thin', color: { rgb: BC } }, right: { style: 'thin', color: { rgb: BC } } };
+    const headerS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: HEADER_BG } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: thinB };
+    const cellS = { font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB };
+    const noteS = { font: { sz: 9, color: { rgb: '64748B' }, italic: true, name: 'Calibri' }, fill: { fgColor: { rgb: 'F8FAFC' } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB };
+
+    const example = ['Ahmet Yilmaz', '12345678901', '05551234567', 'ahmet@email.com', '15.05.1990', '01.01.2020', 'Operator', 'Uretim', 'Firma A.S.', 'Aktif', 'A+', 'Mehmet Yilmaz', '05301234567', 'Istanbul, Kadikoy'];
+    const notlar = [
+      ['NOTLAR:', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['1. Tarih formati: GG.AA.YYYY (ornek: 15.01.2025)', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['2. Durum degerleri: Aktif / Pasif / Ayrildi', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['3. Firma adi sistemdeki kayitla birebir eslesmelidir', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['4. TC Kimlik No 11 haneli olmalidir', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ];
+
+    const wb = XLSXStyle.utils.book_new();
+    const ws = XLSXStyle.utils.aoa_to_sheet([[...EXCEL_COLUMNS], example, ...notlar]);
+
+    // Stilleri uygula
+    EXCEL_COLUMNS.forEach((_, ci) => {
+      const hAddr = XLSXStyle.utils.encode_cell({ r: 0, c: ci });
+      const eAddr = XLSXStyle.utils.encode_cell({ r: 1, c: ci });
+      if (ws[hAddr]) (ws[hAddr] as XLSXStyle.CellObject).s = headerS;
+      if (ws[eAddr]) (ws[eAddr] as XLSXStyle.CellObject).s = cellS;
+    });
+
+    // Not satırları
+    notlar.forEach((row, ri) => {
+      row.forEach((_, ci) => {
+        const addr = XLSXStyle.utils.encode_cell({ r: ri + 2, c: ci });
+        if (ws[addr]) (ws[addr] as XLSXStyle.CellObject).s = noteS;
+      });
+    });
+
+    // Birleştirmeler
+    if (!ws['!merges']) ws['!merges'] = [];
+    notlar.forEach((_, ri) => {
+      ws['!merges']!.push({ s: { r: ri + 2, c: 0 }, e: { r: ri + 2, c: EXCEL_COLUMNS.length - 1 } });
+    });
+
     ws['!cols'] = [{ wch: 26 }, { wch: 15 }, { wch: 16 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 20 }, { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Personeller');
-    const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    if (!ws['!rows']) ws['!rows'] = [];
+    (ws['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
+    (ws['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+
+    XLSXStyle.utils.book_append_sheet(wb, ws, 'Personel Sablonu');
+    const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url; link.download = 'ISG_Personel_Sablonu.xlsx';
+    link.href = url; link.download = `${new Date().toLocaleDateString('tr-TR')} Personel Şablonu.xlsx`;
     document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-    addToast('Boş şablon indirildi.', 'success');
+    addToast('Bos sablon indirildi.', 'success');
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,9 +357,9 @@ export default function PersonellerPage() {
     reader.onload = (ev) => {
       try {
         const data = ev.target?.result;
-        const wb = XLSX.read(data, { type: 'array', cellDates: false });
+        const wb = XLSXStyle.read(data, { type: 'array', cellDates: false });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
+        const rows = XLSXStyle.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
         if (rows.length < 2) { addToast('Excel dosyası boş veya yalnızca başlık satırı içeriyor.', 'warning'); setImportLoading(false); return; }
 
         const headerRow = (rows[0] as unknown[]).map(h => String(h ?? '').trim());

@@ -4,7 +4,6 @@ import type { IsIzni, IsIzniTip, IsIzniStatus } from '@/types';
 import { usePermissions } from '@/hooks/usePermissions';
 import { generateIsIzniNo } from '@/store/useStore';
 import Modal from '@/components/base/Modal';
-import IsIzniImport from './components/IsIzniImport';
 import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
 
 const TIP_CONFIG: Record<IsIzniTip, { color: string; bg: string; icon: string }> = {
@@ -62,7 +61,6 @@ export default function IsIzniPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewRecord, setViewRecord] = useState<IsIzni | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
-  const [showImport, setShowImport] = useState(false);
   const [showBelgeModal, setShowBelgeModal] = useState(false);
   const [savedIsIzni, setSavedIsIzni] = useState<IsIzni | null>(null);
 
@@ -180,14 +178,6 @@ export default function IsIzniPage() {
     setDeleteId(null);
   };
 
-  const handleImport = (rows: typeof emptyForm[]) => {
-    rows.forEach(r => {
-      const { selectedCalisanIds: _ids, ...saveData } = r as typeof emptyForm;
-      addIsIzni(saveData);
-    });
-    addToast(`${rows.length} iş izni aktarıldı.`, 'success');
-  };
-
   const inp = 'isg-input w-full';
 
   return (
@@ -206,9 +196,6 @@ export default function IsIzniPage() {
         </div>
         {canCreate && (
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
-              <i className="ri-upload-cloud-2-line" /> Dışardan Aktar
-            </button>
             <button onClick={openAdd} className="btn-primary whitespace-nowrap">
               <i className="ri-add-line" /> Yeni İş İzni
             </button>
@@ -664,13 +651,6 @@ export default function IsIzniPage() {
         </div>
       </Modal>
 
-      {/* Import Modal */}
-      <IsIzniImport
-        open={showImport}
-        onClose={() => setShowImport(false)}
-        firmalar={aktivFirmalar}
-        onImport={handleImport}
-      />
     </div>
   );
 }

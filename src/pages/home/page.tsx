@@ -16,6 +16,7 @@ import TutanaklarPage from '../tutanaklar/page';
 import CopKutusuPage from '../trash/page';
 import SettingsPage from '../settings/page';
 import IsIzniPage from '../is-izni/page';
+import FirmaEvraklariPage from '../company-documents/page';
 
 function AppContent() {
   const { activeModule, dataLoading, orgLoading, orgError, org } = useApp();
@@ -49,6 +50,7 @@ function AppContent() {
       case 'gorevler': return <GorevlerPage />;
       case 'tutanaklar': return <TutanaklarPage />;
       case 'is-izinleri': return <IsIzniPage />;
+      case 'firma-evraklari': return <FirmaEvraklariPage />;
       case 'raporlar': return <RaporlarPage />;
       case 'copkutusu': return <CopKutusuPage />;
       case 'ayarlar': return <SettingsPage />;

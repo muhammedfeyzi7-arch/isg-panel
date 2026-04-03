@@ -3,6 +3,7 @@ import { useApp } from '../../store/AppContext';
 import type { Egitim, EgitimStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge from '../../components/base/Badge';
+import XLSXStyle from 'xlsx-js-style';
 
 const EGITIM_TURLERI = [
   'İşe Giriş ve Oryantasyon Eğitimi',
@@ -60,6 +61,128 @@ function downloadFromDataUrl(dataUrl: string, filename: string): void {
     link.click();
     document.body.removeChild(link);
   }
+}
+
+function exportEgitimlerToExcel(
+  egitimler: Egitim[],
+  firmalar: { id: string; ad: string }[],
+  personeller: { id: string; adSoyad: string }[],
+): void {
+  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '-';
+  const aktif = egitimler.filter(e => !e.silinmis);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tarih = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
+  const tamamlandi = aktif.filter(e => e.durum === 'Tamamlandı').length;
+  const planlandi = aktif.filter(e => e.durum === 'Planlandı').length;
+  const eksik = aktif.filter(e => e.durum === 'Eksik').length;
+
+  const HEADER_BG = '1E293B'; const HEADER_FG = 'FFFFFF'; const TITLE_BG = '0F172A';
+  const ROW_ALT = 'F1F5F9'; const ROW_NORMAL = 'FFFFFF'; const BC = 'CBD5E1';
+  const thinB = { top: { style: 'thin', color: { rgb: BC } }, bottom: { style: 'thin', color: { rgb: BC } }, left: { style: 'thin', color: { rgb: BC } }, right: { style: 'thin', color: { rgb: BC } } };
+  const medB = { top: { style: 'medium', color: { rgb: '94A3B8' } }, bottom: { style: 'medium', color: { rgb: '94A3B8' } }, left: { style: 'medium', color: { rgb: '94A3B8' } }, right: { style: 'medium', color: { rgb: '94A3B8' } } };
+  const titleS = { font: { bold: true, sz: 13, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: TITLE_BG } }, alignment: { horizontal: 'left', vertical: 'center' }, border: medB };
+  const headerS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: HEADER_BG } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+  const subHeaderS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: '334155' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+  const cellS = (ri: number, align: 'left' | 'center' | 'right' = 'left') => ({ font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: align, vertical: 'center', wrapText: true }, border: thinB });
+  const numS = (ri: number) => ({ font: { sz: 10, color: { rgb: '64748B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB });
+  const totalS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: '334155' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: medB };
+  const sumValS = { font: { bold: true, sz: 11, color: { rgb: '1E40AF' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'EFF6FF' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+  const statusS = (s: string) => {
+    const sl = s.toLowerCase();
+    let fg = '64748B'; let bg = 'F1F5F9';
+    if (sl.includes('tamamlandı') || sl === 'var') { fg = '16A34A'; bg = 'DCFCE7'; }
+    else if (sl.includes('dolmuş') || sl === 'yok') { fg = 'DC2626'; bg = 'FEE2E2'; }
+    else if (sl.includes('kritik') || sl.includes('kaldı') || sl === 'bugün') { fg = 'D97706'; bg = 'FEF3C7'; }
+    else if (sl.includes('yaklaşıyor') || sl.includes('eksik') || sl.includes('bekliyor') || sl.includes('planlandı')) { fg = 'EA580C'; bg = 'FFEDD5'; }
+    return { font: { bold: true, sz: 10, color: { rgb: fg }, name: 'Calibri' }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+  };
+
+  const wb = XLSXStyle.utils.book_new();
+
+  // ── Sayfa 1 ──
+  const COLS1 = ['#', 'Eğitim Türü / Adı', 'Firma', 'Tarih', 'Katılımcı', 'Katılımcılar', 'Geçerlilik', 'Durum', 'Belge', 'Açıklama'];
+  const dataRows1 = aktif.map((e, i) => {
+    const firma = firmalar.find(f => f.id === e.firmaId);
+    const katilimcilar = e.katilimciIds.map(id => personeller.find(p => p.id === id)?.adSoyad).filter(Boolean).join(', ');
+    return [i + 1, e.ad || '-', firma?.ad || '-', fmtDate(e.tarih), e.katilimciIds.length, katilimcilar || '-', e.gecerlilikSuresi ? `${e.gecerlilikSuresi} gün` : 'Süresiz', e.durum, e.belgeDosyaAdi ? 'Var' : 'Yok', e.aciklama || '-'];
+  });
+  const ws1Rows = [
+    [`ISG EĞİTİM RAPORU — ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`, ...Array(COLS1.length - 1).fill('')],
+    ['Toplam', 'Tamamlandı', 'Bekliyor', 'Eksik', '', '', '', '', '', ''],
+    [aktif.length, tamamlandi, planlandi, eksik, '', '', '', '', '', ''],
+    COLS1, ...dataRows1,
+  ];
+  const ws1 = XLSXStyle.utils.aoa_to_sheet(ws1Rows);
+  if (!ws1['!merges']) ws1['!merges'] = [];
+  ws1['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS1.length - 1 } });
+  ws1Rows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws1[addr]) ws1[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      let s: object = cellS(ri - 4);
+      if (ri === 0) s = titleS;
+      else if (ri === 1) s = subHeaderS;
+      else if (ri === 2) s = sumValS;
+      else if (ri === 3) s = headerS;
+      else { const dr = ri - 4; if (ci === 0) s = numS(dr); else if (ci === 7) s = statusS(String(val ?? '')); else if (ci === 8) s = statusS(String(val ?? '')); else if (ci === 3 || ci === 4) s = cellS(dr, 'center'); else s = cellS(dr); }
+      (ws1[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+  ws1['!cols'] = [{ wch: 4 }, { wch: 32 }, { wch: 24 }, { wch: 14 }, { wch: 10 }, { wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 8 }, { wch: 36 }];
+  if (!ws1['!rows']) ws1['!rows'] = [];
+  (ws1['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 30 }; (ws1['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 }; (ws1['!rows'] as XLSXStyle.RowInfo[])[2] = { hpt: 22 }; (ws1['!rows'] as XLSXStyle.RowInfo[])[3] = { hpt: 24 };
+  XLSXStyle.utils.book_append_sheet(wb, ws1, 'Eğitim Listesi');
+
+  // ── Sayfa 2 ──
+  const firmaOzet = firmalar.filter(f => !('silinmis' in f) || !(f as { silinmis?: boolean }).silinmis).map(f => { const fps = aktif.filter(e => e.firmaId === f.id); return [f.ad, fps.length, fps.filter(e => e.durum === 'Tamamlandı').length, fps.filter(e => e.durum === 'Planlandı').length, fps.filter(e => e.durum === 'Eksik').length]; }).filter(r => (r[1] as number) > 0).sort((a, b) => (b[1] as number) - (a[1] as number));
+  const COLS2 = ['Firma Adı', 'Toplam', 'Tamamlandı', 'Bekliyor', 'Eksik'];
+  const ws2Rows = [['FİRMA BAZLI EĞİTİM ÖZETİ', '', '', '', ''], COLS2, ...firmaOzet, ['TOPLAM', aktif.length, tamamlandi, planlandi, eksik], ['', '', '', '', ''], ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR'), '', '', '']];
+  const ws2 = XLSXStyle.utils.aoa_to_sheet(ws2Rows);
+  if (!ws2['!merges']) ws2['!merges'] = [];
+  ws2['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+  ws2Rows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws2[addr]) ws2[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      const totalRowIdx = 2 + firmaOzet.length;
+      let s: object = cellS(ri - 2);
+      if (ri === 0) s = titleS; else if (ri === 1) s = headerS; else if (ri === totalRowIdx) s = totalS;
+      else if (ri > 1 && ri < totalRowIdx) { const dr = ri - 2; s = ci === 0 ? cellS(dr) : { font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: dr % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB }; }
+      (ws2[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+  ws2['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+  if (!ws2['!rows']) ws2['!rows'] = []; (ws2['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 }; (ws2['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+  XLSXStyle.utils.book_append_sheet(wb, ws2, 'Firma Özeti');
+
+  // ── Sayfa 3 ──
+  const kritikler = aktif.filter(e => e.tarih && e.gecerlilikSuresi && e.gecerlilikSuresi > 0).map(e => { const bitis = new Date(e.tarih); bitis.setDate(bitis.getDate() + e.gecerlilikSuresi!); bitis.setHours(0, 0, 0, 0); const diff = Math.ceil((bitis.getTime() - today.getTime()) / 86400000); const firma = firmalar.find(f => f.id === e.firmaId); return { e, diff, bitis, firma }; }).filter(x => x.diff <= 60).sort((a, b) => a.diff - b.diff);
+  const COLS3 = ['Eğitim Adı', 'Firma', 'Eğitim Tarihi', 'Geçerlilik Bitiş', 'Kalan Gün', 'Durum'];
+  const kritikData = kritikler.map(x => [x.e.ad, x.firma?.ad || '-', fmtDate(x.e.tarih), fmtDate(x.bitis.toISOString().split('T')[0]), x.diff < 0 ? `${Math.abs(x.diff)} gün geçti` : x.diff === 0 ? 'BUGÜN' : `${x.diff} gün kaldı`, x.diff < 0 ? 'SÜRESİ DOLMUŞ' : x.diff <= 30 ? 'KRİTİK' : 'YAKLAŞIYOR']);
+  const ws3Rows = [['SÜRESİ YAKLAŞAN / DOLMUŞ EĞİTİMLER (60 Gün İçinde)', '', '', '', '', ''], COLS3, ...(kritikData.length > 0 ? kritikData : [['60 gün içinde süresi dolacak eğitim bulunmuyor.', '', '', '', '', '']])];
+  const ws3 = XLSXStyle.utils.aoa_to_sheet(ws3Rows);
+  if (!ws3['!merges']) ws3['!merges'] = [];
+  ws3['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS3.length - 1 } });
+  ws3Rows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws3[addr]) ws3[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      let s: object = cellS(ri - 2);
+      if (ri === 0) s = titleS; else if (ri === 1) s = headerS;
+      else { const dr = ri - 2; if (ci === 4 || ci === 5) s = statusS(String(val ?? '')); else if (ci >= 2) s = cellS(dr, 'center'); else s = cellS(dr); }
+      (ws3[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+  ws3['!cols'] = [{ wch: 32 }, { wch: 24 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 16 }];
+  if (!ws3['!rows']) ws3['!rows'] = []; (ws3['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 }; (ws3['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+  XLSXStyle.utils.book_append_sheet(wb, ws3, 'Kritik Eğitimler');
+
+  const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = `${new Date().toLocaleDateString('tr-TR')} Eğitim Evrakları Raporu.xlsx`;
+  document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
 }
 
 export default function EgitimlerPage() {
@@ -178,6 +301,9 @@ export default function EgitimlerPage() {
           <p className="text-sm mt-1" style={{ color: '#475569' }}>Personellerin eğitim evraklarını yükleyin ve takip edin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => exportEgitimlerToExcel(egitimler, firmalar, personeller)} className="btn-secondary whitespace-nowrap">
+            <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
+          </button>
           <button onClick={openAdd} className="btn-primary whitespace-nowrap">
             <i className="ri-add-circle-line text-base" />
             Eğitim Evrakı Ekle

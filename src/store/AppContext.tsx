@@ -205,16 +205,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [okunanlar, setOkunanlar] = useState<Set<string>>(new Set());
 
-  // Sync user email into store's currentUser
+  // Sync user info into store's currentUser (including full_name from user_metadata)
   useEffect(() => {
-    if (user?.email && store.currentUser.email !== user.email) {
+    if (!user) return;
+    const metaName = user.user_metadata?.full_name as string | undefined;
+    const metaRole = user.user_metadata?.role as string | undefined;
+    const resolvedName = metaName || getUserDisplayName(user);
+    const needsUpdate =
+      store.currentUser.email !== user.email ||
+      (resolvedName && store.currentUser.ad !== resolvedName) ||
+      (metaRole && store.currentUser.rol !== metaRole);
+    if (needsUpdate) {
       store.updateCurrentUser({
         email: user.email,
-        ad: store.currentUser.ad || getUserDisplayName(user),
+        ad: resolvedName,
+        ...(metaRole ? { rol: metaRole } : {}),
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.email]);
+  }, [user?.id, user?.email, user?.user_metadata?.full_name, user?.user_metadata?.role]);
 
   // Theme sync
   useEffect(() => {

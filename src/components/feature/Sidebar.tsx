@@ -5,18 +5,18 @@ import { useAuth } from '../../store/AuthContext';
 const ROLE_MODULES: Record<string, string[]> = {
   admin: [
     'dashboard', 'firmalar', 'personeller',
-    'evraklar', 'egitimler', 'muayeneler', 'tutanaklar',
+    'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
     'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
     'raporlar', 'copkutusu', 'ayarlar',
   ],
   denetci: [
     'dashboard', 'firmalar', 'personeller',
-    'uygunsuzluklar', 'tutanaklar', 'is-izinleri', 'raporlar',
+    'firma-evraklari', 'uygunsuzluklar', 'tutanaklar', 'is-izinleri', 'raporlar',
     'ayarlar',
   ],
   member: [
     'dashboard', 'firmalar', 'personeller',
-    'evraklar', 'egitimler', 'muayeneler', 'tutanaklar',
+    'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
     'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
     'raporlar', 'copkutusu', 'ayarlar',
   ],
@@ -39,6 +39,7 @@ const menuGroups = [
     label: 'YÖNETİM',
     items: [
       { id: 'evraklar', label: 'Evrak Takibi', icon: 'ri-file-list-3-line' },
+      { id: 'firma-evraklari', label: 'Firma Evrakları', icon: 'ri-building-4-line' },
       { id: 'egitimler', label: 'Eğitim Evrakları', icon: 'ri-graduation-cap-line' },
       { id: 'muayeneler', label: 'Sağlık Evrakları', icon: 'ri-heart-pulse-line' },
       { id: 'tutanaklar', label: 'Tutanaklar', icon: 'ri-article-line' },

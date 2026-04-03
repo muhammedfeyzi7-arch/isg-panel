@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import XLSXStyle from 'xlsx-js-style';
+const XLSX = XLSXStyle;
 import Modal from '../../../components/base/Modal';
 
 interface DofRow {
@@ -37,53 +38,71 @@ const SAMPLE_ROWS = [
 ];
 
 function downloadTemplate() {
-  const wb = XLSX.utils.book_new();
-  const wsData = [TEMPLATE_HEADERS, ...SAMPLE_ROWS];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const HEADER_BG = '1E293B'; const HEADER_FG = 'FFFFFF'; const TITLE_BG = '0F172A';
+  const ROW_ALT = 'F1F5F9'; const ROW_NORMAL = 'FFFFFF'; const BC = 'CBD5E1';
+  const thinB = { top: { style: 'thin', color: { rgb: BC } }, bottom: { style: 'thin', color: { rgb: BC } }, left: { style: 'thin', color: { rgb: BC } }, right: { style: 'thin', color: { rgb: BC } } };
+  const medB = { top: { style: 'medium', color: { rgb: '94A3B8' } }, bottom: { style: 'medium', color: { rgb: '94A3B8' } }, left: { style: 'medium', color: { rgb: '94A3B8' } }, right: { style: 'medium', color: { rgb: '94A3B8' } } };
+  const titleS = { font: { bold: true, sz: 13, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: TITLE_BG } }, alignment: { horizontal: 'left', vertical: 'center' }, border: medB };
+  const headerS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: HEADER_BG } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: thinB };
+  const cellS = (ri: number) => ({ font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB });
+  const noteS = { font: { sz: 9, color: { rgb: '475569' }, italic: true, name: 'Calibri' }, fill: { fgColor: { rgb: 'FFF7ED' } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB };
+  const noteTitleS = { font: { bold: true, sz: 10, color: { rgb: 'EA580C' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'FFF7ED' } }, alignment: { horizontal: 'left', vertical: 'center' }, border: thinB };
 
-  // Column widths
-  ws['!cols'] = [
-    { wch: 35 }, { wch: 50 }, { wch: 20 }, { wch: 28 },
-    { wch: 22 }, { wch: 30 }, { wch: 22 }, { wch: 42 },
+  const notlar = [
+    ['KULLANIM NOTLARI:'],
+    ['1. Baslik alani zorunludur — bos birakilamaz.'],
+    ['2. Tarih formati: YYYY-AA-GG (ornek: 2026-03-15) veya GG.AA.YYYY (ornek: 15.03.2026)'],
+    ['3. Onem degerleri: Dusuk / Orta / Yuksek / Kritik'],
+    ['4. Firma adi sistemdeki kayitla birebir eslesmelidir.'],
+    ['5. Ornek satirlar (2-4. satirlar) aktarmadan once silinebilir.'],
   ];
 
-  // Freeze top row
-  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+  const wsData = [
+    ['ISG DOF - Ice Aktarma Sablonu', ...Array(TEMPLATE_HEADERS.length - 1).fill('')],
+    TEMPLATE_HEADERS,
+    ...SAMPLE_ROWS,
+    ...notlar.map(n => [...n, ...Array(TEMPLATE_HEADERS.length - 1).fill('')]),
+  ];
 
-  // Add validation note sheet
-  const noteWs = XLSX.utils.aoa_to_sheet([
-    ['DÖF İçe Aktarma Şablonu - Kullanım Kılavuzu'],
-    [''],
-    ['DOLDURMA KURALLARI:'],
-    [''],
-    ['Kolon 1 — Başlık *       : Zorunlu alan. Uygunsuzluğun kısa adı.'],
-    ['Kolon 2 — Açıklama       : Detaylı açıklama (isteğe bağlı).'],
-    ['Kolon 3 — Tarih          : YYYY-AA-GG formatında (örn: 2026-03-15)'],
-    ['                           veya GG.AA.YYYY (örn: 15.03.2026)'],
-    ['Kolon 4 — Firma Adı      : Sistemde kayıtlı firma adıyla eşleştirilir.'],
-    ['Kolon 5 — Personel Adı   : Sistemde kayıtlı personel adıyla eşleştirilir.'],
-    ['Kolon 6 — Önem           : Düşük / Orta / Yüksek / Kritik'],
-    ['Kolon 7 — Bölüm/Alan     : Uygunsuzluğun tespit edildiği alan (isteğe bağlı).'],
-    ['Kolon 8 — Notlar         : Ek notlar (isteğe bağlı).'],
-    [''],
-    ['ÖNEMLİ NOTLAR:'],
-    ['• İlk satır başlık satırıdır — silmeyin veya değiştirmeyin.'],
-    ['• Örnek veriler (2-4. satırlar) içe aktarmadan önce silinebilir.'],
-    ['• Boş satırlar otomatik atlanır.'],
-    ['• Desteklenen format: .xlsx (Excel 2007+)'],
-  ]);
-  noteWs['!cols'] = [{ wch: 75 }];
+  const wb = XLSXStyle.utils.book_new();
+  const ws = XLSXStyle.utils.aoa_to_sheet(wsData);
 
-  XLSX.utils.book_append_sheet(wb, ws, 'DÖF Verileri');
-  XLSX.utils.book_append_sheet(wb, noteWs, 'Kullanım Kılavuzu');
+  // Birleştirmeler
+  if (!ws['!merges']) ws['!merges'] = [];
+  ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: TEMPLATE_HEADERS.length - 1 } });
+  notlar.forEach((_, ri) => {
+    ws['!merges']!.push({ s: { r: ri + 2 + SAMPLE_ROWS.length, c: 0 }, e: { r: ri + 2 + SAMPLE_ROWS.length, c: TEMPLATE_HEADERS.length - 1 } });
+  });
 
-  // Use blob-based download for better browser compatibility
-  const wbArray = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  // Stilleri uygula
+  wsData.forEach((row, ri) => {
+    (row as string[]).forEach((_, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws[addr]) return;
+      let s: object;
+      if (ri === 0) s = titleS;
+      else if (ri === 1) s = headerS;
+      else if (ri >= 2 && ri < 2 + SAMPLE_ROWS.length) s = cellS(ri - 2);
+      else if (ri === 2 + SAMPLE_ROWS.length) s = noteTitleS;
+      else s = noteS;
+      (ws[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+
+  ws['!cols'] = [{ wch: 35 }, { wch: 50 }, { wch: 20 }, { wch: 28 }, { wch: 22 }, { wch: 30 }, { wch: 22 }, { wch: 42 }];
+  if (!ws['!rows']) ws['!rows'] = [];
+  (ws['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 30 };
+  (ws['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 26 };
+  SAMPLE_ROWS.forEach((_, i) => { (ws['!rows'] as XLSXStyle.RowInfo[])[i + 2] = { hpt: 22 }; });
+
+  XLSXStyle.utils.book_append_sheet(wb, ws, 'DOF Sablonu');
+
+  const wbArray = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([wbArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'DOF_Sablon.xlsx';
+  a.download = `${new Date().toLocaleDateString('tr-TR')} DÖF Şablonu.xlsx`;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);

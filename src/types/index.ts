@@ -267,6 +267,28 @@ export interface AppData {
   currentUser: CurrentUser;
 }
 
+export type CompanyDocumentStatus = 'Aktif' | 'Süresi Dolmuş' | 'Yaklaşan';
+
+export interface CompanyDocument {
+  id: string;
+  organization_id: string;
+  company_id: string | null;
+  title: string;
+  document_type: string;
+  file_url: string | null;
+  file_name: string | null;
+  file_size: number;
+  file_type: string | null;
+  description: string;
+  version: string;
+  valid_from: string | null;
+  valid_until: string | null;
+  status: CompanyDocumentStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Toast {
   id: string;
   message: string;

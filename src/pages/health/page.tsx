@@ -4,6 +4,7 @@ import Modal from '../../components/base/Modal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import type { Muayene, MuayeneResult } from '../../types';
 import { getEvrakKategori } from '../../utils/evrakKategori';
+import XLSXStyle from 'xlsx-js-style';
 
 const RESULT_CONFIG: Record<MuayeneResult, { label: string; color: string; bg: string; icon: string }> = {
   'Çalışabilir': { label: 'Çalışabilir', color: '#34D399', bg: 'rgba(52,211,153,0.12)', icon: 'ri-checkbox-circle-line' },
@@ -30,6 +31,131 @@ const defaultForm: Omit<Muayene, 'id' | 'olusturmaTarihi'> = {
 function getDaysUntil(dateStr: string): number {
   if (!dateStr) return 999;
   return Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function exportMuayenelerToExcel(
+  muayeneler: Muayene[],
+  firmalar: { id: string; ad: string }[],
+  personeller: { id: string; adSoyad: string; gorev?: string }[],
+): void {
+  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '-';
+  const aktif = muayeneler.filter(m => !m.silinmis);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tarih = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
+  const calisabilir = aktif.filter(m => m.sonuc === 'Çalışabilir').length;
+  const kisitli = aktif.filter(m => m.sonuc === 'Kısıtlı Çalışabilir').length;
+  const calisamaz = aktif.filter(m => m.sonuc === 'Çalışamaz').length;
+  const yaklasan = aktif.filter(m => { const d = getDaysUntil(m.sonrakiTarih); return d >= 0 && d <= 30; }).length;
+  const gecmis = aktif.filter(m => getDaysUntil(m.sonrakiTarih) < 0).length;
+
+  const HEADER_BG = '1E293B'; const HEADER_FG = 'FFFFFF'; const TITLE_BG = '0F172A';
+  const ROW_ALT = 'F1F5F9'; const ROW_NORMAL = 'FFFFFF'; const BC = 'CBD5E1';
+  const thinB = { top: { style: 'thin', color: { rgb: BC } }, bottom: { style: 'thin', color: { rgb: BC } }, left: { style: 'thin', color: { rgb: BC } }, right: { style: 'thin', color: { rgb: BC } } };
+  const medB = { top: { style: 'medium', color: { rgb: '94A3B8' } }, bottom: { style: 'medium', color: { rgb: '94A3B8' } }, left: { style: 'medium', color: { rgb: '94A3B8' } }, right: { style: 'medium', color: { rgb: '94A3B8' } } };
+  const titleS = { font: { bold: true, sz: 13, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: TITLE_BG } }, alignment: { horizontal: 'left', vertical: 'center' }, border: medB };
+  const headerS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: HEADER_BG } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+  const subHeaderS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: '334155' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+  const cellS = (ri: number, align: 'left' | 'center' | 'right' = 'left') => ({ font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: align, vertical: 'center', wrapText: true }, border: thinB });
+  const numS = (ri: number) => ({ font: { sz: 10, color: { rgb: '64748B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB });
+  const totalS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: '334155' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: medB };
+  const sumValS = { font: { bold: true, sz: 11, color: { rgb: '1E40AF' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'EFF6FF' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+  const statusS = (s: string) => {
+    const sl = s.toLowerCase();
+    let fg = '64748B'; let bg = 'F1F5F9';
+    if (sl.includes('çalışabilir') || sl === 'var') { fg = '16A34A'; bg = 'DCFCE7'; }
+    else if (sl.includes('çalışamaz') || sl.includes('gecikmiş') || sl.includes('geçti')) { fg = 'DC2626'; bg = 'FEE2E2'; }
+    else if (sl.includes('kısıtlı') || sl.includes('kaldı') || sl === 'bugün') { fg = 'D97706'; bg = 'FEF3C7'; }
+    return { font: { bold: true, sz: 10, color: { rgb: fg }, name: 'Calibri' }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB };
+  };
+
+  const wb = XLSXStyle.utils.book_new();
+
+  // ── Sayfa 1 ──
+  const COLS1 = ['#', 'Personel', 'Görev', 'Firma', 'Muayene Tarihi', 'Sonraki Muayene', 'Kalan Gün', 'Sonuç', 'Hastane', 'Doktor', 'Belge', 'Notlar'];
+  const dataRows1 = aktif.map((m, i) => {
+    const personel = personeller.find(p => p.id === m.personelId);
+    const firma = firmalar.find(f => f.id === m.firmaId);
+    const diff = getDaysUntil(m.sonrakiTarih);
+    const kalanGun = m.sonrakiTarih ? (diff < 0 ? `${Math.abs(diff)} gün geçti` : diff === 0 ? 'BUGÜN' : `${diff} gün kaldı`) : '-';
+    return [i + 1, personel?.adSoyad || '-', personel?.gorev || '-', firma?.ad || '-', fmtDate(m.muayeneTarihi), fmtDate(m.sonrakiTarih), kalanGun, m.sonuc, m.hastane || '-', m.doktor ? `Dr. ${m.doktor}` : '-', m.belgeMevcut ? 'Var' : 'Yok', m.notlar || '-'];
+  });
+  const ws1Rows = [
+    [`ISG SAĞLIK MUAYENELERİ RAPORU — ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`, ...Array(COLS1.length - 1).fill('')],
+    ['Toplam', 'Çalışabilir', 'Kısıtlı', 'Çalışamaz', 'Yaklaşan (≤30 gün)', 'Süresi Geçmiş', '', '', '', '', '', ''],
+    [aktif.length, calisabilir, kisitli, calisamaz, yaklasan, gecmis, '', '', '', '', '', ''],
+    COLS1, ...dataRows1,
+  ];
+  const ws1 = XLSXStyle.utils.aoa_to_sheet(ws1Rows);
+  if (!ws1['!merges']) ws1['!merges'] = [];
+  ws1['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS1.length - 1 } });
+  ws1Rows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws1[addr]) ws1[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      let s: object = cellS(ri - 4);
+      if (ri === 0) s = titleS;
+      else if (ri === 1) s = subHeaderS;
+      else if (ri === 2) s = sumValS;
+      else if (ri === 3) s = headerS;
+      else { const dr = ri - 4; if (ci === 0) s = numS(dr); else if (ci === 6) s = statusS(String(val ?? '')); else if (ci === 7) s = statusS(String(val ?? '')); else if (ci === 10) s = statusS(String(val ?? '')); else if (ci >= 4 && ci <= 5) s = cellS(dr, 'center'); else s = cellS(dr); }
+      (ws1[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+  ws1['!cols'] = [{ wch: 4 }, { wch: 24 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 8 }, { wch: 32 }];
+  if (!ws1['!rows']) ws1['!rows'] = [];
+  (ws1['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 30 }; (ws1['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 }; (ws1['!rows'] as XLSXStyle.RowInfo[])[2] = { hpt: 22 }; (ws1['!rows'] as XLSXStyle.RowInfo[])[3] = { hpt: 24 };
+  XLSXStyle.utils.book_append_sheet(wb, ws1, 'Muayene Listesi');
+
+  // ── Sayfa 2 ──
+  const firmaOzet = firmalar.filter(f => !('silinmis' in f) || !(f as { silinmis?: boolean }).silinmis).map(f => { const fps = aktif.filter(m => m.firmaId === f.id); return [f.ad, fps.length, fps.filter(m => m.sonuc === 'Çalışabilir').length, fps.filter(m => m.sonuc === 'Kısıtlı Çalışabilir').length, fps.filter(m => m.sonuc === 'Çalışamaz').length, fps.filter(m => getDaysUntil(m.sonrakiTarih) < 0).length]; }).filter(r => (r[1] as number) > 0).sort((a, b) => (b[1] as number) - (a[1] as number));
+  const COLS2 = ['Firma Adı', 'Toplam', 'Çalışabilir', 'Kısıtlı', 'Çalışamaz', 'Süresi Geçmiş'];
+  const ws2Rows = [['FİRMA BAZLI SAĞLIK ÖZETİ', '', '', '', '', ''], COLS2, ...firmaOzet, ['TOPLAM', aktif.length, calisabilir, kisitli, calisamaz, gecmis], ['', '', '', '', '', ''], ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR'), '', '', '', '']];
+  const ws2 = XLSXStyle.utils.aoa_to_sheet(ws2Rows);
+  if (!ws2['!merges']) ws2['!merges'] = [];
+  ws2['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } });
+  ws2Rows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws2[addr]) ws2[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      const totalRowIdx = 2 + firmaOzet.length;
+      let s: object = cellS(ri - 2);
+      if (ri === 0) s = titleS; else if (ri === 1) s = headerS; else if (ri === totalRowIdx) s = totalS;
+      else if (ri > 1 && ri < totalRowIdx) { const dr = ri - 2; s = ci === 0 ? cellS(dr) : { font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: dr % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinB }; }
+      (ws2[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+  ws2['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
+  if (!ws2['!rows']) ws2['!rows'] = []; (ws2['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 }; (ws2['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+  XLSXStyle.utils.book_append_sheet(wb, ws2, 'Firma Özeti');
+
+  // ── Sayfa 3 ──
+  const kritikler = aktif.filter(m => m.sonrakiTarih).map(m => { const diff = getDaysUntil(m.sonrakiTarih); const personel = personeller.find(p => p.id === m.personelId); const firma = firmalar.find(f => f.id === m.firmaId); return { m, diff, personel, firma }; }).filter(x => x.diff <= 30).sort((a, b) => a.diff - b.diff);
+  const COLS3 = ['Personel', 'Görev', 'Firma', 'Sonraki Muayene', 'Kalan Gün', 'Sonuç'];
+  const kritikData = kritikler.map(x => [x.personel?.adSoyad || '-', x.personel?.gorev || '-', x.firma?.ad || '-', fmtDate(x.m.sonrakiTarih), x.diff < 0 ? `${Math.abs(x.diff)} gün gecikmiş` : x.diff === 0 ? 'BUGÜN' : `${x.diff} gün kaldı`, x.m.sonuc]);
+  const ws3Rows = [['YAKLAŞAN & GECİKMİŞ MUAYENELER (30 Gün İçinde)', '', '', '', '', ''], COLS3, ...(kritikData.length > 0 ? kritikData : [['Yaklaşan veya gecikmiş muayene bulunmuyor.', '', '', '', '', '']])];
+  const ws3 = XLSXStyle.utils.aoa_to_sheet(ws3Rows);
+  if (!ws3['!merges']) ws3['!merges'] = [];
+  ws3['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS3.length - 1 } });
+  ws3Rows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws3[addr]) ws3[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      let s: object = cellS(ri - 2);
+      if (ri === 0) s = titleS; else if (ri === 1) s = headerS;
+      else { const dr = ri - 2; if (ci === 4 || ci === 5) s = statusS(String(val ?? '')); else if (ci === 3) s = cellS(dr, 'center'); else s = cellS(dr); }
+      (ws3[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+  ws3['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 22 }, { wch: 16 }];
+  if (!ws3['!rows']) ws3['!rows'] = []; (ws3['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 }; (ws3['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+  XLSXStyle.utils.book_append_sheet(wb, ws3, 'Kritik Muayeneler');
+
+  const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = `${new Date().toLocaleDateString('tr-TR')} Sağlık Muayeneleri Raporu.xlsx`;
+  document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
 }
 
 export default function MuayenelerPage() {
@@ -166,9 +292,14 @@ export default function MuayenelerPage() {
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Sağlık Evrakları</h2>
           <p className="text-sm mt-1" style={{ color: '#64748B' }}>Personel sağlık muayene kayıtlarını takip edin</p>
         </div>
-        <button onClick={openAdd} className="btn-primary self-start sm:self-auto whitespace-nowrap">
-          <i className="ri-add-line" /> Sağlık Evrakı Ekle
-        </button>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button onClick={() => exportMuayenelerToExcel(muayeneler, firmalar, personeller)} className="btn-secondary whitespace-nowrap">
+            <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
+          </button>
+          <button onClick={openAdd} className="btn-primary whitespace-nowrap">
+            <i className="ri-add-line" /> Sağlık Evrakı Ekle
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

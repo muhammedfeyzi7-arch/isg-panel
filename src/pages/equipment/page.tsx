@@ -3,6 +3,7 @@ import { useApp } from '../../store/AppContext';
 import Modal from '../../components/base/Modal';
 import QrModal from './components/QrModal';
 import type { Ekipman, EkipmanStatus } from '../../types';
+import XLSXStyle from 'xlsx-js-style';
 const EKIPMAN_TURLERI = [
   'İş Makinesi', 'Kaldırma Ekipmanı', 'Basınçlı Kap', 'Elektrikli Ekipman',
   'İskele / Platform', 'Koruyucu Donanım', 'Yangın Söndürücü', 'İlk Yardım Kiti',
@@ -21,54 +22,291 @@ function parseTrDate(d: string): string {
 }
 
 function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad: string }[]): void {
-  const headers = ['Ekipman Adı', 'Ekipman Türü', 'Firma Adı', 'Bulunduğu Alan', 'Seri No', 'Marka', 'Model', 'Son Kontrol (GG.AA.YYYY)', 'Sonraki Kontrol (GG.AA.YYYY)', 'Durum', 'Açıklama'];
-  const rows = ekipmanlar
-    .filter(e => !e.silinmis)
-    .map(e => {
-      const firma = firmalar.find(f => f.id === e.firmaId);
-      const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '';
-      return [
-        e.ad, e.tur, firma?.ad ?? '', e.bulunduguAlan, e.seriNo,
-        e.marka, e.model, fmtDate(e.sonKontrolTarihi), fmtDate(e.sonrakiKontrolTarihi),
-        e.durum, e.aciklama,
-      ];
-    });
+  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '-';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const aktif = ekipmanlar.filter(e => !e.silinmis);
+  const tarih = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
 
-  const csvRows = [headers, ...rows].map(row =>
-    row.map(cell => {
-      const str = String(cell ?? '');
-      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
-        return `"${str.replace(/"/g, '""')}"`;
+  const uygunSayisi = aktif.filter(e => e.durum === 'Uygun').length;
+  const uygunDegil = aktif.filter(e => e.durum === 'Uygun Değil').length;
+  const bakimda = aktif.filter(e => e.durum === 'Bakımda').length;
+  const hurda = aktif.filter(e => e.durum === 'Hurda').length;
+  const yaklasan = aktif.filter(e => {
+    if (!e.sonrakiKontrolTarihi) return false;
+    const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000);
+    return diff >= 0 && diff <= 30;
+  }).length;
+  const gecikmis = aktif.filter(e => {
+    if (!e.sonrakiKontrolTarihi) return false;
+    return new Date(e.sonrakiKontrolTarihi) < today;
+  }).length;
+
+  // ── Stil tanımları ──
+  const HEADER_BG = '1E293B';
+  const HEADER_FG = 'FFFFFF';
+  const TITLE_BG = '0F172A';
+  const ROW_ALT = 'F1F5F9';
+  const ROW_NORMAL = 'FFFFFF';
+  const BORDER_COLOR = 'CBD5E1';
+  const SUMMARY_BG = 'EFF6FF';
+  const SUMMARY_FG = '1E40AF';
+
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: BORDER_COLOR } },
+    bottom: { style: 'thin', color: { rgb: BORDER_COLOR } },
+    left: { style: 'thin', color: { rgb: BORDER_COLOR } },
+    right: { style: 'thin', color: { rgb: BORDER_COLOR } },
+  };
+  const medBorder = {
+    top: { style: 'medium', color: { rgb: '94A3B8' } },
+    bottom: { style: 'medium', color: { rgb: '94A3B8' } },
+    left: { style: 'medium', color: { rgb: '94A3B8' } },
+    right: { style: 'medium', color: { rgb: '94A3B8' } },
+  };
+
+  const titleS = { font: { bold: true, sz: 13, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: TITLE_BG } }, alignment: { horizontal: 'left', vertical: 'center' }, border: medBorder };
+  const headerS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: HEADER_BG } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinBorder };
+  const subHeaderS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: '334155' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinBorder };
+  const cellS = (ri: number, align: 'left' | 'center' | 'right' = 'left') => ({ font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: align, vertical: 'center', wrapText: true }, border: thinBorder });
+  const numS = (ri: number) => ({ font: { sz: 10, color: { rgb: '64748B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinBorder });
+  const sumLabelS = { font: { bold: true, sz: 10, color: { rgb: SUMMARY_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: SUMMARY_BG } }, alignment: { horizontal: 'left', vertical: 'center' }, border: thinBorder };
+  const sumValS = { font: { bold: true, sz: 11, color: { rgb: SUMMARY_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: SUMMARY_BG } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinBorder };
+  const totalS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: '334155' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: medBorder };
+
+  const statusS = (s: string) => {
+    const sl = s.toLowerCase();
+    let fg = '64748B'; let bg = 'F1F5F9';
+    if (sl === 'uygun' || sl === 'zamanında') { fg = '16A34A'; bg = 'DCFCE7'; }
+    else if (sl.includes('değil') || sl.includes('gecikmiş') || sl.includes('geçti')) { fg = 'DC2626'; bg = 'FEE2E2'; }
+    else if (sl.includes('kaldı') || sl.includes('yaklaşan') || sl === 'bugün') { fg = 'D97706'; bg = 'FEF3C7'; }
+    else if (sl === 'bakımda') { fg = 'EA580C'; bg = 'FFEDD5'; }
+    else if (sl === 'hurda') { fg = '64748B'; bg = 'F1F5F9'; }
+    return { font: { bold: true, sz: 10, color: { rgb: fg }, name: 'Calibri' }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinBorder };
+  };
+
+  const wb = XLSXStyle.utils.book_new();
+
+  // ── Sayfa 1: Ekipman Listesi ──
+  const COLS1 = ['#', 'Ekipman Adı', 'Ekipman Türü', 'Firma', 'Bulunduğu Alan', 'Marka', 'Model', 'Seri No', 'Son Kontrol', 'Sonraki Kontrol', 'Kontrol Durumu', 'Ekipman Durumu', 'Belge', 'Açıklama'];
+  const dataRows1 = aktif.map((e, idx) => {
+    const firma = firmalar.find(f => f.id === e.firmaId);
+    let kontrolDurumu = '-';
+    if (e.sonrakiKontrolTarihi) {
+      const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000);
+      if (diff < 0) kontrolDurumu = 'GECİKMİŞ';
+      else if (diff === 0) kontrolDurumu = 'BUGÜN';
+      else if (diff <= 30) kontrolDurumu = `${diff} gün kaldı`;
+      else kontrolDurumu = 'Zamanında';
+    }
+    return [idx + 1, e.ad || '-', e.tur || '-', firma?.ad || '-', e.bulunduguAlan || '-', e.marka || '-', e.model || '-', e.seriNo || '-', fmtDate(e.sonKontrolTarihi), fmtDate(e.sonrakiKontrolTarihi), kontrolDurumu, e.durum || '-', e.belgeMevcut ? 'Evet' : 'Hayır', e.aciklama || '-'];
+  });
+
+  // Özet satırları
+  const summaryRows = [
+    [`ISG EKİPMAN KONTROL RAPORU — ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`],
+    ['Toplam', 'Uygun', 'Uygun Değil', 'Bakımda', 'Hurda', 'Yaklaşan (≤30 gün)', 'Gecikmiş'],
+    [aktif.length, uygunSayisi, uygunDegil, bakimda, hurda, yaklasan, gecikmis],
+    COLS1,
+    ...dataRows1,
+  ];
+
+  const ws1 = XLSXStyle.utils.aoa_to_sheet(summaryRows);
+
+  // Başlık birleştir
+  if (!ws1['!merges']) ws1['!merges'] = [];
+  ws1['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS1.length - 1 } });
+
+  // Stilleri uygula
+  summaryRows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws1[addr]) ws1[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      let s: object = cellS(ri - 4);
+      if (ri === 0) s = titleS;
+      else if (ri === 1) s = subHeaderS;
+      else if (ri === 2) s = sumValS;
+      else if (ri === 3) s = headerS;
+      else {
+        // Veri satırları
+        const dataRi = ri - 4;
+        if (ci === 0) s = numS(dataRi);
+        else if (ci === 10) s = statusS(String(val ?? ''));  // Kontrol Durumu
+        else if (ci === 11) s = statusS(String(val ?? '')); // Ekipman Durumu
+        else if (ci === 12) s = { ...cellS(dataRi, 'center'), font: { sz: 10, color: { rgb: String(val) === 'Evet' ? '16A34A' : 'DC2626' }, bold: true, name: 'Calibri' }, fill: { fgColor: { rgb: String(val) === 'Evet' ? 'DCFCE7' : 'FEE2E2' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinBorder };
+        else s = cellS(dataRi, ci >= 8 ? 'center' : 'left');
       }
-      return str;
-    }).join(','),
-  );
+      (ws1[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
 
-  const csvContent = '\uFEFF' + csvRows.join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  ws1['!cols'] = [{ wch: 4 }, { wch: 28 }, { wch: 20 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 8 }, { wch: 36 }];
+  if (!ws1['!rows']) ws1['!rows'] = [];
+  (ws1['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 30 };
+  (ws1['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+  (ws1['!rows'] as XLSXStyle.RowInfo[])[2] = { hpt: 22 };
+  (ws1['!rows'] as XLSXStyle.RowInfo[])[3] = { hpt: 24 };
+  XLSXStyle.utils.book_append_sheet(wb, ws1, 'Ekipman Listesi');
+
+  // ── Sayfa 2: Durum Özeti ──
+  const ozet2Rows = [
+    ['EKİPMAN DURUM ÖZETİ'],
+    ['Durum', 'Adet', 'Oran (%)'],
+    ['Uygun', uygunSayisi, aktif.length ? +((uygunSayisi / aktif.length) * 100).toFixed(1) : 0],
+    ['Uygun Değil', uygunDegil, aktif.length ? +((uygunDegil / aktif.length) * 100).toFixed(1) : 0],
+    ['Bakımda', bakimda, aktif.length ? +((bakimda / aktif.length) * 100).toFixed(1) : 0],
+    ['Hurda', hurda, aktif.length ? +((hurda / aktif.length) * 100).toFixed(1) : 0],
+    ['TOPLAM', aktif.length, 100],
+    [],
+    ['KONTROL TAKVİMİ'],
+    ['Durum', 'Adet'],
+    ['Zamanında', aktif.length - yaklasan - gecikmis],
+    ['Yaklaşan (≤30 gün)', yaklasan],
+    ['Gecikmiş', gecikmis],
+    [],
+    ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR')],
+  ];
+  const ws2 = XLSXStyle.utils.aoa_to_sheet(ozet2Rows);
+  if (!ws2['!merges']) ws2['!merges'] = [];
+  ws2['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } });
+  ws2['!merges'].push({ s: { r: 8, c: 0 }, e: { r: 8, c: 2 } });
+  ozet2Rows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws2[addr]) ws2[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      let s: object = cellS(ri);
+      if (ri === 0 || ri === 8) s = titleS;
+      else if (ri === 1 || ri === 9) s = headerS;
+      else if (ri === 6) s = totalS;
+      else if (ri >= 2 && ri <= 5) {
+        if (ci === 0) s = statusS(String(val ?? ''));
+        else s = { ...cellS(ri - 2, 'center'), font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, border: thinBorder };
+      } else if (ri >= 10 && ri <= 12) {
+        if (ci === 0) s = statusS(String(val ?? ''));
+        else s = { ...cellS(ri - 10, 'center'), font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, border: thinBorder };
+      } else if (ri === 14) s = sumLabelS;
+      (ws2[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+  ws2['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 12 }];
+  if (!ws2['!rows']) ws2['!rows'] = [];
+  (ws2['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
+  (ws2['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+  (ws2['!rows'] as XLSXStyle.RowInfo[])[8] = { hpt: 28 };
+  (ws2['!rows'] as XLSXStyle.RowInfo[])[9] = { hpt: 22 };
+  XLSXStyle.utils.book_append_sheet(wb, ws2, 'Durum Özeti');
+
+  // ── Sayfa 3: Kritik Kontroller ──
+  const kritikler = aktif
+    .filter(e => { if (!e.sonrakiKontrolTarihi) return false; const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000); return diff <= 30; })
+    .sort((a, b) => new Date(a.sonrakiKontrolTarihi).getTime() - new Date(b.sonrakiKontrolTarihi).getTime());
+
+  const COLS3 = ['Ekipman Adı', 'Tür', 'Firma', 'Kontrol Tarihi', 'Kalan Süre', 'Durum'];
+  const kritikData = kritikler.map(e => {
+    const firma = firmalar.find(f => f.id === e.firmaId);
+    const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000);
+    return [e.ad, e.tur || '-', firma?.ad || '-', fmtDate(e.sonrakiKontrolTarihi), diff < 0 ? `${Math.abs(diff)} gün gecikmiş` : diff === 0 ? 'BUGÜN' : `${diff} gün kaldı`, e.durum];
+  });
+  const ws3Rows = [
+    ['YAKLAŞAN & GECİKMİŞ KONTROLLER'],
+    COLS3,
+    ...(kritikData.length > 0 ? kritikData : [['Yaklaşan veya gecikmiş kontrol bulunmuyor.', '', '', '', '', '']]),
+  ];
+  const ws3 = XLSXStyle.utils.aoa_to_sheet(ws3Rows);
+  if (!ws3['!merges']) ws3['!merges'] = [];
+  ws3['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS3.length - 1 } });
+  ws3Rows.forEach((row, ri) => {
+    (row as (string | number)[]).forEach((val, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
+      if (!ws3[addr]) ws3[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
+      let s: object = cellS(ri - 2);
+      if (ri === 0) s = titleS;
+      else if (ri === 1) s = headerS;
+      else {
+        const dataRi = ri - 2;
+        if (ci === 4) s = statusS(String(val ?? ''));
+        else if (ci === 5) s = statusS(String(val ?? ''));
+        else if (ci === 3) s = cellS(dataRi, 'center');
+        else s = cellS(dataRi);
+      }
+      (ws3[addr] as XLSXStyle.CellObject).s = s;
+    });
+  });
+  ws3['!cols'] = [{ wch: 28 }, { wch: 20 }, { wch: 24 }, { wch: 16 }, { wch: 22 }, { wch: 16 }];
+  if (!ws3['!rows']) ws3['!rows'] = [];
+  (ws3['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
+  (ws3['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+  XLSXStyle.utils.book_append_sheet(wb, ws3, 'Kritik Kontroller');
+
+  const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Ekipmanlar-${new Date().toLocaleDateString('tr-TR').replace(/\./g, '-')}.csv`;
+  link.download = `${new Date().toLocaleDateString('tr-TR')} Ekipman Kontrol Raporu.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  URL.revokeObjectURL(url);
 }
 
 function downloadEkipmanTemplate(): void {
+  const HEADER_BG = '1E293B'; const HEADER_FG = 'FFFFFF'; const BC = 'CBD5E1';
+  const thinB = { top: { style: 'thin', color: { rgb: BC } }, bottom: { style: 'thin', color: { rgb: BC } }, left: { style: 'thin', color: { rgb: BC } }, right: { style: 'thin', color: { rgb: BC } } };
+  const headerS = { font: { bold: true, sz: 10, color: { rgb: HEADER_FG }, name: 'Calibri' }, fill: { fgColor: { rgb: HEADER_BG } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: thinB };
+  const cellS = { font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB };
+  const noteS = { font: { sz: 9, color: { rgb: '64748B' }, italic: true, name: 'Calibri' }, fill: { fgColor: { rgb: 'F8FAFC' } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB };
+
   const headers = ['Ekipman Adı', 'Ekipman Türü', 'Firma Adı', 'Bulunduğu Alan', 'Seri No', 'Marka', 'Model', 'Son Kontrol (GG.AA.YYYY)', 'Sonraki Kontrol (GG.AA.YYYY)', 'Durum', 'Açıklama'];
-  const example = ['Forklift', 'İş Makinesi', 'Örnek Firma A.Ş.', 'Depo', 'SN-001', 'Toyota', 'Model-X', '15.01.2025', '15.07.2025', 'Uygun', 'Yıllık bakım yapıldı'];
-  const csvContent = '\uFEFF' + [headers, example].map(row => row.join(',')).join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const example = ['Forklift', 'İş Makinesi', 'Örnek Firma A.S.', 'Depo', 'SN-001', 'Toyota', 'Model-X', '15.01.2025', '15.07.2025', 'Uygun', 'Yillik bakim yapildi'];
+  const notlar = [
+    ['NOTLAR:', '', '', '', '', '', '', '', '', '', ''],
+    ['1. Tarih formati: GG.AA.YYYY (ornek: 15.01.2025)', '', '', '', '', '', '', '', '', '', ''],
+    ['2. Durum degerleri: Uygun / Uygun Degil / Bakimda / Hurda', '', '', '', '', '', '', '', '', '', ''],
+    ['3. Firma adi sistemdeki kayitla birebir eslesmelidir', '', '', '', '', '', '', '', '', '', ''],
+  ];
+
+  const wb = XLSXStyle.utils.book_new();
+  const ws = XLSXStyle.utils.aoa_to_sheet([headers, example, ...notlar]);
+
+  // Stilleri uygula
+  headers.forEach((_, ci) => {
+    const hAddr = XLSXStyle.utils.encode_cell({ r: 0, c: ci });
+    const eAddr = XLSXStyle.utils.encode_cell({ r: 1, c: ci });
+    if (ws[hAddr]) (ws[hAddr] as XLSXStyle.CellObject).s = headerS;
+    if (ws[eAddr]) (ws[eAddr] as XLSXStyle.CellObject).s = cellS;
+  });
+
+  // Not satırları
+  notlar.forEach((row, ri) => {
+    row.forEach((_, ci) => {
+      const addr = XLSXStyle.utils.encode_cell({ r: ri + 2, c: ci });
+      if (ws[addr]) (ws[addr] as XLSXStyle.CellObject).s = noteS;
+    });
+  });
+
+  // Birleştirmeler
+  if (!ws['!merges']) ws['!merges'] = [];
+  notlar.forEach((_, ri) => {
+    ws['!merges']!.push({ s: { r: ri + 2, c: 0 }, e: { r: ri + 2, c: headers.length - 1 } });
+  });
+
+  ws['!cols'] = [{ wch: 18 }, { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 30 }];
+  if (!ws['!rows']) ws['!rows'] = [];
+  (ws['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
+  (ws['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
+
+  XLSXStyle.utils.book_append_sheet(wb, ws, 'Ekipman Sablonu');
+  const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'Ekipman-Sablonu.csv';
+  link.download = `${new Date().toLocaleDateString('tr-TR')} Ekipman Şablonu.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  URL.revokeObjectURL(url);
 }
 
 const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: string; icon: string }> = {
@@ -285,7 +523,7 @@ export default function EkipmanlarPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
           <button onClick={() => exportEkipmanToExcel(ekipmanlar, firmalar)} className="btn-secondary whitespace-nowrap">
-            <i className="ri-file-excel-2-line mr-1" />Excel İndir
+            <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
           </button>
           <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
             <i className="ri-upload-2-line mr-1" />Excel İçe Aktar

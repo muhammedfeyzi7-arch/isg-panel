@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
 import MonthlyStats from './components/MonthlyStats';
 import StatCard from './components/StatCard';
+import CompanyDocumentsWidget from './components/CompanyDocumentsWidget';
 import {
   PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -620,6 +621,9 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ── Firma Evrakları Widget ── */}
+      <CompanyDocumentsWidget />
 
       {/* ── Progress Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

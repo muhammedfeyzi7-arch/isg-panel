@@ -47,13 +47,13 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
     return filtered.filter(u => selected.has(u.id));
   }, [filtered, selected]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (selectedRecords.length === 0) return;
     setGenerating(true);
     try {
-      printDofRaporu(selectedRecords, firmalar, personeller, getUygunsuzlukPhoto);
+      await printDofRaporu(selectedRecords, firmalar, personeller, getUygunsuzlukPhoto);
     } finally {
-      setTimeout(() => setGenerating(false), 1000);
+      setTimeout(() => setGenerating(false), 1500);
     }
   };
 
