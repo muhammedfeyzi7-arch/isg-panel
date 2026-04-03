@@ -86,51 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!email.trim()) return { error: 'E-posta adresi boş olamaz.' };
     if (password.length < 4) return { error: 'Şifre en az 4 karakter olmalıdır.' };
 
-    // Try sign in first
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
     if (!signInError) return { error: null };
 
-    // Detect "wrong credentials" errors — user exists but password wrong
-    // In this case, we must NOT attempt sign-up (would show "already registered")
-    const signInMsg = signInError.message.toLowerCase();
-    const isWrongCredentials =
-      signInMsg.includes('invalid login credentials') ||
-      signInMsg.includes('invalid credentials') ||
-      signInMsg.includes('invalid_credentials') ||
-      signInMsg.includes('email not confirmed') ||
-      signInMsg.includes('email_not_confirmed');
-
-    if (isWrongCredentials) {
-      return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
-    }
-
-    // For any other sign-in error, try sign-up — this handles brand-new users
-    const displayName = email.split('@')[0]
-      .replace(/[._-]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase());
-
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: { data: { full_name: displayName } },
-    });
-
-    // If sign-up also failed for any reason → always show friendly message (never raw Supabase error)
-    if (signUpError) {
-      return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
-    }
-
-    // Sign-up succeeded → new user was created, sign in immediately
-    const { error: signIn2Error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (signIn2Error) {
-      return { error: 'Hesap oluşturuldu. Lütfen e-posta kutunuzu kontrol edip doğrulama yapın, ardından giriş deneyin.' };
-    }
-
-    return { error: null };
+    // Always return a friendly error — never expose raw Supabase messages
+    return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
   }, []);
 
   const logout = useCallback(async () => {

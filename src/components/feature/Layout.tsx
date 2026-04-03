@@ -1,13 +1,21 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useApp } from '../../store/AppContext';
-import { PageSkeleton } from '../base/Skeleton';
 
 export default function Layout({ children }: { children: ReactNode }) {
-  const { sidebarCollapsed, theme, orgLoading, dataLoading } = useApp();
+  const { sidebarCollapsed, theme, activeModule } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isDark = theme === 'dark';
+  const [animKey, setAnimKey] = useState(0);
+  const prevModule = useRef(activeModule);
+
+  useEffect(() => {
+    if (prevModule.current !== activeModule) {
+      prevModule.current = activeModule;
+      setAnimKey(k => k + 1);
+    }
+  }, [activeModule]);
 
   // Close mobile sidebar on resize to desktop
   useEffect(() => {
@@ -27,8 +35,6 @@ export default function Layout({ children }: { children: ReactNode }) {
     }
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
-
-  const isLoading = orgLoading || dataLoading;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-app)', transition: 'background 0.3s ease' }}>
@@ -65,13 +71,9 @@ export default function Layout({ children }: { children: ReactNode }) {
         }`}
       >
         <div className="px-4 md:px-6 py-5 max-w-[1680px]">
-          {isLoading ? (
-            <PageSkeleton />
-          ) : (
-            <div className="page-enter">
-              {children}
-            </div>
-          )}
+          <div key={animKey} className="page-enter">
+            {children}
+          </div>
         </div>
       </main>
     </div>

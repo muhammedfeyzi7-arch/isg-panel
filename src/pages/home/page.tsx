@@ -20,10 +20,6 @@ import IsIzniPage from '../is-izni/page';
 function AppContent() {
   const { activeModule, dataLoading, orgLoading, orgError, org } = useApp();
 
-  const isLoading = (orgLoading || (dataLoading && !org));
-
-  useEffect(() => {}, [isLoading]);
-
   if (orgError && !org) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
@@ -36,22 +32,6 @@ function AppContent() {
           <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer" style={{ background: 'rgba(99,102,241,0.2)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.3)' }}>
             Tekrar Dene
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading && !org) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
-            <i className="ri-shield-check-line text-white text-xl" />
-          </div>
-          <div className="flex items-center gap-2" style={{ color: '#475569' }}>
-            <i className="ri-loader-4-line text-lg animate-spin" />
-            <span className="text-sm">Yükleniyor...</span>
-          </div>
         </div>
       </div>
     );

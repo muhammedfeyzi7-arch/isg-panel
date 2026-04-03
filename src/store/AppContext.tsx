@@ -191,7 +191,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, []),
   );
 
-  const [activeModule, setActiveModule] = useState('dashboard');
+  // Persist active module across page refreshes
+  const [activeModule, setActiveModuleState] = useState<string>(() => {
+    try { return localStorage.getItem('isg_active_module') || 'dashboard'; } catch { return 'dashboard'; }
+  });
+  const setActiveModule = useCallback((m: string) => {
+    setActiveModuleState(m);
+    try { localStorage.setItem('isg_active_module', m); } catch { /* ignore */ }
+  }, []);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [quickCreate, setQuickCreate] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);

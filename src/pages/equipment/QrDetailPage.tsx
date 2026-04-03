@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
 import Modal from '../../components/base/Modal';
@@ -268,8 +268,35 @@ export default function QrDetailPage() {
   const [showKontrol, setShowKontrol] = useState(false);
   const [showUygunsuzluk, setShowUygunsuzluk] = useState(false);
   const [showFoto, setShowFoto] = useState(false);
+  // Force re-render key after actions to show updated data immediately
+  const [refreshKey, setRefreshKey] = useState(0);
+  const prevEkipmanRef = useRef<string>('');
 
-  const ekipman = useMemo(() => ekipmanlar.find(e => e.id === id && !e.silinmis), [ekipmanlar, id]);
+  // Detect when ekipman data changes (after updateEkipman) and trigger visual refresh
+  const ekipman = useMemo(() => ekipmanlar.find(e => e.id === id && !e.silinmis), [ekipmanlar, id, refreshKey]);
+
+  useEffect(() => {
+    const snapshot = JSON.stringify(ekipman);
+    if (snapshot !== prevEkipmanRef.current) {
+      prevEkipmanRef.current = snapshot;
+    }
+  }, [ekipman]);
+
+  const handleKontrolClose = () => {
+    setShowKontrol(false);
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleUygunsuzlukClose = () => {
+    setShowUygunsuzluk(false);
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleFotoClose = () => {
+    setShowFoto(false);
+    setRefreshKey(k => k + 1);
+  };
+
   const firma = useMemo(() => firmalar.find(f => f.id === ekipman?.firmaId), [firmalar, ekipman]);
 
   if (dataLoading) {
@@ -456,20 +483,20 @@ export default function QrDetailPage() {
       {/* Aksiyonlar */}
       <KontrolModal
         open={showKontrol}
-        onClose={() => setShowKontrol(false)}
+        onClose={handleKontrolClose}
         ekipmanAd={ekipman.ad}
         firmaId={ekipman.firmaId}
         ekipmanId={ekipman.id}
       />
       <UygunsuzlukModal
         open={showUygunsuzluk}
-        onClose={() => setShowUygunsuzluk(false)}
+        onClose={handleUygunsuzlukClose}
         ekipmanAd={ekipman.ad}
         firmaId={ekipman.firmaId}
       />
       <FotoModal
         open={showFoto}
-        onClose={() => setShowFoto(false)}
+        onClose={handleFotoClose}
         ekipmanAd={ekipman.ad}
         ekipmanId={ekipman.id}
       />
