@@ -34,16 +34,20 @@ function KontrolModal({
     setSaving(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
+      const notlarVal = notlar.trim()
+        ? `[${today} - ${currentUser.ad || 'Kullanıcı'}] ${notlar.trim()}`
+        : '';
+      // Store üzerinden güncelle (saveToDb otomatik çalışır)
       updateEkipman(ekipmanId, {
         durum,
         sonKontrolTarihi: today,
         ...(sonrakiTarih ? { sonrakiKontrolTarihi: sonrakiTarih } : {}),
-        notlar: notlar.trim() ? `[${today} - ${currentUser.ad || 'Kullanıcı'}] ${notlar.trim()}` : '',
+        notlar: notlarVal,
       });
       addToast('Kontrol kaydedildi.', 'success');
       onClose();
-      // Supabase'e yazıldıktan sonra güncel veriyi çek
-      setTimeout(() => onSaved(), 600);
+      // Store'a yazıldıktan sonra Supabase'den taze veriyi çek
+      setTimeout(() => onSaved(), 800);
     } finally {
       setSaving(false);
     }
@@ -333,21 +337,29 @@ export default function QrDetailPage() {
     try {
       const { data, error } = await supabase
         .from('ekipmanlar')
-        .select('*')
+        .select('data')
         .eq('id', id)
         .maybeSingle();
       if (error) {
         console.error('[QR] Ekipman fetch error:', error);
-        setLocalEkipman(null);
+        // Hata durumunda store'dan dene
+        const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
+        setLocalEkipman(fromStore ?? null);
+      } else if (data && data.data) {
+        // Veri data.data içinde JSON olarak saklı
+        setLocalEkipman(data.data as Ekipman);
       } else {
-        setLocalEkipman(data as Ekipman | null);
+        // Supabase'de yok, store'dan dene
+        const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
+        setLocalEkipman(fromStore ?? null);
       }
     } catch {
-      setLocalEkipman(null);
+      const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
+      setLocalEkipman(fromStore ?? null);
     } finally {
       setLocalLoading(false);
     }
-  }, [id]);
+  }, [id, ekipmanlar]);
 
   // İlk yüklemede Supabase'den çek
   useEffect(() => {
@@ -366,19 +378,14 @@ export default function QrDetailPage() {
     }
   }, [dataLoading, ekipmanlar, id, localEkipman]);
 
-  // Store'daki ekipman güncellenince local state'i de güncelle
+  // Store'daki ekipman güncellenince local state'i de anlık güncelle
   useEffect(() => {
     if (!id || localEkipman === undefined) return;
-    const fromStore = ekipmanlar.find(e => e.id === id);
-    if (fromStore && localEkipman) {
-      // Sadece daha yeni bir güncelleme varsa uygula
-      const storeTime = fromStore.olusturmaTarihi || '';
-      const localTime = localEkipman.olusturmaTarihi || '';
-      if (storeTime >= localTime) {
-        setLocalEkipman(fromStore);
-      }
+    const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
+    if (fromStore) {
+      setLocalEkipman(fromStore);
     }
-  }, [ekipmanlar, id, localEkipman]);
+  }, [ekipmanlar, id]);
 
   // Kontrol kaydedildikten sonra Supabase'den taze veri çek
   const handleAfterSave = useCallback(() => {
@@ -440,7 +447,7 @@ export default function QrDetailPage() {
     );
   }
 
-  const sc = STATUS_CONFIG[localEkipman.durum];
+  const sc = STATUS_CONFIG[localEkipman.durum] ?? STATUS_CONFIG['Uygun'];
   const days = getDaysUntil(localEkipman.sonrakiKontrolTarihi);
   const isOverdue = days < 0;
   const isUrgent = days >= 0 && days <= 30;
