@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AppProvider, useApp } from '../../store/AppContext';
+import { useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ToastContainer from '../../components/base/ToastContainer';
 import DashboardPage from '../dashboard/page';
@@ -85,9 +85,5 @@ function AppContent() {
 }
 
 export default function ISGApp() {
-  return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
-  );
+  return <AppContent />;
 }
