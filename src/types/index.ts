@@ -227,7 +227,7 @@ export interface CurrentUser {
 }
 
 export type IsIzniTip = 'Sıcak Çalışma' | 'Yüksekte Çalışma' | 'Kapalı Alan' | 'Elektrikli Çalışma' | 'Kazı' | 'Genel';
-export type IsIzniStatus = 'Taslak' | 'Onay Bekliyor' | 'Onaylandı' | 'Aktif' | 'Tamamlandı' | 'İptal';
+export type IsIzniStatus = 'Onay Bekliyor' | 'Onaylandı' | 'Reddedildi';
 
 export interface IsIzni {
   id: string;

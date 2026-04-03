@@ -1,30 +1,29 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useApp } from '../../store/AppContext';
-import type { IsIzni, IsIzniTip, IsIzniStatus } from '../../types';
-import { usePermissions } from '../../hooks/usePermissions';
-import { generateIsIzniNo } from '../../store/useStore';
-import Modal from '../../components/base/Modal';
+import { useApp } from '@/store/AppContext';
+import type { IsIzni, IsIzniTip, IsIzniStatus } from '@/types';
+import { usePermissions } from '@/hooks/usePermissions';
+import { generateIsIzniNo } from '@/store/useStore';
+import Modal from '@/components/base/Modal';
+import IsIzniImport from './components/IsIzniImport';
+import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
 
 const TIP_CONFIG: Record<IsIzniTip, { color: string; bg: string; icon: string }> = {
-  'Sıcak Çalışma':     { color: '#F97316', bg: 'rgba(249,115,22,0.12)',   icon: 'ri-fire-line' },
-  'Yüksekte Çalışma':  { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',   icon: 'ri-arrow-up-line' },
-  'Kapalı Alan':       { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)',   icon: 'ri-door-closed-line' },
-  'Elektrikli Çalışma':{ color: '#EAB308', bg: 'rgba(234,179,8,0.12)',    icon: 'ri-flashlight-line' },
-  'Kazı':              { color: '#A16207', bg: 'rgba(161,98,7,0.12)',     icon: 'ri-tools-line' },
-  'Genel':             { color: '#64748B', bg: 'rgba(100,116,139,0.12)', icon: 'ri-file-shield-2-line' },
+  'Sıcak Çalışma':      { color: '#F97316', bg: 'rgba(249,115,22,0.12)',   icon: 'ri-fire-line' },
+  'Yüksekte Çalışma':   { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',   icon: 'ri-arrow-up-line' },
+  'Kapalı Alan':        { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)',   icon: 'ri-door-closed-line' },
+  'Elektrikli Çalışma': { color: '#EAB308', bg: 'rgba(234,179,8,0.12)',    icon: 'ri-flashlight-line' },
+  'Kazı':               { color: '#A16207', bg: 'rgba(161,98,7,0.12)',     icon: 'ri-tools-line' },
+  'Genel':              { color: '#64748B', bg: 'rgba(100,116,139,0.12)', icon: 'ri-file-shield-2-line' },
 };
 
 const DURUM_CONFIG: Record<IsIzniStatus, { color: string; bg: string; border: string; icon: string }> = {
-  'Taslak':         { color: '#94A3B8', bg: 'rgba(148,163,184,0.1)',  border: 'rgba(148,163,184,0.2)', icon: 'ri-draft-line' },
-  'Onay Bekliyor':  { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',   border: 'rgba(245,158,11,0.25)', icon: 'ri-time-line' },
-  'Onaylandı':      { color: '#34D399', bg: 'rgba(52,211,153,0.1)',   border: 'rgba(52,211,153,0.25)', icon: 'ri-checkbox-circle-line' },
-  'Aktif':          { color: '#60A5FA', bg: 'rgba(96,165,250,0.1)',   border: 'rgba(96,165,250,0.25)', icon: 'ri-play-circle-line' },
-  'Tamamlandı':     { color: '#10B981', bg: 'rgba(16,185,129,0.1)',   border: 'rgba(16,185,129,0.25)', icon: 'ri-shield-check-line' },
-  'İptal':          { color: '#EF4444', bg: 'rgba(239,68,68,0.1)',    border: 'rgba(239,68,68,0.25)', icon: 'ri-close-circle-line' },
+  'Onay Bekliyor': { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)', icon: 'ri-time-line' },
+  'Onaylandı':     { color: '#34D399', bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.25)', icon: 'ri-checkbox-circle-line' },
+  'Reddedildi':    { color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)', icon: 'ri-close-circle-line' },
 };
 
 const TIPLER: IsIzniTip[] = ['Sıcak Çalışma', 'Yüksekte Çalışma', 'Kapalı Alan', 'Elektrikli Çalışma', 'Kazı', 'Genel'];
-const DURUMLAR: IsIzniStatus[] = ['Taslak', 'Onay Bekliyor', 'Onaylandı', 'Aktif', 'Tamamlandı', 'İptal'];
+const DURUMLAR: IsIzniStatus[] = ['Onay Bekliyor', 'Onaylandı', 'Reddedildi'];
 
 const emptyForm = {
   tip: 'Genel' as IsIzniTip,
@@ -32,6 +31,7 @@ const emptyForm = {
   bolum: '',
   sorumlu: '',
   calisanlar: '',
+  selectedCalisanIds: [] as string[],
   calisanSayisi: 1,
   aciklama: '',
   tehlikeler: '',
@@ -39,7 +39,7 @@ const emptyForm = {
   gerekliEkipman: '',
   baslamaTarihi: '',
   bitisTarihi: '',
-  durum: 'Taslak' as IsIzniStatus,
+  durum: 'Onay Bekliyor' as IsIzniStatus,
   onaylayanKisi: '',
   onayTarihi: '',
   notlar: '',
@@ -47,7 +47,10 @@ const emptyForm = {
 };
 
 export default function IsIzniPage() {
-  const { isIzinleri, firmalar, currentUser, addIsIzni, updateIsIzni, deleteIsIzni, addToast, quickCreate, setQuickCreate } = useApp();
+  const {
+    isIzinleri, firmalar, personeller, currentUser,
+    addIsIzni, updateIsIzni, deleteIsIzni, addToast, quickCreate, setQuickCreate,
+  } = useApp();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
 
   const [search, setSearch] = useState('');
@@ -59,8 +62,17 @@ export default function IsIzniPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewRecord, setViewRecord] = useState<IsIzni | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [showImport, setShowImport] = useState(false);
+  const [showBelgeModal, setShowBelgeModal] = useState(false);
+  const [savedIsIzni, setSavedIsIzni] = useState<IsIzni | null>(null);
 
   const aktivFirmalar = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
+
+  // Seçilen firmaya göre personeller
+  const firmaPersonelleri = useMemo(() => {
+    if (!form.firmaId) return [];
+    return personeller.filter(p => p.firmaId === form.firmaId && !p.silinmis && p.durum === 'Aktif');
+  }, [personeller, form.firmaId]);
 
   useEffect(() => {
     if (quickCreate === 'is-izinleri') {
@@ -83,21 +95,27 @@ export default function IsIzniPage() {
           && (!firmaFilter || iz.firmaId === firmaFilter)
         );
       })
-      .sort((a, b) => {
-        const ta = a.olusturmaTarihi ?? '';
-        const tb = b.olusturmaTarihi ?? '';
-        return tb.localeCompare(ta);
-      });
+      .sort((a, b) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? ''));
   }, [isIzinleri, firmalar, search, tipFilter, durumFilter, firmaFilter]);
 
   const stats = useMemo(() => ({
     total: isIzinleri.length,
-    aktif: isIzinleri.filter(i => i.durum === 'Aktif').length,
     onayBekliyor: isIzinleri.filter(i => i.durum === 'Onay Bekliyor').length,
-    tamamlandi: isIzinleri.filter(i => i.durum === 'Tamamlandı').length,
+    onaylandi: isIzinleri.filter(i => i.durum === 'Onaylandı').length,
+    reddedildi: isIzinleri.filter(i => i.durum === 'Reddedildi').length,
   }), [isIzinleri]);
 
   const sf = (field: string, value: unknown) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const toggleCalisan = (id: string) => {
+    setForm(prev => {
+      const ids = prev.selectedCalisanIds.includes(id)
+        ? prev.selectedCalisanIds.filter(x => x !== id)
+        : [...prev.selectedCalisanIds, id];
+      const names = ids.map(i => personeller.find(p => p.id === i)?.adSoyad ?? '').filter(Boolean).join(', ');
+      return { ...prev, selectedCalisanIds: ids, calisanlar: names, calisanSayisi: ids.length || prev.calisanSayisi };
+    });
+  };
 
   const openAdd = () => {
     setEditId(null);
@@ -109,11 +127,11 @@ export default function IsIzniPage() {
     setEditId(iz.id);
     setForm({
       tip: iz.tip, firmaId: iz.firmaId, bolum: iz.bolum, sorumlu: iz.sorumlu,
-      calisanlar: iz.calisanlar, calisanSayisi: iz.calisanSayisi, aciklama: iz.aciklama,
-      tehlikeler: iz.tehlikeler, onlemler: iz.onlemler, gerekliEkipman: iz.gerekliEkipman,
-      baslamaTarihi: iz.baslamaTarihi, bitisTarihi: iz.bitisTarihi, durum: iz.durum,
-      onaylayanKisi: iz.onaylayanKisi, onayTarihi: iz.onayTarihi || '', notlar: iz.notlar,
-      olusturanKisi: iz.olusturanKisi,
+      calisanlar: iz.calisanlar, selectedCalisanIds: [], calisanSayisi: iz.calisanSayisi,
+      aciklama: iz.aciklama, tehlikeler: iz.tehlikeler, onlemler: iz.onlemler,
+      gerekliEkipman: iz.gerekliEkipman, baslamaTarihi: iz.baslamaTarihi,
+      bitisTarihi: iz.bitisTarihi, durum: iz.durum, onaylayanKisi: iz.onaylayanKisi,
+      onayTarihi: iz.onayTarihi || '', notlar: iz.notlar, olusturanKisi: iz.olusturanKisi,
     });
     setShowModal(true);
   };
@@ -122,14 +140,37 @@ export default function IsIzniPage() {
     if (!form.aciklama.trim()) { addToast('Açıklama zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.baslamaTarihi) { addToast('Başlama tarihi zorunludur.', 'error'); return; }
+
+    const { selectedCalisanIds: _ids, ...saveData } = form;
+
     if (editId) {
-      updateIsIzni(editId, form);
+      updateIsIzni(editId, saveData);
       addToast('İş izni güncellendi.', 'success');
+      setShowModal(false);
     } else {
-      addIsIzni(form);
-      addToast('İş izni oluşturuldu.', 'success');
+      const newIz = addIsIzni(saveData);
+      setShowModal(false);
+      setSavedIsIzni(newIz);
+      setShowBelgeModal(true);
     }
-    setShowModal(false);
+  };
+
+  const handleBelgeYes = () => {
+    if (!savedIsIzni) return;
+    const firma = firmalar.find(f => f.id === savedIsIzni.firmaId);
+    const calisanlarList = form.selectedCalisanIds.length > 0
+      ? personeller.filter(p => form.selectedCalisanIds.includes(p.id))
+      : [];
+    generateIsIzniPdf(savedIsIzni, firma, calisanlarList);
+    setShowBelgeModal(false);
+    setSavedIsIzni(null);
+    addToast('İş izni belgesi oluşturuldu.', 'success');
+  };
+
+  const handleBelgeNo = () => {
+    setShowBelgeModal(false);
+    setSavedIsIzni(null);
+    addToast('İş izni oluşturuldu.', 'success');
   };
 
   const handleDelete = () => {
@@ -137,6 +178,14 @@ export default function IsIzniPage() {
     deleteIsIzni(deleteId);
     addToast('İş izni silindi.', 'success');
     setDeleteId(null);
+  };
+
+  const handleImport = (rows: typeof emptyForm[]) => {
+    rows.forEach(r => {
+      const { selectedCalisanIds: _ids, ...saveData } = r as typeof emptyForm;
+      addIsIzni(saveData);
+    });
+    addToast(`${rows.length} iş izni aktarıldı.`, 'success');
   };
 
   const inp = 'isg-input w-full';
@@ -156,18 +205,24 @@ export default function IsIzniPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Sıcak çalışma, yüksekte çalışma ve diğer iş izinlerini yönetin</p>
         </div>
         {canCreate && (
-          <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
-            <i className="ri-add-line" /> Yeni İş İzni
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
+              <i className="ri-upload-cloud-2-line" /> Dışardan Aktar
+            </button>
+            <button onClick={openAdd} className="btn-primary whitespace-nowrap">
+              <i className="ri-add-line" /> Yeni İş İzni
+            </button>
+          </div>
         )}
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Toplam İzin', value: stats.total, icon: 'ri-shield-keyhole-line', color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
-          { label: 'Aktif', value: stats.aktif, icon: 'ri-play-circle-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)' },
-          { label: 'Onay Bekliyor', value: stats.onayBekliyor, icon: 'ri-time-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
-          { label: 'Tamamlandı', value: stats.tamamlandi, icon: 'ri-checkbox-circle-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+          { label: 'Toplam İzin',    value: stats.total,        icon: 'ri-shield-keyhole-line',   color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
+          { label: 'Onay Bekliyor',  value: stats.onayBekliyor, icon: 'ri-time-line',              color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+          { label: 'Onaylandı',      value: stats.onaylandi,    icon: 'ri-checkbox-circle-line',   color: '#34D399', bg: 'rgba(52,211,153,0.1)' },
+          { label: 'Reddedildi',     value: stats.reddedildi,   icon: 'ri-close-circle-line',      color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
         ].map(s => (
           <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4">
             <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
@@ -181,6 +236,7 @@ export default function IsIzniPage() {
         ))}
       </div>
 
+      {/* Filters */}
       <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
         <div className="relative flex-1 min-w-[180px]">
           <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
@@ -205,6 +261,7 @@ export default function IsIzniPage() {
         )}
       </div>
 
+      {/* Table */}
       {filtered.length === 0 ? (
         <div className="isg-card rounded-xl py-20 text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
@@ -232,8 +289,8 @@ export default function IsIzniPage() {
               <tbody>
                 {filtered.map(iz => {
                   const firma = firmalar.find(f => f.id === iz.firmaId);
-                  const tip = TIP_CONFIG[iz.tip];
-                  const dur = DURUM_CONFIG[iz.durum];
+                  const tip = TIP_CONFIG[iz.tip] || { color: '#64748B', bg: 'rgba(100,116,139,0.12)', icon: 'ri-question-line' };
+                  const dur = DURUM_CONFIG[iz.durum] || { color: '#64748B', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.25)', icon: 'ri-question-line' };
                   return (
                     <tr key={iz.id}>
                       <td><span className="text-sm font-mono font-semibold" style={{ color: '#60A5FA' }}>{iz.izinNo}</span></td>
@@ -263,6 +320,17 @@ export default function IsIzniPage() {
                           <button onClick={() => setViewRecord(iz)} title="Detay" className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
                             <i className="ri-eye-line text-xs" />
                           </button>
+                          <button
+                            onClick={() => {
+                              const f = firmalar.find(x => x.id === iz.firmaId);
+                              generateIsIzniPdf(iz, f, personeller.filter(p => iz.calisanlar.includes(p.adSoyad)));
+                            }}
+                            title="PDF"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                            style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
+                          >
+                            <i className="ri-file-pdf-line text-xs" />
+                          </button>
                           {canEdit && (
                             <button onClick={() => openEdit(iz)} title="Düzenle" className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
                               <i className="ri-edit-line text-xs" />
@@ -285,8 +353,21 @@ export default function IsIzniPage() {
       )}
 
       {/* Form Modal */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editId ? 'İş İzni Düzenle' : 'Yeni İş İzni Oluştur'} size="lg" icon="ri-shield-keyhole-line"
-        footer={<><button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button><button onClick={handleSave} className="btn-primary whitespace-nowrap"><i className={editId ? 'ri-save-line' : 'ri-add-line'} /> {editId ? 'Güncelle' : 'Oluştur'}</button></>}>
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title={editId ? 'İş İzni Düzenle' : 'Yeni İş İzni Oluştur'}
+        size="lg"
+        icon="ri-shield-keyhole-line"
+        footer={
+          <>
+            <button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleSave} className="btn-primary whitespace-nowrap">
+              <i className={editId ? 'ri-save-line' : 'ri-add-line'} /> {editId ? 'Güncelle' : 'Oluştur'}
+            </button>
+          </>
+        }
+      >
         <div className="space-y-4">
           {!editId && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
@@ -306,7 +387,14 @@ export default function IsIzniPage() {
             </div>
             <div>
               <label className="form-label">Firma *</label>
-              <select value={form.firmaId} onChange={e => sf('firmaId', e.target.value)} className={inp}>
+              <select
+                value={form.firmaId}
+                onChange={e => {
+                  sf('firmaId', e.target.value);
+                  setForm(prev => ({ ...prev, firmaId: e.target.value, selectedCalisanIds: [], calisanlar: '' }));
+                }}
+                className={inp}
+              >
                 <option value="">Firma Seçin</option>
                 {aktivFirmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
               </select>
@@ -329,7 +417,7 @@ export default function IsIzniPage() {
             </div>
             <div>
               <label className="form-label">Durum</label>
-              <select value={form.durum} onChange={e => sf('durum', e.target.value)} className={inp}>
+              <select value={form.durum} onChange={e => sf('durum', e.target.value as IsIzniStatus)} className={inp}>
                 {DURUMLAR.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
@@ -337,10 +425,75 @@ export default function IsIzniPage() {
               <label className="form-label">Çalışan Sayısı</label>
               <input type="number" min={1} value={form.calisanSayisi} onChange={e => sf('calisanSayisi', parseInt(e.target.value) || 1)} className={inp} />
             </div>
+
+            {/* Çalışanlar — Görseldeki gibi: hem listeden seçim hem elle giriş */}
             <div className="sm:col-span-2">
-              <label className="form-label">Çalışanlar</label>
-              <input value={form.calisanlar} onChange={e => sf('calisanlar', e.target.value)} placeholder="Çalışan adları (virgülle ayırın)..." className={inp} />
+              <label className="form-label">
+                Çalışanlar
+                {form.firmaId && firmaPersonelleri.length > 0 && (
+                  <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
+                    ({form.selectedCalisanIds.length}/{firmaPersonelleri.length} seçildi)
+                  </span>
+                )}
+              </label>
+              
+              {/* Personel seçim grid'i */}
+              {form.firmaId && firmaPersonelleri.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1 mb-3">
+                  {firmaPersonelleri.map(p => (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 cursor-pointer transition-all duration-150"
+                      style={{
+                        background: form.selectedCalisanIds.includes(p.id) ? 'rgba(96,165,250,0.1)' : 'var(--bg-item)',
+                        border: form.selectedCalisanIds.includes(p.id) ? '1px solid rgba(96,165,250,0.3)' : '1px solid var(--bg-item-border)',
+                      }}
+                    >
+                      <div
+                        className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
+                        style={form.selectedCalisanIds.includes(p.id)
+                          ? { background: 'linear-gradient(135deg, #60A5FA, #818CF8)' }
+                          : { background: 'var(--bg-input)', border: '1.5px solid var(--border-main)' }}
+                      >
+                        {form.selectedCalisanIds.includes(p.id) && <i className="ri-check-line text-white text-[10px]" />}
+                      </div>
+                      <input type="checkbox" checked={form.selectedCalisanIds.includes(p.id)} onChange={() => toggleCalisan(p.id)} className="hidden" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{p.adSoyad}</p>
+                        {(p.gorev || p.departman) && (
+                          <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{p.gorev || p.departman}</p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+              
+              {/* Elle giriş alanı — her zaman görünür */}
+              <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                <label className="flex items-center gap-2 text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
+                  <i className="ri-edit-line" />
+                  Elle Giriş (Listede olmayanları buraya yazın)
+                </label>
+                <textarea
+                  value={form.calisanlar}
+                  onChange={e => sf('calisanlar', e.target.value)}
+                  placeholder="Çalışan adlarını virgülle ayırarak yazın..."
+                  rows={2}
+                  maxLength={500}
+                  className={`${inp} resize-y`}
+                />
+              </div>
+              
+              {/* Seçilen kişiler özeti */}
+              {form.selectedCalisanIds.length > 0 && (
+                <div className="mt-2 px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(96,165,250,0.06)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.15)' }}>
+                  <i className="ri-user-line mr-1" />
+                  Listeden {form.selectedCalisanIds.length} kişi seçildi
+                </div>
+              )}
             </div>
+
             <div className="sm:col-span-2">
               <label className="form-label">İş Açıklaması *</label>
               <textarea value={form.aciklama} onChange={e => sf('aciklama', e.target.value)} placeholder="Yapılacak işin detaylı açıklaması..." rows={3} maxLength={500} className={`${inp} resize-y`} />
@@ -373,10 +526,56 @@ export default function IsIzniPage() {
         </div>
       </Modal>
 
+      {/* Belge Ver mi? Modal */}
+      <Modal
+        open={showBelgeModal}
+        onClose={handleBelgeNo}
+        title="İş İzni Belgesi"
+        size="sm"
+        icon="ri-file-pdf-line"
+        footer={
+          <>
+            <button onClick={handleBelgeNo} className="btn-secondary whitespace-nowrap">Hayır, Geç</button>
+            <button onClick={handleBelgeYes} className="btn-primary whitespace-nowrap">
+              <i className="ri-printer-line" /> Evet, Belge Oluştur
+            </button>
+          </>
+        }
+      >
+        <div className="py-2 text-center">
+          <div className="w-14 h-14 flex items-center justify-center rounded-2xl mx-auto mb-4" style={{ background: 'rgba(16,185,129,0.12)' }}>
+            <i className="ri-file-pdf-line text-2xl" style={{ color: '#10B981' }} />
+          </div>
+          <p className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>İş izni başarıyla oluşturuldu!</p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <strong style={{ color: '#60A5FA' }}>{savedIsIzni?.izinNo}</strong> numaralı iş izni için belge (PDF) oluşturmak ister misiniz?
+          </p>
+        </div>
+      </Modal>
+
       {/* Detay Modal */}
       {viewRecord && (
-        <Modal open={!!viewRecord} onClose={() => setViewRecord(null)} title={`İzin Detayı — ${viewRecord.izinNo}`} size="lg" icon="ri-shield-keyhole-line"
-          footer={<button onClick={() => setViewRecord(null)} className="btn-secondary whitespace-nowrap">Kapat</button>}>
+        <Modal
+          open={!!viewRecord}
+          onClose={() => setViewRecord(null)}
+          title={`İzin Detayı — ${viewRecord.izinNo}`}
+          size="lg"
+          icon="ri-shield-keyhole-line"
+          footer={
+            <>
+              <button
+                onClick={() => {
+                  const f = firmalar.find(x => x.id === viewRecord.firmaId);
+                  generateIsIzniPdf(viewRecord, f, personeller.filter(p => viewRecord.calisanlar.includes(p.adSoyad)));
+                }}
+                className="btn-secondary whitespace-nowrap"
+              >
+                <i className="ri-file-pdf-line" /> PDF Oluştur
+              </button>
+              <button onClick={() => setViewRecord(null)} className="btn-primary whitespace-nowrap">Kapat</button>
+            </>
+          }
+        >
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -397,6 +596,29 @@ export default function IsIzniPage() {
                 </div>
               ))}
             </div>
+            {/* Çalışanlar — isim kartları olarak */}
+            {(viewRecord.calisanlar || viewRecord.selectedCalisanIds?.length) && (
+              <div className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg-item)' }}>
+                <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Çalışanlar</p>
+                <div className="flex flex-wrap gap-2">
+                  {/* Seçilen personellerden gelenler */}
+                  {viewRecord.selectedCalisanIds?.map(pid => {
+                    const p = personeller.find(x => x.id === pid);
+                    return p ? (
+                      <span key={pid} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs" style={{ background: 'rgba(96,165,250,0.12)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.2)' }}>
+                        <i className="ri-user-line" />{p.adSoyad}
+                      </span>
+                    ) : null;
+                  })}
+                  {/* Elle girilenler */}
+                  {viewRecord.calisanlar?.split(/[,;]/).map((c, i) => c.trim() && (
+                    <span key={`el-${i}`} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
+                      <i className="ri-edit-line" />{c.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             {viewRecord.aciklama && (
               <div className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg-item)' }}>
                 <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Açıklama</p>
@@ -420,8 +642,19 @@ export default function IsIzniPage() {
       )}
 
       {/* Silme Modal */}
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="İş İzni Sil" size="sm" icon="ri-delete-bin-line"
-        footer={<><button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button><button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button></>}>
+      <Modal
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="İş İzni Sil"
+        size="sm"
+        icon="ri-delete-bin-line"
+        footer={
+          <>
+            <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
+          </>
+        }
+      >
         <div className="py-2">
           <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)' }}>
             <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
@@ -430,6 +663,14 @@ export default function IsIzniPage() {
           <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
         </div>
       </Modal>
+
+      {/* Import Modal */}
+      <IsIzniImport
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        firmalar={aktivFirmalar}
+        onImport={handleImport}
+      />
     </div>
   );
 }

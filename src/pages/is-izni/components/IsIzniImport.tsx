@@ -1,0 +1,248 @@
+import { useState, useRef } from 'react';
+import Modal from '@/components/base/Modal';
+import type { IsIzniTip, IsIzniStatus, Firma } from '@/types';
+
+interface ImportRow {
+  tip: IsIzniTip;
+  firmaId: string;
+  bolum: string;
+  sorumlu: string;
+  calisanlar: string;
+  calisanSayisi: number;
+  aciklama: string;
+  tehlikeler: string;
+  onlemler: string;
+  gerekliEkipman: string;
+  baslamaTarihi: string;
+  bitisTarihi: string;
+  durum: IsIzniStatus;
+  onaylayanKisi: string;
+  onayTarihi: string;
+  notlar: string;
+  olusturanKisi: string;
+}
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  firmalar: Firma[];
+  onImport: (rows: ImportRow[]) => void;
+}
+
+const TIPLER: IsIzniTip[] = ['Sıcak Çalışma', 'Yüksekte Çalışma', 'Kapalı Alan', 'Elektrikli Çalışma', 'Kazı', 'Genel'];
+const DURUMLAR: IsIzniStatus[] = ['Onay Bekliyor', 'Onaylandı', 'Reddedildi'];
+
+const TEMPLATE_HEADERS = [
+  'tip', 'firmaAd', 'bolum', 'sorumlu', 'calisanlar', 'calisanSayisi',
+  'aciklama', 'tehlikeler', 'onlemler', 'gerekliEkipman',
+  'baslamaTarihi', 'bitisTarihi', 'durum', 'onaylayanKisi', 'onayTarihi', 'notlar',
+];
+
+function parseCsv(text: string): string[][] {
+  return text.trim().split('\n').map(line => {
+    const result: string[] = [];
+    let cur = '';
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    result.push(cur.trim());
+    return result;
+  });
+}
+
+export default function IsIzniImport({ open, onClose, firmalar, onImport }: Props) {
+  const [rows, setRows] = useState<ImportRow[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [step, setStep] = useState<'upload' | 'preview'>('upload');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = parseCsv(text);
+      if (lines.length < 2) { setErrors(['Dosya boş veya geçersiz.']); return; }
+
+      const headers = lines[0].map(h => h.toLowerCase().trim());
+      const errs: string[] = [];
+      const parsed: ImportRow[] = [];
+
+      lines.slice(1).forEach((cols, idx) => {
+        const row: Record<string, string> = {};
+        headers.forEach((h, i) => { row[h] = cols[i] ?? ''; });
+
+        const rowNum = idx + 2;
+        const tip = TIPLER.find(t => t.toLowerCase() === (row['tip'] ?? '').toLowerCase()) ?? 'Genel';
+        const durum = DURUMLAR.find(d => d.toLowerCase() === (row['durum'] ?? '').toLowerCase()) ?? 'Onay Bekliyor';
+        const firmaAd = (row['firmaad'] ?? '').trim();
+        const firma = firmalar.find(f => f.ad.toLowerCase() === firmaAd.toLowerCase());
+        if (!firma) errs.push(`Satır ${rowNum}: "${firmaAd}" firması bulunamadı.`);
+        if (!row['aciklama']?.trim()) errs.push(`Satır ${rowNum}: Açıklama zorunludur.`);
+        if (!row['baslamatarihi']?.trim()) errs.push(`Satır ${rowNum}: Başlama tarihi zorunludur.`);
+
+        parsed.push({
+          tip,
+          firmaId: firma?.id ?? '',
+          bolum: row['bolum'] ?? '',
+          sorumlu: row['sorumlu'] ?? '',
+          calisanlar: row['calisanlar'] ?? '',
+          calisanSayisi: parseInt(row['calisansayisi'] ?? '1') || 1,
+          aciklama: row['aciklama'] ?? '',
+          tehlikeler: row['tehlikeler'] ?? '',
+          onlemler: row['onlemler'] ?? '',
+          gerekliEkipman: row['gerekliEkipman'] ?? row['gerekliEkipman'.toLowerCase()] ?? '',
+          baslamaTarihi: row['baslamatarihi'] ?? '',
+          bitisTarihi: row['bitistarihi'] ?? '',
+          durum,
+          onaylayanKisi: row['onaylayankisi'] ?? '',
+          onayTarihi: row['onaytarihi'] ?? '',
+          notlar: row['notlar'] ?? '',
+          olusturanKisi: row['olusturankisi'] ?? '',
+        });
+      });
+
+      setErrors(errs);
+      setRows(parsed);
+      setStep('preview');
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  const downloadTemplate = () => {
+    const bom = '\uFEFF';
+    const header = TEMPLATE_HEADERS.join(',');
+    const example = [
+      'Sıcak Çalışma', 'Firma Adı', 'Üretim Alanı', 'Ahmet Yılmaz', 'Mehmet Kaya',
+      '3', 'Kaynak işlemi yapılacak', 'Yangın riski', 'Yangın tüpü hazır', 'Baret,Eldiven',
+      '2026-04-10', '2026-04-10', 'Onay Bekliyor', 'Müdür Adı', '', 'Ek not',
+    ].join(',');
+    const csv = bom + header + '\n' + example;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'is_izni_sablonu.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    const valid = rows.filter(r => r.firmaId && r.aciklama && r.baslamaTarihi);
+    onImport(valid);
+    setRows([]); setErrors([]); setStep('upload');
+    onClose();
+  };
+
+  const reset = () => { setRows([]); setErrors([]); setStep('upload'); };
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => { reset(); onClose(); }}
+      title="İş İzni Aktarımı (CSV)"
+      size="lg"
+      icon="ri-upload-cloud-2-line"
+      footer={
+        step === 'preview' ? (
+          <>
+            <button onClick={reset} className="btn-secondary whitespace-nowrap"><i className="ri-arrow-left-line" /> Geri</button>
+            <button
+              onClick={handleImport}
+              disabled={rows.filter(r => r.firmaId && r.aciklama).length === 0}
+              className="btn-primary whitespace-nowrap"
+            >
+              <i className="ri-check-line" /> {rows.filter(r => r.firmaId && r.aciklama).length} Kaydı Aktar
+            </button>
+          </>
+        ) : (
+          <button onClick={() => { reset(); onClose(); }} className="btn-secondary whitespace-nowrap">İptal</button>
+        )
+      }
+    >
+      {step === 'upload' ? (
+        <div className="space-y-5">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
+            <i className="ri-information-line flex-shrink-0" style={{ color: '#60A5FA' }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>CSV formatında iş izni aktarımı</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Şablonu indirip doldurun, ardından yükleyin. Firma adı sistemdeki firma adıyla eşleşmelidir.</p>
+            </div>
+          </div>
+
+          <button onClick={downloadTemplate} className="btn-secondary w-full">
+            <i className="ri-download-line" /> CSV Şablonunu İndir
+          </button>
+
+          <div
+            className="border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors"
+            style={{ borderColor: 'rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.03)' }}
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+          >
+            <div className="w-14 h-14 flex items-center justify-center rounded-2xl mx-auto mb-3" style={{ background: 'rgba(96,165,250,0.1)' }}>
+              <i className="ri-file-upload-line text-2xl" style={{ color: '#60A5FA' }} />
+            </div>
+            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>CSV dosyasını sürükleyin veya tıklayın</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Yalnızca .csv formatı desteklenir</p>
+            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {errors.length > 0 && (
+            <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <p className="text-sm font-semibold mb-2" style={{ color: '#EF4444' }}>
+                <i className="ri-error-warning-line mr-1" /> {errors.length} Uyarı
+              </p>
+              <ul className="space-y-1">
+                {errors.map((e, i) => <li key={i} className="text-xs" style={{ color: '#EF4444' }}>• {e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
+            <i className="ri-checkbox-circle-line" style={{ color: '#34D399' }} />
+            <p className="text-sm" style={{ color: '#34D399' }}>
+              <strong>{rows.filter(r => r.firmaId && r.aciklama).length}</strong> geçerli kayıt aktarılmaya hazır
+            </p>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border-color)' }}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ background: 'var(--bg-item)' }}>
+                  {['Tip', 'Firma', 'Bölüm', 'Sorumlu', 'Başlama', 'Durum', 'Durum'].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-semibold" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const valid = r.firmaId && r.aciklama && r.baslamaTarihi;
+                  return (
+                    <tr key={i} style={{ borderTop: '1px solid var(--border-color)', background: valid ? undefined : 'rgba(239,68,68,0.04)' }}>
+                      <td className="px-3 py-2">{r.tip}</td>
+                      <td className="px-3 py-2">{firmalar.find(f => f.id === r.firmaId)?.ad ?? <span style={{ color: '#EF4444' }}>Bulunamadı</span>}</td>
+                      <td className="px-3 py-2">{r.bolum || '—'}</td>
+                      <td className="px-3 py-2">{r.sorumlu || '—'}</td>
+                      <td className="px-3 py-2">{r.baslamaTarihi || <span style={{ color: '#EF4444' }}>Eksik</span>}</td>
+                      <td className="px-3 py-2">{r.durum}</td>
+                      <td className="px-3 py-2">
+                        {valid
+                          ? <i className="ri-checkbox-circle-line" style={{ color: '#34D399' }} />
+                          : <i className="ri-close-circle-line" style={{ color: '#EF4444' }} />}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
