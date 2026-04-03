@@ -4,7 +4,7 @@ import { useApp } from '../../store/AppContext';
 import { supabase } from '../../lib/supabase';
 import Modal from '../../components/base/Modal';
 import ImageUpload from '../nonconformity/components/ImageUpload';
-import type { Ekipman, EkipmanStatus, UygunsuzlukSeverity } from '../../types';
+import type { Ekipman, EkipmanStatus, EkipmanSahaFoto, UygunsuzlukSeverity } from '../../types';
 
 const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: string; border: string; icon: string }> = {
   'Uygun':       { label: 'Uygun',       color: '#34D399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)',  icon: 'ri-checkbox-circle-line' },
@@ -201,49 +201,87 @@ function UygunsuzlukModal({
 
 // ── Fotoğraf Yükle Modal ──
 function FotoModal({
-  open, onClose, ekipmanAd, ekipmanId,
-}: { open: boolean; onClose: () => void; ekipmanAd: string; ekipmanId: string }) {
-  const { addUygunsuzluk, setUygunsuzlukPhoto, updateUygunsuzluk, ekipmanlar, addToast } = useApp();
+  open, onClose, ekipmanAd, ekipmanId, onUploaded,
+}: { open: boolean; onClose: () => void; ekipmanAd: string; ekipmanId: string; onUploaded: () => void }) {
+  const { updateEkipman, ekipmanlar, currentUser, addToast } = useApp();
   const [foto, setFoto] = useState<string | null>(null);
   const [aciklama, setAciklama] = useState('');
   const [saving, setSaving] = useState(false);
 
   const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
 
+  const handleClose = () => {
+    setFoto(null);
+    setAciklama('');
+    onClose();
+  };
+
   const handleSave = async () => {
     if (!foto) { addToast('Fotoğraf seçiniz.', 'error'); return; }
+    if (!foto.startsWith('data:')) { addToast('Geçersiz fotoğraf formatı.', 'error'); return; }
     setSaving(true);
     try {
-      const rec = addUygunsuzluk({
-        baslik: `${ekipmanAd} — Saha Fotoğrafı`,
-        aciklama: aciklama.trim() || `QR ile yüklenen saha fotoğrafı`,
-        onlem: '',
-        firmaId: ekipman?.firmaId ?? '',
-        tarih: new Date().toISOString().slice(0, 10),
-        severity: 'Düşük',
-        sorumlu: '',
-        hedefTarih: '',
-        notlar: `QR fotoğraf kaydı — Ekipman: ${ekipmanAd}`,
-        durum: 'Açık',
-        acilisFotoMevcut: true,
-        kapatmaFotoMevcut: false,
-      });
-      if (foto.startsWith('data:')) {
-        const url = await setUygunsuzlukPhoto(rec.id, 'acilis', foto);
-        if (url) updateUygunsuzluk(rec.id, { acilisFotoUrl: url });
+      // base64 → Blob
+      const [meta, data] = foto.split(',');
+      const mimeMatch = meta.match(/data:([^;]+);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const ext = mime.split('/')[1]?.split('+')[0] ?? 'jpg';
+      const byteString = atob(data);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const blob = new Blob([ab], { type: mime });
+
+      const fotoId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+      const filePath = `ekipman-saha/${ekipmanId}/${fotoId}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, blob, { upsert: false, contentType: mime });
+
+      if (uploadError) {
+        console.error('[FotoModal] Upload error:', uploadError);
+        addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
+        return;
       }
-      addToast('Fotoğraf yüklendi ve kayıt oluşturuldu.', 'success');
-      onClose();
+
+      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
+      const publicUrl = urlData?.publicUrl;
+
+      if (!publicUrl) {
+        addToast('Fotoğraf URL alınamadı.', 'error');
+        return;
+      }
+
+      const yeniFoto: EkipmanSahaFoto = {
+        id: fotoId,
+        url: publicUrl,
+        aciklama: aciklama.trim(),
+        tarih: new Date().toISOString(),
+        yukleyenKisi: currentUser.ad || 'Kullanıcı',
+      };
+
+      const mevcutFotolar = ekipman?.sahaFotolari ?? [];
+      updateEkipman(ekipmanId, {
+        sahaFotolari: [...mevcutFotolar, yeniFoto],
+      });
+
+      addToast('Fotoğraf başarıyla yüklendi.', 'success');
+      handleClose();
+      setTimeout(() => onUploaded(), 800);
+    } catch (err) {
+      console.error('[FotoModal] Error:', err);
+      addToast('Fotoğraf yüklenirken hata oluştu.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="Fotoğraf Yükle" size="sm" icon="ri-camera-line"
+    <Modal isOpen={open} onClose={handleClose} title="Saha Fotoğrafı Yükle" size="sm" icon="ri-camera-line"
       footer={
         <>
-          <button onClick={onClose} className="btn-secondary whitespace-nowrap">İptal</button>
+          <button onClick={handleClose} className="btn-secondary whitespace-nowrap">İptal</button>
           <button onClick={handleSave} disabled={saving || !foto} className="btn-primary whitespace-nowrap disabled:opacity-50">
             <i className="ri-upload-cloud-line mr-1" />{saving ? 'Yükleniyor...' : 'Yükle'}
           </button>
@@ -589,6 +627,49 @@ export default function QrDetailPage() {
           </div>
         )}
 
+        {/* ── SAHA FOTOĞRAFLARI ── */}
+        {localEkipman.sahaFotolari && localEkipman.sahaFotolari.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-3 px-1" style={{ color: '#475569' }}>
+              <i className="ri-camera-line mr-1.5" />Saha Fotoğrafları ({localEkipman.sahaFotolari.length})
+            </p>
+            <div className="space-y-3">
+              {[...localEkipman.sahaFotolari].reverse().map((foto) => (
+                <div key={foto.id} className="isg-card rounded-2xl overflow-hidden">
+                  {/* Fotoğraf */}
+                  <div className="w-full" style={{ background: 'rgba(0,0,0,0.3)', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img
+                      src={foto.url}
+                      alt={foto.aciklama || 'Saha fotoğrafı'}
+                      className="w-full object-contain"
+                      style={{ maxHeight: '280px', display: 'block' }}
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </div>
+                  {/* Bilgi */}
+                  <div className="px-4 py-3 space-y-1.5">
+                    {foto.aciklama && (
+                      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>{foto.aciklama}</p>
+                    )}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {foto.yukleyenKisi && (
+                        <span className="flex items-center gap-1 text-xs" style={{ color: '#64748B' }}>
+                          <i className="ri-user-line text-xs" />
+                          {foto.yukleyenKisi}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1 text-xs" style={{ color: '#64748B' }}>
+                        <i className="ri-time-line text-xs" />
+                        {new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── SAHA AKSİYONLARI ── */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider mb-3 px-1" style={{ color: '#475569' }}>Hızlı Aksiyonlar</p>
@@ -675,6 +756,7 @@ export default function QrDetailPage() {
         onClose={handleFotoClose}
         ekipmanAd={localEkipman.ad}
         ekipmanId={localEkipman.id}
+        onUploaded={handleAfterSave}
       />
       <EvrakModal
         open={showEvrak}

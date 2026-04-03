@@ -10,7 +10,7 @@ import type { Toast } from '../types';
 
 export interface Bildirim {
   id: string;
-  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek';
+  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek' | 'kontrol_formu_yaklasan' | 'kontrol_formu_gecikti';
   mesaj: string;
   detay: string;
   tarih: string;
@@ -380,7 +380,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     });
 
+    // ── Kontrol Formları (localStorage) ──
+    try {
+      const raw = localStorage.getItem('isg_kontrol_formlari');
+      if (raw) {
+        const formlar = JSON.parse(raw) as Array<{
+          id: string; ad: string; kategori: string;
+          sonrakiKontrolTarihi?: string; firmaId?: string;
+        }>;
+        formlar.forEach(f => {
+          if (!f.sonrakiKontrolTarihi) return;
+          const d = parseDate(f.sonrakiKontrolTarihi);
+          if (!d) return;
+          const kalanGun = getDaysRemaining(f.sonrakiKontrolTarihi)!;
+          const firma = store.firmalar.find(x => x.id === f.firmaId);
+          const detay = `${f.kategori}${firma ? ' — ' + firma.ad : ''}`;
+
+          if (kalanGun < 0) {
+            result.push({
+              id: `kontrol_formu_gecikti_${f.id}`,
+              tip: 'kontrol_formu_gecikti',
+              mesaj: `${f.ad} kontrolü gecikti`,
+              detay: `${detay} — ${Math.abs(kalanGun)} gün gecikti`,
+              tarih: f.sonrakiKontrolTarihi,
+              okundu: okunanlar.has(`kontrol_formu_gecikti_${f.id}`),
+              kalanGun,
+            });
+          } else if (kalanGun <= 30) {
+            result.push({
+              id: `kontrol_formu_yaklasan_${f.id}`,
+              tip: 'kontrol_formu_yaklasan',
+              mesaj: `${f.ad} kontrol tarihi yaklaşıyor`,
+              detay: `${detay} — ${kalanGun === 0 ? 'Bugün son gün!' : `${kalanGun} gün kaldı`}`,
+              tarih: f.sonrakiKontrolTarihi,
+              okundu: okunanlar.has(`kontrol_formu_yaklasan_${f.id}`),
+              kalanGun,
+            });
+          }
+        });
+      }
+    } catch { /* localStorage parse hatası — sessizce geç */ }
+
     return result.sort((a, b) => a.kalanGun - b.kalanGun);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar]);
 
   const okunmamisBildirimSayisi = useMemo(

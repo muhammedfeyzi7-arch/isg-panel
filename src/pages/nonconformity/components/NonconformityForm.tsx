@@ -104,29 +104,29 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
         logAction('uygunsuzluk_updated', 'Uygunsuzluklar', editRecord.id, form.baslik, 'Uygunsuzluk güncellendi.');
         addToast('Uygunsuzluk güncellendi.', 'success');
       } else {
-        // Yeni kayıt: önce geçici ID ile oluştur, sonra fotoğrafı yükle
-        const tempId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
-        let acilisFotoUrl: string | undefined;
-
-        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
-          const url = await setUygunsuzlukPhoto(tempId, 'acilis', form.acilisFoto);
-          if (url) {
-            acilisFotoUrl = url;
-          } else {
-            addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
-            return;
-          }
-        }
-
-        addUygunsuzluk({
+        // Yeni kayıt: önce kaydı oluştur (gerçek ID ile), sonra fotoğrafı o ID ile yükle
+        const newRecord = addUygunsuzluk({
           baslik: form.baslik.trim(), aciklama: form.aciklama.trim(), onlem: form.onlem.trim(),
           firmaId: form.firmaId, personelId: form.personelId || undefined, tarih: form.tarih,
           severity: form.severity, sorumlu: form.sorumlu.trim(), hedefTarih: form.hedefTarih,
           notlar: form.notlar.trim(), durum: 'Açık',
-          acilisFotoMevcut: !!acilisFotoUrl,
-          acilisFotoUrl,
+          acilisFotoMevcut: false,
+          acilisFotoUrl: undefined,
           kapatmaFotoMevcut: false,
         });
+
+        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
+          const url = await setUygunsuzlukPhoto(newRecord.id, 'acilis', form.acilisFoto);
+          if (url) {
+            updateUygunsuzluk(newRecord.id, {
+              acilisFotoMevcut: true,
+              acilisFotoUrl: url,
+            });
+          } else {
+            addToast('Kayıt oluşturuldu fakat fotoğraf yüklenemedi. Düzenle ile tekrar deneyin.', 'warning');
+          }
+        }
+
         addToast('Uygunsuzluk kaydı oluşturuldu.', 'success');
       }
       onClose();

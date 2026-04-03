@@ -1,217 +1,479 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useApp } from '../../store/AppContext';
-import Modal from '../../components/base/Modal';
-import type { Gorev, GorevStatus, GorevOncelik } from '../../types';
+import { useState, useMemo, useRef } from 'react';
+import { useApp } from '@/store/AppContext';
+import Modal from '@/components/base/Modal';
+import { usePermissions } from '@/hooks/usePermissions';
 
-const STS_CONFIG: Record<GorevStatus, { color: string; bg: string; icon: string }> = {
-  'Bekliyor': { color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-time-line' },
-  'Devam Ediyor': { color: '#60A5FA', bg: 'rgba(96,165,250,0.12)', icon: 'ri-loader-line' },
-  'Tamamlandı': { color: '#34D399', bg: 'rgba(52,211,153,0.12)', icon: 'ri-checkbox-circle-line' },
-  'İptal': { color: '#F87171', bg: 'rgba(248,113,113,0.12)', icon: 'ri-close-circle-line' },
+/* ── Tipler ─────────────────────────────────────────────────── */
+type FormKategori = 'Tümü' | 'Ekipman Kontrolleri' | 'Çalışma Alanı Kontrolleri' | 'Personel ve KKD Kontrolleri' | 'Çevre ve Hijyen Kontrolleri' | 'Periyodik Kontroller' | 'Diğer';
+
+interface KontrolFormu {
+  id: string;
+  ad: string;
+  kategori: Exclude<FormKategori, 'Tümü'>;
+  aciklama: string;
+  firmaId: string;
+  yuklemeTarihi: string;
+  dosyaAdi: string;
+  dosyaBoyutu: number;
+  dosyaTipi: string;
+  dosyaVeri: string;
+  etiketler: string[];
+  olusturanKisi: string;
+  olusturmaTarihi: string;
+  sonKontrolTarihi?: string;
+  sonrakiKontrolTarihi?: string;
+}
+
+const KAT_CONFIG: Record<Exclude<FormKategori, 'Tümü'>, { color: string; bg: string; icon: string }> = {
+  'Ekipman Kontrolleri':         { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',   icon: 'ri-tools-line' },
+  'Çalışma Alanı Kontrolleri':   { color: '#10B981', bg: 'rgba(16,185,129,0.1)',   icon: 'ri-building-4-line' },
+  'Personel ve KKD Kontrolleri': { color: '#3B82F6', bg: 'rgba(59,130,246,0.1)',   icon: 'ri-shield-user-line' },
+  'Çevre ve Hijyen Kontrolleri': { color: '#06B6D4', bg: 'rgba(6,182,212,0.1)',    icon: 'ri-leaf-line' },
+  'Periyodik Kontroller':        { color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)',   icon: 'ri-calendar-check-line' },
+  'Diğer':                       { color: '#64748B', bg: 'rgba(100,116,139,0.1)',  icon: 'ri-file-text-line' },
 };
 
-const PRI_CONFIG: Record<GorevOncelik, { color: string; bg: string }> = {
-  'Düşük': { color: '#94A3B8', bg: 'rgba(148,163,184,0.1)' },
-  'Normal': { color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
-  'Yüksek': { color: '#FBBF24', bg: 'rgba(251,191,36,0.1)' },
-  'Kritik': { color: '#F87171', bg: 'rgba(248,113,113,0.1)' },
-};
+const KATEGORILER: Exclude<FormKategori, 'Tümü'>[] = [
+  'Ekipman Kontrolleri', 'Çalışma Alanı Kontrolleri', 'Personel ve KKD Kontrolleri',
+  'Çevre ve Hijyen Kontrolleri', 'Periyodik Kontroller', 'Diğer',
+];
 
-const defaultForm: Omit<Gorev, 'id' | 'olusturmaTarihi'> = {
-  baslik: '',
-  aciklama: '',
-  firmaId: '',
-  personelId: '',
-  atananKisi: '',
-  oncelik: 'Normal',
-  durum: 'Bekliyor',
-  baslangicTarihi: '',
-  bitisTarihi: '',
-  tamamlanmaTarihi: '',
-  notlar: '',
-};
+function dosyaIkonu(tip: string): string {
+  if (tip.includes('pdf')) return 'ri-file-pdf-line';
+  if (tip.includes('word') || tip.includes('doc')) return 'ri-file-word-line';
+  if (tip.includes('excel') || tip.includes('sheet') || tip.includes('xls')) return 'ri-file-excel-line';
+  if (tip.includes('image') || tip.includes('jpg') || tip.includes('png')) return 'ri-image-line';
+  return 'ri-file-text-line';
+}
 
-export default function GorevlerPage() {
-  const { gorevler, firmalar, personeller, addGorev, updateGorev, deleteGorev, addToast, quickCreate, setQuickCreate } = useApp();
+function dosyaRengi(tip: string): string {
+  if (tip.includes('pdf')) return '#EF4444';
+  if (tip.includes('word') || tip.includes('doc')) return '#3B82F6';
+  if (tip.includes('excel') || tip.includes('sheet') || tip.includes('xls')) return '#10B981';
+  if (tip.includes('image')) return '#F59E0B';
+  return '#64748B';
+}
 
+function formatBoyut(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const STORAGE_KEY = 'isg_kontrol_formlari';
+
+function loadForms(): KontrolFormu[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as KontrolFormu[]) : [];
+  } catch { return []; }
+}
+
+function saveForms(forms: KontrolFormu[]): void {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(forms)); } catch { /* storage full */ }
+}
+
+/* ── Tarih yardımcıları ─────────────────────────────────────── */
+function kontrolDurumu(sonrakiTarih?: string): { label: string; color: string; bg: string; icon: string } | null {
+  if (!sonrakiTarih) return null;
+  const bugun = new Date();
+  bugun.setHours(0, 0, 0, 0);
+  const hedef = new Date(sonrakiTarih);
+  hedef.setHours(0, 0, 0, 0);
+  const fark = Math.ceil((hedef.getTime() - bugun.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (fark < 0) return { label: `${Math.abs(fark)} gün gecikti`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', icon: 'ri-alarm-warning-line' };
+  if (fark === 0) return { label: 'Bugün son gün', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', icon: 'ri-time-line' };
+  if (fark <= 7) return { label: `${fark} gün kaldı`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', icon: 'ri-timer-line' };
+  if (fark <= 30) return { label: `${fark} gün kaldı`, color: '#10B981', bg: 'rgba(16,185,129,0.1)', icon: 'ri-calendar-check-line' };
+  return { label: `${fark} gün kaldı`, color: '#10B981', bg: 'rgba(16,185,129,0.1)', icon: 'ri-calendar-check-line' };
+}
+
+/* ── Ana Bileşen ─────────────────────────────────────────────── */
+export default function KontrolFormlariPage() {
+  const { firmalar, currentUser, addToast } = useApp();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+
+  const [formlar, setFormlar] = useState<KontrolFormu[]>(loadForms);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [katFilter, setKatFilter] = useState<FormKategori>('Tümü');
+  const [firmaFilter, setFirmaFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState<Omit<Gorev, 'id' | 'olusturmaTarihi'>>(defaultForm);
+  const [viewForm, setViewForm] = useState<KontrolFormu | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (quickCreate === 'gorevler') {
-      setEditId(null);
-      setForm(defaultForm);
-      setShowModal(true);
-      setQuickCreate(null);
-    }
-  }, [quickCreate, setQuickCreate]);
+  const [form, setForm] = useState({
+    ad: '', kategori: 'Ekipman Kontrolleri' as Exclude<FormKategori, 'Tümü'>,
+    aciklama: '', firmaId: '',
+    etiketler: [] as string[], etiketInput: '',
+    dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '',
+    sonKontrolTarihi: '', sonrakiKontrolTarihi: '',
+  });
+
+  const aktivFirmalar = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
+
+  const persist = (updated: KontrolFormu[]) => {
+    setFormlar(updated);
+    saveForms(updated);
+  };
 
   const filtered = useMemo(() => {
-    return gorevler
-      .filter(g => {
-        if (g.silinmis) return false;
-        const q = search.toLowerCase();
-        const matchSearch = !q || g.baslik.toLowerCase().includes(q) || g.atananKisi.toLowerCase().includes(q);
-        const matchStatus = !statusFilter || g.durum === statusFilter;
-        return matchSearch && matchStatus;
-      })
-      .sort((a, b) => {
-        const ta = a.olusturmaTarihi ?? '';
-        const tb = b.olusturmaTarihi ?? '';
-        return tb.localeCompare(ta);
-      });
-  }, [gorevler, search, statusFilter]);
+    const q = search.toLowerCase();
+    return formlar.filter(f => {
+      const firma = firmalar.find(x => x.id === f.firmaId);
+      return (
+        (!q || f.ad.toLowerCase().includes(q) || f.aciklama.toLowerCase().includes(q) || (firma?.ad.toLowerCase().includes(q) ?? false))
+        && (katFilter === 'Tümü' || f.kategori === katFilter)
+        && (!firmaFilter || f.firmaId === firmaFilter)
+      );
+    }).sort((a, b) => b.olusturmaTarihi.localeCompare(a.olusturmaTarihi));
+  }, [formlar, firmalar, search, katFilter, firmaFilter]);
 
-  const aktifGorevler = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);
   const stats = useMemo(() => ({
-    total: aktifGorevler.length,
-    bekliyor: aktifGorevler.filter(g => g.durum === 'Bekliyor').length,
-    devamEdiyor: aktifGorevler.filter(g => g.durum === 'Devam Ediyor').length,
-    tamamlandi: aktifGorevler.filter(g => g.durum === 'Tamamlandı').length,
-  }), [aktifGorevler]);
+    total: formlar.length,
+    byKat: KATEGORILER.map(k => ({ k, count: formlar.filter(f => f.kategori === k).length })),
+  }), [formlar]);
 
-  const openAdd = () => { setEditId(null); setForm(defaultForm); setShowModal(true); };
-  const openEdit = (g: Gorev) => {
-    setEditId(g.id);
-    setForm({ baslik: g.baslik, aciklama: g.aciklama, firmaId: g.firmaId || '', personelId: g.personelId || '', atananKisi: g.atananKisi, oncelik: g.oncelik, durum: g.durum, baslangicTarihi: g.baslangicTarihi, bitisTarihi: g.bitisTarihi, tamamlanmaTarihi: g.tamamlanmaTarihi || '', notlar: g.notlar });
+  const sf = (field: string, value: unknown) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleFileChange = (file: File) => {
+    if (file.size > 20 * 1024 * 1024) { addToast('Dosya 20MB\'ı aşamaz.', 'error'); return; }
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = e => {
+      sf('dosyaVeri', e.target?.result as string);
+      sf('dosyaAdi', file.name);
+      sf('dosyaBoyutu', file.size);
+      sf('dosyaTipi', file.type);
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const openAdd = () => {
+    setEditId(null);
+    setForm({ ad: '', kategori: 'Ekipman Kontrolleri', aciklama: '', firmaId: '', etiketler: [], etiketInput: '', dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '', sonKontrolTarihi: '', sonrakiKontrolTarihi: '' });
+    setShowModal(true);
+  };
+
+  const openEdit = (f: KontrolFormu) => {
+    setEditId(f.id);
+    setForm({ ad: f.ad, kategori: f.kategori, aciklama: f.aciklama, firmaId: f.firmaId, etiketler: f.etiketler, etiketInput: '', dosyaAdi: f.dosyaAdi, dosyaBoyutu: f.dosyaBoyutu, dosyaTipi: f.dosyaTipi, dosyaVeri: '', sonKontrolTarihi: f.sonKontrolTarihi ?? '', sonrakiKontrolTarihi: f.sonrakiKontrolTarihi ?? '' });
     setShowModal(true);
   };
 
   const handleSave = () => {
-    if (!form.baslik.trim()) { addToast('Görev başlığı zorunludur.', 'error'); return; }
+    if (!form.ad.trim()) { addToast('Form adı zorunludur.', 'error'); return; }
+    if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
+    if (!editId && !form.dosyaVeri) { addToast('Dosya yüklenmesi zorunludur.', 'error'); return; }
+
+    const now = new Date().toISOString();
     if (editId) {
-      updateGorev(editId, form);
-      addToast('Görev güncellendi.', 'success');
+      const updated = formlar.map(f => {
+        if (f.id !== editId) return f;
+        return {
+          ...f, ad: form.ad, kategori: form.kategori, aciklama: form.aciklama,
+          firmaId: form.firmaId,
+          etiketler: form.etiketler,
+          sonKontrolTarihi: form.sonKontrolTarihi || undefined,
+          sonrakiKontrolTarihi: form.sonrakiKontrolTarihi || undefined,
+          ...(form.dosyaVeri ? { dosyaAdi: form.dosyaAdi, dosyaBoyutu: form.dosyaBoyutu, dosyaTipi: form.dosyaTipi, dosyaVeri: form.dosyaVeri } : {}),
+        };
+      });
+      persist(updated);
+      addToast('Form güncellendi.', 'success');
     } else {
-      addGorev(form);
-      addToast('Görev oluşturuldu.', 'success');
+      const yeni: KontrolFormu = {
+        id: crypto.randomUUID(),
+        ad: form.ad, kategori: form.kategori, aciklama: form.aciklama,
+        firmaId: form.firmaId,
+        yuklemeTarihi: now, dosyaAdi: form.dosyaAdi, dosyaBoyutu: form.dosyaBoyutu,
+        dosyaTipi: form.dosyaTipi, dosyaVeri: form.dosyaVeri,
+        etiketler: form.etiketler, olusturanKisi: currentUser.ad,
+        olusturmaTarihi: now,
+        sonKontrolTarihi: form.sonKontrolTarihi || undefined,
+        sonrakiKontrolTarihi: form.sonrakiKontrolTarihi || undefined,
+      };
+      persist([yeni, ...formlar]);
+      addToast(`"${form.ad}" formu yüklendi.`, 'success');
     }
     setShowModal(false);
   };
 
   const handleDelete = () => {
     if (!deleteId) return;
-    deleteGorev(deleteId);
-    addToast('Görev silindi.', 'success');
+    persist(formlar.filter(f => f.id !== deleteId));
+    addToast('Form silindi.', 'success');
     setDeleteId(null);
   };
 
+  const handleDownload = (f: KontrolFormu) => {
+    const link = document.createElement('a');
+    link.href = f.dosyaVeri;
+    link.download = f.dosyaAdi;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast(`"${f.dosyaAdi}" indiriliyor...`, 'success');
+  };
+
+  const addEtiket = () => {
+    const t = form.etiketInput.trim();
+    if (!t || form.etiketler.includes(t)) return;
+    sf('etiketler', [...form.etiketler, t]);
+    sf('etiketInput', '');
+  };
+
+  const inp = 'isg-input w-full';
+
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Görevler</h2>
-          <p className="text-sm mt-1" style={{ color: '#64748B' }}>Görev atamalarını oluşturun ve takip edin</p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Kontrol Formları</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+            Personel kontrol formlarını, risk analizlerini ve denetim belgelerini yönetin
+          </p>
         </div>
-        <button onClick={openAdd} className="btn-primary self-start sm:self-auto whitespace-nowrap">
-          <i className="ri-add-line" /> Görev Ekle
-        </button>
+        {canCreate && (
+          <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
+            <i className="ri-upload-cloud-2-line mr-1" /> Form Yükle
+          </button>
+        )}
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Toplam Görev', value: stats.total, icon: 'ri-task-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
-          { label: 'Bekliyor', value: stats.bekliyor, icon: 'ri-time-line', color: '#94A3B8', bg: 'rgba(148,163,184,0.1)' },
-          { label: 'Devam Ediyor', value: stats.devamEdiyor, icon: 'ri-loader-line', color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
-          { label: 'Tamamlandı', value: stats.tamamlandi, icon: 'ri-checkbox-circle-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)' },
-        ].map(s => (
-          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4">
-            <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
-              <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{s.value}</p>
-              <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>{s.label}</p>
-            </div>
+        <div className="isg-card rounded-xl p-4 flex items-center gap-4 lg:col-span-1">
+          <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(99,102,241,0.1)' }}>
+            <i className="ri-folder-shield-2-line text-xl" style={{ color: '#6366F1' }} />
           </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="filter-bar">
-        <div className="relative flex-1 min-w-[200px]">
-          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: '#475569' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Görev başlığı veya atanan kişi ara..." className="isg-input pl-9" />
+          <div>
+            <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.total}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Toplam Form</p>
+          </div>
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input" style={{ minWidth: '160px' }}>
-          <option value="">Tüm Durumlar</option>
-          {Object.keys(STS_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        {stats.byKat.slice(0, 3).map(({ k, count }) => {
+          const cfg = KAT_CONFIG[k];
+          return (
+            <div key={k} className="isg-card rounded-xl p-4 flex items-center gap-4">
+              <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: cfg.bg }}>
+                <i className={`${cfg.icon} text-xl`} style={{ color: cfg.color }} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{count}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{k}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Task Cards */}
+      {/* Kategori Sekmeleri */}
+      <div className="flex flex-wrap gap-2">
+        {(['Tümü', ...KATEGORILER] as FormKategori[]).map(k => {
+          const isActive = katFilter === k;
+          const cfg = k !== 'Tümü' ? KAT_CONFIG[k] : null;
+          return (
+            <button
+              key={k}
+              onClick={() => setKatFilter(k)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+              style={{
+                background: isActive ? (cfg?.bg ?? 'rgba(99,102,241,0.15)') : 'var(--bg-item)',
+                color: isActive ? (cfg?.color ?? '#6366F1') : 'var(--text-muted)',
+                border: `1px solid ${isActive ? (cfg?.color ?? '#6366F1') + '40' : 'var(--border-subtle)'}`,
+              }}
+            >
+              {cfg && <i className={`${cfg.icon} text-xs`} />}
+              {k}
+              {k !== 'Tümü' && (
+                <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px]"
+                  style={{ background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--bg-card)' }}>
+                  {formlar.filter(f => f.kategori === k).length}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Filtreler */}
+      <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
+        <div className="relative flex-1 min-w-[200px]">
+          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Form adı, açıklama veya firma ara..." className="isg-input pl-9" />
+        </div>
+        <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input" style={{ minWidth: '180px' }}>
+          <option value="">Tüm Firmalar</option>
+          {aktivFirmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+        </select>
+        {(search || firmaFilter || katFilter !== 'Tümü') && (
+          <button onClick={() => { setSearch(''); setFirmaFilter(''); setKatFilter('Tümü'); }} className="btn-secondary whitespace-nowrap">
+            <i className="ri-filter-off-line" /> Temizle
+          </button>
+        )}
+      </div>
+
+      {/* Form Listesi */}
       {filtered.length === 0 ? (
         <div className="isg-card rounded-xl py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
-            <i className="ri-task-line text-3xl" style={{ color: '#8B5CF6' }} />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
+            <i className="ri-folder-shield-2-line text-3xl" style={{ color: '#6366F1' }} />
           </div>
-          <p className="font-semibold" style={{ color: 'var(--text-muted)' }}>Görev bulunamadı</p>
-          <p className="text-sm mt-2" style={{ color: 'var(--text-faint)' }}>Yeni görev oluşturmak için butonu kullanın</p>
-          <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Görev Ekle</button>
+          <p className="font-semibold" style={{ color: 'var(--text-muted)' }}>Kontrol formu bulunamadı</p>
+          <p className="text-sm mt-2" style={{ color: 'var(--text-faint)' }}>PDF, Word veya Excel formatında form yükleyin</p>
+          {canCreate && (
+            <button onClick={openAdd} className="btn-primary mt-5">
+              <i className="ri-upload-cloud-2-line mr-1" /> Form Yükle
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(g => {
-            const firma = firmalar.find(f => f.id === g.firmaId);
-            const personel = personeller.find(p => p.id === g.personelId);
-            const stc = STS_CONFIG[g.durum];
-            const prc = PRI_CONFIG[g.oncelik];
+          {filtered.map(f => {
+            const firma = firmalar.find(x => x.id === f.firmaId);
+            const cfg = KAT_CONFIG[f.kategori];
+            const fileColor = dosyaRengi(f.dosyaTipi);
+            const fileIcon = dosyaIkonu(f.dosyaTipi);
+            const durum = kontrolDurumu(f.sonrakiKontrolTarihi);
             return (
               <div
-                key={g.id}
-                className="isg-card rounded-xl p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200"
+                key={f.id}
+                className="isg-card rounded-xl overflow-hidden flex flex-col transition-all duration-200 cursor-pointer"
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}
+                onClick={() => setViewForm(f)}
               >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-bold text-sm leading-snug flex-1" style={{ color: 'var(--text-primary)' }}>{g.baslik}</h3>
-                  <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap flex-shrink-0" style={{ background: prc.bg, color: prc.color }}>{g.oncelik}</span>
-                </div>
+                {/* Üst renk bandı */}
+                <div className="h-1.5 w-full" style={{ background: cfg.color }} />
 
-                {g.aciklama && <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{g.aciklama}</p>}
+                <div className="p-4 flex flex-col gap-3 flex-1">
+                  {/* Başlık satırı */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: `${fileColor}18`, border: `1px solid ${fileColor}30` }}>
+                      <i className={`${fileIcon} text-lg`} style={{ color: fileColor }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold leading-snug truncate" style={{ color: 'var(--text-primary)' }}>{f.ad}</h3>
+                      <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        style={{ background: cfg.bg, color: cfg.color }}>
+                        <i className={`${cfg.icon} text-[10px]`} />{f.kategori}
+                      </span>
+                    </div>
+                  </div>
 
-                {/* Meta */}
-                <div className="space-y-1.5">
-                  {g.atananKisi && (
-                    <div className="flex items-center gap-2">
-                      <i className="ri-user-line text-xs" style={{ color: '#475569' }} />
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{g.atananKisi}</span>
-                    </div>
+                  {/* Açıklama */}
+                  {f.aciklama && (
+                    <p className="text-xs leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>{f.aciklama}</p>
                   )}
-                  {firma && (
-                    <div className="flex items-center gap-2">
-                      <i className="ri-building-2-line text-xs" style={{ color: '#475569' }} />
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{firma.ad}</span>
-                    </div>
-                  )}
-                  {personel && (
-                    <div className="flex items-center gap-2">
-                      <i className="ri-team-line text-xs" style={{ color: '#475569' }} />
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{personel.adSoyad}</span>
-                    </div>
-                  )}
-                  {g.bitisTarihi && (
-                    <div className="flex items-center gap-2">
-                      <i className="ri-calendar-line text-xs" style={{ color: '#475569' }} />
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Bitiş: {new Date(g.bitisTarihi).toLocaleDateString('tr-TR')}</span>
-                    </div>
-                  )}
-                </div>
 
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-3 mt-auto" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold" style={{ background: stc.bg, color: stc.color }}>
-                    <i className={stc.icon} />{g.durum}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => openEdit(g)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }}><i className="ri-edit-line text-xs" /></button>
-                    <button onClick={() => setDeleteId(g.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}><i className="ri-delete-bin-line text-xs" /></button>
+                  {/* Meta bilgiler */}
+                  <div className="space-y-1.5">
+                    {firma && (
+                      <div className="flex items-center gap-2">
+                        <i className="ri-building-2-line text-xs flex-shrink-0" style={{ color: 'var(--text-faint)' }} />
+                        <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{firma.ad}</span>
+                      </div>
+                    )}
+                    {f.sonKontrolTarihi && (
+                      <div className="flex items-center gap-2">
+                        <i className="ri-history-line text-xs flex-shrink-0" style={{ color: 'var(--text-faint)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Son: {new Date(f.sonKontrolTarihi).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                    )}
+                    {f.sonrakiKontrolTarihi && (
+                      <div className="flex items-center gap-2">
+                        <i className="ri-calendar-2-line text-xs flex-shrink-0" style={{ color: 'var(--text-faint)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          Sonraki: {new Date(f.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                    )}
+                    {!f.sonKontrolTarihi && !f.sonrakiKontrolTarihi && (
+                      <div className="flex items-center gap-2">
+                        <i className="ri-calendar-line text-xs flex-shrink-0" style={{ color: 'var(--text-faint)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {new Date(f.olusturmaTarihi).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sonraki kontrol durum badge */}
+                  {durum && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                      style={{ background: durum.bg, border: `1px solid ${durum.color}25` }}>
+                      <i className={`${durum.icon} text-xs`} style={{ color: durum.color }} />
+                      <span className="text-xs font-semibold" style={{ color: durum.color }}>{durum.label}</span>
+                    </div>
+                  )}
+
+                  {/* Etiketler */}
+                  {f.etiketler.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {f.etiketler.slice(0, 3).map(et => (
+                        <span key={et} className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                          style={{ background: 'var(--bg-item)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
+                          #{et}
+                        </span>
+                      ))}
+                      {f.etiketler.length > 3 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                          +{f.etiketler.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Dosya bilgisi + aksiyonlar */}
+                  <div className="flex items-center justify-between pt-3 mt-auto"
+                    style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <i className={`${fileIcon} text-xs flex-shrink-0`} style={{ color: fileColor }} />
+                      <span className="text-xs truncate max-w-[100px]" style={{ color: 'var(--text-muted)' }}>{f.dosyaAdi}</span>
+                      <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-faint)' }}>
+                        {formatBoyut(f.dosyaBoyutu)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleDownload(f)}
+                        title="İndir"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                        style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
+                      >
+                        <i className="ri-download-line text-xs" />
+                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => openEdit(f)}
+                          title="Düzenle"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                          style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}
+                        >
+                          <i className="ri-edit-line text-xs" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => setDeleteId(f.id)}
+                          title="Sil"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                          style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
+                        >
+                          <i className="ri-delete-bin-line text-xs" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -220,76 +482,314 @@ export default function GorevlerPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* ── Yükleme / Düzenleme Modal ── */}
       <Modal
-        isOpen={showModal}
+        open={showModal}
         onClose={() => setShowModal(false)}
-        title={editId ? 'Görevi Düzenle' : 'Yeni Görev Ekle'}
+        title={editId ? 'Formu Düzenle' : 'Kontrol Formu Yükle'}
         size="lg"
-        icon="ri-task-line"
+        icon="ri-upload-cloud-2-line"
         footer={
           <>
             <button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleSave} className="btn-primary whitespace-nowrap">
-              <i className={editId ? 'ri-save-line' : 'ri-add-line'} />{editId ? 'Güncelle' : 'Oluştur'}
+            <button onClick={handleSave} disabled={uploading} className="btn-primary whitespace-nowrap">
+              <i className={editId ? 'ri-save-line' : 'ri-upload-line'} />
+              {uploading ? 'Yükleniyor...' : editId ? 'Güncelle' : 'Yükle'}
             </button>
           </>
         }
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <label className="form-label">Görev Başlığı *</label>
-            <input value={form.baslik} onChange={e => setForm(p => ({ ...p, baslik: e.target.value }))} placeholder="Görev açıklaması..." className="isg-input" />
-          </div>
-          <div>
-            <label className="form-label">Atanan Kişi</label>
-            <input value={form.atananKisi} onChange={e => setForm(p => ({ ...p, atananKisi: e.target.value }))} placeholder="Ad Soyad" className="isg-input" />
-          </div>
-          <div>
-            <label className="form-label">Öncelik</label>
-            <select value={form.oncelik} onChange={e => setForm(p => ({ ...p, oncelik: e.target.value as GorevOncelik }))} className="isg-input">
-              {Object.keys(PRI_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Durum</label>
-            <select value={form.durum} onChange={e => setForm(p => ({ ...p, durum: e.target.value as GorevStatus }))} className="isg-input">
-              {Object.keys(STS_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">İlgili Firma</label>
-            <select value={form.firmaId} onChange={e => setForm(p => ({ ...p, firmaId: e.target.value }))} className="isg-input">
-              <option value="">Firma Seçin (İsteğe Bağlı)</option>
-              {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">İlgili Personel</label>
-            <select value={form.personelId} onChange={e => setForm(p => ({ ...p, personelId: e.target.value }))} className="isg-input">
-              <option value="">Personel Seçin (İsteğe Bağlı)</option>
-              {personeller.filter(p => !p.silinmis).map(p => <option key={p.id} value={p.id}>{p.adSoyad}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="form-label">Başlangıç Tarihi</label>
-            <input type="date" value={form.baslangicTarihi} onChange={e => setForm(p => ({ ...p, baslangicTarihi: e.target.value }))} className="isg-input" />
-          </div>
-          <div>
-            <label className="form-label">Bitiş Tarihi</label>
-            <input type="date" value={form.bitisTarihi} onChange={e => setForm(p => ({ ...p, bitisTarihi: e.target.value }))} className="isg-input" />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="form-label">Açıklama</label>
-            <textarea value={form.aciklama} onChange={e => setForm(p => ({ ...p, aciklama: e.target.value }))} placeholder="Görev detayları..." rows={3} maxLength={500} className="isg-input" />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Form Adı */}
+            <div className="sm:col-span-2">
+              <label className="form-label">Form Adı *</label>
+              <input value={form.ad} onChange={e => sf('ad', e.target.value)} placeholder="Örn: Yüksekte Çalışma Risk Analizi..." className={inp} />
+            </div>
+
+            {/* Kategori */}
+            <div>
+              <label className="form-label">Kategori *</label>
+              <select value={form.kategori} onChange={e => sf('kategori', e.target.value)} className={inp}>
+                {KATEGORILER.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+
+            {/* Firma */}
+            <div>
+              <label className="form-label">Firma *</label>
+              <select value={form.firmaId} onChange={e => sf('firmaId', e.target.value)} className={inp}>
+                <option value="">Firma Seçin</option>
+                {aktivFirmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
+              </select>
+            </div>
+
+            {/* Son Kontrol Tarihi */}
+            <div>
+              <label className="form-label">Son Kontrol Tarihi</label>
+              <input
+                type="date"
+                value={form.sonKontrolTarihi}
+                onChange={e => sf('sonKontrolTarihi', e.target.value)}
+                className={inp}
+              />
+            </div>
+
+            {/* Sonraki Kontrol Tarihi */}
+            <div>
+              <label className="form-label">Sonraki Kontrol Tarihi</label>
+              <input
+                type="date"
+                value={form.sonrakiKontrolTarihi}
+                onChange={e => sf('sonrakiKontrolTarihi', e.target.value)}
+                className={inp}
+              />
+            </div>
+
+            {/* Açıklama */}
+            <div className="sm:col-span-2">
+              <label className="form-label">Açıklama</label>
+              <textarea value={form.aciklama} onChange={e => sf('aciklama', e.target.value)} placeholder="Form hakkında kısa açıklama..." rows={2} maxLength={500} className={`${inp} resize-y`} />
+            </div>
+
+            {/* Etiketler */}
+            <div className="sm:col-span-2">
+              <label className="form-label">Etiketler</label>
+              <div className="flex gap-2">
+                <input
+                  value={form.etiketInput}
+                  onChange={e => sf('etiketInput', e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEtiket(); } }}
+                  placeholder="Etiket yazın ve Enter'a basın..."
+                  className={inp}
+                />
+                <button onClick={addEtiket} className="btn-secondary whitespace-nowrap px-3">
+                  <i className="ri-add-line" />
+                </button>
+              </div>
+              {form.etiketler.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {form.etiketler.map(et => (
+                    <span key={et} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>
+                      #{et}
+                      <button onClick={() => sf('etiketler', form.etiketler.filter(x => x !== et))} className="cursor-pointer ml-0.5">
+                        <i className="ri-close-line text-[10px]" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Dosya Yükleme */}
+            <div className="sm:col-span-2">
+              <label className="form-label">
+                Dosya {!editId && '*'}
+                <span className="ml-1 text-xs font-normal" style={{ color: 'var(--text-faint)' }}>
+                  (PDF, Word, Excel, JPG, PNG — Maks. 20MB)
+                </span>
+              </label>
+              <div
+                className="rounded-xl p-5 text-center cursor-pointer transition-all duration-200"
+                style={{ border: '2px dashed var(--border-subtle)', background: 'var(--bg-item)' }}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileChange(f); }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)'; e.currentTarget.style.background = 'rgba(99,102,241,0.03)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-item)'; }}
+              >
+                {uploading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <i className="ri-loader-4-line animate-spin text-xl" style={{ color: '#6366F1' }} />
+                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Yükleniyor...</span>
+                  </div>
+                ) : form.dosyaAdi ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="w-10 h-10 flex items-center justify-center rounded-xl"
+                      style={{ background: `${dosyaRengi(form.dosyaTipi)}18` }}>
+                      <i className={`${dosyaIkonu(form.dosyaTipi)} text-xl`} style={{ color: dosyaRengi(form.dosyaTipi) }} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{form.dosyaAdi}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {formatBoyut(form.dosyaBoyutu)} — Değiştirmek için tıklayın
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 flex items-center justify-center rounded-2xl mx-auto mb-3"
+                      style={{ background: 'rgba(99,102,241,0.1)' }}>
+                      <i className="ri-upload-cloud-2-line text-2xl" style={{ color: '#6366F1' }} />
+                    </div>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                      Dosyayı sürükleyin veya tıklayın
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>
+                      PDF, Word (.docx), Excel (.xlsx), JPG, PNG
+                    </p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileChange(f); e.target.value = ''; }}
+              />
+            </div>
           </div>
         </div>
       </Modal>
 
+      {/* ── Detay Modal ── */}
+      {viewForm && (
+        <Modal
+          open={!!viewForm}
+          onClose={() => setViewForm(null)}
+          title={viewForm.ad}
+          size="lg"
+          icon={KAT_CONFIG[viewForm.kategori].icon}
+          footer={
+            <div className="flex items-center gap-2 w-full flex-wrap">
+              <button onClick={() => setViewForm(null)} className="btn-secondary whitespace-nowrap mr-auto">Kapat</button>
+              {canEdit && (
+                <button onClick={() => { setViewForm(null); openEdit(viewForm); }} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
+                  style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <i className="ri-edit-line" /> Düzenle
+                </button>
+              )}
+              <button onClick={() => handleDownload(viewForm)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
+                style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <i className="ri-download-line" /> İndir
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {/* Kategori + dosya tipi */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold"
+                style={{ background: KAT_CONFIG[viewForm.kategori].bg, color: KAT_CONFIG[viewForm.kategori].color }}>
+                <i className={KAT_CONFIG[viewForm.kategori].icon} />{viewForm.kategori}
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold"
+                style={{ background: `${dosyaRengi(viewForm.dosyaTipi)}15`, color: dosyaRengi(viewForm.dosyaTipi) }}>
+                <i className={dosyaIkonu(viewForm.dosyaTipi)} />{viewForm.dosyaAdi.split('.').pop()?.toUpperCase()}
+              </span>
+              {(() => {
+                const d = kontrolDurumu(viewForm.sonrakiKontrolTarihi);
+                return d ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold"
+                    style={{ background: d.bg, color: d.color }}>
+                    <i className={d.icon} />{d.label}
+                  </span>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Kontrol tarihleri — öne çıkan alan */}
+            {(viewForm.sonKontrolTarihi || viewForm.sonrakiKontrolTarihi) && (
+              <div className="grid grid-cols-2 gap-3">
+                {viewForm.sonKontrolTarihi && (
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                    style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(16,185,129,0.12)' }}>
+                      <i className="ri-history-line text-base" style={{ color: '#10B981' }} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#10B981' }}>Son Kontrol</p>
+                      <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                        {new Date(viewForm.sonKontrolTarihi).toLocaleDateString('tr-TR')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {viewForm.sonrakiKontrolTarihi && (() => {
+                  const d = kontrolDurumu(viewForm.sonrakiKontrolTarihi);
+                  return (
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                      style={{ background: d ? d.bg : 'rgba(99,102,241,0.06)', border: `1px solid ${d ? d.color + '30' : 'rgba(99,102,241,0.2)'}` }}>
+                      <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                        style={{ background: d ? d.bg : 'rgba(99,102,241,0.12)' }}>
+                        <i className="ri-calendar-2-line text-base" style={{ color: d?.color ?? '#6366F1' }} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: d?.color ?? '#6366F1' }}>Sonraki Kontrol</p>
+                        <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                          {new Date(viewForm.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Bilgi grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Firma', value: firmalar.find(x => x.id === viewForm.firmaId)?.ad ?? '—', icon: 'ri-building-2-line' },
+                { label: 'Yükleme Tarihi', value: new Date(viewForm.olusturmaTarihi).toLocaleDateString('tr-TR'), icon: 'ri-calendar-line' },
+                { label: 'Yükleyen', value: viewForm.olusturanKisi || '—', icon: 'ri-user-star-line' },
+                { label: 'Dosya Adı', value: viewForm.dosyaAdi, icon: 'ri-file-line' },
+                { label: 'Dosya Boyutu', value: formatBoyut(viewForm.dosyaBoyutu), icon: 'ri-hard-drive-2-line' },
+              ].map(item => (
+                <div key={item.label} className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl"
+                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(99,102,241,0.1)' }}>
+                    <i className={`${item.icon} text-xs`} style={{ color: '#6366F1' }} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-faint)' }}>{item.label}</p>
+                    <p className="text-sm font-medium mt-0.5 break-all" style={{ color: 'var(--text-primary)' }}>{item.value}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Açıklama */}
+            {viewForm.aciklama && (
+              <div className="px-4 py-3 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-faint)' }}>Açıklama</p>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>{viewForm.aciklama}</p>
+              </div>
+            )}
+
+            {/* Etiketler */}
+            {viewForm.etiketler.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>Etiketler</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {viewForm.etiketler.map(et => (
+                    <span key={et} className="px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>
+                      #{et}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Dosya önizleme (görsel ise) */}
+            {viewForm.dosyaTipi.startsWith('image/') && (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+                <img src={viewForm.dosyaVeri} alt={viewForm.ad} className="w-full object-contain max-h-64" />
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Silme Modal ── */}
       <Modal
-        isOpen={!!deleteId}
+        open={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="Görevi Sil"
+        title="Formu Sil"
         size="sm"
         icon="ri-delete-bin-line"
         footer={
@@ -300,11 +800,14 @@ export default function GorevlerPage() {
         }
       >
         <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4"
+            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
           </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu görevi silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
+          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+            Bu formu silmek istediğinizden emin misiniz?
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Yüklenen dosya da kalıcı olarak silinecektir.</p>
         </div>
       </Modal>
     </div>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '@/store/AppContext';
 import type { IsIzni, IsIzniTip, IsIzniStatus } from '@/types';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -44,6 +44,11 @@ const emptyForm = {
   onayTarihi: '',
   notlar: '',
   olusturanKisi: '',
+  belgeMevcut: false,
+  belgeDosyaAdi: '',
+  belgeDosyaBoyutu: 0,
+  belgeDosyaTipi: '',
+  belgeDosyaVeri: '',
 };
 
 export default function IsIzniPage() {
@@ -65,6 +70,11 @@ export default function IsIzniPage() {
   const [showBelgeModal, setShowBelgeModal] = useState(false);
   const [savedIsIzni, setSavedIsIzni] = useState<IsIzni | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [statusChangeId, setStatusChangeId] = useState<string | null>(null);
+  const [showEvrakModal, setShowEvrakModal] = useState<string | null>(null);
+  const [evrakForm, setEvrakForm] = useState({ ad: '', tur: '', notlar: '', dosya: null as File | null });
+  const evrakFileRef = useRef<HTMLInputElement>(null);
+  const formFileRef = useRef<HTMLInputElement>(null);
 
   const aktivFirmalar = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
 
@@ -132,6 +142,11 @@ export default function IsIzniPage() {
       gerekliEkipman: iz.gerekliEkipman, baslamaTarihi: iz.baslamaTarihi,
       bitisTarihi: iz.bitisTarihi, durum: iz.durum, onaylayanKisi: iz.onaylayanKisi,
       onayTarihi: iz.onayTarihi || '', notlar: iz.notlar, olusturanKisi: iz.olusturanKisi,
+      belgeMevcut: iz.belgeMevcut ?? false,
+      belgeDosyaAdi: iz.belgeDosyaAdi ?? '',
+      belgeDosyaBoyutu: iz.belgeDosyaBoyutu ?? 0,
+      belgeDosyaTipi: iz.belgeDosyaTipi ?? '',
+      belgeDosyaVeri: '',
     });
     setShowModal(true);
   };
@@ -141,7 +156,11 @@ export default function IsIzniPage() {
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.baslamaTarihi) { addToast('Başlama tarihi zorunludur.', 'error'); return; }
 
-    const { selectedCalisanIds: _ids, ...saveData } = form;
+    const { selectedCalisanIds: _ids, belgeDosyaVeri: _bdv, ...saveDataBase } = form;
+    const saveData = {
+      ...saveDataBase,
+      belgeDosyaVeri: form.belgeMevcut ? form.belgeDosyaVeri : '',
+    };
 
     if (editId) {
       updateIsIzni(editId, saveData);
@@ -178,6 +197,57 @@ export default function IsIzniPage() {
     deleteIsIzni(deleteId);
     addToast('İş izni silindi.', 'success');
     setDeleteId(null);
+  };
+
+  /* Durum değiştirme */
+  const handleStatusChange = (iz: IsIzni, yeniDurum: IsIzniStatus) => {
+    const updates: Partial<IsIzni> = { durum: yeniDurum };
+    if (yeniDurum === 'Onaylandı') {
+      updates.onaylayanKisi = currentUser.ad;
+      updates.onayTarihi = new Date().toISOString().split('T')[0];
+    }
+    updateIsIzni(iz.id, updates);
+    addToast(`İş izni durumu "${yeniDurum}" olarak güncellendi.`, 'success');
+    setStatusChangeId(null);
+  };
+
+  /* Evrak işlemleri */
+  const handleEvrakEkle = () => {
+    if (!showEvrakModal || !evrakForm.ad.trim() || !evrakForm.dosya) {
+      addToast('Evrak adı ve dosya zorunludur.', 'error');
+      return;
+    }
+    const iz = isIzinleri.find(i => i.id === showEvrakModal);
+    if (!iz) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const yeniEvrak = {
+        id: Math.random().toString(36).substring(2),
+        ad: evrakForm.ad,
+        tur: evrakForm.tur || 'Belge',
+        yuklemeTarihi: new Date().toISOString(),
+        dosyaAdi: evrakForm.dosya!.name,
+        dosyaBoyutu: evrakForm.dosya!.size,
+        dosyaTipi: evrakForm.dosya!.type,
+        dosyaVeri: e.target?.result as string,
+        notlar: evrakForm.notlar,
+      };
+      const mevcutEvraklar = iz.evraklar || [];
+      updateIsIzni(iz.id, { evraklar: [...mevcutEvraklar, yeniEvrak] });
+      addToast(`"${evrakForm.ad}" evrakı eklendi.`, 'success');
+      setShowEvrakModal(null);
+      setEvrakForm({ ad: '', tur: '', notlar: '', dosya: null });
+    };
+    reader.readAsDataURL(evrakForm.dosya);
+  };
+
+  const handleEvrakSil = (izId: string, evrakId: string) => {
+    const iz = isIzinleri.find(i => i.id === izId);
+    if (!iz) return;
+    const yeniEvraklar = (iz.evraklar || []).filter(e => e.id !== evrakId);
+    updateIsIzni(izId, { evraklar: yeniEvraklar });
+    addToast('Evrak silindi.', 'success');
   };
 
   const inp = 'isg-input w-full';
@@ -303,14 +373,39 @@ export default function IsIzniPage() {
                         </span>
                       </td>
                       <td>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}` }}>
-                          <i className={`${dur.icon} text-xs`} />{iz.durum}
-                        </span>
+                        {statusChangeId === iz.id ? (
+                          <select
+                            value={iz.durum}
+                            onChange={e => handleStatusChange(iz, e.target.value as IsIzniStatus)}
+                            onBlur={() => setStatusChangeId(null)}
+                            autoFocus
+                            className="text-xs py-1 px-2 rounded border"
+                            style={{ background: dur.bg, color: dur.color, borderColor: dur.border }}
+                          >
+                            {DURUMLAR.map(d => (
+                              <option key={d} value={d}>{d}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <button
+                            onClick={() => canEdit && setStatusChangeId(iz.id)}
+                            disabled={!canEdit}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all"
+                            style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}`, opacity: canEdit ? 1 : 0.7 }}
+                            title={canEdit ? 'Durumu değiştirmek için tıklayın' : 'Değiştirme yetkiniz yok'}
+                          >
+                            <i className={`${dur.icon} text-xs`} />{iz.durum}
+                            {canEdit && <i className="ri-arrow-down-s-line text-[10px] ml-0.5" />}
+                          </button>
+                        )}
                       </td>
                       <td>
                         <div className="flex items-center gap-1 justify-end">
                           <button onClick={() => setViewRecord(iz)} title="Detay" className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
                             <i className="ri-eye-line text-xs" />
+                          </button>
+                          <button onClick={() => setShowEvrakModal(iz.id)} title="Evrak Ekle" className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }}>
+                            <i className="ri-attachment-2 text-xs" />
                           </button>
                           <button
                             onClick={() => {
@@ -514,6 +609,103 @@ export default function IsIzniPage() {
               <label className="form-label">Notlar</label>
               <textarea value={form.notlar} onChange={e => sf('notlar', e.target.value)} placeholder="Ek notlar..." rows={2} maxLength={500} className={`${inp} resize-y`} />
             </div>
+
+            {/* Belge Mevcut mu? */}
+            <div className="sm:col-span-2">
+              <div
+                className="rounded-xl p-4"
+                style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 flex items-center justify-center rounded-lg" style={{ background: 'rgba(59,130,246,0.1)' }}>
+                      <i className="ri-file-text-line text-sm" style={{ color: '#3B82F6' }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Belge Mevcut mu?</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>İş iznine ait fiziksel veya dijital belge var mı?</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {(['Evet', 'Hayır'] as const).map(opt => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <div
+                          className="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all"
+                          style={{
+                            borderColor: (opt === 'Evet' ? form.belgeMevcut : !form.belgeMevcut) ? '#3B82F6' : 'var(--border-main)',
+                            background: (opt === 'Evet' ? form.belgeMevcut : !form.belgeMevcut) ? '#3B82F6' : 'transparent',
+                          }}
+                          onClick={() => sf('belgeMevcut', opt === 'Evet')}
+                        >
+                          {(opt === 'Evet' ? form.belgeMevcut : !form.belgeMevcut) && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                          )}
+                        </div>
+                        <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Belge yükleme alanı — sadece Evet seçilince */}
+                {form.belgeMevcut && (
+                  <div
+                    className="rounded-xl p-4 text-center cursor-pointer transition-all mt-2"
+                    style={{ border: '2px dashed rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.03)' }}
+                    onClick={() => formFileRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files[0];
+                      if (!file) return;
+                      if (file.size > 10 * 1024 * 1024) { addToast('Dosya 10MB\'ı aşamaz.', 'error'); return; }
+                      const reader = new FileReader();
+                      reader.onload = ev => sf('belgeDosyaVeri', ev.target?.result as string);
+                      reader.readAsDataURL(file);
+                      sf('belgeDosyaAdi', file.name);
+                      sf('belgeDosyaBoyutu', file.size);
+                      sf('belgeDosyaTipi', file.type);
+                    }}
+                  >
+                    {form.belgeDosyaAdi ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <i className="ri-file-check-line text-xl" style={{ color: '#10B981' }} />
+                        <div className="text-left">
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{form.belgeDosyaAdi}</p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {form.belgeDosyaBoyutu ? `${(form.belgeDosyaBoyutu / 1024).toFixed(1)} KB` : ''} — Değiştirmek için tıklayın
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <i className="ri-upload-cloud-2-line text-2xl mb-1" style={{ color: '#3B82F6' }} />
+                        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Belgeyi yükleyin</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>PDF, Word, Excel, JPG, PNG • Maks. 10MB</p>
+                      </>
+                    )}
+                  </div>
+                )}
+                <input
+                  ref={formFileRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 10 * 1024 * 1024) { addToast('Dosya 10MB\'ı aşamaz.', 'error'); return; }
+                    const reader = new FileReader();
+                    reader.onload = ev => sf('belgeDosyaVeri', ev.target?.result as string);
+                    reader.readAsDataURL(file);
+                    sf('belgeDosyaAdi', file.name);
+                    sf('belgeDosyaBoyutu', file.size);
+                    sf('belgeDosyaTipi', file.type);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </Modal>
@@ -629,6 +821,77 @@ export default function IsIzniPage() {
                 <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{viewRecord.onlemler}</p>
               </div>
             )}
+
+            {/* Evraklar */}
+            {(viewRecord.evraklar?.length ?? 0) > 0 && (
+              <div className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg-item)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Ekli Evraklar ({viewRecord.evraklar!.length})</p>
+                  {canEdit && (
+                    <button
+                      onClick={() => { setViewRecord(null); setShowEvrakModal(viewRecord.id); }}
+                      className="text-xs px-2 py-1 rounded cursor-pointer"
+                      style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }}
+                    >
+                      + Ekle
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {viewRecord.evraklar!.map(evrak => (
+                    <div
+                      key={evrak.id}
+                      className="flex items-center justify-between p-2.5 rounded-lg"
+                      style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)' }}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(59,130,246,0.12)' }}>
+                          <i className="ri-file-text-line text-sm" style={{ color: '#3B82F6' }} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{evrak.ad}</p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{evrak.tur} • {(evrak.dosyaBoyutu / 1024).toFixed(1)} KB</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <a
+                          href={evrak.dosyaVeri}
+                          download={evrak.dosyaAdi}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                          style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
+                          title="İndir"
+                        >
+                          <i className="ri-download-line text-xs" />
+                        </a>
+                        {canEdit && (
+                          <button
+                            onClick={() => handleEvrakSil(viewRecord.id, evrak.id)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                            style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
+                            title="Sil"
+                          >
+                            <i className="ri-delete-bin-line text-xs" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {canEdit && !(viewRecord.evraklar?.length) && (
+              <div className="px-3 py-2.5 rounded-lg text-center" style={{ background: 'var(--bg-item)', border: '1px dashed var(--border-subtle)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Henüz evrak eklenmemiş</p>
+                <button
+                  onClick={() => { setViewRecord(null); setShowEvrakModal(viewRecord.id); }}
+                  className="text-xs px-3 py-1.5 rounded-lg mt-2 cursor-pointer"
+                  style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }}
+                >
+                  <i className="ri-attachment-2 mr-1" /> Evrak Ekle
+                </button>
+              </div>
+            )}
           </div>
         </Modal>
       )}
@@ -678,6 +941,99 @@ export default function IsIzniPage() {
           addToast(`${count} iş izni başarıyla içe aktarıldı.`, 'success');
         }}
       />
+
+      {/* Evrak Ekleme Modal */}
+      {showEvrakModal && (
+        <Modal
+          open={!!showEvrakModal}
+          onClose={() => { setShowEvrakModal(null); setEvrakForm({ ad: '', tur: '', notlar: '', dosya: null }); }}
+          title="İş İznine Evrak Ekle"
+          size="md"
+          icon="ri-attachment-2"
+          footer={
+            <>
+              <button onClick={() => { setShowEvrakModal(null); setEvrakForm({ ad: '', tur: '', notlar: '', dosya: null }); }} className="btn-secondary whitespace-nowrap">İptal</button>
+              <button onClick={handleEvrakEkle} disabled={!evrakForm.ad.trim() || !evrakForm.dosya} className="btn-primary whitespace-nowrap">
+                <i className="ri-upload-line mr-1" /> Evrak Ekle
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="form-label">Evrak Adı *</label>
+              <input
+                value={evrakForm.ad}
+                onChange={e => setEvrakForm(prev => ({ ...prev, ad: e.target.value }))}
+                placeholder="Örn: Risk Analizi, Çalışma Talimatı..."
+                className={inp}
+              />
+            </div>
+            <div>
+              <label className="form-label">Evrak Türü</label>
+              <select
+                value={evrakForm.tur}
+                onChange={e => setEvrakForm(prev => ({ ...prev, tur: e.target.value }))}
+                className={inp}
+              >
+                <option value="">Tür Seçin</option>
+                <option value="Risk Analizi">Risk Analizi</option>
+                <option value="Çalışma Talimatı">Çalışma Talimatı</option>
+                <option value="Eğitim Belgesi">Eğitim Belgesi</option>
+                <option value="Yöntem Belgesi">Yöntem Belgesi</option>
+                <option value="Onay Belgesi">Onay Belgesi</option>
+                <option value="Diğer">Diğer</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Dosya *</label>
+              <div
+                className="rounded-xl p-4 text-center cursor-pointer transition-all"
+                style={{ border: '2px dashed var(--border-subtle)', background: 'var(--bg-item)' }}
+                onClick={() => evrakFileRef.current?.click()}
+              >
+                {evrakForm.dosya ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <i className="ri-file-check-line text-xl" style={{ color: '#10B981' }} />
+                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{evrakForm.dosya.name}</span>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>({(evrakForm.dosya.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                ) : (
+                  <>
+                    <i className="ri-upload-cloud-2-line text-2xl mb-1" style={{ color: 'var(--text-faint)' }} />
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Dosya yüklemek için tıklayın</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG • Maks. 10MB</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={evrakFileRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f && f.size <= 10 * 1024 * 1024) {
+                    setEvrakForm(prev => ({ ...prev, dosya: f }));
+                  } else if (f) {
+                    addToast('Dosya boyutu 10MB\'ı aşamaz.', 'error');
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <label className="form-label">Notlar</label>
+              <textarea
+                value={evrakForm.notlar}
+                onChange={e => setEvrakForm(prev => ({ ...prev, notlar: e.target.value }))}
+                placeholder="Evrak hakkında notlar..."
+                rows={2}
+                className={`${inp} resize-y`}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
 
     </div>
   );

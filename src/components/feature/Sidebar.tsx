@@ -45,7 +45,7 @@ const menuGroups = [
       { id: 'tutanaklar', label: 'Tutanaklar', icon: 'ri-article-line' },
       { id: 'uygunsuzluklar', label: 'Saha Denetim', icon: 'ri-map-pin-user-line' },
       { id: 'ekipmanlar', label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },
-      { id: 'gorevler', label: 'Görevler', icon: 'ri-task-line' },
+      { id: 'gorevler', label: 'Kontrol Formları', icon: 'ri-folder-shield-2-line' },
       { id: 'is-izinleri', label: 'İş İzni Takip', icon: 'ri-shield-keyhole-line' },
     ],
   },

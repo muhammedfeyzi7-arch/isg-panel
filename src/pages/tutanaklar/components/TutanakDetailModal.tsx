@@ -184,29 +184,6 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
           </div>
         </div>
 
-        {/* ── Notlar ── */}
-        {tutanak.notlar && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-5 rounded-full" style={{ background: '#F59E0B' }} />
-              <p className="text-sm font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-                Notlar
-              </p>
-            </div>
-            <div
-              className="rounded-xl p-4 text-sm leading-relaxed italic"
-              style={{
-                background: 'rgba(245,158,11,0.06)',
-                border: '1px solid rgba(245,158,11,0.15)',
-                color: 'var(--text-muted)',
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {tutanak.notlar}
-            </div>
-          </div>
-        )}
-
         {/* ── Ek Dosya ── */}
         {tutanak.dosyaAdi && (
           <div>

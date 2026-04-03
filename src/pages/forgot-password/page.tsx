@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+
+const EDGE_FN_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/send-reset-email';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -19,24 +20,36 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       setError('E-posta adresi boş bırakılamaz.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Geçerli bir e-posta adresi giriniz.');
       return;
     }
     setLoading(true);
     setError(null);
 
-    const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}reset-password`
-      .replace(/\/+/g, '/')
-      .replace(':/', '://');
+    try {
+      const res = await fetch(EDGE_FN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail }),
+      });
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
-    setLoading(false);
+      const data = await res.json() as { success?: boolean; error?: string };
 
-    if (resetError) {
-      setError('İstek gönderilemedi. Lütfen tekrar deneyin.');
-    } else {
-      setSent(true);
+      if (!res.ok || data.error) {
+        setError(data.error ?? 'İstek gönderilemedi. Lütfen tekrar deneyin.');
+      } else {
+        setSent(true);
+      }
+    } catch {
+      setError('Bağlantı hatası. İnternet bağlantınızı kontrol edin.');
+    } finally {
+      setLoading(false);
     }
   };
 

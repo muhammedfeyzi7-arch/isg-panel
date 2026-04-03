@@ -1056,19 +1056,6 @@ export default function TutanaklarPage() {
               />
             </div>
 
-            {/* Notlar */}
-            <div className="sm:col-span-2">
-              <label className="form-label">Notlar</label>
-              <textarea
-                value={form.notlar}
-                onChange={e => sf('notlar', e.target.value)}
-                placeholder="Ek notlar..."
-                rows={2}
-                maxLength={500}
-                className={`${inp} resize-y`}
-              />
-            </div>
-
             {/* İndirme bilgi notu */}
             <div className="sm:col-span-2">
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl"

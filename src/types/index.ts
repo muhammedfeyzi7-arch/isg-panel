@@ -152,6 +152,14 @@ export interface Uygunsuzluk {
   cascadeFirmaId?: string;
 }
 
+export interface EkipmanSahaFoto {
+  id: string;
+  url: string;
+  aciklama: string;
+  tarih: string;
+  yukleyenKisi?: string;
+}
+
 export interface Ekipman {
   id: string;
   ad: string;
@@ -171,6 +179,7 @@ export interface Ekipman {
   dosyaTipi?: string;
   dosyaVeri?: string;
   notlar: string;
+  sahaFotolari?: EkipmanSahaFoto[];
   olusturmaTarihi: string;
   silinmis?: boolean;
   silinmeTarihi?: string;
@@ -229,6 +238,18 @@ export interface CurrentUser {
 export type IsIzniTip = 'Sıcak Çalışma' | 'Yüksekte Çalışma' | 'Kapalı Alan' | 'Elektrikli Çalışma' | 'Kazı' | 'Genel';
 export type IsIzniStatus = 'Onay Bekliyor' | 'Onaylandı' | 'Reddedildi';
 
+export interface IsIzniEvrak {
+  id: string;
+  ad: string;
+  tur: string;
+  yuklemeTarihi: string;
+  dosyaAdi: string;
+  dosyaBoyutu: number;
+  dosyaTipi: string;
+  dosyaVeri: string;
+  notlar?: string;
+}
+
 export interface IsIzni {
   id: string;
   izinNo: string;
@@ -251,6 +272,12 @@ export interface IsIzni {
   olusturanKisi: string;
   olusturmaTarihi: string;
   guncellemeTarihi: string;
+  evraklar?: IsIzniEvrak[];
+  belgeMevcut?: boolean;
+  belgeDosyaAdi?: string;
+  belgeDosyaBoyutu?: number;
+  belgeDosyaTipi?: string;
+  belgeDosyaVeri?: string;
 }
 
 export interface AppData {
