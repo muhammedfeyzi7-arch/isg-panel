@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import Modal from '../../../components/base/Modal';
 import type { Ekipman } from '../../../types';
 
@@ -49,14 +49,23 @@ export default function QrModal({ ekipman, onClose }: Props) {
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
   };
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&margin=2`;
-    link.download = `QR-${ekipman.ad.replace(/\s+/g, '-')}.png`;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async () => {
+    try {
+      const imgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&margin=4&bgcolor=ffffff&color=0f172a`;
+      const response = await fetch(imgUrl);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `QR-${ekipman.ad.replace(/\s+/g, '-')}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch {
+      // Fallback: open in new tab
+      window.open(`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&margin=4`, '_blank');
+    }
   };
 
   return (
