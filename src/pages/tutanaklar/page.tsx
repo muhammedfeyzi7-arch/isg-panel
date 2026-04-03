@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun,
-  BorderStyle, ShadingType,
+  BorderStyle, ShadingType, Table, TableRow, TableCell,
+  WidthType, VerticalAlign, HeightRule,
 } from 'docx';
 import { useApp } from '../../store/AppContext';
 import type { Tutanak, TutanakStatus } from '../../types';
@@ -39,80 +40,357 @@ function getImageType(mimeType: string): 'jpg' | 'png' | 'gif' | 'bmp' {
   return 'jpg';
 }
 
-/* ── Modern Word Doküman Üretici (Blok Yapı) ─────────────────── */
+/* ── Tablo hücresi yardımcısı ────────────────────────────────── */
+function makeCell(
+  text: string,
+  opts: {
+    bold?: boolean;
+    size?: number;
+    color?: string;
+    bg?: string;
+    align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+    width?: number;
+    borders?: boolean;
+    labelCell?: boolean;
+    verticalAlign?: (typeof VerticalAlign)[keyof typeof VerticalAlign];
+    colspan?: number;
+  } = {},
+): TableCell {
+  const {
+    bold = false, size = 20, color = '1F2937', bg,
+    align = AlignmentType.LEFT, width, borders = true,
+    labelCell = false, verticalAlign = VerticalAlign.CENTER,
+    colspan,
+  } = opts;
+
+  const borderStyle = borders
+    ? { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' }
+    : { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+
+  return new TableCell({
+    columnSpan: colspan,
+    verticalAlign,
+    shading: bg ? { type: ShadingType.SOLID, color: bg } : undefined,
+    width: width ? { size: width, type: WidthType.DXA } : undefined,
+    margins: { top: 80, bottom: 80, left: labelCell ? 120 : 160, right: 160 },
+    borders: {
+      top: borderStyle, bottom: borderStyle,
+      left: borderStyle, right: borderStyle,
+    },
+    children: [
+      new Paragraph({
+        alignment: align,
+        children: [
+          new TextRun({ text, bold, size, font: 'Calibri', color }),
+        ],
+      }),
+    ],
+  });
+}
+
+/* ── Word Doküman Üretici ────────────────────────────────────── */
 async function generateWordDoc(
   tutanak: Tutanak,
   firmaAd: string,
   fileVeri?: string,
   firmaLogo?: string,
 ): Promise<void> {
-  const tarihStr = tutanak.tarih ? new Date(tutanak.tarih).toLocaleDateString('tr-TR') : '—';
+  const tarihStr = tutanak.tarih
+    ? new Date(tutanak.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '—';
   const FONT = 'Calibri';
+  const ACCENT = '1B3A6B';   // koyu lacivert
+  const ACCENT2 = '2563EB';  // mavi
+  const LABEL_BG = 'EFF6FF'; // açık mavi arka plan (label hücreleri)
+  const HEADER_BG = '1B3A6B';
 
-  /* — Logo — */
-  const logoParagraflar: Paragraph[] = [];
+  /* ── Yardımcı: boş satır ── */
+  const emptyLine = (before = 0, after = 0) => new Paragraph({
+    spacing: { before, after },
+    children: [],
+  });
+
+  /* ── Yardımcı: yatay çizgi ── */
+  const hrLine = (color = 'D1D5DB', before = 160, after = 160) => new Paragraph({
+    spacing: { before, after },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color } },
+    children: [],
+  });
+
+  /* ── Yardımcı: bölüm başlığı ── */
+  const sectionHeader = (text: string, before = 280) => new Paragraph({
+    spacing: { before, after: 120 },
+    shading: { type: ShadingType.SOLID, color: HEADER_BG },
+    border: {
+      top: { style: BorderStyle.SINGLE, size: 4, color: ACCENT },
+      bottom: { style: BorderStyle.SINGLE, size: 4, color: ACCENT },
+      left: { style: BorderStyle.THICK, size: 24, color: ACCENT2 },
+      right: { style: BorderStyle.SINGLE, size: 4, color: ACCENT },
+    },
+    indent: { left: 160, right: 160 },
+    children: [
+      new TextRun({ text: '  ' + text, bold: true, size: 22, font: FONT, color: 'FFFFFF', allCaps: true }),
+    ],
+  });
+
+  /* ── LOGO + BAŞLIK HEADER TABLOSU ── */
+  let logoImageRun: ImageRun | null = null;
   if (firmaLogo && firmaLogo.startsWith('data:image')) {
     try {
       const logoData = dataUrlToUint8Array(firmaLogo);
       const logoType = getImageType(firmaLogo.split(';')[0].split(':')[1] || 'image/png');
-      logoParagraflar.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 0, after: 300 },
-        children: [new ImageRun({ data: logoData, transformation: { width: 140, height: 70 }, type: logoType })],
-      }));
-    } catch { /* logo eklenemedi */ }
+      logoImageRun = new ImageRun({ data: logoData, transformation: { width: 110, height: 55 }, type: logoType });
+    } catch { /* logo yüklenemedi */ }
   }
 
-  /* — Ayraç çizgisi — */
-  const divider = () => new Paragraph({
-    spacing: { before: 200, after: 200 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'E2E8F0' } },
-    children: [],
-  });
-
-  /* — Bölüm başlığı — */
-  const sectionTitle = (text: string, before = 320) => new Paragraph({
-    spacing: { before, after: 160 },
+  /* Logo hücresi */
+  const logoCell = new TableCell({
+    verticalAlign: VerticalAlign.CENTER,
+    width: { size: 2200, type: WidthType.DXA },
+    margins: { top: 120, bottom: 120, left: 120, right: 120 },
+    borders: {
+      top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    },
     children: [
-      new TextRun({ text: '▌  ', size: 24, font: FONT, color: '4F46E5' }),
-      new TextRun({ text, bold: true, size: 26, font: FONT, color: '1F2937' }),
+      new Paragraph({
+        alignment: AlignmentType.LEFT,
+        children: logoImageRun
+          ? [logoImageRun]
+          : [new TextRun({ text: firmaAd, bold: true, size: 22, font: FONT, color: ACCENT })],
+      }),
     ],
   });
 
-  /* — Bilgi bloğu (label + value) — */
-  const infoBlock = (label: string, value: string) => [
-    new Paragraph({
-      spacing: { before: 120, after: 60 },
-      children: [
-        new TextRun({ text: label.toUpperCase(), bold: true, size: 18, font: FONT, color: '64748B', allCaps: true }),
-      ],
-    }),
-    new Paragraph({
-      spacing: { before: 0, after: 160 },
-      children: [
-        new TextRun({ text: value || '—', size: 24, font: FONT, color: '111827' }),
-      ],
-    }),
-  ];
+  /* Başlık hücresi */
+  const titleCell = new TableCell({
+    verticalAlign: VerticalAlign.CENTER,
+    shading: { type: ShadingType.SOLID, color: HEADER_BG },
+    margins: { top: 160, bottom: 160, left: 200, right: 200 },
+    borders: {
+      top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    },
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 60 },
+        children: [
+          new TextRun({ text: 'İŞ SAĞLIĞI VE GÜVENLİĞİ', bold: true, size: 26, font: FONT, color: 'FFFFFF' }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0 },
+        children: [
+          new TextRun({ text: 'DENETİM TUTANAĞI', bold: true, size: 22, font: FONT, color: 'BFD7FF' }),
+        ],
+      }),
+    ],
+  });
 
-  /* — Fotoğraf bölümü — */
-  const fotoParagraflar: Paragraph[] = [];
+  /* Tutanak No hücresi */
+  const noCell = new TableCell({
+    verticalAlign: VerticalAlign.CENTER,
+    width: { size: 2400, type: WidthType.DXA },
+    shading: { type: ShadingType.SOLID, color: 'EFF6FF' },
+    margins: { top: 120, bottom: 120, left: 160, right: 160 },
+    borders: {
+      top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    },
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { before: 0, after: 60 },
+        children: [
+          new TextRun({ text: 'Tutanak No', bold: true, size: 18, font: FONT, color: '6B7280' }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { before: 0, after: 60 },
+        children: [
+          new TextRun({ text: tutanak.tutanakNo, bold: true, size: 24, font: FONT, color: ACCENT }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { before: 0, after: 0 },
+        children: [
+          new TextRun({ text: tarihStr, size: 18, font: FONT, color: '6B7280' }),
+        ],
+      }),
+    ],
+  });
+
+  const headerTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.THICK, size: 24, color: ACCENT2 },
+      bottom: { style: BorderStyle.THICK, size: 24, color: ACCENT2 },
+      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      insideH: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      insideV: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    },
+    rows: [
+      new TableRow({
+        height: { value: 900, rule: HeightRule.ATLEAST },
+        children: [logoCell, titleCell, noCell],
+      }),
+    ],
+  });
+
+  /* ── BİLGİ TABLOSU ── */
+  const infoTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      bottom: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      left: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      right: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      insideH: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      insideV: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+    },
+    rows: [
+      /* Satır 1: Firma | Tutanak Başlığı */
+      new TableRow({
+        height: { value: 400, rule: HeightRule.ATLEAST },
+        children: [
+          makeCell('FİRMA', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1400, labelCell: true }),
+          makeCell(firmaAd, { size: 20, color: '111827', width: 3600 }),
+          makeCell('TUTANAK BAŞLIĞI', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1600, labelCell: true }),
+          makeCell(tutanak.baslik, { size: 20, color: '111827', width: 3400 }),
+        ],
+      }),
+      /* Satır 2: Tarih | Oluşturan Kişi */
+      new TableRow({
+        height: { value: 400, rule: HeightRule.ATLEAST },
+        children: [
+          makeCell('TARİH', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1400, labelCell: true }),
+          makeCell(tarihStr, { size: 20, color: '111827', width: 3600 }),
+          makeCell('OLUŞTURAN KİŞİ', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1600, labelCell: true }),
+          makeCell(tutanak.olusturanKisi || '—', { size: 20, color: '111827', width: 3400 }),
+        ],
+      }),
+      /* Satır 3: Durum */
+      new TableRow({
+        height: { value: 400, rule: HeightRule.ATLEAST },
+        children: [
+          makeCell('DURUM', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1400, labelCell: true }),
+          makeCell(tutanak.durum, { size: 20, color: '111827', width: 3600 }),
+          makeCell('TUTANAK NO', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1600, labelCell: true }),
+          makeCell(tutanak.tutanakNo, { size: 20, color: ACCENT, bold: true, width: 3400 }),
+        ],
+      }),
+    ],
+  });
+
+  /* ── AÇIKLAMA TABLOSU ── */
+  const aciklamaTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      bottom: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      left: { style: BorderStyle.THICK, size: 20, color: ACCENT2 },
+      right: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      insideH: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      insideV: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    },
+    rows: [
+      new TableRow({
+        height: { value: 1200, rule: HeightRule.ATLEAST },
+        children: [
+          new TableCell({
+            shading: { type: ShadingType.SOLID, color: 'F8FAFC' },
+            margins: { top: 160, bottom: 160, left: 200, right: 200 },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+              bottom: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+              left: { style: BorderStyle.THICK, size: 20, color: ACCENT2 },
+              right: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+            },
+            children: [
+              new Paragraph({
+                spacing: { before: 0, after: 0 },
+                children: [
+                  new TextRun({
+                    text: tutanak.aciklama || '—',
+                    size: 22, font: FONT, color: '374151',
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+
+  /* ── NOTLAR TABLOSU ── */
+  const notlarTable = tutanak.notlar
+    ? new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+          top: { style: BorderStyle.SINGLE, size: 4, color: 'FDE68A' },
+          bottom: { style: BorderStyle.SINGLE, size: 4, color: 'FDE68A' },
+          left: { style: BorderStyle.THICK, size: 20, color: 'F59E0B' },
+          right: { style: BorderStyle.SINGLE, size: 4, color: 'FDE68A' },
+          insideH: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideV: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        },
+        rows: [
+          new TableRow({
+            height: { value: 600, rule: HeightRule.ATLEAST },
+            children: [
+              new TableCell({
+                shading: { type: ShadingType.SOLID, color: 'FFFBEB' },
+                margins: { top: 120, bottom: 120, left: 200, right: 200 },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 4, color: 'FDE68A' },
+                  bottom: { style: BorderStyle.SINGLE, size: 4, color: 'FDE68A' },
+                  left: { style: BorderStyle.THICK, size: 20, color: 'F59E0B' },
+                  right: { style: BorderStyle.SINGLE, size: 4, color: 'FDE68A' },
+                },
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: tutanak.notlar, size: 20, font: FONT, italics: true, color: '78716C' }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      })
+    : null;
+
+  /* ── EK GÖRSEL ── */
+  const fotoParagraflar: (Paragraph | Table)[] = [];
   const hasPhoto = fileVeri && tutanak.dosyaTipi?.startsWith('image/');
   if (hasPhoto && fileVeri) {
     try {
       const imgData = dataUrlToUint8Array(fileVeri);
       const imgType = getImageType(tutanak.dosyaTipi || 'image/jpeg');
       fotoParagraflar.push(
-        divider(),
-        sectionTitle('EK GÖRSEL / FOTOĞRAF', 160),
+        sectionHeader('EK GÖRSEL / FOTOĞRAF'),
+        emptyLine(120, 0),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { before: 200, after: 300 },
-          children: [new ImageRun({ data: imgData, transformation: { width: 500, height: 360 }, type: imgType })],
+          spacing: { before: 0, after: 200 },
+          children: [new ImageRun({ data: imgData, transformation: { width: 480, height: 340 }, type: imgType })],
         }),
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 100 },
+          spacing: { before: 0, after: 80 },
           children: [
             new TextRun({ text: tutanak.dosyaAdi || 'Ek Görsel', size: 18, font: FONT, italics: true, color: '6B7280' }),
           ],
@@ -120,177 +398,153 @@ async function generateWordDoc(
       );
     } catch {
       fotoParagraflar.push(
-        divider(),
-        sectionTitle('EK DOSYA', 160),
+        sectionHeader('EK DOSYA'),
+        emptyLine(80, 0),
         new Paragraph({
-          spacing: { before: 160, after: 80 },
           children: [
-            new TextRun({ text: `Ek Dosya: ${tutanak.dosyaAdi || 'dosya eklenmiştir'}`, size: 21, font: FONT, italics: true, color: '6B7280' }),
+            new TextRun({ text: `Ek Dosya: ${tutanak.dosyaAdi || 'dosya eklenmiştir'}`, size: 20, font: FONT, italics: true, color: '6B7280' }),
           ],
         }),
       );
     }
   } else if (tutanak.dosyaAdi && !hasPhoto) {
     fotoParagraflar.push(
-      divider(),
-      sectionTitle('EK DOSYA', 160),
+      sectionHeader('EK DOSYA'),
+      emptyLine(80, 0),
       new Paragraph({
-        spacing: { before: 160, after: 80 },
         children: [
-          new TextRun({ text: `Ek Dosya: ${tutanak.dosyaAdi}`, size: 21, font: FONT, italics: true, color: '6B7280' }),
+          new TextRun({ text: `Ek Dosya: ${tutanak.dosyaAdi}`, size: 20, font: FONT, italics: true, color: '6B7280' }),
         ],
       }),
     );
   }
 
-  /* — İmza bölümü (Tespit Eden sayfa sonunda) — */
-  const signatureBlock = [
-    divider(),
-    sectionTitle('TESPİT EDEN / İMZA', 240),
-    /* Sağa hizalı imza bloğu */
-    new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      spacing: { before: 160, after: 80 },
-      children: [
-        new TextRun({ text: 'Tespit Eden', bold: true, size: 20, font: FONT, color: '64748B', allCaps: true }),
-      ],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      spacing: { before: 0, after: 80 },
-      children: [
-        new TextRun({ text: 'Ad Soyad:  ', size: 22, font: FONT, color: '374151', bold: true }),
-        new TextRun({ text: tutanak.olusturanKisi || '___________________________', size: 22, font: FONT, color: '111827' }),
-      ],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      spacing: { before: 0, after: 400 },
-      children: [
-        new TextRun({ text: 'Tarih:  ', size: 22, font: FONT, color: '374151', bold: true }),
-        new TextRun({ text: tarihStr, size: 22, font: FONT, color: '111827' }),
-      ],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      spacing: { before: 0, after: 80 },
-      children: [
-        new TextRun({ text: 'İmza:  ', size: 22, font: FONT, color: '374151', bold: true }),
-        new TextRun({ text: '______________________________', size: 22, font: FONT, color: 'CBD5E1' }),
-      ],
-    }),
-  ];
-
-  /* — Üst dekoratif çizgi — */
-  const topAccentLine = new Paragraph({
-    spacing: { before: 0, after: 0 },
-    border: { top: { style: BorderStyle.THICK, size: 36, color: '4F46E5' } },
-    children: [],
+  /* ── İMZA TABLOSU ── */
+  const makeSignCell = (title: string, name: string) => new TableCell({
+    verticalAlign: VerticalAlign.TOP,
+    shading: { type: ShadingType.SOLID, color: 'F9FAFB' },
+    margins: { top: 200, bottom: 200, left: 200, right: 200 },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      bottom: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      left: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+      right: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' },
+    },
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 80 },
+        children: [new TextRun({ text: title, bold: true, size: 20, font: FONT, color: ACCENT, allCaps: true })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 200 },
+        children: [new TextRun({ text: name || '—', size: 20, font: FONT, color: '374151' })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 80 },
+        border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' } },
+        children: [new TextRun({ text: 'İmza', size: 18, font: FONT, color: '9CA3AF', italics: true })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 80 },
+        children: [new TextRun({ text: tarihStr, size: 18, font: FONT, color: '6B7280' })],
+      }),
+    ],
   });
 
-  /* — Başlık bloğu — */
-  const headerBlock = [
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 80 },
-      children: [
-        new TextRun({ text: 'İŞ SAĞLIĞI VE GÜVENLİĞİ', bold: true, size: 32, font: FONT, color: '1F2937' }),
-      ],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 120 },
-      children: [
-        new TextRun({ text: 'DENETİM TUTANAĞI', bold: true, size: 28, font: FONT, color: '4F46E5' }),
-      ],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 300 },
-      shading: { type: ShadingType.SOLID, color: 'EEF2FF' },
-      children: [
-        new TextRun({ text: 'Tutanak No: ', size: 22, font: FONT, color: '6366F1' }),
-        new TextRun({ text: tutanak.tutanakNo, bold: true, size: 26, font: FONT, color: '4338CA' }),
-        new TextRun({ text: '    |    Tarih: ', size: 22, font: FONT, color: '6366F1' }),
-        new TextRun({ text: tarihStr, bold: true, size: 22, font: FONT, color: '4338CA' }),
-      ],
-    }),
-  ];
+  const signatureTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      insideH: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      insideV: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    },
+    rows: [
+      new TableRow({
+        height: { value: 1400, rule: HeightRule.ATLEAST },
+        children: [
+          makeSignCell('DENETÇİ', tutanak.olusturanKisi || ''),
+          /* boşluk hücresi */
+          new TableCell({
+            width: { size: 400, type: WidthType.DXA },
+            borders: {
+              top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+              bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+              left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+              right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+            },
+            children: [new Paragraph({ children: [] })],
+          }),
+          makeSignCell('ONAYLAYAN', ''),
+        ],
+      }),
+    ],
+  });
 
+  /* ── FOOTER ── */
+  const footerParagraph = new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 240, after: 0 },
+    border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'D1D5DB' } },
+    children: [
+      new TextRun({ text: 'ISG Denetim Sistemi', size: 16, font: FONT, color: '9CA3AF', bold: true }),
+      new TextRun({ text: `   ·   ${tutanak.tutanakNo}   ·   ${tarihStr}`, size: 16, font: FONT, color: '9CA3AF' }),
+    ],
+  });
+
+  /* ── DOKÜMAN ── */
   const doc = new Document({
     styles: { default: { document: { run: { font: FONT, size: 22 } } } },
     sections: [{
       properties: {
-        page: { margin: { top: 900, right: 1000, bottom: 900, left: 1000 } },
+        page: { margin: { top: 720, right: 900, bottom: 720, left: 900 } },
       },
       children: [
-        /* Üst accent çizgisi */
-        topAccentLine,
+        /* 1. Header tablosu (logo + başlık + no) */
+        headerTable,
+        emptyLine(200, 0),
 
-        /* Logo */
-        ...logoParagraflar,
+        /* 2. Bilgi tablosu */
+        sectionHeader('GENEL BİLGİLER', 0),
+        emptyLine(120, 0),
+        infoTable,
+        emptyLine(200, 0),
 
-        /* Başlık */
-        ...headerBlock,
+        /* 3. Açıklama */
+        sectionHeader('AÇIKLAMA / TUTANAK DETAYI', 0),
+        emptyLine(120, 0),
+        aciklamaTable,
+        emptyLine(200, 0),
 
-        divider(),
-
-        /* Bilgi blokları (tablo yerine) */
-        sectionTitle('GENEL BİLGİLER', 160),
-        ...infoBlock('Firma', firmaAd),
-        ...infoBlock('Başlık', tutanak.baslik),
-
-        divider(),
-
-        /* Açıklama */
-        sectionTitle('AÇIKLAMA / TUTANAK DETAYI', 160),
-        new Paragraph({
-          spacing: { before: 160, after: 160 },
-          shading: { type: ShadingType.SOLID, color: 'F8FAFC' },
-          border: {
-            top: { style: BorderStyle.SINGLE, size: 2, color: 'E2E8F0' },
-            bottom: { style: BorderStyle.SINGLE, size: 2, color: 'E2E8F0' },
-            left: { style: BorderStyle.THICK, size: 16, color: '4F46E5' },
-            right: { style: BorderStyle.SINGLE, size: 2, color: 'E2E8F0' },
-          },
-          indent: { left: 200, right: 200 },
-          children: [new TextRun({ text: tutanak.aciklama || '—', size: 22, font: FONT, color: '374151' })],
-        }),
-
-        /* Fotoğraf */
-        ...fotoParagraflar,
-
-        /* Notlar */
-        ...(tutanak.notlar ? [
-          divider(),
-          sectionTitle('NOTLAR', 160),
-          new Paragraph({
-            spacing: { before: 160, after: 160 },
-            shading: { type: ShadingType.SOLID, color: 'FFFBEB' },
-            border: {
-              top: { style: BorderStyle.SINGLE, size: 2, color: 'FDE68A' },
-              bottom: { style: BorderStyle.SINGLE, size: 2, color: 'FDE68A' },
-              left: { style: BorderStyle.THICK, size: 16, color: 'F59E0B' },
-              right: { style: BorderStyle.SINGLE, size: 2, color: 'FDE68A' },
-            },
-            indent: { left: 200, right: 200 },
-            children: [new TextRun({ text: tutanak.notlar, size: 20, font: FONT, italics: true, color: '78716C' })],
-          }),
+        /* 4. Notlar (varsa) */
+        ...(notlarTable ? [
+          sectionHeader('NOTLAR', 0),
+          emptyLine(120, 0),
+          notlarTable,
+          emptyLine(200, 0),
         ] : []),
 
-        /* İmza */
-        ...signatureBlock,
+        /* 5. Ek dosya/görsel (varsa) */
+        ...(fotoParagraflar.length > 0 ? [
+          emptyLine(0, 0),
+          ...fotoParagraflar,
+          emptyLine(200, 0),
+        ] : []),
 
-        /* Footer */
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 400, after: 0 },
-          border: { top: { style: BorderStyle.SINGLE, size: 2, color: 'E2E8F0' } },
-          children: [
-            new TextRun({ text: 'ISG Denetim Sistemi', size: 16, font: FONT, color: '94A3B8', bold: true }),
-            new TextRun({ text: `   ·   ${tutanak.tutanakNo}`, size: 16, font: FONT, color: '94A3B8' }),
-          ],
-        }),
+        /* 6. İmza */
+        sectionHeader('İMZA VE ONAY', 0),
+        emptyLine(160, 0),
+        signatureTable,
+        emptyLine(200, 0),
+
+        /* 7. Footer */
+        footerParagraph,
       ],
     }],
   });
