@@ -282,6 +282,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // ── Ekipman kontrolleri ──
     store.ekipmanlar.forEach(ek => {
       if (ek.silinmis) return;
+
+      // ⚠️ UYGUN DEĞİL override: tarih hesaplama yapma, anında kritik bildirim üret
+      if (ek.durum === 'Uygun Değil') {
+        const firma = store.firmalar.find(f => f.id === ek.firmaId);
+        result.push({
+          id: `ekipman_uygunsuz_${ek.id}`,
+          tip: 'ekipman_kontrol',
+          mesaj: `${ek.ad} — KRİTİK: Uygun Değil`,
+          detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman uygunsuz olarak işaretlendi`,
+          tarih: new Date().toISOString().split('T')[0],
+          okundu: okunanlar.has(`ekipman_uygunsuz_${ek.id}`),
+          kalanGun: -999, // kritik flag
+        });
+        return; // tarih bazlı kontrol yapma
+      }
+
       const d = parseDate(ek.sonrakiKontrolTarihi);
       if (!d) return; // Kontrol tarihi yoksa → uyarı üretme
       const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi)!;

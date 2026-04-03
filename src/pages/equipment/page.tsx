@@ -152,6 +152,7 @@ export default function EkipmanlarPage() {
     const uygun = aktifEkipmanlar.filter(e => e.durum === 'Uygun').length;
     const uygunDegil = aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length;
     const yaklasan = aktifEkipmanlar.filter(e => {
+      if (e.durum === 'Uygun Değil') return false; // kritik — tarih hesabı yapılmaz
       const days = getDaysUntil(e.sonrakiKontrolTarihi);
       return days >= 0 && days <= 30;
     }).length;
@@ -408,13 +409,23 @@ export default function EkipmanlarPage() {
                         </span>
                       </td>
                       <td>
-                        <div>
-                          <span className={`text-sm ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : 'text-slate-400'}`}>
-                            {ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : '—'}
-                          </span>
-                          {isOverdue && <p className="text-[10px] text-red-500 mt-0.5">Gecikmiş!</p>}
-                          {isUrgent && !isOverdue && <p className="text-[10px] text-yellow-500 mt-0.5">{days} gün kaldı</p>}
-                        </div>
+                        {ekipman.durum === 'Uygun Değil' ? (
+                          /* Uygun Değil: tarih hesaplama yapma, kritik uyarı göster */
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse whitespace-nowrap"
+                              style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}>
+                              <i className="ri-error-warning-fill mr-1" />KRİTİK
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className={`text-sm ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : 'text-slate-400'}`}>
+                              {ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : '—'}
+                            </span>
+                            {isOverdue && <p className="text-[10px] text-red-500 mt-0.5">Gecikmiş!</p>}
+                            {isUrgent && !isOverdue && <p className="text-[10px] text-yellow-500 mt-0.5">{days} gün kaldı</p>}
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span

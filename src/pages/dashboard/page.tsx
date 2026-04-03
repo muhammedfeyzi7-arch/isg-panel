@@ -45,8 +45,9 @@ export default function DashboardPage() {
       return d !== null && d < today;
     }).length;
 
-    // Geciken ekipman kontrolleri — sadece geçerli tarihi olanlar
+    // Geciken ekipman kontrolleri — Uygun Değil olanları hariç tut (onlar zaten kritik)
     const gecikmisEkipman = aktifEkipmanlar.filter(e => {
+      if (e.durum === 'Uygun Değil') return false; // kritik panelde gösterilecek
       const d = parseValidDate(e.sonrakiKontrolTarihi);
       return d !== null && d < today;
     }).length;
@@ -57,6 +58,9 @@ export default function DashboardPage() {
       return d !== null && d < today;
     }).length;
 
+    // Uygun Değil ekipmanlar — kritik sayaç
+    const uygunDegil = aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length;
+
     // 7 gün içinde yaklaşanlar
     const yaklasan7Belge = aktifEvraklar.filter(e => {
       const d = parseValidDate(e.gecerlilikTarihi);
@@ -64,6 +68,7 @@ export default function DashboardPage() {
     }).length;
 
     const yaklasan7Ekipman = aktifEkipmanlar.filter(e => {
+      if (e.durum === 'Uygun Değil') return false; // kritik panelde
       const d = parseValidDate(e.sonrakiKontrolTarihi);
       return d !== null && d >= today && d <= in7;
     }).length;
@@ -80,6 +85,7 @@ export default function DashboardPage() {
     }).length;
 
     const yaklasan30Ekipman = aktifEkipmanlar.filter(e => {
+      if (e.durum === 'Uygun Değil') return false; // kritik panelde
       const d = parseValidDate(e.sonrakiKontrolTarihi);
       return d !== null && d >= today && d <= in30;
     }).length;
@@ -97,6 +103,7 @@ export default function DashboardPage() {
       gecikmisBelge, gecikmisEkipman, gecikmisMuayene, toplamGecikme,
       yaklasan7Belge, yaklasan7Ekipman, yaklasan7Muayene, toplam7,
       yaklasan30Belge, yaklasan30Ekipman, yaklasan30Muayene, toplam30,
+      uygunDegil,
     };
   }, [aktifEvraklar, aktifEkipmanlar, aktifMuayeneler]);
 
@@ -163,6 +170,7 @@ export default function DashboardPage() {
     const in60 = new Date(today.getTime() + 60 * 86400000);
     return aktifEkipmanlar
       .filter(e => {
+        if (e.durum === 'Uygun Değil') return false; // kritik panelde gösterilecek
         if (!e.sonrakiKontrolTarihi) return false;
         const d = new Date(e.sonrakiKontrolTarihi); d.setHours(0, 0, 0, 0);
         return d >= today && d <= in60;
@@ -170,6 +178,13 @@ export default function DashboardPage() {
       .sort((a, b) => new Date(a.sonrakiKontrolTarihi).getTime() - new Date(b.sonrakiKontrolTarihi).getTime())
       .slice(0, 5);
   }, [aktifEkipmanlar]);
+
+  // Uygun Değil ekipmanlar — kritik uyarı listesi
+  const uygunDegılEkipmanlar = useMemo(() =>
+    aktifEkipmanlar
+      .filter(e => e.durum === 'Uygun Değil')
+      .slice(0, 5),
+  [aktifEkipmanlar]);
 
   const acikUygunsuzluklar = useMemo(() =>
     aktifUygunsuzluklar.filter(u => u.durum === 'Açık')
@@ -180,6 +195,7 @@ export default function DashboardPage() {
   // Smart insights — ISG odaklı
   const insights = useMemo(() => {
     const list: { icon: string; text: string; color: string; bg: string; priority: number }[] = [];
+    if (riskStats.uygunDegil > 0)      list.push({ icon: 'ri-error-warning-fill',  text: `${riskStats.uygunDegil} ekipman KRİTİK: Uygun Değil`,          color: '#EF4444', bg: 'rgba(239,68,68,0.12)', priority: 5 });
     if (riskStats.gecikmisBelge > 0)   list.push({ icon: 'ri-file-damage-line',   text: `${riskStats.gecikmisBelge} evrak süresi dolmuş`,          color: '#F87171', bg: 'rgba(239,68,68,0.1)',   priority: 4 });
     if (riskStats.gecikmisEkipman > 0) list.push({ icon: 'ri-tools-line',          text: `${riskStats.gecikmisEkipman} ekipman kontrolü gecikti`,    color: '#F87171', bg: 'rgba(239,68,68,0.1)',   priority: 4 });
     if (riskStats.gecikmisMuayene > 0) list.push({ icon: 'ri-heart-pulse-line',    text: `${riskStats.gecikmisMuayene} muayene tarihi geçti`,         color: '#F87171', bg: 'rgba(239,68,68,0.1)',   priority: 4 });
@@ -334,13 +350,51 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2.5 mb-5">
             <div className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(180deg, #EF4444, #F87171)' }} />
             <h3 className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>İSG Risk Paneli</h3>
-            {riskStats.toplamGecikme > 0 && (
+            {(riskStats.toplamGecikme > 0 || riskStats.uygunDegil > 0) && (
               <span className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-full animate-pulse"
                 style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                {riskStats.toplamGecikme} gecikmiş
+                {riskStats.toplamGecikme + riskStats.uygunDegil} kritik
               </span>
             )}
           </div>
+
+          {/* Uygun Değil Ekipmanlar — Kritik Uyarı */}
+          {riskStats.uygunDegil > 0 && (
+            <div className="mb-5 rounded-xl p-3.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <div className="w-6 h-6 flex items-center justify-center rounded-md" style={{ background: 'rgba(239,68,68,0.15)' }}>
+                  <i className="ri-error-warning-fill text-[11px]" style={{ color: '#EF4444' }} />
+                </div>
+                <p className="text-[11px] font-bold" style={{ color: '#F87171' }}>
+                  KRİTİK — {riskStats.uygunDegil} Uygunsuz Ekipman
+                </p>
+                <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full animate-pulse"
+                  style={{ background: 'rgba(239,68,68,0.2)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)' }}>
+                  UYGUNSUZ
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {uygunDegılEkipmanlar.map(ek => {
+                  const firma = aktifFirmalar.find(f => f.id === ek.firmaId);
+                  return (
+                    <div key={ek.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                      style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}>
+                      <i className="ri-tools-line text-[10px]" style={{ color: '#F87171' }} />
+                      <span className="text-[11px] font-medium flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</span>
+                      {firma && <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{firma.ad}</span>}
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                        style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>
+                        KRİTİK
+                      </span>
+                    </div>
+                  );
+                })}
+                {riskStats.uygunDegil > 5 && (
+                  <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>+{riskStats.uygunDegil - 5} daha</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Geciken İşlemler */}
           <div className="mb-5">
