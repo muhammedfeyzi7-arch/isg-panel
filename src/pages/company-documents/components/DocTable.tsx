@@ -13,18 +13,22 @@ interface Props {
   onEdit: (doc: CompanyDocument) => void;
   onDelete: (doc: CompanyDocument) => void;
   onView: (doc: CompanyDocument) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: () => void;
 }
 
-export default function DocTable({ documents, firmalar, onEdit, onDelete, onView }: Props) {
+export default function DocTable({ documents, firmalar, onEdit, onDelete, onView, selectedIds, onToggleSelect, onToggleSelectAll }: Props) {
   const getFirmaAd = (id: string | null) => id ? (firmalar.find(f => f.id === id)?.ad ?? '—') : '—';
-
   const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
 
   const getDaysLeft = (until: string | null) => {
     if (!until) return null;
-    const diff = Math.ceil((new Date(until).getTime() - Date.now()) / 86400000);
-    return diff;
+    return Math.ceil((new Date(until).getTime() - Date.now()) / 86400000);
   };
+
+  const allSelected = documents.length > 0 && selectedIds.size === documents.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < documents.length;
 
   if (documents.length === 0) {
     return (
@@ -44,21 +48,43 @@ export default function DocTable({ documents, firmalar, onEdit, onDelete, onView
         <table className="table-premium w-full">
           <thead>
             <tr>
+              <th className="w-10">
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = someSelected; }}
+                    onChange={onToggleSelectAll}
+                    className="w-4 h-4 rounded cursor-pointer accent-emerald-400"
+                  />
+                </div>
+              </th>
               <th className="text-left">Evrak Başlığı</th>
               <th className="text-left hidden md:table-cell">Tür</th>
               <th className="text-left hidden md:table-cell">Firma</th>
               <th className="text-left hidden lg:table-cell">Geçerlilik</th>
               <th className="text-left hidden lg:table-cell">Versiyon</th>
               <th className="text-left">Durum</th>
-              <th className="text-right w-28">İşlemler</th>
+              <th className="text-right w-32">İşlemler</th>
             </tr>
           </thead>
           <tbody>
             {documents.map(doc => {
               const sc = STATUS_CFG[doc.status] ?? STATUS_CFG['Aktif'];
               const daysLeft = getDaysLeft(doc.valid_until);
+              const isSelected = selectedIds.has(doc.id);
               return (
-                <tr key={doc.id}>
+                <tr key={doc.id} style={isSelected ? { background: 'rgba(52,211,153,0.04)' } : {}}>
+                  <td>
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onToggleSelect(doc.id)}
+                        className="w-4 h-4 rounded cursor-pointer accent-emerald-400"
+                      />
+                    </div>
+                  </td>
                   <td>
                     <div>
                       <button
@@ -107,18 +133,16 @@ export default function DocTable({ documents, firmalar, onEdit, onDelete, onView
                   <td>
                     <div className="flex items-center gap-1 justify-end">
                       {doc.file_url && (
-                        <a
-                          href={doc.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => onView(doc)}
                           className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
                           style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }}
-                          title="Dosyayı Görüntüle"
+                          title="Görüntüle / İndir"
                         >
                           <i className="ri-eye-line text-sm" />
-                        </a>
+                        </button>
                       )}
                       <button
                         onClick={() => onEdit(doc)}

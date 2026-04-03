@@ -48,13 +48,31 @@ export function useCompanyDocuments({ organizationId }: UseCompanyDocumentsOptio
     payload: Omit<CompanyDocument, 'id' | 'created_at' | 'updated_at' | 'status'>,
   ): Promise<{ error: string | null }> => {
     try {
-      const { error: err } = await supabase
+      // Compute status before insert (status column is NOT NULL)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let computedStatus: 'Aktif' | 'Yaklaşan' | 'Süresi Dolmuş' = 'Aktif';
+      if (payload.valid_until) {
+        const until = new Date(payload.valid_until);
+        until.setHours(0, 0, 0, 0);
+        const diff = Math.ceil((until.getTime() - today.getTime()) / 86400000);
+        if (diff < 0) computedStatus = 'Süresi Dolmuş';
+        else if (diff <= 30) computedStatus = 'Yaklaşan';
+      }
+      const insertData = { ...payload, status: computedStatus, updated_at: new Date().toISOString() };
+      const { error: err, data: insertedData } = await supabase
         .from('company_documents')
-        .insert([{ ...payload, updated_at: new Date().toISOString() }]);
-      if (err) throw err;
+        .insert([insertData])
+        .select();
+      if (err) {
+        console.error('Supabase insert error:', err);
+        throw new Error(`${err.message} (code: ${err.code})`);
+      }
+      console.log('Insert success:', insertedData);
       await fetchDocuments();
       return { error: null };
     } catch (e) {
+      console.error('addDocument catch:', e);
       return { error: e instanceof Error ? e.message : 'Eklenemedi' };
     }
   }, [fetchDocuments]);

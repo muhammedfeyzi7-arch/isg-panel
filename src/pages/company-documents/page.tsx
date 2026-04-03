@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
-import { useApp } from '@/store/AppContext';
 import Modal from '@/components/base/Modal';
+import { useApp } from '@/store/AppContext';
 import DocStatsCards from './components/DocStatsCards';
 import DocTable from './components/DocTable';
 import DocFormModal, { DOCUMENT_TYPES } from './components/DocFormModal';
+import DocViewModal from './components/DocViewModal';
+import BulkDocUpload, { type BulkFile } from './components/BulkDocUpload';
 import { useCompanyDocuments } from './hooks/useCompanyDocuments';
 import type { CompanyDocument } from '@/types';
 
@@ -19,11 +21,15 @@ export default function FirmaEvraklariPage() {
   const [turFilter, setTurFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editDoc, setEditDoc] = useState<CompanyDocument | null>(null);
   const [deleteDoc, setDeleteDoc] = useState<CompanyDocument | null>(null);
   const [viewDoc, setViewDoc] = useState<CompanyDocument | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDownloading, setBulkDownloading] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -41,7 +47,7 @@ export default function FirmaEvraklariPage() {
   const openEdit = (doc: CompanyDocument) => { setEditDoc(doc); setFormOpen(true); };
 
   const handleSave = async (formData: Parameters<typeof DocFormModal>[0]['onSave'] extends (d: infer D) => unknown ? D : never) => {
-    if (!org?.id) return;
+    if (!org?.id) { addToast('Organizasyon bilgisi bulunamadı.', 'error'); return; }
     setSaving(true);
     try {
       let fileUrl = editDoc?.file_url ?? null;
@@ -51,11 +57,15 @@ export default function FirmaEvraklariPage() {
 
       if (formData.file) {
         const { url, error: uploadErr } = await uploadFile(formData.file, org.id);
-        if (uploadErr) { addToast(`Dosya yüklenemedi: ${uploadErr}`, 'error'); setSaving(false); return; }
-        fileUrl = url;
-        fileName = formData.file.name;
-        fileSize = formData.file.size;
-        fileType = formData.file.type;
+        if (uploadErr) {
+          // Dosya yükleme başarısız olsa bile kaydı devam ettir, sadece uyar
+          addToast(`Dosya yüklenemedi (${uploadErr}), evrak bilgileri kaydediliyor...`, 'error');
+        } else {
+          fileUrl = url;
+          fileName = formData.file.name;
+          fileSize = formData.file.size;
+          fileType = formData.file.type;
+        }
       }
 
       const resolvedType = formData.document_type === 'Diğer' && formData.custom_type.trim()
@@ -67,13 +77,13 @@ export default function FirmaEvraklariPage() {
         company_id: formData.company_id || null,
         title: formData.title.trim(),
         document_type: resolvedType,
-        description: formData.description,
-        version: formData.version,
+        description: formData.description ?? '',
+        version: formData.version ?? '',
         valid_from: formData.valid_from || null,
         valid_until: formData.valid_until || null,
         file_url: fileUrl,
         file_name: fileName,
-        file_size: fileSize,
+        file_size: fileSize ?? 0,
         file_type: fileType,
         created_by: null,
       };
@@ -84,10 +94,12 @@ export default function FirmaEvraklariPage() {
         addToast('Evrak güncellendi.', 'success');
       } else {
         const { error } = await addDocument(payload);
-        if (error) { addToast(`Eklenemedi: ${error}`, 'error'); return; }
+        if (error) { addToast(`Kaydedilemedi: ${error}`, 'error'); return; }
         addToast('Evrak eklendi.', 'success');
       }
       setFormOpen(false);
+    } catch (e) {
+      addToast(`Beklenmeyen hata: ${e instanceof Error ? e.message : String(e)}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -103,7 +115,98 @@ export default function FirmaEvraklariPage() {
     setDeleteDoc(null);
   };
 
-  // Dinamik tür listesi: sabit liste + mevcut verilerdeki özel türler
+  // Toplu yükleme
+  const handleBulkUpload = async (items: BulkFile[]) => {
+    if (!org?.id) return;
+    setBulkUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const item of items) {
+      try {
+        let fileUrl: string | null = null;
+        let fileName: string | null = null;
+        let fileSize = 0;
+        let fileType: string | null = null;
+
+        const { url, error: uploadErr } = await uploadFile(item.file, org.id);
+        if (uploadErr) { errorCount++; continue; }
+        fileUrl = url;
+        fileName = item.file.name;
+        fileSize = item.file.size;
+        fileType = item.file.type;
+
+        const resolvedType = item.document_type === 'Diğer' ? item.document_type : item.document_type;
+
+        const { error } = await addDocument({
+          organization_id: org.id,
+          company_id: item.company_id || null,
+          title: item.title.trim(),
+          document_type: resolvedType,
+          description: '',
+          version: '',
+          valid_from: null,
+          valid_until: null,
+          file_url: fileUrl,
+          file_name: fileName,
+          file_size: fileSize,
+          file_type: fileType,
+          created_by: null,
+        });
+
+        if (error) { errorCount++; } else { successCount++; }
+      } catch {
+        errorCount++;
+      }
+    }
+
+    setBulkUploading(false);
+    setBulkOpen(false);
+    if (successCount > 0) addToast(`${successCount} evrak başarıyla yüklendi.`, 'success');
+    if (errorCount > 0) addToast(`${errorCount} evrak yüklenemedi.`, 'error');
+  };
+
+  // Toplu indirme
+  const handleBulkDownload = async () => {
+    const toDownload = filtered.filter(d => selectedIds.has(d.id) && d.file_url);
+    if (toDownload.length === 0) { addToast('İndirilecek dosya seçilmedi.', 'error'); return; }
+    setBulkDownloading(true);
+    for (const doc of toDownload) {
+      try {
+        const res = await fetch(doc.file_url!);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.file_name ?? doc.title;
+        a.click();
+        URL.revokeObjectURL(url);
+        await new Promise(r => setTimeout(r, 300));
+      } catch {
+        // skip
+      }
+    }
+    setBulkDownloading(false);
+    addToast(`${toDownload.length} dosya indirildi.`, 'success');
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(d => d.id)));
+    }
+  };
+
+  // Dinamik tür listesi
   const allTypes = useMemo(() => {
     const fromDocs = documents.map(d => d.document_type).filter(t => !DOCUMENT_TYPES.includes(t));
     return [...new Set([...DOCUMENT_TYPES.filter(t => t !== 'Diğer'), ...fromDocs])];
@@ -119,9 +222,14 @@ export default function FirmaEvraklariPage() {
             Firmalara ait tüm evrakları merkezi olarak yönetin
           </p>
         </div>
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
-          <i className="ri-add-line text-base" />Evrak Ekle
-        </button>
+        <div className="flex gap-2 flex-wrap self-start sm:self-auto">
+          <button onClick={() => setBulkOpen(true)} className="btn-secondary whitespace-nowrap">
+            <i className="ri-stack-line text-base" /> Toplu Yükle
+          </button>
+          <button onClick={openAdd} className="btn-primary whitespace-nowrap">
+            <i className="ri-add-line text-base" /> Evrak Ekle
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -159,6 +267,31 @@ export default function FirmaEvraklariPage() {
         )}
       </div>
 
+      {/* Toplu seçim araç çubuğu */}
+      {selectedIds.size > 0 && (
+        <div className="isg-card rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap" style={{ border: '1px solid rgba(52,211,153,0.3)', background: 'rgba(52,211,153,0.05)' }}>
+          <span className="text-sm font-semibold" style={{ color: '#34D399' }}>
+            <i className="ri-checkbox-multiple-line mr-1" />{selectedIds.size} evrak seçildi
+          </span>
+          <button
+            onClick={handleBulkDownload}
+            disabled={bulkDownloading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap disabled:opacity-50"
+            style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399', border: '1px solid rgba(52,211,153,0.3)' }}
+          >
+            <i className={bulkDownloading ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} />
+            {bulkDownloading ? 'İndiriliyor...' : 'Seçilenleri İndir'}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
+            style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}
+          >
+            <i className="ri-close-line" /> Seçimi Temizle
+          </button>
+        </div>
+      )}
+
       {/* Loading */}
       {loading ? (
         <div className="isg-card rounded-xl py-20 text-center">
@@ -172,6 +305,9 @@ export default function FirmaEvraklariPage() {
           onEdit={openEdit}
           onDelete={setDeleteDoc}
           onView={setViewDoc}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
         />
       )}
 
@@ -183,6 +319,23 @@ export default function FirmaEvraklariPage() {
         editDoc={editDoc}
         firmalar={firmalar}
         saving={saving}
+      />
+
+      {/* Toplu Yükleme Modal */}
+      <BulkDocUpload
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        firmalar={firmalar}
+        onUpload={handleBulkUpload}
+        uploading={bulkUploading}
+      />
+
+      {/* Gelişmiş Görüntüleme Modal */}
+      <DocViewModal
+        doc={viewDoc}
+        firmalar={firmalar}
+        onClose={() => setViewDoc(null)}
+        onEdit={openEdit}
       />
 
       {/* Delete Confirm */}
@@ -211,60 +364,6 @@ export default function FirmaEvraklariPage() {
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Bu işlem geri alınamaz.</p>
         </div>
       </Modal>
-
-      {/* View Modal */}
-      {viewDoc && (
-        <Modal
-          isOpen={!!viewDoc}
-          onClose={() => setViewDoc(null)}
-          title={viewDoc.title}
-          size="md"
-          icon="ri-file-text-line"
-          footer={
-            <div className="flex gap-2">
-              {viewDoc.file_url && (
-                <a href={viewDoc.file_url} target="_blank" rel="noopener noreferrer" className="btn-secondary whitespace-nowrap">
-                  <i className="ri-external-link-line" /> Dosyayı Aç
-                </a>
-              )}
-              <button onClick={() => { setViewDoc(null); openEdit(viewDoc); }} className="btn-primary whitespace-nowrap">
-                <i className="ri-edit-line" /> Düzenle
-              </button>
-            </div>
-          }
-        >
-          <div className="space-y-3">
-            {[
-              { label: 'Evrak Türü', value: viewDoc.document_type },
-              { label: 'Firma', value: firmalar.find(f => f.id === viewDoc.company_id)?.ad ?? '—' },
-              { label: 'Versiyon', value: viewDoc.version || '—' },
-              { label: 'Geçerlilik Başlangıcı', value: viewDoc.valid_from ? new Date(viewDoc.valid_from).toLocaleDateString('tr-TR') : '—' },
-              { label: 'Geçerlilik Bitişi', value: viewDoc.valid_until ? new Date(viewDoc.valid_until).toLocaleDateString('tr-TR') : '—' },
-              { label: 'Eklenme Tarihi', value: new Date(viewDoc.created_at).toLocaleDateString('tr-TR') },
-            ].map(item => (
-              <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{item.value}</span>
-              </div>
-            ))}
-            {viewDoc.description && (
-              <div className="py-2.5 px-3 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Açıklama</p>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{viewDoc.description}</p>
-              </div>
-            )}
-            {viewDoc.file_name && (
-              <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                <i className="ri-file-check-line text-lg" style={{ color: '#34D399' }} />
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{viewDoc.file_name}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{viewDoc.file_size ? `${(viewDoc.file_size / 1024).toFixed(1)} KB` : ''}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }

@@ -24,6 +24,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const clearAuthStorage = useCallback(() => {
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-')) localStorage.removeItem(key);
+    });
+  }, []);
+
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setLoading(false);
@@ -33,24 +39,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Load existing session on mount
     supabase.auth.getSession().then(({ data: { session: s }, error }) => {
       if (error) {
-        // Geçersiz/süresi dolmuş token → localStorage'ı temizle, oturumu kapat
         const errMsg = error.message?.toLowerCase() ?? '';
         if (
           errMsg.includes('refresh token') ||
           errMsg.includes('invalid') ||
           errMsg.includes('not found') ||
-          errMsg.includes('expired')
+          errMsg.includes('expired') ||
+          errMsg.includes('failed to fetch') ||
+          errMsg.includes('network')
         ) {
-          // Tüm supabase auth verilerini localStorage'dan temizle
-          Object.keys(localStorage).forEach((key) => {
-            if (key.startsWith('sb-')) localStorage.removeItem(key);
-          });
+          clearAuthStorage();
         }
-        supabase.auth.signOut();
+        supabase.auth.signOut().catch(() => {});
         setSession(null);
       } else {
         setSession(s);
       }
+      setLoading(false);
+    }).catch(() => {
+      // Network error — clear stale tokens and show login
+      clearAuthStorage();
+      setSession(null);
       setLoading(false);
     });
 
@@ -60,24 +69,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(s);
       } else if (event === 'SIGNED_OUT') {
         setSession(null);
-        // Geçersiz token kalıntılarını temizle
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith('sb-')) localStorage.removeItem(key);
-        });
-      } else if (event === 'TOKEN_REFRESH_FAILED' as string) {
-        // Token yenileme başarısız → oturumu temizle
+        clearAuthStorage();
+      } else if ((event as string) === 'TOKEN_REFRESH_FAILED') {
         setSession(null);
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith('sb-')) localStorage.removeItem(key);
-        });
-        supabase.auth.signOut();
+        clearAuthStorage();
+        supabase.auth.signOut().catch(() => {});
       } else {
         setSession(s);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [clearAuthStorage]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
     if (!isSupabaseConfigured) {
