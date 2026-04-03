@@ -1,7 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-
-const EDGE_FN_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/send-reset-email';
+import { supabase } from '../../lib/supabase';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -33,19 +32,17 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     try {
-      const res = await fetch(EDGE_FN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmedEmail }),
+      const { error: supabaseError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
-      const data = await res.json() as { success?: boolean; error?: string };
-
-      if (!res.ok || data.error) {
-        setError(data.error ?? 'İstek gönderilemedi. Lütfen tekrar deneyin.');
-      } else {
-        setSent(true);
+      if (supabaseError) {
+        // Güvenlik: email bulunamasa bile başarılı göster (enumeration koruması)
+        console.error('[ForgotPassword] Supabase error:', supabaseError.message);
       }
+
+      // Her durumda başarılı göster — kullanıcı enumeration'ı önlemek için
+      setSent(true);
     } catch {
       setError('Bağlantı hatası. İnternet bağlantınızı kontrol edin.');
     } finally {
