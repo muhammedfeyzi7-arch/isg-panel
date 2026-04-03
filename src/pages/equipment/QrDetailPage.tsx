@@ -6,11 +6,11 @@ import Modal from '../../components/base/Modal';
 import ImageUpload from '../nonconformity/components/ImageUpload';
 import type { Ekipman, EkipmanStatus, EkipmanSahaFoto, UygunsuzlukSeverity } from '../../types';
 
-const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  'Uygun':       { label: 'Uygun',       color: '#34D399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)',  icon: 'ri-checkbox-circle-line' },
-  'Uygun Değil': { label: 'Uygun Değil', color: '#F87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.3)', icon: 'ri-close-circle-line' },
-  'Bakımda':     { label: 'Bakımda',     color: '#FBBF24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',  icon: 'ri-time-line' },
-  'Hurda':       { label: 'Hurda',       color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.3)', icon: 'ri-delete-bin-line' },
+const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: string; border: string; icon: string; gradient: string }> = {
+  'Uygun':       { label: 'Uygun',       color: '#34D399', bg: 'rgba(52,211,153,0.15)',  border: 'rgba(52,211,153,0.35)',  icon: 'ri-checkbox-circle-fill', gradient: 'linear-gradient(135deg, rgba(52,211,153,0.2) 0%, rgba(16,185,129,0.08) 100%)' },
+  'Uygun Değil': { label: 'Uygun Değil', color: '#F87171', bg: 'rgba(248,113,113,0.15)', border: 'rgba(248,113,113,0.35)', icon: 'ri-close-circle-fill',     gradient: 'linear-gradient(135deg, rgba(248,113,113,0.2) 0%, rgba(239,68,68,0.08) 100%)' },
+  'Bakımda':     { label: 'Bakımda',     color: '#FBBF24', bg: 'rgba(251,191,36,0.15)',  border: 'rgba(251,191,36,0.35)',  icon: 'ri-tools-fill',            gradient: 'linear-gradient(135deg, rgba(251,191,36,0.2) 0%, rgba(245,158,11,0.08) 100%)' },
+  'Hurda':       { label: 'Hurda',       color: '#94A3B8', bg: 'rgba(148,163,184,0.15)', border: 'rgba(148,163,184,0.35)', icon: 'ri-delete-bin-fill',       gradient: 'linear-gradient(135deg, rgba(148,163,184,0.2) 0%, rgba(100,116,139,0.08) 100%)' },
 };
 
 const SEV_OPTIONS: UygunsuzlukSeverity[] = ['Düşük', 'Orta', 'Yüksek', 'Kritik'];
@@ -37,7 +37,6 @@ function KontrolModal({
       const notlarVal = notlar.trim()
         ? `[${today} - ${currentUser.ad || 'Kullanıcı'}] ${notlar.trim()}`
         : '';
-      // Store üzerinden güncelle (saveToDb otomatik çalışır)
       updateEkipman(ekipmanId, {
         durum,
         sonKontrolTarihi: today,
@@ -46,7 +45,6 @@ function KontrolModal({
       });
       addToast('Kontrol kaydedildi.', 'success');
       onClose();
-      // Store'a yazıldıktan sonra Supabase'den taze veriyi çek
       setTimeout(() => onSaved(), 800);
     } finally {
       setSaving(false);
@@ -221,7 +219,6 @@ function FotoModal({
     if (!foto.startsWith('data:')) { addToast('Geçersiz fotoğraf formatı.', 'error'); return; }
     setSaving(true);
     try {
-      // base64 → Blob
       const [meta, data] = foto.split(',');
       const mimeMatch = meta.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
@@ -351,13 +348,37 @@ function EvrakModal({
   );
 }
 
+// ── Fotoğraf Lightbox ──
+function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.92)' }}
+      onClick={onClose}
+    >
+      <button
+        className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full cursor-pointer"
+        style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}
+        onClick={onClose}
+      >
+        <i className="ri-close-line text-xl" />
+      </button>
+      <img
+        src={url}
+        alt="Saha fotoğrafı"
+        className="max-w-full max-h-full rounded-2xl object-contain"
+        onClick={e => e.stopPropagation()}
+      />
+    </div>
+  );
+}
+
 // ── Ana Sayfa ──
 export default function QrDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { ekipmanlar, firmalar, org, dataLoading, getEkipmanFile, evraklar } = useApp();
 
-  // Local ekipman state — Supabase'den direkt çekilen güncel veri
   const [localEkipman, setLocalEkipman] = useState<Ekipman | null | undefined>(undefined);
   const [localLoading, setLocalLoading] = useState(true);
   const [showKontrol, setShowKontrol] = useState(false);
@@ -367,9 +388,9 @@ export default function QrDetailPage() {
   const [evrakVeri, setEvrakVeri] = useState('');
   const [evrakAdi, setEvrakAdi] = useState('');
   const [evrakTipi, setEvrakTipi] = useState('');
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const fetchedRef = useRef(false);
 
-  // Supabase'den ekipmanı direkt çek — en güncel veriyi al
   const fetchEkipmanFromDb = useCallback(async () => {
     if (!id) return;
     try {
@@ -379,15 +400,11 @@ export default function QrDetailPage() {
         .eq('id', id)
         .maybeSingle();
       if (error) {
-        console.error('[QR] Ekipman fetch error:', error);
-        // Hata durumunda store'dan dene
         const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
         setLocalEkipman(fromStore ?? null);
       } else if (data && data.data) {
-        // Veri data.data içinde JSON olarak saklı
         setLocalEkipman(data.data as Ekipman);
       } else {
-        // Supabase'de yok, store'dan dene
         const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
         setLocalEkipman(fromStore ?? null);
       }
@@ -399,14 +416,12 @@ export default function QrDetailPage() {
     }
   }, [id, ekipmanlar]);
 
-  // İlk yüklemede Supabase'den çek
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     fetchEkipmanFromDb();
   }, [fetchEkipmanFromDb]);
 
-  // dataLoading bitince store'dan da kontrol et (fallback)
   useEffect(() => {
     if (dataLoading || localEkipman !== undefined) return;
     const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
@@ -416,30 +431,20 @@ export default function QrDetailPage() {
     }
   }, [dataLoading, ekipmanlar, id, localEkipman]);
 
-  // Store'daki ekipman güncellenince local state'i de anlık güncelle
   useEffect(() => {
     if (!id || localEkipman === undefined) return;
     const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
-    if (fromStore) {
-      setLocalEkipman(fromStore);
-    }
+    if (fromStore) setLocalEkipman(fromStore);
   }, [ekipmanlar, id]);
 
-  // Kontrol kaydedildikten sonra Supabase'den taze veri çek
   const handleAfterSave = useCallback(() => {
     fetchEkipmanFromDb();
   }, [fetchEkipmanFromDb]);
 
-  const handleKontrolClose = () => setShowKontrol(false);
-  const handleUygunsuzlukClose = () => setShowUygunsuzluk(false);
-  const handleFotoClose = () => setShowFoto(false);
-
-  // Ekipmanın evraklarını bul (store'dan)
   const ekipmanEvraklari = evraklar.filter(
     e => !e.silinmis && e.firmaId === localEkipman?.firmaId && e.ad?.toLowerCase().includes(localEkipman?.ad?.toLowerCase() ?? '')
   );
 
-  // Ekipmanın kendi belgesi
   const handleOpenBelge = () => {
     if (!localEkipman) return;
     const veri = getEkipmanFile(localEkipman.id);
@@ -455,10 +460,13 @@ export default function QrDetailPage() {
   // Yükleniyor
   if (localLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-main)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0B1120' }}>
         <div className="text-center">
-          <div className="w-12 h-12 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4" style={{ borderColor: 'rgba(100,116,139,0.4)', borderTopColor: '#64748B' }} />
-          <p className="text-sm" style={{ color: '#64748B' }}>Ekipman yükleniyor...</p>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
+            <i className="ri-qr-code-line text-2xl" style={{ color: '#34D399' }} />
+          </div>
+          <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'rgba(52,211,153,0.3)', borderTopColor: '#34D399' }} />
+          <p className="text-sm font-medium" style={{ color: '#64748B' }}>Ekipman yükleniyor...</p>
         </div>
       </div>
     );
@@ -467,16 +475,13 @@ export default function QrDetailPage() {
   // Bulunamadı
   if (!localEkipman || localEkipman.silinmis) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg-main)' }}>
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0B1120' }}>
         <div className="text-center max-w-sm">
           <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <i className="ri-error-warning-line text-4xl" style={{ color: '#EF4444' }} />
           </div>
-          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Ekipman Bulunamadı</h2>
-          <p className="text-sm mb-2" style={{ color: '#64748B' }}>Bu QR koda ait ekipman kaydı mevcut değil veya silinmiş.</p>
-          <p className="text-xs mb-6 px-3 py-2 rounded-lg" style={{ color: '#F87171', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)' }}>
-            <i className="ri-shield-cross-line mr-1" />Bu ekipmana erişim yetkiniz yok veya kayıt mevcut değil.
-          </p>
+          <h2 className="text-xl font-bold mb-2" style={{ color: '#F1F5F9' }}>Ekipman Bulunamadı</h2>
+          <p className="text-sm mb-6" style={{ color: '#64748B' }}>Bu QR koda ait ekipman kaydı mevcut değil veya silinmiş.</p>
           <button onClick={() => navigate('/')} className="btn-primary whitespace-nowrap">
             <i className="ri-home-line mr-1" />Ana Sayfaya Dön
           </button>
@@ -490,98 +495,282 @@ export default function QrDetailPage() {
   const isOverdue = days < 0;
   const isUrgent = days >= 0 && days <= 30;
   const hasBelge = !!(localEkipman.dosyaAdi && getEkipmanFile(localEkipman.id));
-
-  const InfoRow = ({ icon, label, value, valueColor }: { icon: string; label: string; value?: string | null; valueColor?: string }) => (
-    <div className="flex items-start gap-3 py-3" style={{ borderBottom: '1px solid rgba(51,65,85,0.25)' }}>
-      <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 mt-0.5" style={{ background: 'rgba(51,65,85,0.4)' }}>
-        <i className={`${icon} text-sm`} style={{ color: '#64748B' }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: '#475569' }}>{label}</p>
-        <p className="text-sm font-medium break-words" style={{ color: valueColor || (value ? 'var(--text-primary)' : '#475569') }}>
-          {value || '—'}
-        </p>
-      </div>
-    </div>
-  );
+  const sahaFotolar = localEkipman.sahaFotolari ?? [];
 
   return (
-    <div className="min-h-screen pb-10" style={{ background: 'var(--bg-main)' }}>
-      {/* Top Bar */}
-      <div className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between" style={{ background: 'rgba(15,23,42,0.95)', borderBottom: '1px solid rgba(51,65,85,0.4)', backdropFilter: 'blur(12px)' }}>
-        <button onClick={() => navigate(-1)} className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer" style={{ background: 'rgba(51,65,85,0.4)', color: '#94A3B8' }}>
-          <i className="ri-arrow-left-line" />
+    <div className="min-h-screen" style={{ background: '#0B1120' }}>
+      {/* ── Top Bar ── */}
+      <div
+        className="sticky top-0 z-20 px-4 py-3 flex items-center justify-between"
+        style={{ background: 'rgba(11,17,32,0.92)', borderBottom: '1px solid rgba(51,65,85,0.35)', backdropFilter: 'blur(16px)' }}
+      >
+        <button
+          onClick={() => navigate(-1)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all active:scale-90"
+          style={{ background: 'rgba(51,65,85,0.5)', color: '#94A3B8' }}
+        >
+          <i className="ri-arrow-left-s-line text-lg" />
         </button>
-        <div className="text-center">
-          <p className="text-xs font-semibold" style={{ color: '#64748B' }}>QR Saha Modu</p>
-          <p className="text-xs" style={{ color: '#334155' }}>
-            <i className="ri-shield-check-line mr-0.5" style={{ color: '#22C55E' }} />
-            {org?.name || 'Organizasyon'}
-          </p>
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 flex items-center justify-center">
+            <i className="ri-qr-code-line text-sm" style={{ color: '#34D399' }} />
+          </div>
+          <span className="text-sm font-semibold" style={{ color: '#94A3B8' }}>QR Saha Modu</span>
         </div>
         <div className="w-9" />
       </div>
 
-      <div className="px-4 pt-5 max-w-lg mx-auto space-y-4">
-
-        {/* Ekipman Kimlik Kartı */}
-        <div className="isg-card rounded-2xl overflow-hidden">
-          <div className="px-5 py-4" style={{ background: 'rgba(15,23,42,0.5)', borderBottom: '1px solid rgba(51,65,85,0.4)' }}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  {localEkipman.seriNo && (
-                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
-                      {localEkipman.seriNo}
-                    </span>
-                  )}
-                  <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(51,65,85,0.4)', color: '#64748B' }}>
-                    {localEkipman.tur || 'Ekipman'}
-                  </span>
-                </div>
-                <h1 className="text-xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{localEkipman.ad}</h1>
-                {firma && <p className="text-sm mt-1" style={{ color: '#64748B' }}>{firma.ad}</p>}
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex-shrink-0" style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
-                <i className={sc.icon} />{sc.label}
+      {/* ── Hero Kartı ── */}
+      <div className="relative overflow-hidden" style={{ background: sc.gradient, borderBottom: `1px solid ${sc.border}` }}>
+        {/* Dekoratif arka plan dairesi */}
+        <div
+          className="absolute -top-12 -right-12 w-48 h-48 rounded-full opacity-10"
+          style={{ background: sc.color }}
+        />
+        <div className="relative px-5 pt-6 pb-5">
+          {/* Durum badge */}
+          <div className="flex items-center justify-between mb-4">
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+              style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}
+            >
+              <i className={sc.icon} />
+              {sc.label}
+            </span>
+            {localEkipman.seriNo && (
+              <span
+                className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg"
+                style={{ background: 'rgba(15,23,42,0.6)', color: '#94A3B8', border: '1px solid rgba(51,65,85,0.4)' }}
+              >
+                #{localEkipman.seriNo}
               </span>
-            </div>
+            )}
           </div>
 
-          {/* Kontrol uyarısı */}
-          {(isOverdue || isUrgent) && (
-            <div className="px-5 py-3 flex items-center gap-2" style={{ background: isOverdue ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', borderBottom: `1px solid ${isOverdue ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
-              <i className={`${isOverdue ? 'ri-alarm-warning-line' : 'ri-time-line'} text-sm`} style={{ color: isOverdue ? '#EF4444' : '#F59E0B' }} />
-              <p className="text-xs font-semibold" style={{ color: isOverdue ? '#EF4444' : '#F59E0B' }}>
-                {isOverdue ? `Kontrol ${Math.abs(days)} gün gecikmiş!` : `Kontrol tarihi ${days} gün sonra`}
-              </p>
-            </div>
+          {/* Ekipman adı */}
+          <h1 className="text-2xl font-bold leading-tight mb-1" style={{ color: '#F1F5F9' }}>
+            {localEkipman.ad}
+          </h1>
+          {firma && (
+            <p className="text-sm flex items-center gap-1.5 mb-4" style={{ color: '#64748B' }}>
+              <i className="ri-building-line text-xs" />
+              {firma.ad}
+            </p>
           )}
 
-          {/* Bilgi satırları */}
-          <div className="px-5">
-            <InfoRow icon="ri-building-line" label="Firma" value={firma?.ad} />
-            <InfoRow icon="ri-map-pin-line" label="Bulunduğu Alan" value={localEkipman.bulunduguAlan} />
-            <InfoRow icon="ri-price-tag-3-line" label="Marka / Model" value={[localEkipman.marka, localEkipman.model].filter(Boolean).join(' / ') || null} />
-            <InfoRow icon="ri-calendar-check-line" label="Son Kontrol" value={localEkipman.sonKontrolTarihi ? new Date(localEkipman.sonKontrolTarihi).toLocaleDateString('tr-TR') : null} />
-            <InfoRow icon="ri-calendar-2-line" label="Sonraki Kontrol" value={localEkipman.sonrakiKontrolTarihi ? new Date(localEkipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : null} valueColor={isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : undefined} />
-            {localEkipman.aciklama && <InfoRow icon="ri-file-text-line" label="Açıklama" value={localEkipman.aciklama} />}
+          {/* Tür + Alan chips */}
+          <div className="flex flex-wrap gap-2">
+            {localEkipman.tur && (
+              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(15,23,42,0.5)', color: '#94A3B8', border: '1px solid rgba(51,65,85,0.35)' }}>
+                <i className="ri-settings-3-line text-xs" />
+                {localEkipman.tur}
+              </span>
+            )}
+            {localEkipman.bulunduguAlan && (
+              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(15,23,42,0.5)', color: '#94A3B8', border: '1px solid rgba(51,65,85,0.35)' }}>
+                <i className="ri-map-pin-line text-xs" />
+                {localEkipman.bulunduguAlan}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* ── BELGELER ── */}
+        {/* Kontrol uyarı bandı */}
+        {(isOverdue || isUrgent) && (
+          <div
+            className="px-5 py-2.5 flex items-center gap-2"
+            style={{
+              background: isOverdue ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.1)',
+              borderTop: `1px solid ${isOverdue ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.2)'}`,
+            }}
+          >
+            <i
+              className={`${isOverdue ? 'ri-alarm-warning-fill' : 'ri-time-fill'} text-sm`}
+              style={{ color: isOverdue ? '#EF4444' : '#F59E0B' }}
+            />
+            <p className="text-xs font-semibold" style={{ color: isOverdue ? '#EF4444' : '#F59E0B' }}>
+              {isOverdue
+                ? `Kontrol ${Math.abs(days)} gün gecikmiş!`
+                : `Kontrol tarihi ${days} gün sonra`}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="px-4 pt-5 pb-10 max-w-lg mx-auto space-y-5">
+
+        {/* ── Detay Bilgileri ── */}
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(15,23,42,0.7)', border: '1px solid rgba(51,65,85,0.35)' }}>
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(51,65,85,0.3)' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#475569' }}>
+              <i className="ri-information-line mr-1.5" />Ekipman Bilgileri
+            </p>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'rgba(51,65,85,0.2)' }}>
+            {[
+              { icon: 'ri-price-tag-3-line', label: 'Marka / Model', value: [localEkipman.marka, localEkipman.model].filter(Boolean).join(' / ') || null },
+              { icon: 'ri-calendar-check-line', label: 'Son Kontrol', value: localEkipman.sonKontrolTarihi ? new Date(localEkipman.sonKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null },
+              { icon: 'ri-calendar-2-line', label: 'Sonraki Kontrol', value: localEkipman.sonrakiKontrolTarihi ? new Date(localEkipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null, valueColor: isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : undefined },
+              ...(localEkipman.aciklama ? [{ icon: 'ri-file-text-line', label: 'Açıklama', value: localEkipman.aciklama }] : []),
+            ].map((row, i) => row.value ? (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(51,65,85,0.5)' }}>
+                  <i className={`${row.icon} text-sm`} style={{ color: '#64748B' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs" style={{ color: '#475569' }}>{row.label}</p>
+                  <p className="text-sm font-semibold mt-0.5 break-words" style={{ color: row.valueColor || '#CBD5E1' }}>{row.value}</p>
+                </div>
+              </div>
+            ) : null)}
+          </div>
+        </div>
+
+        {/* ── Hızlı Aksiyonlar ── */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3 px-1" style={{ color: '#475569' }}>
+            Hızlı Aksiyonlar
+          </p>
+          <div className="space-y-3">
+            {/* Kontrol Yap */}
+            <button
+              onClick={() => setShowKontrol(true)}
+              className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl cursor-pointer transition-all active:scale-95 text-left"
+              style={{ background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.2)' }}
+            >
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.15)' }}>
+                <i className="ri-checkbox-circle-line text-2xl" style={{ color: '#34D399' }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold" style={{ color: '#34D399' }}>Kontrol Yap</p>
+                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Durumu güncelle, kontrol tarihi kaydet</p>
+              </div>
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(52,211,153,0.1)' }}>
+                <i className="ri-arrow-right-s-line" style={{ color: '#34D399' }} />
+              </div>
+            </button>
+
+            {/* Uygunsuzluk Bildir */}
+            <button
+              onClick={() => setShowUygunsuzluk(true)}
+              className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl cursor-pointer transition-all active:scale-95 text-left"
+              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)' }}
+            >
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(239,68,68,0.12)' }}>
+                <i className="ri-alert-line text-2xl" style={{ color: '#F87171' }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold" style={{ color: '#F87171' }}>Uygunsuzluk Bildir</p>
+                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Tespit edilen sorunu kayıt altına al</p>
+              </div>
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                <i className="ri-arrow-right-s-line" style={{ color: '#F87171' }} />
+              </div>
+            </button>
+
+            {/* Fotoğraf Yükle */}
+            <button
+              onClick={() => setShowFoto(true)}
+              className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl cursor-pointer transition-all active:scale-95 text-left"
+              style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)' }}
+            >
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(251,191,36,0.12)' }}>
+                <i className="ri-camera-line text-2xl" style={{ color: '#FBBF24' }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold" style={{ color: '#FBBF24' }}>Fotoğraf Yükle</p>
+                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Saha fotoğrafı çek ve sisteme kaydet</p>
+              </div>
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(251,191,36,0.1)' }}>
+                <i className="ri-arrow-right-s-line" style={{ color: '#FBBF24' }} />
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Saha Fotoğrafları ── */}
+        {sahaFotolar.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#475569' }}>
+                <i className="ri-image-line mr-1.5" />Saha Fotoğrafları
+              </p>
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(251,191,36,0.1)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                {sahaFotolar.length} fotoğraf
+              </span>
+            </div>
+
+            {/* Grid görünüm — 2 sütun */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {[...sahaFotolar].reverse().slice(0, 4).map((foto) => (
+                <button
+                  key={foto.id}
+                  onClick={() => setLightboxUrl(foto.url)}
+                  className="relative rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all"
+                  style={{ aspectRatio: '1/1', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(51,65,85,0.35)' }}
+                >
+                  <img
+                    src={foto.url}
+                    alt={foto.aciklama || 'Saha fotoğrafı'}
+                    className="w-full h-full object-cover"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <div className="absolute inset-0 flex items-end p-2" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }}>
+                    <p className="text-xs text-white leading-tight line-clamp-2">
+                      {foto.aciklama || new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Tüm fotoğraflar — liste görünüm */}
+            {sahaFotolar.length > 4 && (
+              <div className="space-y-2">
+                {[...sahaFotolar].reverse().slice(4).map((foto) => (
+                  <button
+                    key={foto.id}
+                    onClick={() => setLightboxUrl(foto.url)}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all active:scale-95 text-left"
+                    style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(51,65,85,0.3)' }}
+                  >
+                    <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0" style={{ background: 'rgba(51,65,85,0.4)' }}>
+                      <img src={foto.url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {foto.aciklama && <p className="text-sm font-medium truncate" style={{ color: '#CBD5E1' }}>{foto.aciklama}</p>}
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {foto.yukleyenKisi && (
+                          <span className="text-xs flex items-center gap-1" style={{ color: '#64748B' }}>
+                            <i className="ri-user-line text-xs" />{foto.yukleyenKisi}
+                          </span>
+                        )}
+                        <span className="text-xs flex items-center gap-1" style={{ color: '#64748B' }}>
+                          <i className="ri-time-line text-xs" />
+                          {new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
+                    <i className="ri-zoom-in-line text-sm flex-shrink-0" style={{ color: '#475569' }} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Belgeler ── */}
         {(hasBelge || ekipmanEvraklari.length > 0) && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-3 px-1" style={{ color: '#475569' }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-3 px-1" style={{ color: '#475569' }}>
               <i className="ri-folder-open-line mr-1.5" />Belgeler
             </p>
-            <div className="isg-card rounded-2xl overflow-hidden">
-              {/* Ekipmanın kendi belgesi */}
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(15,23,42,0.7)', border: '1px solid rgba(51,65,85,0.35)' }}>
               {hasBelge && (
                 <button
                   onClick={handleOpenBelge}
                   className="w-full flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-all text-left"
-                  style={{ borderBottom: ekipmanEvraklari.length > 0 ? '1px solid rgba(51,65,85,0.3)' : 'none' }}
+                  style={{ borderBottom: ekipmanEvraklari.length > 0 ? '1px solid rgba(51,65,85,0.25)' : 'none' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.05)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                 >
@@ -589,30 +778,26 @@ export default function QrDetailPage() {
                     <i className="ri-file-check-line text-base" style={{ color: '#34D399' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{localEkipman.dosyaAdi || 'Ekipman Belgesi'}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
-                      {localEkipman.dosyaBoyutu ? `${(localEkipman.dosyaBoyutu / 1024).toFixed(1)} KB` : 'Ekipman belgesi'} — Görüntüle / İndir
-                    </p>
+                    <p className="text-sm font-semibold truncate" style={{ color: '#CBD5E1' }}>{localEkipman.dosyaAdi || 'Ekipman Belgesi'}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>Görüntüle / İndir</p>
                   </div>
                   <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#34D399' }} />
                 </button>
               )}
-
-              {/* Evrak modülündeki ilgili evraklar */}
               {ekipmanEvraklari.map((evrak, idx) => (
                 <div
                   key={evrak.id}
                   className="flex items-center gap-3 px-4 py-3.5"
-                  style={{ borderBottom: idx < ekipmanEvraklari.length - 1 ? '1px solid rgba(51,65,85,0.3)' : 'none' }}
+                  style={{ borderBottom: idx < ekipmanEvraklari.length - 1 ? '1px solid rgba(51,65,85,0.25)' : 'none' }}
                 >
                   <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)' }}>
                     <i className="ri-file-text-line text-base" style={{ color: '#60A5FA' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{evrak.ad}</p>
+                    <p className="text-sm font-semibold truncate" style={{ color: '#CBD5E1' }}>{evrak.ad}</p>
                     <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
                       {evrak.tur || 'Evrak'}
-                      {evrak.gecerlilikTarihi && ` — ${new Date(evrak.gecerlilikTarihi).toLocaleDateString('tr-TR')} tarihine kadar geçerli`}
+                      {evrak.gecerlilikTarihi && ` — ${new Date(evrak.gecerlilikTarihi).toLocaleDateString('tr-TR')} tarihine kadar`}
                     </p>
                   </div>
                   <span className="text-xs px-2 py-0.5 rounded-lg whitespace-nowrap flex-shrink-0" style={{
@@ -627,133 +812,35 @@ export default function QrDetailPage() {
           </div>
         )}
 
-        {/* ── SAHA FOTOĞRAFLARI ── */}
-        {localEkipman.sahaFotolari && localEkipman.sahaFotolari.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-3 px-1" style={{ color: '#475569' }}>
-              <i className="ri-camera-line mr-1.5" />Saha Fotoğrafları ({localEkipman.sahaFotolari.length})
-            </p>
-            <div className="space-y-3">
-              {[...localEkipman.sahaFotolari].reverse().map((foto) => (
-                <div key={foto.id} className="isg-card rounded-2xl overflow-hidden">
-                  {/* Fotoğraf */}
-                  <div className="w-full" style={{ background: 'rgba(0,0,0,0.3)', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img
-                      src={foto.url}
-                      alt={foto.aciklama || 'Saha fotoğrafı'}
-                      className="w-full object-contain"
-                      style={{ maxHeight: '280px', display: 'block' }}
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  </div>
-                  {/* Bilgi */}
-                  <div className="px-4 py-3 space-y-1.5">
-                    {foto.aciklama && (
-                      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>{foto.aciklama}</p>
-                    )}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {foto.yukleyenKisi && (
-                        <span className="flex items-center gap-1 text-xs" style={{ color: '#64748B' }}>
-                          <i className="ri-user-line text-xs" />
-                          {foto.yukleyenKisi}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1 text-xs" style={{ color: '#64748B' }}>
-                        <i className="ri-time-line text-xs" />
-                        {new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── SAHA AKSİYONLARI ── */}
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-3 px-1" style={{ color: '#475569' }}>Hızlı Aksiyonlar</p>
-          <div className="grid grid-cols-1 gap-3">
-
-            {/* Kontrol Yap */}
-            <button
-              onClick={() => setShowKontrol(true)}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl cursor-pointer transition-all active:scale-95"
-              style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)' }}
-            >
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.15)' }}>
-                <i className="ri-checkbox-circle-line text-2xl" style={{ color: '#34D399' }} />
-              </div>
-              <div className="text-left flex-1">
-                <p className="text-base font-bold" style={{ color: '#34D399' }}>Kontrol Yap</p>
-                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Ekipman durumunu güncelle, kontrol tarihi kaydet</p>
-              </div>
-              <i className="ri-arrow-right-s-line text-xl" style={{ color: '#334155' }} />
-            </button>
-
-            {/* Uygunsuzluk Bildir */}
-            <button
-              onClick={() => setShowUygunsuzluk(true)}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl cursor-pointer transition-all active:scale-95"
-              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}
-            >
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(239,68,68,0.12)' }}>
-                <i className="ri-alert-line text-2xl" style={{ color: '#EF4444' }} />
-              </div>
-              <div className="text-left flex-1">
-                <p className="text-base font-bold" style={{ color: '#EF4444' }}>Uygunsuzluk Bildir</p>
-                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Tespit edilen sorunu kayıt altına al</p>
-              </div>
-              <i className="ri-arrow-right-s-line text-xl" style={{ color: '#334155' }} />
-            </button>
-
-            {/* Fotoğraf Yükle */}
-            <button
-              onClick={() => setShowFoto(true)}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl cursor-pointer transition-all active:scale-95"
-              style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)' }}
-            >
-              <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(168,85,247,0.12)' }}>
-                <i className="ri-camera-line text-2xl" style={{ color: '#A855F7' }} />
-              </div>
-              <div className="text-left flex-1">
-                <p className="text-base font-bold" style={{ color: '#A855F7' }}>Fotoğraf Yükle</p>
-                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Saha fotoğrafı çek ve sisteme kaydet</p>
-              </div>
-              <i className="ri-arrow-right-s-line text-xl" style={{ color: '#334155' }} />
-            </button>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-2 pb-2">
+        {/* ── Footer ── */}
+        <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-1.5">
-            <i className="ri-qr-code-line text-xs" style={{ color: '#334155' }} />
-            <span className="text-xs" style={{ color: '#334155' }}>QR ile erişildi</span>
+            <i className="ri-shield-check-line text-xs" style={{ color: '#34D399' }} />
+            <span className="text-xs" style={{ color: '#334155' }}>{org?.name || 'ISG Denetim'}</span>
           </div>
-          <button onClick={() => navigate('/')} className="text-xs cursor-pointer" style={{ color: '#475569' }}>
-            <i className="ri-home-line mr-1" />Ana Sayfa
+          <button onClick={() => navigate('/')} className="text-xs cursor-pointer flex items-center gap-1" style={{ color: '#475569' }}>
+            <i className="ri-home-line" />Ana Sayfa
           </button>
         </div>
       </div>
 
-      {/* Aksiyonlar */}
+      {/* Modaller */}
       <KontrolModal
         open={showKontrol}
-        onClose={handleKontrolClose}
+        onClose={() => setShowKontrol(false)}
         ekipmanAd={localEkipman.ad}
         ekipmanId={localEkipman.id}
         onSaved={handleAfterSave}
       />
       <UygunsuzlukModal
         open={showUygunsuzluk}
-        onClose={handleUygunsuzlukClose}
+        onClose={() => setShowUygunsuzluk(false)}
         ekipmanAd={localEkipman.ad}
         firmaId={localEkipman.firmaId}
       />
       <FotoModal
         open={showFoto}
-        onClose={handleFotoClose}
+        onClose={() => setShowFoto(false)}
         ekipmanAd={localEkipman.ad}
         ekipmanId={localEkipman.id}
         onUploaded={handleAfterSave}
@@ -765,6 +852,9 @@ export default function QrDetailPage() {
         dosyaAdi={evrakAdi}
         dosyaTipi={evrakTipi}
       />
+      {lightboxUrl && (
+        <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      )}
     </div>
   );
 }
