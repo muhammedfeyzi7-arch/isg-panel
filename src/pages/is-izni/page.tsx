@@ -73,15 +73,21 @@ export default function IsIzniPage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return isIzinleri.filter(iz => {
-      const firma = firmalar.find(f => f.id === iz.firmaId);
-      return (
-        (!q || iz.izinNo.toLowerCase().includes(q) || iz.aciklama.toLowerCase().includes(q) || iz.sorumlu.toLowerCase().includes(q) || (firma?.ad.toLowerCase().includes(q) ?? false))
-        && (!tipFilter || iz.tip === tipFilter)
-        && (!durumFilter || iz.durum === durumFilter)
-        && (!firmaFilter || iz.firmaId === firmaFilter)
-      );
-    });
+    return isIzinleri
+      .filter(iz => {
+        const firma = firmalar.find(f => f.id === iz.firmaId);
+        return (
+          (!q || iz.izinNo.toLowerCase().includes(q) || iz.aciklama.toLowerCase().includes(q) || iz.sorumlu.toLowerCase().includes(q) || (firma?.ad.toLowerCase().includes(q) ?? false))
+          && (!tipFilter || iz.tip === tipFilter)
+          && (!durumFilter || iz.durum === durumFilter)
+          && (!firmaFilter || iz.firmaId === firmaFilter)
+        );
+      })
+      .sort((a, b) => {
+        const ta = a.olusturmaTarihi ?? '';
+        const tb = b.olusturmaTarihi ?? '';
+        return tb.localeCompare(ta);
+      });
   }, [isIzinleri, firmalar, search, tipFilter, durumFilter, firmaFilter]);
 
   const stats = useMemo(() => ({

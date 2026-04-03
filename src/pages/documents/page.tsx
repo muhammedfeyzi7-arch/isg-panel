@@ -90,13 +90,19 @@ export default function EvraklarPage() {
     durum: calcEvrakDurum(e.dosyaAdi, e.gecerlilikTarihi),
   })), [evraklar]);
 
-  const filtered = useMemo(() => evraklarWithDurum.filter(e => {
-    const q = search.toLowerCase();
-    return (!search || e.ad.toLowerCase().includes(q) || e.tur.toLowerCase().includes(q))
-      && (!firmaFilter || e.firmaId === firmaFilter)
-      && (!statusFilter || e.durum === statusFilter)
-      && (!turFilter || e.tur === turFilter);
-  }), [evraklarWithDurum, search, firmaFilter, statusFilter, turFilter]);
+  const filtered = useMemo(() => evraklarWithDurum
+    .filter(e => {
+      const q = search.toLowerCase();
+      return (!search || e.ad.toLowerCase().includes(q) || e.tur.toLowerCase().includes(q))
+        && (!firmaFilter || e.firmaId === firmaFilter)
+        && (!statusFilter || e.durum === statusFilter)
+        && (!turFilter || e.tur === turFilter);
+    })
+    .sort((a, b) => {
+      const ta = a.olusturmaTarihi ?? '';
+      const tb = b.olusturmaTarihi ?? '';
+      return tb.localeCompare(ta);
+    }), [evraklarWithDurum, search, firmaFilter, statusFilter, turFilter]);
 
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
   const getPersonelAd = (id?: string) => id ? (personeller.find(p => p.id === id)?.adSoyad || '—') : 'Firma Evrakı';

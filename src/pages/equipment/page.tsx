@@ -131,19 +131,25 @@ export default function EkipmanlarPage() {
   }, [quickCreate, setQuickCreate]);
 
   const filtered = useMemo(() => {
-    return ekipmanlar.filter(e => {
-      if (e.silinmis) return false;
-      const firma = firmalar.find(f => f.id === e.firmaId);
-      const q = search.toLowerCase();
-      const matchSearch = !q ||
-        e.ad.toLowerCase().includes(q) ||
-        e.tur.toLowerCase().includes(q) ||
-        e.seriNo.toLowerCase().includes(q) ||
-        (firma?.ad.toLowerCase().includes(q) ?? false);
-      const matchFirma = !firmaFilter || e.firmaId === firmaFilter;
-      const matchStatus = !statusFilter || e.durum === statusFilter;
-      return matchSearch && matchFirma && matchStatus;
-    });
+    return ekipmanlar
+      .filter(e => {
+        if (e.silinmis) return false;
+        const firma = firmalar.find(f => f.id === e.firmaId);
+        const q = search.toLowerCase();
+        const matchSearch = !q ||
+          e.ad.toLowerCase().includes(q) ||
+          e.tur.toLowerCase().includes(q) ||
+          e.seriNo.toLowerCase().includes(q) ||
+          (firma?.ad.toLowerCase().includes(q) ?? false);
+        const matchFirma = !firmaFilter || e.firmaId === firmaFilter;
+        const matchStatus = !statusFilter || e.durum === statusFilter;
+        return matchSearch && matchFirma && matchStatus;
+      })
+      .sort((a, b) => {
+        const ta = a.olusturmaTarihi ?? '';
+        const tb = b.olusturmaTarihi ?? '';
+        return tb.localeCompare(ta);
+      });
   }, [ekipmanlar, firmalar, search, firmaFilter, statusFilter]);
 
   const aktifEkipmanlar = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);

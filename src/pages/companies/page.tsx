@@ -85,13 +85,19 @@ export default function FirmalarPage() {
     }
   }, [quickCreate, setQuickCreate]);
 
-  const filtered = useMemo(() => firmalar.filter(f => {
-    if (f.silinmis) return false;
-    const q = search.toLowerCase();
-    return (!search || f.ad.toLowerCase().includes(q) || f.yetkiliKisi.toLowerCase().includes(q) || f.vergiNo.includes(q))
-      && (!statusFilter || f.durum === statusFilter)
-      && (!tehlikeFilter || f.tehlikeSinifi === tehlikeFilter);
-  }), [firmalar, search, statusFilter, tehlikeFilter]);
+  const filtered = useMemo(() => firmalar
+    .filter(f => {
+      if (f.silinmis) return false;
+      const q = search.toLowerCase();
+      return (!search || f.ad.toLowerCase().includes(q) || f.yetkiliKisi.toLowerCase().includes(q) || f.vergiNo.includes(q))
+        && (!statusFilter || f.durum === statusFilter)
+        && (!tehlikeFilter || f.tehlikeSinifi === tehlikeFilter);
+    })
+    .sort((a, b) => {
+      const ta = a.olusturmaTarihi ?? '';
+      const tb = b.olusturmaTarihi ?? '';
+      return tb.localeCompare(ta);
+    }), [firmalar, search, statusFilter, tehlikeFilter]);
 
   const openAdd = () => { setForm({ ...emptyFirma }); setEditingId(null); setLogoVeri(''); setFormOpen(true); };
   const openEdit = (f: Firma) => {

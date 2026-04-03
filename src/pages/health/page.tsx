@@ -58,15 +58,21 @@ export default function MuayenelerPage() {
   );
 
   const filtered = useMemo(() => {
-    return muayeneler.filter(m => {
-      if (m.silinmis) return false;
-      const personel = personeller.find(p => p.id === m.personelId);
-      const firma = firmalar.find(f => f.id === m.firmaId);
-      const q = search.toLowerCase();
-      const matchSearch = !q || (personel?.adSoyad.toLowerCase().includes(q) ?? false) || (firma?.ad.toLowerCase().includes(q) ?? false);
-      const matchFirma = !firmaFilter || m.firmaId === firmaFilter;
-      return matchSearch && matchFirma;
-    });
+    return muayeneler
+      .filter(m => {
+        if (m.silinmis) return false;
+        const personel = personeller.find(p => p.id === m.personelId);
+        const firma = firmalar.find(f => f.id === m.firmaId);
+        const q = search.toLowerCase();
+        const matchSearch = !q || (personel?.adSoyad.toLowerCase().includes(q) ?? false) || (firma?.ad.toLowerCase().includes(q) ?? false);
+        const matchFirma = !firmaFilter || m.firmaId === firmaFilter;
+        return matchSearch && matchFirma;
+      })
+      .sort((a, b) => {
+        const ta = a.olusturmaTarihi ?? '';
+        const tb = b.olusturmaTarihi ?? '';
+        return tb.localeCompare(ta);
+      });
   }, [muayeneler, personeller, firmalar, search, firmaFilter]);
 
   // Sağlık kategorisindeki evraklar (EK-2, Sağlık Raporu vb.)

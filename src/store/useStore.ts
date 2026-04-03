@@ -376,7 +376,7 @@ export function useStore(
   const addFirma = useCallback((firma: Omit<Firma, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
     const now = new Date().toISOString();
     const newFirma: Firma = { ...firma, id: genId(), olusturmaTarihi: now, guncellemeTarihi: now };
-    setFirmalar(prev => [...prev, newFirma]);
+    setFirmalar(prev => [newFirma, ...prev]);
     saveToDb('firmalar', newFirma as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('firma_created', 'Firmalar', newFirma.id, newFirma.ad, `${newFirma.ad} firması oluşturuldu.`);
     return newFirma;
@@ -521,7 +521,7 @@ export function useStore(
   const addPersonel = useCallback((personel: Omit<Personel, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
     const now = new Date().toISOString();
     const newPersonel: Personel = { ...personel, id: genId(), olusturmaTarihi: now, guncellemeTarihi: now };
-    setPersoneller(prev => [...prev, newPersonel]);
+    setPersoneller(prev => [newPersonel, ...prev]);
     saveToDb('personeller', newPersonel as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('personel_created', 'Personeller', newPersonel.id, newPersonel.adSoyad, `${newPersonel.adSoyad} personel olarak eklendi.`);
     return newPersonel;
@@ -571,7 +571,7 @@ export function useStore(
     const kategori = evrak.kategori || getEvrakKategori(evrak.tur, evrak.ad);
     const newEvrak: Evrak = { ...rest, kategori, id, olusturmaTarihi: new Date().toISOString() };
     if (dosyaVeri) saveFileData(orgId, 'evrak', id, dosyaVeri);
-    setEvraklar(prev => [...prev, newEvrak]);
+    setEvraklar(prev => [newEvrak, ...prev]);
     saveToDb('evraklar', newEvrak as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('evrak_created', 'Evraklar', id, newEvrak.ad, `${newEvrak.ad} evrakı eklendi.`);
     return { ...newEvrak, dosyaVeri };
@@ -628,7 +628,7 @@ export function useStore(
     const { belgeDosyaVeri, ...rest } = egitim;
     const newEgitim: Egitim = { ...rest, id, olusturmaTarihi: new Date().toISOString() };
     if (belgeDosyaVeri) saveFileData(orgId, 'egitim', id, belgeDosyaVeri);
-    setEgitimler(prev => [...prev, newEgitim]);
+    setEgitimler(prev => [newEgitim, ...prev]);
     saveToDb('egitimler', newEgitim as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('egitim_created', 'Eğitimler', id, newEgitim.ad, `${newEgitim.ad} eğitimi oluşturuldu.`);
     return newEgitim;
@@ -680,7 +680,7 @@ export function useStore(
   // ──────── MUAYENE ────────
   const addMuayene = useCallback((muayene: Omit<Muayene, 'id' | 'olusturmaTarihi'>) => {
     const newMuayene: Muayene = { ...muayene, id: genId(), olusturmaTarihi: new Date().toISOString() };
-    setMuayeneler(prev => [...prev, newMuayene]);
+    setMuayeneler(prev => [newMuayene, ...prev]);
     saveToDb('muayeneler', newMuayene as unknown as { id: string } & Record<string, unknown>);
     return newMuayene;
   }, [setMuayeneler, saveToDb]);
@@ -729,7 +729,7 @@ export function useStore(
     const acilisNo = generateDofNo(uygRef.current);
     const durum = u.kapatmaFotoMevcut ? 'Kapandı' as const : 'Açık' as const;
     const newU: Uygunsuzluk = { ...u, id, durum, olusturmaTarihi: now, acilisNo };
-    setUygunsuzluklar(prev => [...prev, newU]);
+    setUygunsuzluklar(prev => [newU, ...prev]);
     saveToDb('uygunsuzluklar', newU as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('uygunsuzluk_created', 'Uygunsuzluklar', id, u.baslik, `${u.baslik} uygunsuzluk kaydı oluşturuldu.`);
     return newU;
@@ -825,7 +825,7 @@ export function useStore(
     const { dosyaVeri, ...rest } = e;
     const newE: Ekipman = { ...rest, id, olusturmaTarihi: new Date().toISOString() };
     if (dosyaVeri) saveFileData(orgId, 'ekipman', id, dosyaVeri);
-    setEkipmanlar(prev => [...prev, newE]);
+    setEkipmanlar(prev => [newE, ...prev]);
     saveToDb('ekipmanlar', newE as unknown as { id: string } & Record<string, unknown>);
     return newE;
   }, [setEkipmanlar, saveToDb]);
@@ -854,7 +854,7 @@ export function useStore(
   // ──────── GÖREV ────────
   const addGorev = useCallback((g: Omit<Gorev, 'id' | 'olusturmaTarihi'>) => {
     const newG: Gorev = { ...g, id: genId(), olusturmaTarihi: new Date().toISOString() };
-    setGorevler(prev => [...prev, newG]);
+    setGorevler(prev => [newG, ...prev]);
     saveToDb('gorevler', newG as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('gorev_created', 'Görevler', newG.id, newG.baslik, `${newG.baslik} görevi oluşturuldu.`);
     return newG;
@@ -884,7 +884,7 @@ export function useStore(
     const tutanakNo = generateTutanakNo(tutRef.current);
     const newT: Tutanak = { ...rest, id, tutanakNo, olusturmaTarihi: now, guncellemeTarihi: now };
     if (dosyaVeri) saveFileData(orgId, 'tutanak', id, dosyaVeri);
-    setTutanaklar(prev => [...prev, newT]);
+    setTutanaklar(prev => [newT, ...prev]);
     saveToDb('tutanaklar', newT as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('tutanak_created', 'Tutanaklar', id, newT.baslik, `${newT.tutanakNo} - ${newT.baslik} tutanağı oluşturuldu.`);
     return { ...newT, dosyaVeri };
@@ -917,7 +917,7 @@ export function useStore(
     const id = genId();
     const izinNo = generateIsIzniNo(isIzRef.current);
     const newIz: IsIzni = { ...iz, id, izinNo, olusturmaTarihi: now, guncellemeTarihi: now };
-    setIsIzinleri(prev => [...prev, newIz]);
+    setIsIzinleri(prev => [newIz, ...prev]);
     saveToDb('is_izinleri', newIz as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('is_izni_created', 'İş İzinleri', id, izinNo, `${izinNo} iş izni oluşturuldu.`);
     return newIz;

@@ -44,17 +44,23 @@ export default function UygunsuzluklarPage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return aktif.filter(u => {
-      if (firmaFilter && u.firmaId !== firmaFilter) return false;
-      if (statusFilter && u.durum !== statusFilter) return false;
-      if (dateFrom && u.tarih && u.tarih < dateFrom) return false;
-      if (dateTo && u.tarih && u.tarih > dateTo) return false;
-      if (q) {
-        const firma = firmalar.find(f => f.id === u.firmaId);
-        if (!u.baslik.toLowerCase().includes(q) && !(firma?.ad.toLowerCase().includes(q) ?? false) && !(u.acilisNo?.toLowerCase().includes(q) ?? false)) return false;
-      }
-      return true;
-    });
+    return aktif
+      .filter(u => {
+        if (firmaFilter && u.firmaId !== firmaFilter) return false;
+        if (statusFilter && u.durum !== statusFilter) return false;
+        if (dateFrom && u.tarih && u.tarih < dateFrom) return false;
+        if (dateTo && u.tarih && u.tarih > dateTo) return false;
+        if (q) {
+          const firma = firmalar.find(f => f.id === u.firmaId);
+          if (!u.baslik.toLowerCase().includes(q) && !(firma?.ad.toLowerCase().includes(q) ?? false) && !(u.acilisNo?.toLowerCase().includes(q) ?? false)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const ta = a.olusturmaTarihi ?? '';
+        const tb = b.olusturmaTarihi ?? '';
+        return tb.localeCompare(ta);
+      });
   }, [aktif, search, firmaFilter, statusFilter, dateFrom, dateTo, firmalar]);
 
   const stats = useMemo(() => ({

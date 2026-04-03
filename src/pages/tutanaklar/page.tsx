@@ -341,15 +341,21 @@ export default function TutanaklarPage() {
     }
   }, [quickCreate, setQuickCreate, currentUser.ad]);
 
-  const filtered = useMemo(() => tutanaklar.filter(t => {
-    const firma = firmalar.find(f => f.id === t.firmaId);
-    const q = search.toLowerCase();
-    return (
-      (!q || t.baslik.toLowerCase().includes(q) || t.tutanakNo.toLowerCase().includes(q) || (firma?.ad.toLowerCase().includes(q) ?? false))
-      && (!firmaFilter || t.firmaId === firmaFilter)
-      && (!statusFilter || t.durum === statusFilter)
-    );
-  }), [tutanaklar, firmalar, search, firmaFilter, statusFilter]);
+  const filtered = useMemo(() => tutanaklar
+    .filter(t => {
+      const firma = firmalar.find(f => f.id === t.firmaId);
+      const q = search.toLowerCase();
+      return (
+        (!q || t.baslik.toLowerCase().includes(q) || t.tutanakNo.toLowerCase().includes(q) || (firma?.ad.toLowerCase().includes(q) ?? false))
+        && (!firmaFilter || t.firmaId === firmaFilter)
+        && (!statusFilter || t.durum === statusFilter)
+      );
+    })
+    .sort((a, b) => {
+      const ta = a.olusturmaTarihi ?? '';
+      const tb = b.olusturmaTarihi ?? '';
+      return tb.localeCompare(ta);
+    }), [tutanaklar, firmalar, search, firmaFilter, statusFilter]);
 
   const stats = useMemo(() => ({
     total: tutanaklar.length,

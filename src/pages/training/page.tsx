@@ -92,12 +92,18 @@ export default function EgitimlerPage() {
     return personeller.filter(p => p.firmaId === form.firmaId && !p.silinmis);
   }, [form.firmaId, personeller]);
 
-  const filtered = useMemo(() => egitimler.filter(e => {
-    if (e.silinmis) return false;
-    const q = search.toLowerCase();
-    return (!search || e.ad.toLowerCase().includes(q) || (e.aciklama || '').toLowerCase().includes(q))
-      && (!firmaFilter || e.firmaId === firmaFilter);
-  }), [egitimler, search, firmaFilter]);
+  const filtered = useMemo(() => egitimler
+    .filter(e => {
+      if (e.silinmis) return false;
+      const q = search.toLowerCase();
+      return (!search || e.ad.toLowerCase().includes(q) || (e.aciklama || '').toLowerCase().includes(q))
+        && (!firmaFilter || e.firmaId === firmaFilter);
+    })
+    .sort((a, b) => {
+      const ta = a.olusturmaTarihi ?? '';
+      const tb = b.olusturmaTarihi ?? '';
+      return tb.localeCompare(ta);
+    }), [egitimler, search, firmaFilter]);
 
   const getFirmaAd = (id: string) => firmalar.find(fi => fi.id === id)?.ad || '—';
 

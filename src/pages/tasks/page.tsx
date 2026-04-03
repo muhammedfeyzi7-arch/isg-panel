@@ -51,13 +51,19 @@ export default function GorevlerPage() {
   }, [quickCreate, setQuickCreate]);
 
   const filtered = useMemo(() => {
-    return gorevler.filter(g => {
-      if (g.silinmis) return false;
-      const q = search.toLowerCase();
-      const matchSearch = !q || g.baslik.toLowerCase().includes(q) || g.atananKisi.toLowerCase().includes(q);
-      const matchStatus = !statusFilter || g.durum === statusFilter;
-      return matchSearch && matchStatus;
-    });
+    return gorevler
+      .filter(g => {
+        if (g.silinmis) return false;
+        const q = search.toLowerCase();
+        const matchSearch = !q || g.baslik.toLowerCase().includes(q) || g.atananKisi.toLowerCase().includes(q);
+        const matchStatus = !statusFilter || g.durum === statusFilter;
+        return matchSearch && matchStatus;
+      })
+      .sort((a, b) => {
+        const ta = a.olusturmaTarihi ?? '';
+        const tb = b.olusturmaTarihi ?? '';
+        return tb.localeCompare(ta);
+      });
   }, [gorevler, search, statusFilter]);
 
   const aktifGorevler = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);

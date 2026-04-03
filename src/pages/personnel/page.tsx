@@ -233,13 +233,19 @@ export default function PersonellerPage() {
     reader.readAsArrayBuffer(file);
   };
 
-  const filtered = useMemo(() => personeller.filter(p => {
-    if (p.silinmis) return false;
-    const q = search.toLowerCase();
-    return (!search || p.adSoyad.toLowerCase().includes(q) || p.tc.includes(q) || p.gorev.toLowerCase().includes(q))
-      && (!firmaFilter || p.firmaId === firmaFilter)
-      && (!statusFilter || p.durum === statusFilter);
-  }), [personeller, search, firmaFilter, statusFilter]);
+  const filtered = useMemo(() => personeller
+    .filter(p => {
+      if (p.silinmis) return false;
+      const q = search.toLowerCase();
+      return (!search || p.adSoyad.toLowerCase().includes(q) || p.tc.includes(q) || p.gorev.toLowerCase().includes(q))
+        && (!firmaFilter || p.firmaId === firmaFilter)
+        && (!statusFilter || p.durum === statusFilter);
+    })
+    .sort((a, b) => {
+      const ta = a.olusturmaTarihi ?? '';
+      const tb = b.olusturmaTarihi ?? '';
+      return tb.localeCompare(ta);
+    }), [personeller, search, firmaFilter, statusFilter]);
 
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
 
