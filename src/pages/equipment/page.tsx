@@ -489,21 +489,33 @@ export default function EkipmanlarPage() {
       const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
       const headerRow = (allRows[0] as unknown[]).map(h => String(h ?? '').trim());
 
-      // Header bazlı kolon eşleştirme
+      // Header bazlı kolon eşleştirme — Türkçe normalize ile
+      const normHPrev = (s: string) => s.trim().toLowerCase()
+        .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
+        .replace(/Ğ/g, 'g').replace(/ğ/g, 'g')
+        .replace(/Ü/g, 'u').replace(/ü/g, 'u')
+        .replace(/Ş/g, 's').replace(/ş/g, 's')
+        .replace(/Ö/g, 'o').replace(/ö/g, 'o')
+        .replace(/Ç/g, 'c').replace(/ç/g, 'c')
+        .replace(/\s+/g, ' ');
+
+      const normalizedHeadersPrev = headerRow.map(normHPrev);
+
       const colMap: Record<string, number> = {};
-      const findCol = (keywords: string[]): number => {
-        for (let i = 0; i < headerRow.length; i++) {
-          const h = headerRow[i].toLowerCase();
-          for (const kw of keywords) {
-            if (h.includes(kw.toLowerCase())) return i;
-          }
+      const findColPrev = (keywords: string[]): number => {
+        for (const kw of keywords) {
+          const normKw = normHPrev(kw);
+          const exactIdx = normalizedHeadersPrev.findIndex(h => h === normKw);
+          if (exactIdx >= 0) return exactIdx;
+          const partialIdx = normalizedHeadersPrev.findIndex(h => h.includes(normKw) || normKw.includes(h));
+          if (partialIdx >= 0) return partialIdx;
         }
         return -1;
       };
 
-      colMap['ad'] = findCol(['ekipman ad', 'ad', 'isim', 'name']);
-      colMap['tur'] = findCol(['tür', 'tur', 'tip', 'type', 'cins']);
-      colMap['firma'] = findCol(['firma ad', 'firma', 'company', 'şirket']);
+      colMap['ad'] = findColPrev(['ekipman adi', 'ekipman ad']);
+      colMap['tur'] = findColPrev(['ekipman turu', 'ekipman tur', 'tur', 'cesit']);
+      colMap['firma'] = findColPrev(['firma adi', 'firma ad', 'firma']);
 
       const getCell = (row: string[], key: string): string => {
         const idx = colMap[key];
@@ -518,7 +530,7 @@ export default function EkipmanlarPage() {
           row: i + 2,
           ad: ad || '(Boş)',
           status: (hasError ? 'error' : 'ok') as 'ok' | 'error',
-          message: hasError ? `Eksik: ${!ad ? 'Ad ' : ''}${!firma ? 'Firma' : ''}` : 'Hazır',
+          message: hasError ? `Eksik: ${!ad ? 'Ekipman Adı ' : ''}${!firma ? 'Firma Adı' : ''}` : 'Hazır',
         };
       });
 
@@ -540,6 +552,8 @@ export default function EkipmanlarPage() {
 
       if (validCount === 0) {
         addToast('Dosyada geçerli veri bulunamadı. Boş satırlar ve not satırları otomatik atlandı.', 'warning');
+        setImporting(false);
+        setShowImport(false);
         return;
       }
 
@@ -551,38 +565,54 @@ export default function EkipmanlarPage() {
       const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
       const headerRow = (allRows[0] as unknown[]).map(h => String(h ?? '').trim());
 
-      // Header bazlı kolon eşleştirme
-      const colMap: Record<string, number> = {};
+      // Header bazlı kolon eşleştirme — Türkçe normalize ile
+      const normH = (s: string) => s.trim().toLowerCase()
+        .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
+        .replace(/Ğ/g, 'g').replace(/ğ/g, 'g')
+        .replace(/Ü/g, 'u').replace(/ü/g, 'u')
+        .replace(/Ş/g, 's').replace(/ş/g, 's')
+        .replace(/Ö/g, 'o').replace(/ö/g, 'o')
+        .replace(/Ç/g, 'c').replace(/ç/g, 'c')
+        .replace(/\s+/g, ' ');
+
+      const normalizedHeaders = headerRow.map(normH);
+
+      const importColMap: Record<string, number> = {};
+
       const findCol = (keywords: string[]): number => {
-        for (let i = 0; i < headerRow.length; i++) {
-          const h = headerRow[i].toLowerCase();
-          for (const kw of keywords) {
-            if (h.includes(kw.toLowerCase())) return i;
-          }
+        for (const kw of keywords) {
+          const normKw = normH(kw);
+          // Önce tam eşleşme dene
+          const exactIdx = normalizedHeaders.findIndex(h => h === normKw);
+          if (exactIdx >= 0) return exactIdx;
+          // Sonra içerme dene
+          const partialIdx = normalizedHeaders.findIndex(h => h.includes(normKw) || normKw.includes(h));
+          if (partialIdx >= 0) return partialIdx;
         }
         return -1;
       };
 
-      colMap['ad'] = findCol(['ekipman ad', 'ad', 'isim', 'name']);
-      colMap['tur'] = findCol(['tür', 'tur', 'tip', 'type', 'cins']);
-      colMap['firma'] = findCol(['firma ad', 'firma', 'company', 'şirket']);
-      colMap['alan'] = findCol(['alan', 'bölge', 'lokasyon', 'location', 'bulunduğu']);
-      colMap['seriNo'] = findCol(['seri', 'serino', 'serial', 'no']);
-      colMap['marka'] = findCol(['marka', 'brand', 'üretici']);
-      colMap['model'] = findCol(['model', 'tip']);
-      colMap['sonKontrol'] = findCol(['son kontrol', 'sonkontrol', 'ilk kontrol']);
-      colMap['sonrakiKontrol'] = findCol(['sonraki kontrol', 'sonrakikontrol', 'gelecek kontrol']);
-      colMap['durum'] = findCol(['durum', 'status', 'statü', 'kondisyon']);
-      colMap['aciklama'] = findCol(['açıklama', 'aciklama', 'not', 'note', 'açıkl']);
+      // Şablondaki başlıklarla birebir eşleşen keyword'ler (öncelik sırasına göre)
+      importColMap['ad'] = findCol(['ekipman adi', 'ekipman ad']);
+      importColMap['tur'] = findCol(['ekipman turu', 'ekipman tur', 'tur', 'cesit']);
+      importColMap['firma'] = findCol(['firma adi', 'firma ad', 'firma']);
+      importColMap['alan'] = findCol(['bulundugu alan', 'alan', 'lokasyon', 'bolge']);
+      importColMap['seriNo'] = findCol(['seri no', 'serino', 'seri numarasi', 'serial']);
+      importColMap['marka'] = findCol(['marka', 'brand', 'uretici']);
+      importColMap['model'] = findCol(['model']);
+      importColMap['sonKontrol'] = findCol(['son kontrol', 'sonkontrol']);
+      importColMap['sonrakiKontrol'] = findCol(['sonraki kontrol', 'sonrakikontrol', 'gelecek kontrol']);
+      importColMap['durum'] = findCol(['durum', 'status']);
+      importColMap['aciklama'] = findCol(['aciklama', 'acikl', 'not ']);
 
       // Zorunlu kolon kontrolü
-      if (colMap['ad'] < 0) {
+      if (importColMap['ad'] < 0) {
         addToast('"Ekipman Adı" kolonu bulunamadı. Lütfen şablonu kontrol edin.', 'error');
         return;
       }
 
       const getCell = (row: string[], key: string): string => {
-        const idx = colMap[key];
+        const idx = importColMap[key];
         return idx >= 0 ? (row[idx] ?? '').trim() : '';
       };
 
@@ -605,18 +635,67 @@ export default function EkipmanlarPage() {
           continue;
         }
 
-        const firma = firmalar.find(f => !f.silinmis && f.ad.toLowerCase() === firmaAd.toLowerCase());
+        const normFirma = (s: string) => s.trim().toLowerCase()
+          .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
+          .replace(/Ğ/g, 'g').replace(/ğ/g, 'g')
+          .replace(/Ü/g, 'u').replace(/ü/g, 'u')
+          .replace(/Ş/g, 's').replace(/ş/g, 's')
+          .replace(/Ö/g, 'o').replace(/ö/g, 'o')
+          .replace(/Ç/g, 'c').replace(/ç/g, 'c')
+          .replace(/[.\-,;:'"()[\]/\\&@#!?]/g, ' ')
+          .replace(/\s+/g, ' ').trim();
+
+        const normFirmaAd = normFirma(firmaAd);
+        const aktivFirmalar = firmalar.filter(f => !f.silinmis);
+
+        // 1. Birebir normalize eşleşme
+        let firma = aktivFirmalar.find(f => normFirma(f.ad) === normFirmaAd);
+        // 2. Kısmi içerme eşleşmesi
+        if (!firma) firma = aktivFirmalar.find(f => normFirma(f.ad).includes(normFirmaAd) || normFirmaAd.includes(normFirma(f.ad)));
+        // 3. Token bazlı eşleşme
         if (!firma) {
-          errors.push(`Satır ${rowNum}: "${firmaAd}" firması bulunamadı`);
+          const inputTokens = normFirmaAd.split(' ').filter(t => t.length >= 2);
+          if (inputTokens.length > 0) {
+            const scored = aktivFirmalar.map(f => {
+              const fTokens = normFirma(f.ad).split(' ').filter(t => t.length >= 2);
+              const matched = inputTokens.filter(t => fTokens.includes(t)).length;
+              return { f, score: matched / Math.max(inputTokens.length, fTokens.length, 1) };
+            }).filter(x => x.score >= 0.4).sort((a, b) => b.score - a.score);
+            if (scored.length > 0) firma = scored[0].f;
+          }
+        }
+
+        if (!firma) {
+          const firmaListesi = aktivFirmalar.slice(0, 5).map(f => `"${f.ad}"`).join(', ');
+          errors.push(`Satır ${rowNum}: "${firmaAd}" firması bulunamadı. Sistemdeki firmalar: ${firmaListesi}`);
           continue;
         }
 
-        const durumVal = getCell(row, 'durum');
-        const durumTyped: EkipmanStatus = ['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'].includes(durumVal) ? (durumVal as EkipmanStatus) : 'Uygun';
+        // Durum normalize et — Türkçe karakter uyumu
+        const durumRaw = getCell(row, 'durum');
+        const normDurum = (s: string) => s.trim().toLowerCase()
+          .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
+          .replace(/Ğ/g, 'g').replace(/ğ/g, 'g')
+          .replace(/Ü/g, 'u').replace(/ü/g, 'u')
+          .replace(/Ş/g, 's').replace(/ş/g, 's')
+          .replace(/Ö/g, 'o').replace(/ö/g, 'o')
+          .replace(/Ç/g, 'c').replace(/ç/g, 'c');
+        let durumTyped: EkipmanStatus = 'Uygun';
+        const nd = normDurum(durumRaw);
+        if (nd.includes('degil') || nd.includes('değil') || nd.includes('uygun d')) durumTyped = 'Uygun Değil';
+        else if (nd.includes('bakim') || nd.includes('bakım')) durumTyped = 'Bakımda';
+        else if (nd.includes('hurda')) durumTyped = 'Hurda';
+        else if (nd.includes('uygun')) durumTyped = 'Uygun';
+
+        // Ekipman türü normalize et
+        const turRaw = getCell(row, 'tur');
+        const normTur = normDurum(turRaw); // aynı normalize fonksiyonu
+        const turMatch = EKIPMAN_TURLERI.find(t => normDurum(t) === normTur || normDurum(t).includes(normTur) || normTur.includes(normDurum(t)));
+        const turFinal = turMatch || (turRaw.trim() ? turRaw.trim() : '');
 
         addEkipman({
           ad,
-          tur: getCell(row, 'tur') || '',
+          tur: turFinal,
           firmaId: firma.id,
           bulunduguAlan: getCell(row, 'alan') || '',
           seriNo: getCell(row, 'seriNo') || '',

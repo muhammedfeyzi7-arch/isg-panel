@@ -295,13 +295,15 @@ export default function PersonellerPage() {
     const cellS = { font: { sz: 10, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB };
     const noteS = { font: { sz: 9, color: { rgb: '64748B' }, italic: true, name: 'Calibri' }, fill: { fgColor: { rgb: 'F8FAFC' } }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinB };
 
-    const example = ['Ahmet Yilmaz', '12345678901', '05551234567', 'ahmet@email.com', '15.05.1990', '01.01.2020', 'Operator', 'Uretim', 'Firma A.S.', 'Aktif', 'A+', 'Mehmet Yilmaz', '05301234567', 'Istanbul, Kadikoy'];
+    // Örnek satır: sistemdeki ilk aktif firmayı kullan, yoksa boş bırak
+    const ilkFirma = firmalar.find(f => !f.silinmis)?.ad ?? 'Sistemdeki Firma Adı';
+    const example = ['Ahmet Yılmaz', '12345678901', '05551234567', 'ahmet@email.com', '15.05.1990', '01.01.2020', 'Operatör', 'Üretim', ilkFirma, 'Aktif', 'A+', 'Mehmet Yılmaz', '05301234567', 'İstanbul, Kadıköy'];
     const notlar = [
       ['NOTLAR:', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-      ['1. Tarih formati: GG.AA.YYYY (ornek: 15.01.2025)', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-      ['2. Durum degerleri: Aktif / Pasif / Ayrildi', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-      ['3. Firma adi sistemdeki kayitla birebir eslesmelidir', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-      ['4. TC Kimlik No 11 haneli olmalidir', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['1. Tarih formatı: GG.AA.YYYY (örnek: 15.01.2025)', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['2. Durum değerleri: Aktif / Pasif / Ayrıldı', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['3. Firma adı sistemdeki kayıtla birebir eşleşmelidir', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['4. TC Kimlik No 11 haneli olmalıdır', '', '', '', '', '', '', '', '', '', '', '', '', ''],
     ];
 
     const wb = XLSXStyle.utils.book_new();
@@ -391,16 +393,37 @@ export default function PersonellerPage() {
       const findFirmaId = (raw: string): { id: string | null; hint: string } => {
         const softRaw = normalize(raw); const strictRaw = strictNorm(raw);
         if (!softRaw) return { id: null, hint: '' };
+
+        // 1. Birebir eşleşme (normalize edilmiş)
         const s1 = firmaMapSoft.get(softRaw); if (s1) return { id: s1, hint: '' };
+        // 2. Noktalama temizlenmiş eşleşme
         const s2 = firmaMapStrict.get(strictRaw); if (s2) return { id: s2, hint: '' };
+
+        // 3. Kısmi içerme eşleşmesi (her iki yönde)
         const partial = firmaNormList.find(f => f.strict.includes(strictRaw) || strictRaw.includes(f.strict));
         if (partial) return { id: partial.id, hint: `(Eşleşti: "${partial.ad}")` };
+
+        // 4. Token bazlı benzerlik skoru
         const inputTokens = tokenSet(strictRaw);
         if (inputTokens.size > 0) {
-          const scored = firmaNormList.map(f => { let matched = 0; inputTokens.forEach(t => { if (f.tokens.has(t)) matched++; }); const score = matched / Math.max(inputTokens.size, f.tokens.size, 1); return { ...f, score }; }).filter(f => f.score >= 0.4).sort((a, b) => b.score - a.score);
-          if (scored.length > 0 && scored[0].score >= 0.7) return { id: scored[0].id, hint: `(Eşleşti: "${scored[0].ad}")` };
+          const scored = firmaNormList.map(f => {
+            let matched = 0;
+            inputTokens.forEach(t => { if (f.tokens.has(t)) matched++; });
+            // Ters yön: firma tokenları input'ta var mı?
+            let reverseMatched = 0;
+            f.tokens.forEach(t => { if (inputTokens.has(t)) reverseMatched++; });
+            const score = Math.max(
+              matched / Math.max(inputTokens.size, 1),
+              reverseMatched / Math.max(f.tokens.size, 1),
+            );
+            return { ...f, score };
+          }).filter(f => f.score >= 0.3).sort((a, b) => b.score - a.score);
+          if (scored.length > 0 && scored[0].score >= 0.5) return { id: scored[0].id, hint: `(Eşleşti: "${scored[0].ad}")` };
         }
-        return { id: null, hint: `Sistemdeki firmalar: ${aktivFirmalar.slice(0, 5).map(f => `"${f.ad}"`).join(', ')}` };
+
+        // 5. Bulunamadı — sistemdeki firmaları göster
+        const firmaListesi = aktivFirmalar.slice(0, 5).map(f => `"${f.ad}"`).join(', ');
+        return { id: null, hint: `Sistemdeki firmalar: ${firmaListesi}` };
       };
 
       const durumMap: Record<string, 'Aktif' | 'Pasif' | 'Ayrıldı'> = { aktif: 'Aktif', active: 'Aktif', pasif: 'Pasif', inactive: 'Pasif', ayrildi: 'Ayrıldı', ayrilmis: 'Ayrıldı', left: 'Ayrıldı' };

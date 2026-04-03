@@ -72,11 +72,24 @@ export async function parseImportFile(file: File): Promise<ParseResult> {
           const r = row as unknown[];
           if (isEmptyRow(r)) return false;
 
-          // Şablon not satırları: ilk hücre "KULLANIM NOTLARI" veya rakamla başlayan açıklama satırları
+          // Şablon not satırları: ilk hücre çeşitli not/açıklama kalıplarıyla başlıyorsa atla
           const firstCell = String(r[0] ?? '').trim();
-          if (firstCell.toUpperCase().startsWith('KULLANIM')) return false;
-          if (/^\d+\.\s/.test(firstCell)) return false; // "1. Başlık alanı..." gibi not satırları
-          if (firstCell.toUpperCase().startsWith('ISG ')) return false; // Başlık satırı tekrarı
+          const firstUpper = firstCell.toUpperCase();
+
+          // "NOTLAR:", "NOT:", "KULLANIM NOTLARI" gibi başlıklar
+          if (firstUpper.startsWith('NOTLAR')) return false;
+          if (firstUpper.startsWith('NOT:')) return false;
+          if (firstUpper.startsWith('KULLANIM')) return false;
+          // "1. Tarih formatı..." gibi numaralı not satırları
+          if (/^\d+[\.\)]\s/.test(firstCell)) return false;
+          // "ISG ..." başlıklı satırlar
+          if (firstUpper.startsWith('ISG ')) return false;
+          // "AÇIKLAMA:", "UYARI:", "DİKKAT:" gibi uyarı satırları
+          if (firstUpper.startsWith('AÇIKLAMA') || firstUpper.startsWith('ACIKLAMA')) return false;
+          if (firstUpper.startsWith('UYARI') || firstUpper.startsWith('DİKKAT') || firstUpper.startsWith('DIKKAT')) return false;
+          // Tüm hücreler aynı değerdeyse (birleştirilmiş hücre satırı) ve uzun metin içeriyorsa atla
+          const nonEmpty = r.filter(c => String(c ?? '').trim() !== '');
+          if (nonEmpty.length === 1 && firstCell.length > 30 && !firstCell.includes('\t')) return false;
 
           return true;
         });

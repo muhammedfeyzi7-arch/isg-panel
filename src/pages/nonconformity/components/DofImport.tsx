@@ -126,31 +126,107 @@ export default function DofImport({ isOpen, onClose, onImport }: DofImportProps)
   const handleFile = async (file: File) => {
     setParseError('');
     try {
-      const { rows, validCount } = await parseImportFile(file);
+      // Dosyayı ham olarak oku — tüm satırları al
+      const rawBuffer = await file.arrayBuffer();
+      const wb = XLSXStyle.read(new Uint8Array(rawBuffer), { type: 'array', cellDates: false });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const allRows = XLSXStyle.utils.sheet_to_json<unknown[]>(ws, {
+        header: 1,
+        defval: '',
+        blankrows: false,
+      }) as string[][];
 
-      if (validCount === 0) {
+      if (allRows.length < 2) {
+        setParseError('Dosya boş veya yalnızca başlık içeriyor.');
+        return;
+      }
+
+      // Şablonda satır 1 = "ISG DOF..." başlığı, satır 2 = kolon başlıkları
+      // Kolon başlıklarının bulunduğu satırı bul (TEMPLATE_HEADERS ile eşleşen satır)
+      let headerRowIdx = 0;
+      for (let i = 0; i < Math.min(allRows.length, 5); i++) {
+        const row = allRows[i];
+        const firstCell = String(row[0] ?? '').trim();
+        // Kolon başlığı satırı: "Başlık" veya "Baslik" içeriyor
+        if (firstCell.toLowerCase().includes('başlık') || firstCell.toLowerCase().includes('baslik') || firstCell.includes('*')) {
+          headerRowIdx = i;
+          break;
+        }
+      }
+
+      // Veri satırları: header satırından sonraki satırlar
+      const dataRows = allRows.slice(headerRowIdx + 1);
+
+      // Boş satırları ve not satırlarını filtrele
+      const isNoteRow = (row: string[]) => {
+        const first = String(row[0] ?? '').trim();
+        const firstUpper = first.toUpperCase();
+        if (!first) return true; // boş
+        if (firstUpper.startsWith('KULLANIM') || firstUpper.startsWith('NOTLAR') || firstUpper.startsWith('NOT:')) return true;
+        if (/^\d+[\.\)]\s/.test(first)) return true; // "1. ..." numaralı notlar
+        if (row.every(c => String(c ?? '').trim() === '')) return true; // tamamen boş
+        return false;
+      };
+
+      const validDataRows = dataRows.filter(row => !isNoteRow(row));
+
+      if (validDataRows.length === 0) {
         setParseError('İçe aktarılacak veri satırı bulunamadı. Boş satırlar ve şablon notları otomatik atlandı.');
         return;
       }
 
-      const parsed: DofRow[] = rows.map(row => ({
-        baslik: row[0] ?? '',
-        aciklama: row[1] ?? '',
-        tarih: parseExcelDate(row[2]),
-        firmaAd: row[3] ?? '',
-        personelAd: row[4] ?? '',
-        severity: normalizeSeverity(row[5] ?? ''),
-        bolum: row[6] ?? '',
-        notlar: row[7] ?? '',
+      // Header bazlı kolon eşleştirme
+      const headerRow = allRows[headerRowIdx].map(h => String(h ?? '').trim().toLowerCase()
+        .replace(/İ/g, 'i').replace(/I/g, 'i').replace(/ı/g, 'i')
+        .replace(/Ğ/g, 'g').replace(/ğ/g, 'g')
+        .replace(/Ü/g, 'u').replace(/ü/g, 'u')
+        .replace(/Ş/g, 's').replace(/ş/g, 's')
+        .replace(/Ö/g, 'o').replace(/ö/g, 'o')
+        .replace(/Ç/g, 'c').replace(/ç/g, 'c')
+        .replace(/[*]/g, '').trim()
+      );
+
+      const findCol = (keywords: string[]) => {
+        for (const kw of keywords) {
+          const idx = headerRow.findIndex(h => h.includes(kw) || kw.includes(h));
+          if (idx >= 0) return idx;
+        }
+        return -1;
+      };
+
+      const colBaslik = findCol(['baslik', 'title', 'konu']);
+      const colAciklama = findCol(['aciklama', 'description', 'detay']);
+      const colTarih = findCol(['tarih', 'date']);
+      const colFirma = findCol(['firma', 'company', 'sirket']);
+      const colPersonel = findCol(['personel', 'kisi', 'person']);
+      const colSeverity = findCol(['onem', 'severity', 'oncelik', 'derece']);
+      const colBolum = findCol(['bolum', 'alan', 'department', 'section']);
+      const colNotlar = findCol(['notlar', 'not ', 'notes', 'aciklama2']);
+
+      const getCell = (row: string[], idx: number, fallback: number) => {
+        if (idx >= 0 && idx < row.length) return String(row[idx] ?? '').trim();
+        if (fallback >= 0 && fallback < row.length) return String(row[fallback] ?? '').trim();
+        return '';
+      };
+
+      const parsed: DofRow[] = validDataRows.map(row => ({
+        baslik: getCell(row, colBaslik, 0),
+        aciklama: getCell(row, colAciklama, 1),
+        tarih: parseExcelDate(getCell(row, colTarih, 2)),
+        firmaAd: getCell(row, colFirma, 3),
+        personelAd: getCell(row, colPersonel, 4),
+        severity: normalizeSeverity(getCell(row, colSeverity, 5)),
+        bolum: getCell(row, colBolum, 6),
+        notlar: getCell(row, colNotlar, 7),
       }));
 
-      const validRows = parsed.filter(r => r.baslik.trim() !== '');
-      if (validRows.length === 0) {
+      const finalRows = parsed.filter(r => r.baslik.trim() !== '');
+      if (finalRows.length === 0) {
         setParseError('Başlık alanı dolu satır bulunamadı. Lütfen şablonu kontrol edin.');
         return;
       }
 
-      setPreview(validRows);
+      setPreview(finalRows);
       setFileName(file.name);
       setStep('preview');
     } catch (err) {
