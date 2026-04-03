@@ -92,8 +92,12 @@ export default function TeamMembersSection() {
     if (!form.password || form.password.length < 8) { setFormError('Şifre en az 8 karakter olmalıdır.'); return; }
 
     setFormLoading(true);
+    console.log('[FRONTEND] Creating user:', form.email.trim().toLowerCase());
+    
     try {
       const authHeader = await getAuthHeader();
+      console.log('[FRONTEND] Got auth header');
+      
       const res = await fetch(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
@@ -106,17 +110,39 @@ export default function TeamMembersSection() {
           role: form.role,
         }),
       });
+      
+      console.log('[FRONTEND] Response status:', res.status);
+      
+      // Check HTTP status first
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[FRONTEND] HTTP error:', res.status, errorText);
+        setFormError(`Sunucu hatası (${res.status}): ${errorText}`);
+        return;
+      }
+      
       const json = await res.json();
+      console.log('[FRONTEND] Response JSON:', json);
+      
       if (json.error) {
+        console.error('[FRONTEND] Server returned error:', json.error);
         setFormError(json.error);
-      } else {
+      } else if (json.success === true && json.user_id) {
+        // Only show success if we have both success flag AND user_id
+        console.log('[FRONTEND] User created successfully with ID:', json.user_id);
         addToast(`${form.display_name} başarıyla eklendi.`, 'success');
         setShowAddModal(false);
         setForm(emptyForm);
         await fetchMembers();
+      } else {
+        // Response doesn't have proper success indicators
+        console.error('[FRONTEND] Invalid success response:', json);
+        setFormError('Kullanıcı oluşturuldu ancak yanıt geçersiz. Lütfen listeyi kontrol edin.');
+        await fetchMembers(); // Refresh list anyway
       }
-    } catch {
-      setFormError('Kullanıcı eklenirken hata oluştu.');
+    } catch (err) {
+      console.error('[FRONTEND] Exception during user creation:', err);
+      setFormError('Kullanıcı eklenirken hata oluştu: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
     } finally {
       setFormLoading(false);
     }

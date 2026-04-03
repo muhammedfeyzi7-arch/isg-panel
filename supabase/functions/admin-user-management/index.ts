@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { jwtVerify } from 'https://esm.sh/jose@5';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,24 +13,6 @@ function normalizeRole(role: string): string {
   return 'member';
 }
 
-async function verifyJWT(token: string): Promise<{ userId: string; email: string } | null> {
-  try {
-    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
-    if (!jwtSecret) {
-      console.error('SUPABASE_JWT_SECRET is not set - rejecting request for security');
-      return null;
-    }
-    const encoder = new TextEncoder();
-    const secretKey = encoder.encode(jwtSecret);
-    const { payload } = await jwtVerify(token, secretKey);
-    if (!payload.sub) return null;
-    return { userId: payload.sub as string, email: payload.email as string };
-  } catch (e) {
-    console.error('JWT verification failed:', e);
-    return null;
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -39,6 +20,7 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -49,15 +31,24 @@ Deno.serve(async (req) => {
   }
 
   const token = authHeader.replace('Bearer ', '');
-  const jwtData = await verifyJWT(token);
-  if (!jwtData) {
+
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  const { data: { user: callerUser }, error: authError } = await userClient.auth.getUser();
+
+  if (authError || !callerUser) {
+    console.error('[AUTH] Token verification failed:', authError?.message);
     return new Response(JSON.stringify({ error: 'Geçersiz token.' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  const { userId, email } = jwtData;
+  const userId = callerUser.id;
+  const email = callerUser.email ?? '';
 
   const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -166,6 +157,8 @@ Deno.serve(async (req) => {
 
   // ── CREATE USER ───────────────────────────────────────────────
   if (action === 'create') {
+    console.log('[CREATE USER] Started');
+    
     const { email: newEmail, password, display_name, role } = body as {
       email: string;
       password: string;
@@ -174,6 +167,7 @@ Deno.serve(async (req) => {
     };
 
     if (!newEmail || !password || !display_name) {
+      console.log('[CREATE USER] Validation failed: missing fields');
       return new Response(
         JSON.stringify({ error: 'E-posta, şifre ve ad soyad zorunludur.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -181,6 +175,7 @@ Deno.serve(async (req) => {
     }
 
     if (password.length < 8) {
+      console.log('[CREATE USER] Validation failed: password too short');
       return new Response(
         JSON.stringify({ error: 'Şifre en az 8 karakter olmalıdır.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -188,45 +183,94 @@ Deno.serve(async (req) => {
     }
 
     const normalizedEmail = newEmail.toLowerCase().trim();
-    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+    console.log('[CREATE USER] Email normalized:', normalizedEmail);
+
+    // Check existing auth user
+    console.log('[CREATE USER] Checking existing auth users...');
+    const { data: existingUsers, error: listError } = await adminClient.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error('[CREATE USER] Error listing users:', listError);
+      return new Response(
+        JSON.stringify({ error: 'Kullanıcı listesi alınamadı: ' + listError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    
     const existingAuthUser = existingUsers?.users?.find((u) => u.email === normalizedEmail);
+    console.log('[CREATE USER] Existing auth user found:', existingAuthUser ? 'YES' : 'NO');
 
     let newUserId: string;
 
     if (existingAuthUser) {
-      const { data: alreadyMember } = await adminClient
+      console.log('[CREATE USER] Checking if already member of org:', orgId);
+      const { data: alreadyMember, error: checkError } = await adminClient
         .from('user_organizations')
         .select('id')
         .eq('user_id', existingAuthUser.id)
         .eq('organization_id', orgId)
         .maybeSingle();
 
+      if (checkError) {
+        console.error('[CREATE USER] Error checking membership:', checkError);
+      }
+
       if (alreadyMember) {
+        console.log('[CREATE USER] User already member of organization');
         return new Response(
           JSON.stringify({ error: 'Bu e-posta zaten organizasyonunuzda kayıtlı.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
       newUserId = existingAuthUser.id;
+      console.log('[CREATE USER] Using existing user ID:', newUserId);
     } else {
+      console.log('[CREATE USER] Creating new auth user...');
+      
+      // admin_created flag prevents trigger from creating unnecessary company
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email: normalizedEmail,
         password,
         email_confirm: true,
-        user_metadata: { full_name: display_name },
+        user_metadata: { 
+          full_name: display_name,
+          admin_created: true,
+          organization_id: orgId,
+        },
       });
 
-      if (createError || !newUser?.user) {
-        const errMsg = createError?.message ?? 'Kullanıcı oluşturulamadı.';
-        return new Response(JSON.stringify({ error: errMsg }), {
+      if (createError) {
+        console.error('[CREATE USER] Auth creation error:', createError.message, createError);
+        
+        // Provide more specific error messages
+        let errorMsg = 'Kullanıcı oluşturulamadı: ' + createError.message;
+        if (createError.message.includes('Database error')) {
+          errorMsg = 'Veritabanı hatası: Kullanıcı kaydı oluşturulamadı. Lütfen tekrar deneyin.';
+        } else if (createError.message.includes('already registered') || createError.message.includes('already exists')) {
+          errorMsg = 'Bu e-posta adresi zaten kayıtlı.';
+        }
+        
+        return new Response(JSON.stringify({ error: errorMsg }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      
+      if (!newUser?.user) {
+        console.error('[CREATE USER] Auth creation returned no user');
+        return new Response(JSON.stringify({ error: 'Kullanıcı oluşturulamadı: Auth servisi yanıt vermedi.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       newUserId = newUser.user.id;
+      console.log('[CREATE USER] New auth user created with ID:', newUserId);
     }
 
-    const { error: memberError } = await adminClient.from('user_organizations').insert({
+    // Insert to user_organizations
+    console.log('[CREATE USER] Inserting to user_organizations...');
+    const memberData = {
       user_id: newUserId,
       organization_id: orgId,
       role: normalizeRole(role),
@@ -234,13 +278,39 @@ Deno.serve(async (req) => {
       email: normalizedEmail,
       is_active: true,
       must_change_password: true,
-    });
+    };
+
+    const { data: insertData, error: memberError } = await adminClient
+      .from('user_organizations')
+      .insert(memberData)
+      .select()
+      .single();
 
     if (memberError) {
-      return new Response(JSON.stringify({ error: memberError.message }), {
+      console.error('[CREATE USER] DB insert error:', memberError);
+      return new Response(JSON.stringify({ 
+        error: 'Kullanıcı veritabanına eklenemedi: ' + memberError.message,
+        details: memberError.details,
+        code: memberError.code
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    console.log('[CREATE USER] DB insert successful:', insertData);
+
+    // Also upsert to profiles table (ignore errors - profiles schema may differ)
+    try {
+      await adminClient
+        .from('profiles')
+        .upsert({
+          id: newUserId,
+          user_id: newUserId,
+          role: normalizeRole(role),
+        }, { onConflict: 'id', ignoreDuplicates: true });
+    } catch (profileErr) {
+      console.warn('[CREATE USER] Profile upsert skipped:', profileErr);
     }
 
     const roleLabel = role === 'admin' ? 'Admin' : role === 'denetci' ? 'Denetçi' : 'Kullanıcı';
@@ -252,7 +322,12 @@ Deno.serve(async (req) => {
       `${display_name} (${normalizedEmail}) kullanıcısı ${roleLabel} rolüyle oluşturuldu.`,
     );
 
-    return new Response(JSON.stringify({ success: true, user_id: newUserId }), {
+    console.log('[CREATE USER] Completed successfully');
+    return new Response(JSON.stringify({ 
+      success: true, 
+      user_id: newUserId,
+      message: 'Kullanıcı başarıyla oluşturuldu'
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
