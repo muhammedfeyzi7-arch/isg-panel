@@ -15,7 +15,11 @@ export default function UygunsuzluklarPage() {
     uygunsuzluklar, firmalar, personeller,
     deleteUygunsuzluk, addUygunsuzluk, addToast, quickCreate, setQuickCreate,
   } = useApp();
-  const { canEdit, canCreate, canDelete, isReadOnly } = usePermissions();
+  const { canEdit, canCreate, canDelete, isReadOnly, role } = usePermissions();
+
+  // Denetçi uygunsuzluk açabilir ve kapatabilir — sadece düzenleme/silme yapamaz
+  const canCreateNonconformity = canCreate || role === 'denetci';
+  const canCloseNonconformity = canEdit || role === 'denetci';
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -126,14 +130,14 @@ export default function UygunsuzluklarPage() {
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           {isReadOnly && (
             <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'rgba(6,182,212,0.1)', color: '#06B6D4', border: '1px solid rgba(6,182,212,0.25)' }}>
-              <i className="ri-search-eye-line" /> Denetçi — Salt Okunur
+              <i className="ri-search-eye-line" /> Denetçi — Saha Modu
             </span>
           )}
           <button onClick={() => setShowReport(true)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-chart-line mr-1" />DÖF Raporu
           </button>
           {canCreate && <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap"><i className="ri-file-excel-2-line mr-1" />Excel İçe Aktar</button>}
-          {canCreate && <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap"><i className="ri-add-line mr-1" />Yeni Kayıt</button>}
+          {canCreateNonconformity && <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap"><i className="ri-add-line mr-1" />Yeni Kayıt</button>}
         </div>
       </div>
 
@@ -270,11 +274,11 @@ export default function UygunsuzluklarPage() {
                       <td>
                         <div className="flex items-center gap-1 justify-end">
                           <button onClick={() => setDetailRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }} title="Detay"><i className="ri-eye-line text-xs" /></button>
-                          {u.durum !== 'Kapandı' && (
+                          {u.durum !== 'Kapandı' && canCloseNonconformity && (
                             <button onClick={() => setKapatmaRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }} title="Kapatma Yap"><i className="ri-checkbox-circle-line text-xs" /></button>
                           )}
-                          <button onClick={() => openEdit(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Düzenle"><i className="ri-edit-line text-xs" /></button>
-                          <button onClick={() => setDeleteId(u.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil"><i className="ri-delete-bin-line text-xs" /></button>
+                          {canEdit && <button onClick={() => openEdit(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Düzenle"><i className="ri-edit-line text-xs" /></button>}
+                          {canDelete && <button onClick={() => setDeleteId(u.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil"><i className="ri-delete-bin-line text-xs" /></button>}
                         </div>
                       </td>
                     </tr>

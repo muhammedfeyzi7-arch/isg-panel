@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../store/AppContext';
+import { usePermissions } from '../../../hooks/usePermissions';
 import Modal from '../../../components/base/Modal';
 import Badge, { getPersonelStatusColor, getEvrakStatusColor } from '../../../components/base/Badge';
 import CategorizedEvraklar from './CategorizedEvraklar';
@@ -71,6 +72,7 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
   const {
     personeller, firmalar, evraklar, egitimler, muayeneler, uygunsuzluklar, getPersonelFoto,
   } = useApp();
+  const { canViewSensitiveData } = usePermissions();
   const navigate = useNavigate();
 
   const [tab, setTab] = useState('bilgiler');
@@ -218,20 +220,30 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
           {/* ── Bilgiler ── */}
           {tab === 'bilgiler' && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <IR label="TC Kimlik"   value={personel.tc} />
-              <IR label="Telefon"     value={personel.telefon} />
-              <IR label="E-posta"     value={personel.email} />
+              {canViewSensitiveData && <IR label="TC Kimlik" value={personel.tc} />}
+              {canViewSensitiveData && <IR label="Telefon" value={personel.telefon} />}
+              {canViewSensitiveData && <IR label="E-posta" value={personel.email} />}
               <IR label="Doğum Tarihi"
                 value={personel.dogumTarihi ? new Date(personel.dogumTarihi).toLocaleDateString('tr-TR') : '—'} />
               <IR label="İşe Giriş"
                 value={personel.iseGirisTarihi ? new Date(personel.iseGirisTarihi).toLocaleDateString('tr-TR') : '—'} />
-              <IR label="Görev"       value={personel.gorev} />
-              <IR label="Departman"   value={personel.departman} />
-              <IR label="Acil Kişi"   value={personel.acilKisi} />
-              <IR label="Acil Telefon" value={personel.acilTelefon} />
-              <div className="col-span-2">
-                <IR label="Adres" value={personel.adres} />
-              </div>
+              <IR label="Görev" value={personel.gorev} />
+              <IR label="Departman" value={personel.departman} />
+              {canViewSensitiveData && <IR label="Acil Kişi" value={personel.acilKisi} />}
+              {canViewSensitiveData && <IR label="Acil Telefon" value={personel.acilTelefon} />}
+              {canViewSensitiveData && (
+                <div className="col-span-2">
+                  <IR label="Adres" value={personel.adres} />
+                </div>
+              )}
+              {!canViewSensitiveData && (
+                <div className="col-span-2 md:col-span-3">
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.15)' }}>
+                    <i className="ri-shield-keyhole-line text-xs flex-shrink-0" style={{ color: '#06B6D4' }} />
+                    <p className="text-[11px]" style={{ color: '#06B6D4' }}>TC, iletişim ve adres bilgileri denetçi rolünde gizlidir.</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

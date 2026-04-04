@@ -9,16 +9,17 @@ const ROLE_MODULES: Record<string, string[]> = {
     'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
     'raporlar', 'copkutusu', 'ayarlar',
   ],
+  // Denetçi (sahacı): sadece temel modüller + uygunsuzluk
   denetci: [
     'dashboard', 'firmalar', 'personeller',
-    'firma-evraklari', 'uygunsuzluklar', 'tutanaklar', 'is-izinleri', 'raporlar',
-    'ayarlar',
+    'ekipmanlar', 'uygunsuzluklar',
   ],
+  // Member (evrakçı): ayarlar hariç her şey
   member: [
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
     'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
-    'raporlar', 'copkutusu', 'ayarlar',
+    'raporlar', 'copkutusu',
   ],
 };
 

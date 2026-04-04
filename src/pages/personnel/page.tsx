@@ -95,7 +95,7 @@ interface ImportResult {
 
 export default function PersonellerPage() {
   const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto } = useApp();
-  const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
+  const { canCreate, canEdit, canDelete, isReadOnly, canViewSensitiveData } = usePermissions();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -663,7 +663,7 @@ export default function PersonellerPage() {
                   <th className="text-left">Personel</th>
                   <th className="text-left hidden md:table-cell">Firma</th>
                   <th className="text-left hidden lg:table-cell">Görev / Departman</th>
-                  <th className="text-left hidden lg:table-cell">İletişim</th>
+                  {canViewSensitiveData && <th className="text-left hidden lg:table-cell">İletişim</th>}
                   <th className="text-left">Durum</th>
                   <th className="w-28 text-right">İşlemler</th>
                 </tr>
@@ -678,7 +678,10 @@ export default function PersonellerPage() {
                           <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="sm" />
                           <div>
                             <button onClick={() => setDetailId(p.id)} className="text-[12.5px] font-semibold hover:text-blue-400 transition-colors cursor-pointer block text-left" style={{ color: 'var(--text-primary)' }}>{p.adSoyad}</button>
-                            <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.tc || 'TC yok'}</p>
+                            {canViewSensitiveData
+                              ? <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.tc || 'TC yok'}</p>
+                              : <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>—</p>
+                            }
                           </div>
                         </div>
                       </td>
@@ -687,7 +690,9 @@ export default function PersonellerPage() {
                         <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.gorev || '—'}</p>
                         <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{p.departman || ''}</p>
                       </td>
-                      <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.telefon || '—'}</p></td>
+                      {canViewSensitiveData && (
+                        <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.telefon || '—'}</p></td>
+                      )}
                       <td><Badge label={p.durum} color={getPersonelStatusColor(p.durum)} /></td>
                       <td>
                         <div className="flex items-center gap-1 justify-end">

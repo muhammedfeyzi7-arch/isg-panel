@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import Modal from '../../components/base/Modal';
 import QrModal from './components/QrModal';
 import type { Ekipman, EkipmanStatus } from '../../types';
@@ -346,6 +347,7 @@ function getDaysUntil(dateStr: string): number {
 
 export default function EkipmanlarPage() {
   const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, addToast, quickCreate, setQuickCreate, org } = useApp();
+  const { canCreate, canEdit, canDelete } = usePermissions();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -774,13 +776,17 @@ export default function EkipmanlarPage() {
           <button onClick={() => exportEkipmanToExcel(ekipmanlar, firmalar)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
           </button>
-          <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
-            <i className="ri-upload-2-line mr-1" />Excel İçe Aktar
-          </button>
-          <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
-            <i className="ri-add-line text-base" />
-            Ekipman Ekle
-          </button>
+          {canCreate && (
+            <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
+              <i className="ri-upload-2-line mr-1" />Excel İçe Aktar
+            </button>
+          )}
+          {canCreate && (
+            <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
+              <i className="ri-add-line text-base" />
+              Ekipman Ekle
+            </button>
+          )}
         </div>
       </div>
 
@@ -945,8 +951,12 @@ export default function EkipmanlarPage() {
                             <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Belgeyi İndir"><i className="ri-download-2-line text-sm" /></button>
                           )}
                           <button onClick={() => setQrEkipman(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(168,85,247,0.1)', color: '#A855F7' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.1)'; }} title="QR Kod"><i className="ri-qr-code-line text-sm" /></button>
-                          <button onClick={() => openEdit(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>
-                          <button onClick={() => setDeleteId(ekipman.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>
+                          {canEdit && (
+                            <button onClick={() => openEdit(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => setDeleteId(ekipman.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>
+                          )}
                         </div>
                       </td>
                     </tr>
