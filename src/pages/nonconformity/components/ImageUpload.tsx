@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useApp } from '@/store/AppContext';
+import { uploadFileToStorage, getSignedUrlFromPath } from '@/utils/fileUpload';
 
 interface Props {
   label: string;
   value?: string | null;
-  onChange: (publicUrl: string | null) => void;
+  onChange: (filePath: string | null) => void;
   accept?: string;
   disabled?: boolean;
   /** Storage path prefix, e.g. "dof" or "kapatma" */
@@ -22,25 +22,30 @@ export default function ImageUpload({
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const { org } = useApp();
+
+  // value değişince signed URL üret (preview için)
+  const resolvePreview = async (path: string | null | undefined) => {
+    if (!path) { setPreviewUrl(null); return; }
+    // base64 ise direkt kullan
+    if (path.startsWith('data:')) { setPreviewUrl(path); return; }
+    // Zaten tam URL ise (eski kayıtlar) direkt kullan
+    if (path.startsWith('http')) { setPreviewUrl(path); return; }
+    // filePath → signed URL
+    const url = await getSignedUrlFromPath(path);
+    setPreviewUrl(url);
+  };
+
+  // value prop değişince preview güncelle
+  useState(() => { void resolvePreview(value); });
 
   const uploadToStorage = async (file: File): Promise<string | null> => {
     try {
-      const ext = file.name.split('.').pop() ?? 'jpg';
       const orgId = org?.id ?? 'unknown';
-      const filePath = `${pathPrefix}/${orgId}/${crypto.randomUUID()}.${ext}`;
-
-      const { error } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, file, { upsert: false, contentType: file.type });
-
-      if (error) {
-        console.error('[ImageUpload] Storage upload error:', error);
-        return null;
-      }
-
-      const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
-      return data?.publicUrl ?? null;
+      // uploadFileToStorage → filePath döner (DB'ye kaydedilir)
+      const filePath = await uploadFileToStorage(file, orgId, pathPrefix, crypto.randomUUID());
+      return filePath;
     } catch (err) {
       console.error('[ImageUpload] upload error:', err);
       return null;
@@ -54,17 +59,30 @@ export default function ImageUpload({
       return;
     }
     setLoading(true);
+    // Önce local preview göster
+    const reader = new FileReader();
+    reader.onload = (e) => { if (e.target?.result) setPreviewUrl(e.target.result as string); };
+    reader.readAsDataURL(file);
+
     try {
-      const url = await uploadToStorage(file);
-      if (url) {
-        onChange(url);
+      const filePath = await uploadToStorage(file);
+      if (filePath) {
+        // filePath'i parent'a ilet (DB'ye kaydedilecek)
+        onChange(filePath);
+        // Signed URL ile preview güncelle
+        const signedUrl = await getSignedUrlFromPath(filePath);
+        if (signedUrl) setPreviewUrl(signedUrl);
       } else {
         // Fallback: base64 olarak sakla (offline/hata durumu)
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) onChange(e.target.result as string);
+        const r = new FileReader();
+        r.onload = (e) => {
+          if (e.target?.result) {
+            const b64 = e.target.result as string;
+            onChange(b64);
+            setPreviewUrl(b64);
+          }
         };
-        reader.readAsDataURL(file);
+        r.readAsDataURL(file);
       }
     } finally {
       setLoading(false);
@@ -75,18 +93,17 @@ export default function ImageUpload({
     e.preventDefault();
     if (disabled) return;
     const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
+    if (file) void handleFile(file);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleFile(file);
+    if (file) void handleFile(file);
     e.target.value = '';
   };
 
-  const isUrl = value && (value.startsWith('http://') || value.startsWith('https://'));
-  const isBase64 = value && value.startsWith('data:');
-  const hasImage = isUrl || isBase64;
+  const hasImage = !!previewUrl;
+  const isStoragePath = value && !value.startsWith('data:') && !value.startsWith('http');
 
   return (
     <div className="space-y-2">
@@ -107,7 +124,7 @@ export default function ImageUpload({
       ) : hasImage ? (
         <div className="relative rounded-xl overflow-hidden" style={{ border: '1px solid rgba(34,197,94,0.3)' }}>
           <img
-            src={value!}
+            src={previewUrl!}
             alt={label}
             className="w-full object-cover"
             style={{ maxHeight: '220px', objectFit: 'contain', background: '#0F172A' }}
@@ -116,7 +133,7 @@ export default function ImageUpload({
           {!disabled && (
             <button
               type="button"
-              onClick={() => onChange(null)}
+              onClick={() => { onChange(null); setPreviewUrl(null); }}
               className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full cursor-pointer transition-all"
               style={{ background: 'rgba(239,68,68,0.9)', color: '#fff' }}
             >
@@ -128,7 +145,7 @@ export default function ImageUpload({
             style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}
           >
             <i className="ri-cloud-line" />
-            {isUrl ? 'Fotoğraf buluta kaydedildi — tüm cihazlarda görünür' : 'Fotoğraf seçildi (yerel)'}
+            {isStoragePath ? 'Fotoğraf buluta kaydedildi — tüm cihazlarda görünür' : 'Fotoğraf seçildi'}
           </div>
         </div>
       ) : (

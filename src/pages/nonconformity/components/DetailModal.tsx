@@ -3,6 +3,7 @@ import Modal from '../../../components/base/Modal';
 import { useApp } from '../../../store/AppContext';
 import type { Uygunsuzluk } from '../../../types';
 import { STATUS_CONFIG, SEV_CONFIG } from '../utils/statusHelper';
+import { useSignedUrl } from '../../../hooks/useSignedUrl';
 
 interface Props {
   record: Uygunsuzluk | null;
@@ -14,9 +15,13 @@ interface Props {
 export default function DetailModal({ record, onClose, onKapat, onEdit }: Props) {
   const { firmalar, personeller, getUygunsuzlukPhoto } = useApp();
 
-  // Fotoğrafları doğrudan record'dan al (Storage URL öncelikli, localStorage fallback)
-  const acilisFoto = record ? (getUygunsuzlukPhoto(record.id, 'acilis') ?? null) : null;
-  const kapatmaFoto = record ? (getUygunsuzlukPhoto(record.id, 'kapatma') ?? null) : null;
+  // Ham path/URL'leri al
+  const acilisRaw = record ? (getUygunsuzlukPhoto(record.id, 'acilis') ?? null) : null;
+  const kapatmaRaw = record ? (getUygunsuzlukPhoto(record.id, 'kapatma') ?? null) : null;
+
+  // Signed URL'e çevir (filePath ise) — base64 ve tam URL'ler de desteklenir
+  const acilisFoto = useSignedUrl(acilisRaw);
+  const kapatmaFoto = useSignedUrl(kapatmaRaw);
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   useEffect(() => {}, [record]);

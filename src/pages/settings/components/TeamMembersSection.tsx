@@ -23,6 +23,12 @@ interface AddUserForm {
   role: string;
 }
 
+interface FetchOptions {
+  method: string;
+  headers: Record<string, string>;
+  body: string;
+}
+
 const emptyForm: AddUserForm = { display_name: '', email: '', password: '', role: 'member' };
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; gradient: string }> = {
@@ -45,7 +51,6 @@ export default function TeamMembersSection() {
   const [showPassword, setShowPassword] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Member | null>(null);
-  // Password reset modal
   const [resetTarget, setResetTarget] = useState<Member | null>(null);
   const [resetPassword, setResetPassword] = useState('');
   const [resetShowPassword, setResetShowPassword] = useState(false);
@@ -53,26 +58,87 @@ export default function TeamMembersSection() {
   const [resetError, setResetError] = useState<string | null>(null);
 
   const getAuthHeader = useCallback(async (): Promise<string> => {
-    // First try to refresh the session to get a fresh token
-    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-    if (!refreshError && refreshData.session?.access_token) {
-      return `Bearer ${refreshData.session.access_token}`;
+    // Önce mevcut session'ı al
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentToken = sessionData.session?.access_token;
+
+    if (currentToken) {
+      // Token var, expire kontrolü yap
+      const payload = currentToken.split('.')[1];
+      if (payload) {
+        try {
+          const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+          const exp = decoded.exp as number;
+          const now = Math.floor(Date.now() / 1000);
+          // 60 saniyeden fazla süresi varsa direkt kullan
+          if (exp && exp - now > 60) {
+            return `Bearer ${currentToken}`;
+          }
+        } catch {
+          // decode başarısız, refresh dene
+        }
+      }
     }
-    // Fallback to current session
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token ?? '';
-    if (!token) {
-      console.error('[AUTH] No access token available - user may need to re-login');
+
+    // Token yok veya expire yakın, refresh dene
+    try {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (!refreshError && refreshData.session?.access_token) {
+        return `Bearer ${refreshData.session.access_token}`;
+      }
+    } catch {
+      // ignore
     }
-    return `Bearer ${token}`;
+
+    // Son çare: mevcut token'ı kullan
+    if (currentToken) return `Bearer ${currentToken}`;
+    throw new Error('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
   }, []);
+
+  // Fetch with 30s timeout + auto-retry on network errors
+  const fetchWithRetry = useCallback(async (
+    url: string,
+    options: FetchOptions,
+    retries = 2,
+  ): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return res;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      const isNetwork = err instanceof Error && (
+        err.message.includes('Failed to fetch') ||
+        err.message.includes('NetworkError') ||
+        err.message.includes('network')
+      );
+
+      if ((isAbort || isNetwork) && retries > 0) {
+        await new Promise(r => setTimeout(r, 1000));
+        const freshHeader = await getAuthHeader();
+        return fetchWithRetry(
+          url,
+          { ...options, headers: { ...options.headers, Authorization: freshHeader } },
+          retries - 1,
+        );
+      }
+
+      if (isAbort) throw new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.');
+      if (isNetwork) throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+      throw err;
+    }
+  }, [getAuthHeader]);
 
   const fetchMembers = useCallback(async () => {
     if (!org?.id) return;
     setListLoading(true);
     try {
       const authHeader = await getAuthHeader();
-      const res = await fetch(EDGE_URL, {
+      const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({ action: 'list', organization_id: org.id }),
@@ -83,12 +149,12 @@ export default function TeamMembersSection() {
       } else if (json.members) {
         setMembers(json.members);
       }
-    } catch {
-      addToast('Üye listesi yüklenemedi.', 'error');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Üye listesi yüklenemedi.', 'error');
     } finally {
       setListLoading(false);
     }
-  }, [org?.id, getAuthHeader, addToast]);
+  }, [org?.id, getAuthHeader, fetchWithRetry, addToast]);
 
   useEffect(() => {
     if (org?.role === 'admin') {
@@ -103,13 +169,9 @@ export default function TeamMembersSection() {
     if (!form.password || form.password.length < 8) { setFormError('Şifre en az 8 karakter olmalıdır.'); return; }
 
     setFormLoading(true);
-    console.log('[FRONTEND] Creating user:', form.email.trim().toLowerCase());
-    
     try {
       const authHeader = await getAuthHeader();
-      console.log('[FRONTEND] Got auth header');
-      
-      const res = await fetch(EDGE_URL, {
+      const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
@@ -121,39 +183,34 @@ export default function TeamMembersSection() {
           role: form.role,
         }),
       });
-      
-      console.log('[FRONTEND] Response status:', res.status);
-      
-      // Check HTTP status first
+
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error('[FRONTEND] HTTP error:', res.status, errorText);
-        setFormError(`Sunucu hatası (${res.status}): ${errorText}`);
+        let errorMsg = `Sunucu hatası (${res.status})`;
+        try {
+          const errJson = await res.json();
+          errorMsg = errJson.error || errorMsg;
+        } catch {
+          const errText = await res.text().catch(() => '');
+          if (errText) errorMsg = errText;
+        }
+        setFormError(errorMsg);
         return;
       }
-      
+
       const json = await res.json();
-      console.log('[FRONTEND] Response JSON:', json);
-      
       if (json.error) {
-        console.error('[FRONTEND] Server returned error:', json.error);
         setFormError(json.error);
       } else if (json.success === true && json.user_id) {
-        // Only show success if we have both success flag AND user_id
-        console.log('[FRONTEND] User created successfully with ID:', json.user_id);
         addToast(`${form.display_name} başarıyla eklendi.`, 'success');
         setShowAddModal(false);
         setForm(emptyForm);
         await fetchMembers();
       } else {
-        // Response doesn't have proper success indicators
-        console.error('[FRONTEND] Invalid success response:', json);
-        setFormError('Kullanıcı oluşturuldu ancak yanıt geçersiz. Lütfen listeyi kontrol edin.');
-        await fetchMembers(); // Refresh list anyway
+        setFormError('Beklenmeyen yanıt. Lütfen listeyi kontrol edin.');
+        await fetchMembers();
       }
     } catch (err) {
-      console.error('[FRONTEND] Exception during user creation:', err);
-      setFormError('Kullanıcı eklenirken hata oluştu: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
+      setFormError(err instanceof Error ? err.message : 'Bilinmeyen hata oluştu.');
     } finally {
       setFormLoading(false);
     }
@@ -163,7 +220,7 @@ export default function TeamMembersSection() {
     setActionLoading(member.user_id);
     try {
       const authHeader = await getAuthHeader();
-      const res = await fetch(EDGE_URL, {
+      const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
@@ -185,8 +242,8 @@ export default function TeamMembersSection() {
         );
         await fetchMembers();
       }
-    } catch {
-      addToast('Güncelleme sırasında hata oluştu.', 'error');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Güncelleme sırasında hata oluştu.', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -196,7 +253,7 @@ export default function TeamMembersSection() {
     setActionLoading(member.user_id + '_role');
     try {
       const authHeader = await getAuthHeader();
-      const res = await fetch(EDGE_URL, {
+      const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
@@ -214,8 +271,8 @@ export default function TeamMembersSection() {
         addToast(`Rol ${roleLabel} olarak güncellendi.`, 'success');
         await fetchMembers();
       }
-    } catch {
-      addToast('Rol güncellenirken hata oluştu.', 'error');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Rol güncellenirken hata oluştu.', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -226,7 +283,7 @@ export default function TeamMembersSection() {
     setActionLoading(deleteConfirm.user_id + '_delete');
     try {
       const authHeader = await getAuthHeader();
-      const res = await fetch(EDGE_URL, {
+      const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
@@ -243,8 +300,8 @@ export default function TeamMembersSection() {
         setDeleteConfirm(null);
         await fetchMembers();
       }
-    } catch {
-      addToast('Silme işlemi sırasında hata oluştu.', 'error');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Silme işlemi sırasında hata oluştu.', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -260,7 +317,7 @@ export default function TeamMembersSection() {
     setResetLoading(true);
     try {
       const authHeader = await getAuthHeader();
-      const res = await fetch(EDGE_URL, {
+      const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
@@ -279,8 +336,8 @@ export default function TeamMembersSection() {
         setResetPassword('');
         await fetchMembers();
       }
-    } catch {
-      setResetError('Şifre sıfırlanırken hata oluştu.');
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : 'Şifre sıfırlanırken hata oluştu.');
     } finally {
       setResetLoading(false);
     }
@@ -398,7 +455,6 @@ export default function TeamMembersSection() {
                     opacity: member.is_active ? 1 : 0.6,
                   }}
                 >
-                  {/* Avatar */}
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
                     style={{ background: roleConf.gradient }}
@@ -406,14 +462,12 @@ export default function TeamMembersSection() {
                     {(member.display_name || member.email || '?').charAt(0).toUpperCase()}
                   </div>
 
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold truncate" style={{ color: nameColor }}>
                         {member.display_name || member.email}
                         {isMe && <span className="ml-1 text-xs font-normal" style={{ color: '#6366F1' }}>(siz)</span>}
                       </p>
-                      {/* Role badge */}
                       <span
                         className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                         style={{ background: roleConf.bg, color: roleConf.color }}
@@ -444,10 +498,8 @@ export default function TeamMembersSection() {
                     </p>
                   </div>
 
-                  {/* Actions */}
                   {!isMe && (
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {/* Role selector */}
                       <select
                         value={member.role}
                         onChange={e => handleChangeRole(member, e.target.value)}
@@ -465,21 +517,15 @@ export default function TeamMembersSection() {
                         <option value="member">Kullanıcı</option>
                       </select>
 
-                      {/* Reset password button */}
                       <button
                         onClick={() => { setResetTarget(member); setResetPassword(''); setResetError(null); setResetShowPassword(false); }}
                         title="Şifreyi Sıfırla"
                         className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
-                        style={{
-                          background: 'rgba(245,158,11,0.08)',
-                          border: '1px solid rgba(245,158,11,0.2)',
-                          color: '#F59E0B',
-                        }}
+                        style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}
                       >
                         <i className="ri-lock-password-line text-xs" />
                       </button>
 
-                      {/* Active/Passive toggle */}
                       <button
                         onClick={() => handleToggleActive(member)}
                         disabled={actionLoading === member.user_id}
@@ -499,7 +545,6 @@ export default function TeamMembersSection() {
                         {member.is_active ? 'Pasif' : 'Aktif'}
                       </button>
 
-                      {/* Delete button */}
                       <button
                         onClick={() => setDeleteConfirm(member)}
                         disabled={isDeleting}
@@ -526,7 +571,6 @@ export default function TeamMembersSection() {
           </div>
         )}
 
-        {/* Info note */}
         <div
           className="flex items-start gap-2 px-3 py-2.5 rounded-lg"
           style={{
@@ -589,7 +633,6 @@ export default function TeamMembersSection() {
                   style={inputStyle}
                 />
               </div>
-
               <div>
                 <label style={labelStyle}>E-posta *</label>
                 <input
@@ -600,7 +643,6 @@ export default function TeamMembersSection() {
                   style={inputStyle}
                 />
               </div>
-
               <div>
                 <label style={labelStyle}>Geçici Şifre *</label>
                 <div className="relative">
@@ -624,7 +666,6 @@ export default function TeamMembersSection() {
                   Kullanıcı ilk girişte şifresini değiştirmek zorundadır.
                 </p>
               </div>
-
               <div>
                 <label style={labelStyle}>Rol</label>
                 <select
@@ -639,26 +680,23 @@ export default function TeamMembersSection() {
               </div>
             </div>
 
-            {/* Org info */}
             <div
               className="flex items-center gap-3 p-3 rounded-xl"
               style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
             >
               <i className="ri-building-2-line text-sm" style={{ color: '#6366F1' }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs" style={{ color: '#818CF8' }}>
-                  <strong>{org.name}</strong> organizasyonuna otomatik olarak eklenecek
-                </p>
-              </div>
+              <p className="text-xs flex-1 min-w-0" style={{ color: '#818CF8' }}>
+                <strong>{org.name}</strong> organizasyonuna otomatik olarak eklenecek
+              </p>
             </div>
 
             {formError && (
               <div
-                className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
+                className="flex items-start gap-2 px-4 py-3 rounded-xl text-sm"
                 style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#F87171' }}
               >
-                <i className="ri-error-warning-line flex-shrink-0" />
-                {formError}
+                <i className="ri-error-warning-line flex-shrink-0 mt-0.5" />
+                <span>{formError}</span>
               </div>
             )}
 
@@ -716,17 +754,12 @@ export default function TeamMembersSection() {
                 <p className="text-xs mt-0.5" style={{ color: subColor }}>{resetTarget.display_name || resetTarget.email}</p>
               </div>
             </div>
-
-            <div
-              className="flex items-start gap-2 px-3 py-2.5 rounded-lg"
-              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}
-            >
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
               <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
               <p className="text-xs leading-relaxed" style={{ color: '#F59E0B' }}>
                 Kullanıcı bir sonraki girişinde bu geçici şifreyle giriş yapacak ve yeni şifre belirlemeye zorlanacak.
               </p>
             </div>
-
             <div>
               <label className="block text-xs font-semibold mb-2" style={{ color: subColor }}>Yeni Geçici Şifre *</label>
               <div className="relative">
@@ -742,14 +775,12 @@ export default function TeamMembersSection() {
                 </button>
               </div>
             </div>
-
             {resetError && (
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#F87171' }}>
                 <i className="ri-error-warning-line flex-shrink-0" />
                 {resetError}
               </div>
             )}
-
             <div className="flex gap-3">
               <button
                 onClick={() => { setResetTarget(null); setResetPassword(''); setResetError(null); }}

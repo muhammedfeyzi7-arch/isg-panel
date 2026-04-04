@@ -5,7 +5,7 @@ import Modal from '../../components/base/Modal';
 import QrModal from './components/QrModal';
 import type { Ekipman, EkipmanStatus } from '../../types';
 import XLSXStyle from 'xlsx-js-style';
-import { uploadFileToStorage, downloadFromUrl, validateFile } from '@/utils/fileUpload';
+import { uploadFileToStorage, downloadFromUrl, validateFile, getSignedUrlFromPath } from '@/utils/fileUpload';
 
 const EKIPMAN_TURLERI = [
   'İş Makinesi', 'Kaldırma Ekipmanı', 'Basınçlı Kap', 'Elektrikli Ekipman',
@@ -442,8 +442,12 @@ export default function EkipmanlarPage() {
 
   const handleFileDownload = async (ekipman: Ekipman) => {
     if (ekipman.dosyaUrl) {
-      const ok = await downloadFromUrl(ekipman.dosyaUrl, ekipman.dosyaAdi || 'ekipman-belgesi');
-      if (ok) { addToast(`"${ekipman.dosyaAdi}" indiriliyor...`, 'success'); return; }
+      // dosyaUrl filePath veya signed URL olabilir — her iki durumu destekle
+      const resolvedUrl = await getSignedUrlFromPath(ekipman.dosyaUrl);
+      if (resolvedUrl) {
+        const ok = await downloadFromUrl(resolvedUrl, ekipman.dosyaAdi || 'ekipman-belgesi');
+        if (ok) { addToast(`"${ekipman.dosyaAdi}" indiriliyor...`, 'success'); return; }
+      }
     }
     addToast('Bu ekipman için yüklenmiş belge bulunamadı.', 'error');
   };
@@ -945,7 +949,11 @@ export default function EkipmanlarPage() {
                             </span>
                           )}
                           {ekipman.dosyaUrl && (
-                            <button onClick={() => window.open(ekipman.dosyaUrl, '_blank')} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Belgeyi Görüntüle"><i className="ri-eye-line text-sm" /></button>
+                            <button onClick={async () => {
+                              const url = await getSignedUrlFromPath(ekipman.dosyaUrl!);
+                              if (url) window.open(url, '_blank');
+                              else addToast('Belge erişim linki alınamadı.', 'error');
+                            }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Belgeyi Görüntüle"><i className="ri-eye-line text-sm" /></button>
                           )}
                           {ekipman.dosyaUrl && (
                             <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Belgeyi İndir"><i className="ri-download-2-line text-sm" /></button>

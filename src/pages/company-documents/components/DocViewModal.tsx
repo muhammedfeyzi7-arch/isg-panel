@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import Modal from '@/components/base/Modal';
 import type { CompanyDocument } from '@/types';
 import type { Firma } from '@/types';
+import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
 interface Props {
   doc: CompanyDocument | null;
@@ -26,15 +28,22 @@ function isImage(url: string | null) {
 }
 
 export default function DocViewModal({ doc, firmalar, onClose, onEdit }: Props) {
+  const sc = doc ? (STATUS_CFG[doc.status] ?? STATUS_CFG['Aktif']) : STATUS_CFG['Aktif'];
+  const firma = doc ? firmalar.find(f => f.id === doc.company_id) : undefined;
+
+  // Signed URL state — hooks must be called unconditionally
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!doc?.file_url) { setResolvedUrl(null); return; }
+    getSignedUrlFromPath(doc.file_url).then(url => setResolvedUrl(url));
+  }, [doc?.file_url]);
+
   if (!doc) return null;
 
-  const sc = STATUS_CFG[doc.status] ?? STATUS_CFG['Aktif'];
-  const firma = firmalar.find(f => f.id === doc.company_id);
-
   const handleDownload = async () => {
-    if (!doc.file_url) return;
+    if (!resolvedUrl) return;
     try {
-      const res = await fetch(doc.file_url);
+      const res = await fetch(resolvedUrl);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -43,7 +52,7 @@ export default function DocViewModal({ doc, firmalar, onClose, onEdit }: Props) 
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      window.open(doc.file_url, '_blank');
+      if (resolvedUrl) window.open(resolvedUrl, '_blank');
     }
   };
 
@@ -56,40 +65,25 @@ export default function DocViewModal({ doc, firmalar, onClose, onEdit }: Props) 
       icon="ri-file-text-line"
       footer={
         <div className="flex gap-2 flex-wrap">
-          {doc.file_url && (
+          {resolvedUrl && (
             <>
-              <button
-                onClick={handleDownload}
-                className="btn-secondary whitespace-nowrap"
-              >
+              <button onClick={handleDownload} className="btn-secondary whitespace-nowrap">
                 <i className="ri-download-2-line" /> İndir
               </button>
-              <a
-                href={doc.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary whitespace-nowrap"
-              >
+              <a href={resolvedUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary whitespace-nowrap">
                 <i className="ri-external-link-line" /> Yeni Sekmede Aç
               </a>
             </>
           )}
-          <button
-            onClick={() => { onClose(); onEdit(doc); }}
-            className="btn-primary whitespace-nowrap"
-          >
+          <button onClick={() => { onClose(); onEdit(doc); }} className="btn-primary whitespace-nowrap">
             <i className="ri-edit-line" /> Düzenle
           </button>
         </div>
       }
     >
       <div className="space-y-4">
-        {/* Durum + meta */}
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-            style={{ background: sc.bg, color: sc.color }}
-          >
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: sc.bg, color: sc.color }}>
             <i className={sc.icon} />{doc.status}
           </span>
           <span className="text-xs px-2.5 py-1.5 rounded-lg font-medium" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
@@ -102,7 +96,6 @@ export default function DocViewModal({ doc, firmalar, onClose, onEdit }: Props) 
           )}
         </div>
 
-        {/* Bilgi satırları */}
         <div className="grid grid-cols-2 gap-2">
           {[
             { label: 'Firma', value: firma?.ad ?? '—', icon: 'ri-building-line' },
@@ -122,7 +115,6 @@ export default function DocViewModal({ doc, firmalar, onClose, onEdit }: Props) 
           ))}
         </div>
 
-        {/* Açıklama */}
         {doc.description && (
           <div className="py-3 px-4 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
             <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Açıklama</p>
@@ -130,65 +122,35 @@ export default function DocViewModal({ doc, firmalar, onClose, onEdit }: Props) 
           </div>
         )}
 
-        {/* Dosya önizleme */}
-        {doc.file_url && (
+        {resolvedUrl && (
           <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--bg-item-border)' }}>
             <div className="flex items-center justify-between px-4 py-2.5" style={{ background: 'var(--bg-item)', borderBottom: '1px solid var(--bg-item-border)' }}>
               <div className="flex items-center gap-2">
                 <i className="ri-file-line text-sm" style={{ color: 'var(--text-muted)' }} />
-                <span className="text-sm font-medium truncate max-w-[300px]" style={{ color: 'var(--text-primary)' }}>
-                  {doc.file_name ?? 'Dosya'}
-                </span>
-                {doc.file_size ? (
-                  <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
-                    ({(doc.file_size / 1024).toFixed(1)} KB)
-                  </span>
-                ) : null}
+                <span className="text-sm font-medium truncate max-w-[300px]" style={{ color: 'var(--text-primary)' }}>{doc.file_name ?? 'Dosya'}</span>
+                {doc.file_size ? <span className="text-xs" style={{ color: 'var(--text-faint)' }}>({(doc.file_size / 1024).toFixed(1)} KB)</span> : null}
               </div>
-              <button
-                onClick={handleDownload}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
-                style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }}
-              >
+              <button onClick={handleDownload} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }}>
                 <i className="ri-download-2-line" /> İndir
               </button>
             </div>
-
-            {/* PDF inline */}
-            {isPdf(doc.file_url) && (
+            {isPdf(resolvedUrl) && (
               <div className="w-full" style={{ height: '420px' }}>
-                <iframe
-                  src={`${doc.file_url}#toolbar=1&navpanes=0`}
-                  className="w-full h-full"
-                  title={doc.title}
-                  style={{ border: 'none' }}
-                />
+                <iframe src={`${resolvedUrl}#toolbar=1&navpanes=0`} className="w-full h-full" title={doc.title} style={{ border: 'none' }} />
               </div>
             )}
-
-            {/* Resim inline */}
-            {isImage(doc.file_url) && (
+            {isImage(resolvedUrl) && (
               <div className="flex items-center justify-center p-4" style={{ background: 'var(--bg-main)', minHeight: '200px' }}>
-                <img
-                  src={doc.file_url}
-                  alt={doc.title}
-                  className="max-w-full max-h-96 rounded-lg object-contain"
-                />
+                <img src={resolvedUrl} alt={doc.title} className="max-w-full max-h-96 rounded-lg object-contain" />
               </div>
             )}
-
-            {/* Diğer dosya türleri */}
-            {!isPdf(doc.file_url) && !isImage(doc.file_url) && (
+            {!isPdf(resolvedUrl) && !isImage(resolvedUrl) && (
               <div className="flex flex-col items-center justify-center py-10 gap-3" style={{ background: 'var(--bg-main)' }}>
                 <div className="w-14 h-14 flex items-center justify-center rounded-2xl" style={{ background: 'rgba(99,102,241,0.1)' }}>
                   <i className="ri-file-word-line text-3xl" style={{ color: '#818CF8' }} />
                 </div>
                 <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Bu dosya türü tarayıcıda önizlenemiyor</p>
-                <button onClick={handleDownload} className="btn-primary text-sm whitespace-nowrap">
-                  <i className="ri-download-2-line" /> Dosyayı İndir
-                </button>
+                <button onClick={handleDownload} className="btn-primary text-sm whitespace-nowrap"><i className="ri-download-2-line" /> Dosyayı İndir</button>
               </div>
             )}
           </div>

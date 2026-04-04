@@ -1,21 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// CORS — sadece bilinen origin'lere izin ver
-const ALLOWED_ORIGINS = [
-  'https://readdy.ai',
-  'https://app.readdy.ai',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
+// CORS — tüm originlere izin ver (JWT manuel doğrulanıyor)
 function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowed = origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))
-    ? origin
-    : ALLOWED_ORIGINS[0];
   return {
-    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Origin': origin || '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
     'Vary': 'Origin',
   };
 }
@@ -27,7 +18,7 @@ function normalizeRole(role: string): string {
   return 'member';
 }
 
-// Decode JWT payload without verification (for logging/debugging)
+// Decode JWT payload without verification
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split('.');
@@ -43,79 +34,79 @@ Deno.serve(async (req) => {
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
 
+  // Handle preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.error('[AUTH] Missing or invalid Authorization header');
-    return new Response(JSON.stringify({ error: 'Yetkisiz erişim: Authorization header eksik.' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response('ok', { 
+      status: 200,
+      headers: corsHeaders 
     });
   }
 
-  const token = authHeader.replace('Bearer ', '').trim();
-  
-  if (!token || token === 'undefined' || token === 'null' || token === '') {
-    console.error('[AUTH] Token is empty or invalid string');
-    return new Response(JSON.stringify({ error: 'Geçersiz token: Oturum süresi dolmuş olabilir. Lütfen tekrar giriş yapın.' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-  // Debug: decode JWT to check expiry
-  const payload = decodeJwtPayload(token);
-  if (payload) {
-    const exp = payload.exp as number | undefined;
-    const now = Math.floor(Date.now() / 1000);
-    console.log('[AUTH] Token exp:', exp, 'now:', now, 'expired:', exp ? exp < now : 'unknown');
-    if (exp && exp < now) {
-      return new Response(JSON.stringify({ error: 'Oturum süresi dolmuş. Lütfen tekrar giriş yapın.' }), {
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[FATAL] Missing env vars');
+      return new Response(JSON.stringify({ error: 'Sunucu yapılandırma hatası.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Yetkisiz erişim: Authorization header eksik.' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-  }
 
-  const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  // Use admin client to verify the token via getUser
-  const { data: { user: callerUser }, error: authError } = await adminClient.auth.getUser(token);
-
-  if (authError || !callerUser) {
-    console.error('[AUTH] Token verification failed:', authError?.message, authError?.status);
+    const token = authHeader.replace('Bearer ', '').trim();
     
-    // Try with user client as fallback
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    
-    const { data: { user: fallbackUser }, error: fallbackError } = await userClient.auth.getUser();
-    
-    if (fallbackError || !fallbackUser) {
-      console.error('[AUTH] Fallback verification also failed:', fallbackError?.message);
+    if (!token || token === 'undefined' || token === 'null' || token === '') {
       return new Response(JSON.stringify({ error: 'Geçersiz token. Lütfen tekrar giriş yapın.' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    
-    console.log('[AUTH] Fallback verification succeeded for user:', fallbackUser.id);
-    return await handleRequest(req, fallbackUser.id, fallbackUser.email ?? '', adminClient, corsHeaders, normalizeRole);
-  }
 
-  console.log('[AUTH] Token verified for user:', callerUser.id);
-  return await handleRequest(req, callerUser.id, callerUser.email ?? '', adminClient, corsHeaders, normalizeRole);
+    // Check token expiry
+    const payload = decodeJwtPayload(token);
+    if (payload) {
+      const exp = payload.exp as number | undefined;
+      const now = Math.floor(Date.now() / 1000);
+      if (exp && exp < now) {
+        return new Response(JSON.stringify({ error: 'Oturum süresi dolmuş. Lütfen tekrar giriş yapın.' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Verify token
+    const { data: { user: callerUser }, error: authError } = await adminClient.auth.getUser(token);
+
+    if (authError || !callerUser) {
+      console.error('[AUTH] Token verification failed:', authError?.message);
+      return new Response(JSON.stringify({ error: 'Geçersiz oturum. Lütfen tekrar giriş yapın.' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return await handleRequest(req, callerUser.id, callerUser.email ?? '', adminClient, corsHeaders, normalizeRole);
+  } catch (err) {
+    console.error('[FATAL] Unhandled error:', err);
+    return new Response(JSON.stringify({ error: 'Sunucu hatası oluştu. Lütfen tekrar deneyin.' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 });
 
 async function handleRequest(
@@ -136,6 +127,7 @@ async function handleRequest(
   const action = body.action as string;
   const requestedOrgId = body.organization_id as string | undefined;
 
+  // Get caller membership
   let membershipQuery = adminClient
     .from('user_organizations')
     .select('role, organization_id, display_name, email, is_active')
@@ -149,7 +141,7 @@ async function handleRequest(
   const { data: memberships, error: membershipError } = await membershipQuery;
 
   if (membershipError || !memberships || memberships.length === 0) {
-    console.error('[MEMBERSHIP] Error or no memberships:', membershipError?.message, 'userId:', userId, 'orgId:', requestedOrgId);
+    console.error('[MEMBERSHIP] Error:', membershipError?.message, 'userId:', userId, 'orgId:', requestedOrgId);
     return new Response(JSON.stringify({ error: 'Organizasyon üyeliği bulunamadı.' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -230,8 +222,6 @@ async function handleRequest(
 
   // ── CREATE USER ───────────────────────────────────────────────
   if (action === 'create') {
-    console.log('[CREATE USER] Started');
-    
     const { email: newEmail, password, display_name, role } = body as {
       email: string;
       password: string;
@@ -255,34 +245,35 @@ async function handleRequest(
 
     const normalizedEmail = newEmail.toLowerCase().trim();
 
-    const { data: existingUsers, error: listError } = await adminClient.auth.admin.listUsers();
+    // Check if user already exists in this org
+    const { data: existingMember } = await adminClient
+      .from('user_organizations')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    if (existingMember) {
+      return new Response(
+        JSON.stringify({ error: 'Bu e-posta zaten organizasyonunuzda kayıtlı.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Check auth users
+    let newUserId: string;
+    
+    const { data: existingUsers, error: listError } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
     
     if (listError) {
-      return new Response(
-        JSON.stringify({ error: 'Kullanıcı listesi alınamadı: ' + listError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      console.error('[CREATE] listUsers error:', listError.message);
     }
     
     const existingAuthUser = existingUsers?.users?.find((u) => u.email === normalizedEmail);
 
-    let newUserId: string;
-
     if (existingAuthUser) {
-      const { data: alreadyMember } = await adminClient
-        .from('user_organizations')
-        .select('id')
-        .eq('user_id', existingAuthUser.id)
-        .eq('organization_id', orgId)
-        .maybeSingle();
-
-      if (alreadyMember) {
-        return new Response(
-          JSON.stringify({ error: 'Bu e-posta zaten organizasyonunuzda kayıtlı.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
-      }
       newUserId = existingAuthUser.id;
+      console.log('[CREATE] Existing auth user found:', newUserId);
     } else {
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email: normalizedEmail,
@@ -296,12 +287,16 @@ async function handleRequest(
       });
 
       if (createError) {
-        console.error('[CREATE USER] Auth creation error:', createError.message);
-        let errorMsg = 'Kullanıcı oluşturulamadı: ' + createError.message;
-        if (createError.message.includes('Database error')) {
-          errorMsg = 'Veritabanı hatası oluştu. Lütfen birkaç saniye bekleyip tekrar deneyin.';
-        } else if (createError.message.includes('already registered') || createError.message.includes('already exists')) {
+        console.error('[CREATE] Auth creation error:', createError.message);
+        let errorMsg = 'Kullanıcı oluşturulamadı.';
+        if (createError.message.includes('already registered') || createError.message.includes('already exists')) {
           errorMsg = 'Bu e-posta adresi zaten kayıtlı.';
+        } else if (createError.message.includes('Database error')) {
+          errorMsg = 'Veritabanı hatası. Lütfen birkaç saniye bekleyip tekrar deneyin.';
+        } else if (createError.message.includes('invalid')) {
+          errorMsg = 'Geçersiz e-posta adresi.';
+        } else {
+          errorMsg = 'Kullanıcı oluşturulamadı: ' + createError.message;
         }
         return new Response(JSON.stringify({ error: errorMsg }), {
           status: 400,
@@ -310,17 +305,18 @@ async function handleRequest(
       }
       
       if (!newUser?.user) {
-        return new Response(JSON.stringify({ error: 'Kullanıcı oluşturulamadı: Auth servisi yanıt vermedi.' }), {
+        return new Response(JSON.stringify({ error: 'Kullanıcı oluşturulamadı: Servis yanıt vermedi.' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       
       newUserId = newUser.user.id;
-      console.log('[CREATE USER] New auth user created with ID:', newUserId);
+      console.log('[CREATE] New auth user created:', newUserId);
     }
 
-    const { data: insertData, error: memberError } = await adminClient
+    // Add to organization
+    const { error: memberError } = await adminClient
       .from('user_organizations')
       .insert({
         user_id: newUserId,
@@ -330,22 +326,27 @@ async function handleRequest(
         email: normalizedEmail,
         is_active: true,
         must_change_password: true,
-      })
-      .select()
-      .single();
+      });
 
     if (memberError) {
-      console.error('[CREATE USER] DB insert error:', memberError);
+      console.error('[CREATE] DB insert error:', memberError.message, memberError.code);
+      
+      if (memberError.code === '23505') {
+        return new Response(JSON.stringify({ error: 'Bu kullanıcı zaten organizasyonda kayıtlı.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       return new Response(JSON.stringify({ 
-        error: 'Kullanıcı veritabanına eklenemedi: ' + memberError.message,
+        error: 'Kullanıcı organizasyona eklenemedi: ' + memberError.message,
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('[CREATE USER] DB insert successful:', insertData?.user_id);
-
+    // Upsert profile (non-blocking)
     try {
       await adminClient
         .from('profiles')
@@ -354,7 +355,7 @@ async function handleRequest(
           role: normalizeRole(role),
         }, { onConflict: 'user_id', ignoreDuplicates: true });
     } catch (profileErr) {
-      console.warn('[CREATE USER] Profile upsert skipped:', profileErr);
+      console.warn('[CREATE] Profile upsert skipped:', profileErr);
     }
 
     const roleLabel = role === 'admin' ? 'Admin' : role === 'denetci' ? 'Denetçi' : 'Kullanıcı';

@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import Modal from '../../../components/base/Modal';
 import type { Tutanak, Firma } from '../../../types';
 import type { TutanakStatus } from '../../../types';
+import { getSignedUrlFromPath } from '../../../utils/fileUpload';
 
 const STS_CONFIG: Record<TutanakStatus, { color: string; bg: string; icon: string; label: string }> = {
   'Taslak':     { color: '#94A3B8', bg: 'rgba(148,163,184,0.15)', icon: 'ri-draft-line',           label: 'Taslak' },
@@ -61,6 +63,18 @@ function isPdfFile(dosyaTipi?: string, dosyaAdi?: string): boolean {
 }
 
 export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose, onEdit, onWordDownload, wordLoading, canEdit }: Props) {
+  // Hooks must be called unconditionally — before any early return
+  const rawFileUrl = tutanak ? (tutanak.dosyaUrl || dosyaVeri) : undefined;
+  const [fileUrl, setFileUrl] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!rawFileUrl) { setFileUrl(undefined); return; }
+    if (rawFileUrl.startsWith('data:') || rawFileUrl.startsWith('http')) {
+      setFileUrl(rawFileUrl);
+      return;
+    }
+    getSignedUrlFromPath(rawFileUrl).then(url => setFileUrl(url ?? undefined));
+  }, [rawFileUrl]);
+
   if (!tutanak) return null;
 
   const stc = STS_CONFIG[tutanak.durum];
@@ -68,14 +82,9 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
   const olusturmaTarih = new Date(tutanak.olusturmaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
 
   const handleEdit = () => {
-    if (onEdit) {
-      onEdit(tutanak);
-      onClose();
-    }
+    if (onEdit) { onEdit(tutanak); onClose(); }
   };
 
-  // Dosya URL'si: önce dosyaUrl, yoksa dosyaVeri (base64)
-  const fileUrl = tutanak.dosyaUrl || dosyaVeri;
   const hasFile = !!(tutanak.dosyaAdi && fileUrl);
   const isImage = isImageFile(tutanak.dosyaTipi, tutanak.dosyaAdi);
   const isPdf = isPdfFile(tutanak.dosyaTipi, tutanak.dosyaAdi);
@@ -94,7 +103,7 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch {
-      window.open(fileUrl, '_blank');
+      if (fileUrl) window.open(fileUrl, '_blank');
     }
   };
 

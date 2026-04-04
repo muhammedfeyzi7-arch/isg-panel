@@ -3,7 +3,7 @@ import { useApp } from '@/store/AppContext';
 import Modal from '@/components/base/Modal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabase';
-import { uploadFileToStorage, downloadFromUrl } from '@/utils/fileUpload';
+import { uploadFileToStorage, downloadFromUrl, getSignedUrlFromPath } from '@/utils/fileUpload';
 
 /* ── Tipler ─────────────────────────────────────────────────── */
 type FormKategori = 'Tümü' | 'Ekipman Kontrolleri' | 'Çalışma Alanı Kontrolleri' | 'Personel ve KKD Kontrolleri' | 'Çevre ve Hijyen Kontrolleri' | 'Periyodik Kontroller' | 'Diğer';
@@ -267,7 +267,9 @@ export default function KontrolFormlariPage() {
 
   const handleDownload = async (f: KontrolFormu) => {
     if (!f.dosyaUrl) { addToast('Dosya bulunamadı.', 'error'); return; }
-    const ok = await downloadFromUrl(f.dosyaUrl, f.dosyaAdi);
+    const resolvedUrl = await getSignedUrlFromPath(f.dosyaUrl);
+    if (!resolvedUrl) { addToast('Dosya erişim linki alınamadı.', 'error'); return; }
+    const ok = await downloadFromUrl(resolvedUrl, f.dosyaAdi);
     if (ok) {
       addToast(`"${f.dosyaAdi}" indiriliyor...`, 'success');
     } else {
@@ -641,7 +643,7 @@ export default function KontrolFormlariPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="w-12 h-12 flex items-center justify-center rounded-2xl mx-auto mb-3"
+                    <div className="w-12 h-12 flex items-center justify-center rounded-2xl mx-auto mb-4"
                       style={{ background: 'rgba(99,102,241,0.1)' }}>
                       <i className="ri-upload-cloud-2-line text-2xl" style={{ color: '#6366F1' }} />
                     </div>

@@ -1,23 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
-/**
- * Verilen filePath için görüntüleme anında signed URL üretir.
- * filePath hem eski signed URL formatını hem de yeni path formatını destekler.
- * URL 50 dakikada bir otomatik yenilenir (expire olmadan önce).
- */
 export function useSignedUrl(filePath: string | null | undefined, bucket = 'uploads'): string | null {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!filePath) {
-      setSignedUrl(null);
+    if (!filePath) { setSignedUrl(null); return; }
+
+    // base64 veya tam URL ise direkt kullan — signed URL üretmeye gerek yok
+    if (filePath.startsWith('data:') || filePath.startsWith('http')) {
+      setSignedUrl(filePath);
       return;
     }
 
-    // Eğer zaten tam bir signed URL ise (eski format) — direkt kullan
-    // Ama expire olmuş olabilir, yine de path'i çıkarıp yenile
     const fetchUrl = async () => {
       const url = await getSignedUrlFromPath(filePath, bucket);
       setSignedUrl(url);
@@ -25,32 +21,20 @@ export function useSignedUrl(filePath: string | null | undefined, bucket = 'uplo
 
     void fetchUrl();
 
-    // 50 dakikada bir yenile (1 saatlik URL'nin 10 dk öncesinde)
-    timerRef.current = setInterval(() => {
-      void fetchUrl();
-    }, 50 * 60 * 1000);
+    timerRef.current = setInterval(() => { void fetchUrl(); }, 50 * 60 * 1000);
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [filePath, bucket]);
 
   return signedUrl;
 }
 
-/**
- * Birden fazla filePath için signed URL üretir.
- * Record<filePath, signedUrl> döner.
- */
 export function useSignedUrls(filePaths: (string | null | undefined)[]): Record<string, string> {
   const [urls, setUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const validPaths = filePaths.filter((p): p is string => !!p);
-    if (validPaths.length === 0) {
-      setUrls({});
-      return;
-    }
+    if (validPaths.length === 0) { setUrls({}); return; }
 
     let cancelled = false;
 
@@ -58,6 +42,11 @@ export function useSignedUrls(filePaths: (string | null | undefined)[]): Record<
       const results: Record<string, string> = {};
       await Promise.all(
         validPaths.map(async (path) => {
+          // base64 veya tam URL ise direkt kullan
+          if (path.startsWith('data:') || path.startsWith('http')) {
+            results[path] = path;
+            return;
+          }
           const url = await getSignedUrlFromPath(path);
           if (url) results[path] = url;
         }),

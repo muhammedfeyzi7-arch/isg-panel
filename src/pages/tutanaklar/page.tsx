@@ -10,6 +10,7 @@ import Modal from '../../components/base/Modal';
 import { generateTutanakNo } from '../../store/useStore';
 import TutanakDetailModal from './components/TutanakDetailModal';
 import { usePermissions } from '../../hooks/usePermissions';
+import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
 /* ── Durum renk konfig ──────────────────────────────────────── */
 const STS_CONFIG: Record<TutanakStatus, { color: string; bg: string; icon: string }> = {
@@ -712,7 +713,9 @@ export default function TutanaklarPage() {
   const handleFileDownload = async (t: Tutanak) => {
     if (!t.dosyaUrl) { addToast('Bu tutanak için yüklenmiş dosya bulunamadı.', 'error'); return; }
     try {
-      const res = await fetch(t.dosyaUrl);
+      const resolvedUrl = await getSignedUrlFromPath(t.dosyaUrl);
+      if (!resolvedUrl) { addToast('Dosya erişim linki alınamadı.', 'error'); return; }
+      const res = await fetch(resolvedUrl);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -730,7 +733,9 @@ export default function TutanaklarPage() {
   const resolveFileVeri = async (t: Tutanak): Promise<string | undefined> => {
     if (!t.dosyaUrl) return undefined;
     try {
-      const res = await fetch(t.dosyaUrl);
+      const resolvedUrl = await getSignedUrlFromPath(t.dosyaUrl);
+      if (!resolvedUrl) return undefined;
+      const res = await fetch(resolvedUrl);
       if (res.ok) {
         const blob = await res.blob();
         return new Promise<string>(resolve => {
