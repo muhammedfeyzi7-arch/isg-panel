@@ -94,7 +94,7 @@ interface ImportResult {
 }
 
 export default function PersonellerPage() {
-  const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto } = useApp();
+  const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto, refreshData, dataLoading } = useApp();
   const { canCreate, canEdit, canDelete, isReadOnly, canViewSensitiveData } = usePermissions();
 
   const [search, setSearch] = useState('');
@@ -569,6 +569,13 @@ export default function PersonellerPage() {
   const f = (field: keyof typeof form) => form[field] as string;
   const set = (field: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [field]: value }));
   const aktifCount = personeller.filter(p => !p.silinmis && p.durum === 'Aktif').length;
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    if (refreshing || dataLoading) return;
+    setRefreshing(true);
+    try { await refreshData(); addToast('Veriler güncellendi.', 'success'); }
+    finally { setRefreshing(false); }
+  };
 
   const statusStyle = (s: ImportResult['rows'][0]['status']) => {
     if (s === 'success') return { color: '#34D399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)', icon: 'ri-checkbox-circle-line' };
@@ -592,6 +599,9 @@ export default function PersonellerPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
+            <i className={`ri-refresh-line text-xs ${refreshing ? 'animate-spin' : ''}`} />{refreshing ? 'Yenileniyor...' : 'Yenile'}
+          </button>
           <button onClick={handleDownloadTemplate} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
             <i className="ri-download-2-line text-xs" />Şablon İndir
           </button>

@@ -566,9 +566,16 @@ export default function TutanaklarPage() {
   const {
     tutanaklar, firmalar, currentUser,
     addTutanak, updateTutanak, deleteTutanak,
-    addToast, quickCreate, setQuickCreate, org,
+    addToast, quickCreate, setQuickCreate, org, refreshData, dataLoading,
   } = useApp();
   const { canEdit, canCreate, canDelete, isReadOnly } = usePermissions();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    if (refreshing || dataLoading) return;
+    setRefreshing(true);
+    try { await refreshData(); addToast('Veriler güncellendi.', 'success'); }
+    finally { setRefreshing(false); }
+  };
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -802,11 +809,16 @@ export default function TutanaklarPage() {
             Firma bazlı tutanakları yönetin ve Word belgesi oluşturun
           </p>
         </div>
-        {canCreate && (
-          <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
-            <i className="ri-add-line" /> Yeni Tutanak
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap">
+            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />{refreshing ? 'Yenileniyor...' : 'Yenile'}
           </button>
-        )}
+          {canCreate && (
+            <button onClick={openAdd} className="btn-primary whitespace-nowrap">
+              <i className="ri-add-line" /> Yeni Tutanak
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}

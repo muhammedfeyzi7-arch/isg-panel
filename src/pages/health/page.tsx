@@ -160,10 +160,11 @@ function exportMuayenelerToExcel(
 }
 
 export default function MuayenelerPage() {
-  const { muayeneler, evraklar, personeller, firmalar, addMuayene, updateMuayene, deleteMuayene, addToast, quickCreate, setQuickCreate, org } = useApp();
+  const { muayeneler, evraklar, personeller, firmalar, addMuayene, updateMuayene, deleteMuayene, addToast, quickCreate, setQuickCreate, org, refreshData } = useApp();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -360,6 +361,19 @@ export default function MuayenelerPage() {
           <p className="text-sm mt-1" style={{ color: '#64748B' }}>Personel sağlık muayene kayıtlarını takip edin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button
+            onClick={async () => {
+              setRefreshing(true);
+              await refreshData();
+              setRefreshing(false);
+            }}
+            disabled={refreshing}
+            className="btn-secondary whitespace-nowrap"
+            title="Verileri yenile"
+          >
+            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Yenileniyor...' : 'Yenile'}
+          </button>
           <button onClick={() => exportMuayenelerToExcel(muayeneler, firmalar, personeller)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
           </button>

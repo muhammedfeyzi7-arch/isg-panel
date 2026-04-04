@@ -156,12 +156,19 @@ function exportEgitimlerToExcel(
 }
 
 export default function EgitimlerPage() {
-  const { egitimler, firmalar, personeller, addEgitim, updateEgitim, deleteEgitim, org, addToast, quickCreate, setQuickCreate } = useApp();
+  const { egitimler, firmalar, personeller, addEgitim, updateEgitim, deleteEgitim, org, addToast, quickCreate, setQuickCreate, refreshData, dataLoading } = useApp();
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [belgeLoading, setBelgeLoading] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    if (refreshing || dataLoading) return;
+    setRefreshing(true);
+    try { await refreshData(); addToast('Veriler güncellendi.', 'success'); }
+    finally { setRefreshing(false); }
+  };
 
   // Single definition of emptyEgitim — gecerlilikSuresi is in AY (months)
   const emptyEgitim: Omit<Egitim, 'id' | 'olusturmaTarihi'> = {
@@ -339,6 +346,9 @@ export default function EgitimlerPage() {
           <p className="text-sm mt-1" style={{ color: '#475569' }}>Personellerin eğitim evraklarını yükleyin ve takip edin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap">
+            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />{refreshing ? 'Yenileniyor...' : 'Yenile'}
+          </button>
           <button onClick={() => exportEgitimlerToExcel(egitimler, firmalar, personeller)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
           </button>

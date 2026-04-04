@@ -346,7 +346,7 @@ function getDaysUntil(dateStr: string): number {
 }
 
 export default function EkipmanlarPage() {
-  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, addToast, quickCreate, setQuickCreate, org } = useApp();
+  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, addToast, quickCreate, setQuickCreate, org, refreshData, dataLoading } = useApp();
   const { canCreate, canEdit, canDelete } = usePermissions();
 
   const [search, setSearch] = useState('');
@@ -365,6 +365,13 @@ export default function EkipmanlarPage() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    if (refreshing || dataLoading) return;
+    setRefreshing(true);
+    try { await refreshData(); addToast('Veriler güncellendi.', 'success'); }
+    finally { setRefreshing(false); }
+  };
 
   useEffect(() => {
     if (quickCreate === 'ekipmanlar') {
@@ -777,6 +784,9 @@ export default function EkipmanlarPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Ekipman kayıtlarını ve kontrol durumlarını yönetin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap">
+            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />{refreshing ? 'Yenileniyor...' : 'Yenile'}
+          </button>
           <button onClick={() => exportEkipmanToExcel(ekipmanlar, firmalar)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
           </button>

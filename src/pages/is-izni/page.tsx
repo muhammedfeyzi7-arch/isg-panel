@@ -54,7 +54,7 @@ const emptyForm = {
 export default function IsIzniPage() {
   const {
     isIzinleri, firmalar, personeller, currentUser,
-    addIsIzni, updateIsIzni, deleteIsIzni, addToast, quickCreate, setQuickCreate, org,
+    addIsIzni, updateIsIzni, deleteIsIzni, addToast, quickCreate, setQuickCreate, org, refreshData,
   } = useApp();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
 
@@ -67,6 +67,7 @@ export default function IsIzniPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewRecord, setViewRecord] = useState<IsIzni | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [refreshing, setRefreshing] = useState(false);
   const [showBelgeModal, setShowBelgeModal] = useState(false);
   const [savedIsIzni, setSavedIsIzni] = useState<IsIzni | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -289,16 +290,31 @@ export default function IsIzniPage() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>İş İzni Takip</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Sıcak çalışma, yüksekte çalışma ve diğer iş izinlerini yönetin</p>
         </div>
-        {canCreate && (
-          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-            <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
-              <i className="ri-file-excel-2-line mr-1" />Excel İçe Aktar
-            </button>
-            <button onClick={openAdd} className="btn-primary whitespace-nowrap">
-              <i className="ri-add-line" /> Yeni İş İzni
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={async () => {
+              setRefreshing(true);
+              await refreshData();
+              setRefreshing(false);
+            }}
+            disabled={refreshing}
+            className="btn-secondary whitespace-nowrap"
+            title="Verileri yenile"
+          >
+            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Yenileniyor...' : 'Yenile'}
+          </button>
+          {canCreate && (
+            <>
+              <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
+                <i className="ri-file-excel-2-line mr-1" />Excel İçe Aktar
+              </button>
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap">
+                <i className="ri-add-line" /> Yeni İş İzni
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Stats */}

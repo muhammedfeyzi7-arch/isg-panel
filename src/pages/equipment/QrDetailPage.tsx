@@ -388,6 +388,15 @@ export default function QrDetailPage() {
   const navigate = useNavigate();
   const { ekipmanlar, firmalar, org, dataLoading, evraklar } = useApp();
 
+  // Geri tuşu: history varsa geri git, yoksa ana sayfaya yönlendir
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  };
+
   const [localEkipman, setLocalEkipman] = useState<Ekipman | null | undefined>(undefined);
   const [localLoading, setLocalLoading] = useState(true);
   const [showKontrol, setShowKontrol] = useState(false);
@@ -529,22 +538,23 @@ export default function QrDetailPage() {
       {/* ── Top Bar ── */}
       <div
         className="sticky top-0 z-20 px-4 py-3 flex items-center justify-between"
-        style={{ background: 'rgba(11,17,32,0.92)', borderBottom: '1px solid rgba(51,65,85,0.35)', backdropFilter: 'blur(16px)' }}
+        style={{ background: 'rgba(11,17,32,0.95)', borderBottom: '1px solid rgba(52,211,153,0.15)', backdropFilter: 'blur(20px)' }}
       >
         <button
-          onClick={() => navigate(-1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all active:scale-90"
-          style={{ background: 'rgba(51,65,85,0.5)', color: '#94A3B8' }}
+          onClick={handleGoBack}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all active:scale-90"
+          style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }}
         >
           <i className="ri-arrow-left-s-line text-lg" />
+          <span className="text-xs font-semibold">Geri</span>
         </button>
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 flex items-center justify-center">
-            <i className="ri-qr-code-line text-sm" style={{ color: '#34D399' }} />
+          <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(52,211,153,0.15)' }}>
+            <i className="ri-qr-code-line text-xs" style={{ color: '#34D399' }} />
           </div>
-          <span className="text-sm font-semibold" style={{ color: '#94A3B8' }}>QR Saha Modu</span>
+          <span className="text-sm font-bold" style={{ color: '#E2E8F0' }}>QR Saha Modu</span>
         </div>
-        <div className="w-9" />
+        <div className="w-20" />
       </div>
 
       {/* ── Hero Kartı ── */}

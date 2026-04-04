@@ -37,7 +37,7 @@ const statusConfig = {
 };
 
 export default function EvraklarPage() {
-  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, addToast, quickCreate, setQuickCreate, org } = useApp();
+  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, addToast, quickCreate, setQuickCreate, org, refreshData } = useApp();
   const location = useLocation();
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -49,6 +49,7 @@ export default function EvraklarPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // PersonelDetayModal'dan "Evrak Ekle" butonuyla gelindiğinde pre-fill
@@ -215,6 +216,20 @@ export default function EvraklarPage() {
           <p className="text-[12px] mt-1" style={{ color: 'var(--text-muted)' }}>{evraklar.length} toplam evrak — durum otomatik hesaplanır</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={async () => {
+              setRefreshing(true);
+              await refreshData();
+              setRefreshing(false);
+            }}
+            disabled={refreshing}
+            className="btn-secondary whitespace-nowrap"
+            style={{ fontSize: '12.5px', padding: '7px 14px' }}
+            title="Verileri yenile"
+          >
+            <i className={`ri-refresh-line text-sm ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Yenileniyor...' : 'Yenile'}
+          </button>
           <button onClick={openAdd} className="btn-primary" style={{ fontSize: '12.5px', padding: '7px 14px' }}>
             <i className="ri-file-add-line text-sm" />
             Yeni Evrak
