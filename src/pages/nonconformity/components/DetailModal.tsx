@@ -127,7 +127,7 @@ export default function DetailModal({ record, onClose, onKapat, onEdit }: Props)
         </div>
 
         {/* Main title */}
-        <div className="px-4 py-3 rounded-xl" style={{ background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(51,65,85,0.4)' }}>
+        <div className="px-4 py-3 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-main)' }}>
           <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{record.baslik}</h3>
         </div>
 
@@ -145,8 +145,8 @@ export default function DetailModal({ record, onClose, onKapat, onEdit }: Props)
 
         {record.aciklama && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Açıklama</p>
-            <div className="px-3 py-2.5 rounded-xl text-sm leading-relaxed" style={{ background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(51,65,85,0.3)', color: 'var(--text-secondary)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Açıklama</p>
+            <div className="px-3 py-2.5 rounded-xl text-sm leading-relaxed" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}>
               {record.aciklama}
             </div>
           </div>
@@ -154,8 +154,8 @@ export default function DetailModal({ record, onClose, onKapat, onEdit }: Props)
 
         {record.onlem && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Alınması Gereken Önlem</p>
-            <div className="px-3 py-2.5 rounded-xl text-sm leading-relaxed" style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--text-secondary)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Alınması Gereken Önlem</p>
+            <div className="px-3 py-2.5 rounded-xl text-sm leading-relaxed" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)', color: 'var(--text-primary)' }}>
               {record.onlem}
             </div>
           </div>
@@ -188,8 +188,8 @@ export default function DetailModal({ record, onClose, onKapat, onEdit }: Props)
 
         {record.kapatmaAciklama && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#64748B' }}>Kapatma Açıklaması</p>
-            <div className="px-3 py-2.5 rounded-xl text-sm leading-relaxed" style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)', color: 'var(--text-secondary)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Kapatma Açıklaması</p>
+            <div className="px-3 py-2.5 rounded-xl text-sm leading-relaxed" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)', color: 'var(--text-primary)' }}>
               {record.kapatmaAciklama}
             </div>
           </div>

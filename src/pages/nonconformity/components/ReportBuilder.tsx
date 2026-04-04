@@ -133,8 +133,8 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
         </div>
 
         {/* Select all toolbar */}
-        <div className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(51,65,85,0.3)' }}>
-          <span className="text-sm font-medium" style={{ color: '#94A3B8' }}>
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-main)' }}>
+          <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
             {filtered.length} kayıt bulundu
           </span>
           <div className="flex items-center gap-2">
@@ -150,23 +150,23 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
         </div>
 
         {/* List */}
-        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(51,65,85,0.3)', maxHeight: '360px', overflowY: 'auto' }}>
+        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-main)', maxHeight: '360px', overflowY: 'auto' }}>
           {filtered.length === 0 ? (
             <div className="py-12 text-center">
-              <i className="ri-file-list-line text-3xl block mb-2" style={{ color: '#475569' }} />
-              <p className="text-sm" style={{ color: '#64748B' }}>Filtre kriterlerine uygun kayıt bulunamadı</p>
+              <i className="ri-file-list-line text-3xl block mb-2" style={{ color: 'var(--text-muted)' }} />
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Filtre kriterlerine uygun kayıt bulunamadı</p>
             </div>
           ) : (
             <table className="w-full">
               <thead>
-                <tr style={{ background: 'rgba(15,23,42,0.6)', borderBottom: '1px solid rgba(51,65,85,0.4)' }}>
+                <tr style={{ background: 'var(--table-head-bg)', borderBottom: '1px solid var(--table-border)' }}>
                   <th className="px-3 py-2 w-10">
                     <input type="checkbox" checked={allSelected} onChange={allSelected ? clearAll : selectAll} className="cursor-pointer" />
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold" style={{ color: '#64748B' }}>DÖF No / Başlık</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold hidden sm:table-cell" style={{ color: '#64748B' }}>Firma</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold hidden sm:table-cell" style={{ color: '#64748B' }}>Tarih</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold" style={{ color: '#64748B' }}>Durum</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>DÖF No / Başlık</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold hidden sm:table-cell" style={{ color: 'var(--text-muted)' }}>Firma</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold hidden sm:table-cell" style={{ color: 'var(--text-muted)' }}>Tarih</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Durum</th>
                 </tr>
               </thead>
               <tbody>
@@ -181,7 +181,7 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
                       onClick={() => toggleOne(u.id)}
                       className="cursor-pointer transition-all"
                       style={{
-                        borderBottom: '1px solid rgba(51,65,85,0.2)',
+                        borderBottom: '1px solid var(--table-row-border)',
                         background: isChecked ? 'rgba(99,102,241,0.08)' : 'transparent',
                       }}
                     >

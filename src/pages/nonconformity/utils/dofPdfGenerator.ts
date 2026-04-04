@@ -33,7 +33,11 @@ async function resolveToBase64(src: string | undefined | null): Promise<string |
 
 async function fetchToBase64(url: string): Promise<string | null> {
   try {
-    const response = await fetch(url, { cache: 'force-cache' });
+    const response = await fetch(url, {
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-store',
+    });
     if (!response.ok) return null;
     const blob = await response.blob();
     return new Promise((resolve) => {
