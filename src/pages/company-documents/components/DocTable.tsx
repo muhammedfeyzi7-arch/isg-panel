@@ -132,18 +132,19 @@ export default function DocTable({ documents, firmalar, onEdit, onDelete, onView
                   </td>
                   <td>
                     <div className="flex items-center gap-1 justify-end">
-                      {doc.file_url && (
-                        <button
-                          onClick={() => onView(doc)}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
-                          style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }}
-                          title="Görüntüle / İndir"
-                        >
-                          <i className="ri-eye-line text-sm" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => onView(doc)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+                        style={{
+                          background: doc.file_url ? 'rgba(52,211,153,0.1)' : 'rgba(100,116,139,0.1)',
+                          color: doc.file_url ? '#34D399' : '#64748B',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = doc.file_url ? 'rgba(52,211,153,0.2)' : 'rgba(100,116,139,0.2)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = doc.file_url ? 'rgba(52,211,153,0.1)' : 'rgba(100,116,139,0.1)'; }}
+                        title={doc.file_url ? 'Görüntüle / İndir' : 'Dosya eklenmemiş — Detayları Gör'}
+                      >
+                        <i className={`${doc.file_url ? 'ri-eye-line' : 'ri-eye-off-line'} text-sm`} />
+                      </button>
                       <button
                         onClick={() => onEdit(doc)}
                         className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"

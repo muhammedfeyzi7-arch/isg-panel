@@ -332,119 +332,220 @@ export async function printDofRaporu(
   win.addEventListener('afterprint', () => clearTimeout(fb));
 }
 
+// Fotoğraf URL'sini base64'e çevir (Excel için)
+async function photoUrlToBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { cache: 'force-cache' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function exportDofToExcel(
   records: Uygunsuzluk[],
   firmalar: Firma[],
   personeller: Personel[],
+  getPhoto?: (id: string, type: 'acilis' | 'kapatma') => string | undefined,
 ): Promise<void> {
-  const XLSX = await import('xlsx-js-style');
-
-  const headers = [
-    'No', 'DÖF No', 'Tarih', 'Firma', 'Personel', 'Başlık',
-    'Uygunsuzluk Açıklaması', 'Alınması Gereken Önlemler',
-    'Sorumlu', 'Hedef Tarih', 'Kapanma Tarihi', 'Durum',
-  ];
-
-  const rows = records.map((r, i) => {
-    const firma = firmalar.find(f => f.id === r.firmaId);
-    const personel = personeller.find(p => p.id === r.personelId);
-    return [
-      i + 1,
-      r.acilisNo ?? `DÖF-${i + 1}`,
-      r.tarih ? new Date(r.tarih).toLocaleDateString('tr-TR') : '—',
-      firma?.ad ?? '—',
-      personel?.adSoyad ?? '—',
-      r.baslik ?? '',
-      r.aciklama ?? '',
-      r.onlem ?? '',
-      r.sorumlu ?? '',
-      r.hedefTarih ? new Date(r.hedefTarih).toLocaleDateString('tr-TR') : '',
-      r.kapatmaTarihi ? new Date(r.kapatmaTarihi).toLocaleDateString('tr-TR') : '',
-      r.durum,
-    ];
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-
-  // Kolon genişlikleri
-  ws['!cols'] = [
-    { wch: 5 },   // No
-    { wch: 14 },  // DÖF No
-    { wch: 12 },  // Tarih
-    { wch: 28 },  // Firma
-    { wch: 22 },  // Personel
-    { wch: 32 },  // Başlık
-    { wch: 45 },  // Açıklama
-    { wch: 45 },  // Önlemler
-    { wch: 22 },  // Sorumlu
-    { wch: 14 },  // Hedef Tarih
-    { wch: 14 },  // Kapanma Tarihi
-    { wch: 14 },  // Durum
-  ];
-
-  // Başlık satırı stilini ayarla
-  const headerRange = XLSX.utils.decode_range(ws['!ref'] ?? 'A1');
-  for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
-    const cellAddr = XLSX.utils.encode_cell({ r: 0, c: col });
-    if (!ws[cellAddr]) continue;
-    ws[cellAddr].s = {
-      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
-      fill: { fgColor: { rgb: '1E293B' } },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-      border: {
-        bottom: { style: 'medium', color: { rgb: 'EF4444' } },
-      },
-    };
-  }
-
-  // Veri satırlarını stillendir
-  for (let row = 1; row <= rows.length; row++) {
-    const isEven = row % 2 === 0;
-    for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
-      const cellAddr = XLSX.utils.encode_cell({ r: row, c: col });
-      if (!ws[cellAddr]) {
-        ws[cellAddr] = { t: 's', v: '' };
-      }
-      ws[cellAddr].s = {
-        fill: { fgColor: { rgb: isEven ? 'F8FAFC' : 'FFFFFF' } },
-        alignment: { vertical: 'top', wrapText: true },
-        border: {
-          bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
-          right: { style: 'thin', color: { rgb: 'E5E7EB' } },
-        },
-      };
-
-      // Durum sütununu renklendir (son sütun = index 11)
-      if (col === 11) {
-        const val = ws[cellAddr].v;
-        if (val === 'Açık') {
-          ws[cellAddr].s.font = { bold: true, color: { rgb: 'DC2626' } };
-        } else if (val === 'Kapandı') {
-          ws[cellAddr].s.font = { bold: true, color: { rgb: '16A34A' } };
+  // Fotoğrafları önceden çek (URL → base64)
+  const photoMap = new Map<string, string>();
+  if (getPhoto) {
+    const jobs: Promise<void>[] = [];
+    records.forEach(r => {
+      if (r.acilisFotoMevcut) {
+        const src = getPhoto(r.id, 'acilis') ?? r.acilisFotoUrl;
+        if (src && src.startsWith('http')) {
+          jobs.push(photoUrlToBase64(src).then(b64 => { if (b64) photoMap.set(`${r.id}_acilis`, b64); }));
+        } else if (src && src.startsWith('data:')) {
+          photoMap.set(`${r.id}_acilis`, src);
         }
       }
+      if (r.kapatmaFotoMevcut) {
+        const src = getPhoto(r.id, 'kapatma') ?? r.kapatmaFotoUrl;
+        if (src && src.startsWith('http')) {
+          jobs.push(photoUrlToBase64(src).then(b64 => { if (b64) photoMap.set(`${r.id}_kapatma`, b64); }));
+        } else if (src && src.startsWith('data:')) {
+          photoMap.set(`${r.id}_kapatma`, src);
+        }
+      }
+    });
+    await Promise.all(jobs);
+  } else {
+    // getPhoto verilmemişse direkt URL'leri kullan
+    const jobs: Promise<void>[] = [];
+    records.forEach(r => {
+      if (r.acilisFotoUrl && r.acilisFotoUrl.startsWith('http')) {
+        jobs.push(photoUrlToBase64(r.acilisFotoUrl).then(b64 => { if (b64) photoMap.set(`${r.id}_acilis`, b64); }));
+      }
+      if (r.kapatmaFotoUrl && r.kapatmaFotoUrl.startsWith('http')) {
+        jobs.push(photoUrlToBase64(r.kapatmaFotoUrl).then(b64 => { if (b64) photoMap.set(`${r.id}_kapatma`, b64); }));
+      }
+    });
+    await Promise.all(jobs);
+  }
+
+  const ExcelJS = (await import('exceljs')).default;
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'ISG Denetim Sistemi';
+  wb.created = new Date();
+
+  // ── Ana Sayfa ──
+  const ws = wb.addWorksheet('DÖF Raporu', {
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+  });
+
+  // Sütun tanımları
+  ws.columns = [
+    { header: 'No', key: 'no', width: 6 },
+    { header: 'DÖF No', key: 'dofNo', width: 16 },
+    { header: 'Tarih', key: 'tarih', width: 13 },
+    { header: 'Firma', key: 'firma', width: 28 },
+    { header: 'Personel', key: 'personel', width: 22 },
+    { header: 'Başlık', key: 'baslik', width: 32 },
+    { header: 'Uygunsuzluk Açıklaması', key: 'aciklama', width: 42 },
+    { header: 'Alınması Gereken Önlemler', key: 'onlem', width: 42 },
+    { header: 'Sorumlu', key: 'sorumlu', width: 20 },
+    { header: 'Hedef Tarih', key: 'hedefTarih', width: 14 },
+    { header: 'Kapanma Tarihi', key: 'kapatmaTarihi', width: 16 },
+    { header: 'Önem', key: 'severity', width: 12 },
+    { header: 'Durum', key: 'durum', width: 14 },
+    { header: 'Açılış Fotoğrafı', key: 'acilisFoto', width: 22 },
+    { header: 'Kapanış Fotoğrafı', key: 'kapatmaFoto', width: 22 },
+  ];
+
+  // Başlık satırı stili
+  const headerRow = ws.getRow(1);
+  headerRow.height = 30;
+  headerRow.eachCell(cell => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      bottom: { style: 'medium', color: { argb: 'FFEF4444' } },
+    };
+  });
+
+  // Veri satırları
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const firma = firmalar.find(f => f.id === r.firmaId);
+    const personel = personeller.find(p => p.id === r.personelId);
+    const isEven = i % 2 === 0;
+    const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
+
+    const rowData = {
+      no: i + 1,
+      dofNo: r.acilisNo ?? `DÖF-${i + 1}`,
+      tarih: r.tarih ? new Date(r.tarih).toLocaleDateString('tr-TR') : '—',
+      firma: firma?.ad ?? '—',
+      personel: personel?.adSoyad ?? '—',
+      baslik: r.baslik ?? '',
+      aciklama: r.aciklama ?? '',
+      onlem: r.onlem ?? '',
+      sorumlu: r.sorumlu ?? '',
+      hedefTarih: r.hedefTarih ? new Date(r.hedefTarih).toLocaleDateString('tr-TR') : '',
+      kapatmaTarihi: r.kapatmaTarihi ? new Date(r.kapatmaTarihi).toLocaleDateString('tr-TR') : '',
+      severity: r.severity,
+      durum: r.durum,
+      acilisFoto: '',
+      kapatmaFoto: '',
+    };
+
+    const dataRow = ws.addRow(rowData);
+    dataRow.height = 80;
+
+    // Satır stili
+    dataRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+      cell.alignment = { vertical: 'middle', wrapText: true };
+      cell.border = {
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      };
+      // Durum sütunu rengi (col 13)
+      if (colNumber === 13) {
+        const val = cell.value as string;
+        if (val === 'Açık') {
+          cell.font = { bold: true, color: { argb: 'FFDC2626' }, size: 11 };
+        } else if (val === 'Kapandı') {
+          cell.font = { bold: true, color: { argb: 'FF16A34A' }, size: 11 };
+        }
+      }
+      // Önem sütunu rengi (col 12)
+      if (colNumber === 12) {
+        const val = cell.value as string;
+        const sevColors: Record<string, string> = {
+          'Kritik': 'FFDC2626', 'Yüksek': 'FFD97706', 'Orta': 'FFCA8A04', 'Düşük': 'FF16A34A',
+        };
+        if (sevColors[val]) cell.font = { bold: true, color: { argb: sevColors[val] }, size: 11 };
+      }
+    });
+
+    // Fotoğrafları ekle (col 14 = Açılış, col 15 = Kapanış)
+    const acilisB64 = photoMap.get(`${r.id}_acilis`);
+    const kapatmaB64 = photoMap.get(`${r.id}_kapatma`);
+
+    const addPhoto = async (b64: string, col: number) => {
+      try {
+        const [meta, data] = b64.split(',');
+        const mimeMatch = meta.match(/data:([^;]+);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const ext = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : 'jpeg';
+        const imageId = wb.addImage({ base64: data, extension: ext as 'jpeg' | 'png' | 'gif' });
+        // Satır index (0-based): i+1 (başlık row=0)
+        ws.addImage(imageId, {
+          tl: { col: col - 1, row: i + 1 },
+          br: { col: col, row: i + 2 },
+          editAs: 'oneCell',
+        });
+        // Hücredeki metni temizle
+        const cell = dataRow.getCell(col);
+        cell.value = '';
+      } catch { /* fotoğraf eklenemezse sessizce geç */ }
+    };
+
+    if (acilisB64) await addPhoto(acilisB64, 14);
+    else {
+      const cell = dataRow.getCell(14);
+      cell.value = r.acilisFotoUrl ? '🔗 Fotoğraf var (URL)' : '—';
+      cell.font = { color: { argb: r.acilisFotoUrl ? 'FF6366F1' : 'FF9CA3AF' }, size: 10 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    }
+
+    if (kapatmaB64) await addPhoto(kapatmaB64, 15);
+    else {
+      const cell = dataRow.getCell(15);
+      cell.value = r.kapatmaFotoUrl ? '🔗 Fotoğraf var (URL)' : '—';
+      cell.font = { color: { argb: r.kapatmaFotoUrl ? 'FF16A34A' : 'FF9CA3AF' }, size: 10 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
     }
   }
 
-  // Satır yükseklikleri
-  ws['!rows'] = [
-    { hpt: 28 }, // başlık
-    ...rows.map(() => ({ hpt: 60 })), // veri satırları
-  ];
+  // Freeze header row
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'DÖF Raporu');
+  // ── Özet Sayfası ──
+  const wsSummary = wb.addWorksheet('Özet');
+  wsSummary.columns = [{ header: '', key: 'label', width: 30 }, { header: '', key: 'value', width: 22 }];
 
-  // Özet sayfası
-  const summaryData = [
+  const summaryRows = [
     ['DÖF RAPORU ÖZETİ', ''],
     ['Oluşturma Tarihi', new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })],
     ['', ''],
     ['Toplam Kayıt', records.length],
     ['Açık Uygunsuzluk', records.filter(r => r.durum === 'Açık').length],
     ['Kapatılan', records.filter(r => r.durum === 'Kapandı').length],
+    ['Kapanma Oranı (%)', records.length > 0 ? Math.round((records.filter(r => r.durum === 'Kapandı').length / records.length) * 100) : 0],
     ['', ''],
-    ['Firma Dağılımı', ''],
+    ['FIRMA DAĞILIMI', ''],
     ...Object.entries(
       records.reduce<Record<string, number>>((acc, r) => {
         const firmAd = firmalar.find(f => f.id === r.firmaId)?.ad ?? 'Bilinmiyor';
@@ -454,15 +555,18 @@ export async function exportDofToExcel(
     ).map(([firma, count]) => [firma, count]),
   ];
 
-  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-  wsSummary['!cols'] = [{ wch: 28 }, { wch: 20 }];
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Özet');
+  summaryRows.forEach((rowData, idx) => {
+    const row = wsSummary.addRow(rowData);
+    if (idx === 0 || idx === 8) {
+      row.getCell(1).font = { bold: true, size: 13, color: { argb: 'FF1E293B' } };
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    }
+    row.height = 22;
+  });
 
-  const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  const blob = new Blob(
-    [xlsxData],
-    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-  );
+  // Excel dosyasını indir
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

@@ -565,7 +565,7 @@ export default function TutanaklarPage() {
   const {
     tutanaklar, firmalar, currentUser,
     addTutanak, updateTutanak, deleteTutanak,
-    getTutanakFile, getFirmaLogo, addToast,
+    getTutanakFile, uploadTutanakFile, getFirmaLogo, addToast,
     quickCreate, setQuickCreate,
   } = useApp();
   const { canEdit, canCreate, canDelete, isReadOnly } = usePermissions();
@@ -658,17 +658,29 @@ export default function TutanaklarPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.baslik.trim()) { addToast('Başlık zorunludur.', 'error'); return; }
     if (!form.firmaId)       { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.aciklama.trim()) { addToast('Açıklama zorunludur.', 'error'); return; }
 
     if (editId) {
-      updateTutanak(editId, form);
+      // Yeni dosya seçildiyse Storage'a yükle
+      if (form.dosyaVeri && form.dosyaAdi && form.dosyaTipi) {
+        const url = await uploadTutanakFile(editId, form.dosyaVeri, form.dosyaTipi, form.dosyaAdi);
+        updateTutanak(editId, { ...form, dosyaUrl: url ?? undefined });
+      } else {
+        updateTutanak(editId, form);
+      }
       addToast('Tutanak güncellendi.', 'success');
     } else {
       const tutanakNo = generateTutanakNo(tutanaklar);
-      addTutanak({ ...form, tutanakNo });
+      const newT = addTutanak({ ...form, tutanakNo });
+      // Dosya varsa Storage'a yükle ve URL'yi kaydet
+      if (form.dosyaVeri && form.dosyaAdi && form.dosyaTipi) {
+        uploadTutanakFile(newT.id, form.dosyaVeri, form.dosyaTipi, form.dosyaAdi).then(url => {
+          if (url) updateTutanak(newT.id, { dosyaUrl: url });
+        });
+      }
       addToast(`Tutanak oluşturuldu: ${tutanakNo}`, 'success');
     }
     closeModal();
@@ -682,7 +694,25 @@ export default function TutanaklarPage() {
   };
 
   /* ── Dosya indirme ──────────────────────────────────────── */
-  const handleFileDownload = (t: Tutanak) => {
+  const handleFileDownload = async (t: Tutanak) => {
+    // Önce Storage URL dene, sonra localStorage fallback
+    const storageUrl = t.dosyaUrl;
+    if (storageUrl) {
+      try {
+        const res = await fetch(storageUrl);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = t.dosyaAdi || 'tutanak-eki';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        addToast(`"${t.dosyaAdi}" indiriliyor...`, 'success');
+        return;
+      } catch { /* fallback */ }
+    }
     const veri = getTutanakFile(t.id) || t.dosyaVeri;
     if (!veri) { addToast('Bu tutanak için yüklenmiş dosya bulunamadı.', 'error'); return; }
     const link = document.createElement('a');
@@ -694,11 +724,31 @@ export default function TutanaklarPage() {
     addToast(`"${t.dosyaAdi}" indiriliyor...`, 'success');
   };
 
+  /* ── Dosya verisini al (Storage URL öncelikli) ── */
+  const resolveFileVeri = async (t: Tutanak): Promise<string | undefined> => {
+    // Storage URL varsa fetch ile base64'e çevir
+    if (t.dosyaUrl) {
+      try {
+        const res = await fetch(t.dosyaUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          return new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(getTutanakFile(t.id) || t.dosyaVeri || '');
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch { /* fallback */ }
+    }
+    return getTutanakFile(t.id) || t.dosyaVeri;
+  };
+
   const handleWordDownload = async (t: Tutanak) => {
     setWordLoading(t.id);
     try {
       const firma = firmalar.find(f => f.id === t.firmaId);
-      const fileVeri = getTutanakFile(t.id) || t.dosyaVeri;
+      const fileVeri = await resolveFileVeri(t);
       const firmaLogoVeri = getFirmaLogo(t.firmaId);
       await generateWordDoc(t, firma?.ad || '—', fileVeri, firmaLogoVeri);
       addToast(`Tutanak-${t.tutanakNo}.docx indiriliyor...`, 'success');
@@ -1106,7 +1156,7 @@ export default function TutanaklarPage() {
       <TutanakDetailModal
         tutanak={viewTutanak}
         firma={viewTutanak ? firmalar.find(f => f.id === viewTutanak.firmaId) : undefined}
-        dosyaVeri={viewTutanak ? (getTutanakFile(viewTutanak.id) || viewTutanak.dosyaVeri) : undefined}
+        dosyaVeri={viewTutanak ? (viewTutanak.dosyaUrl || getTutanakFile(viewTutanak.id) || viewTutanak.dosyaVeri) : undefined}
         onClose={() => setViewId(null)}
         onEdit={(t) => { setViewId(null); openEdit(t); }}
         onWordDownload={handleWordDownload}

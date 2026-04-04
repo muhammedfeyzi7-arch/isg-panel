@@ -766,6 +766,50 @@ export function useStore(
     }
   }, []);
 
+  /**
+   * Genel dosya yükleme yardımcısı — base64 → Storage → public URL
+   * @param base64 data URL (data:mime;base64,...)
+   * @param pathPrefix örn: "evrak", "ekipman", "saglik"
+   * @param id kayıt ID'si (dosya adı olarak kullanılır)
+   * @param ext dosya uzantısı (opsiyonel, mime'den çıkarılır)
+   */
+  const uploadBase64ToStorage = useCallback(async (
+    base64: string,
+    pathPrefix: string,
+    id: string,
+    fileName?: string,
+  ): Promise<string | null> => {
+    try {
+      const orgId = orgIdRef.current ?? 'unknown';
+      const [meta, data] = base64.split(',');
+      const mimeMatch = meta.match(/data:([^;]+);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+      const ext = fileName?.split('.').pop() ?? mime.split('/')[1]?.split('+')[0] ?? 'bin';
+      const filePath = `${pathPrefix}/${orgId}/${id}.${ext}`;
+
+      const byteString = atob(data);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const blob = new Blob([ab], { type: mime });
+
+      const { error } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, blob, { upsert: true, contentType: mime });
+
+      if (error) {
+        console.error(`[ISG] Storage upload error (${pathPrefix}):`, error);
+        return null;
+      }
+
+      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
+      return urlData?.publicUrl ?? null;
+    } catch (err) {
+      console.error(`[ISG] uploadBase64ToStorage error (${pathPrefix}):`, err);
+      return null;
+    }
+  }, []);
+
   const getUygunsuzlukPhoto = useCallback((id: string, type: 'acilis' | 'kapatma'): string | undefined => {
     // Supabase Storage public URL'ini döndür (tüm cihazlardan erişilebilir)
     const record = uygRef.current.find(u => u.id === id);
@@ -875,6 +919,44 @@ export function useStore(
   }, [setGorevler, deleteFromDb]);
 
   // ──────── TUTANAK ────────
+  const uploadTutanakFile = useCallback(async (
+    id: string,
+    dosyaVeri: string,
+    dosyaTipi: string,
+    dosyaAdi: string,
+  ): Promise<string | null> => {
+    try {
+      const orgId = orgIdRef.current ?? 'unknown';
+      const ext = dosyaAdi.split('.').pop() ?? (dosyaTipi.includes('pdf') ? 'pdf' : dosyaTipi.includes('png') ? 'png' : 'jpg');
+      const filePath = `tutanak/${orgId}/${id}.${ext}`;
+
+      // base64 → Blob
+      const [meta, data] = dosyaVeri.split(',');
+      const mimeMatch = meta.match(/data:([^;]+);/);
+      const mime = mimeMatch ? mimeMatch[1] : dosyaTipi;
+      const byteString = atob(data);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const blob = new Blob([ab], { type: mime });
+
+      const { error } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, blob, { upsert: true, contentType: mime });
+
+      if (error) {
+        console.error('[ISG] Tutanak file upload error:', error);
+        return null;
+      }
+
+      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
+      return urlData?.publicUrl ?? null;
+    } catch (err) {
+      console.error('[ISG] uploadTutanakFile error:', err);
+      return null;
+    }
+  }, []);
+
   const addTutanak = useCallback((t: Omit<Tutanak, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
     const orgId = orgIdRef.current ?? '';
     const now = new Date().toISOString();
@@ -882,6 +964,7 @@ export function useStore(
     const { dosyaVeri, ...rest } = t;
     const tutanakNo = generateTutanakNo(tutRef.current);
     const newT: Tutanak = { ...rest, id, tutanakNo, olusturmaTarihi: now, guncellemeTarihi: now };
+    // localStorage fallback (sync) — async Storage upload tutanak page'de yapılır
     if (dosyaVeri) saveFileData(orgId, 'tutanak', id, dosyaVeri);
     setTutanaklar(prev => [newT, ...prev]);
     saveToDb('tutanaklar', newT as unknown as { id: string } & Record<string, unknown>);
@@ -966,7 +1049,8 @@ export function useStore(
     addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, getUygunsuzlukPhoto, setUygunsuzlukPhoto,
     addEkipman, updateEkipman, deleteEkipman, getEkipmanFile,
     addGorev, updateGorev, deleteGorev,
-    addTutanak, updateTutanak, deleteTutanak, getTutanakFile,
+    addTutanak, updateTutanak, deleteTutanak, getTutanakFile, uploadTutanakFile,
+    uploadBase64ToStorage,
     addIsIzni, updateIsIzni, deleteIsIzni,
     getFirmaLogo, setFirmaLogo, clearFirmaLogo,
     getPersonelFoto, setPersonelFoto,

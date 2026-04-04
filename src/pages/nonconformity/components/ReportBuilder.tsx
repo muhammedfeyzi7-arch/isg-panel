@@ -61,7 +61,7 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
     if (selectedRecords.length === 0) return;
     setExporting(true);
     try {
-      await exportDofToExcel(selectedRecords, firmalar, personeller);
+      await exportDofToExcel(selectedRecords, firmalar, personeller, getUygunsuzlukPhoto);
     } catch {
       // silent
     } finally {

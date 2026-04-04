@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
 import MonthlyStats from './components/MonthlyStats';
 import StatCard from './components/StatCard';
@@ -20,7 +19,7 @@ function parseValidDate(dateStr: string | null | undefined): Date | null {
 export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
-    uygunsuzluklar, bildirimler, gorevler, ekipmanlar,
+    uygunsuzluklar, bildirimler, gorevler, ekipmanlar, setActiveModule,
   } = useApp();
 
   const aktifFirmalar      = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
@@ -208,7 +207,6 @@ export default function DashboardPage() {
     return list.sort((a, b) => b.priority - a.priority).slice(0, 5);
   }, [riskStats, stats]);
 
-  const navigate = useNavigate();
   const isEmpty = aktifFirmalar.length === 0 && aktifPersoneller.length === 0;
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
 
@@ -546,7 +544,7 @@ export default function DashboardPage() {
                 <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Kapatılmayı bekleyen kayıtlar</p>
               </div>
             </div>
-            <button onClick={() => navigate('/')} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+            <button onClick={() => setActiveModule('uygunsuzluklar')} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
               style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.15)' }}>
               Modüle Git
             </button>

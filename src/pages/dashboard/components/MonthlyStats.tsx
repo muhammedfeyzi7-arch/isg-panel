@@ -1,10 +1,8 @@
 import { useMemo, Fragment } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../../store/AppContext';
 
 export default function MonthlyStats() {
-  const { personeller, egitimler, gorevler, muayeneler, theme } = useApp();
-  const navigate = useNavigate();
+  const { personeller, egitimler, gorevler, muayeneler, theme, setActiveModule } = useApp();
   const isDark = theme === 'dark';
 
   const now = new Date();
@@ -258,7 +256,7 @@ export default function MonthlyStats() {
             })}
 
             <button
-              onClick={() => navigate('/training')}
+              onClick={() => setActiveModule('egitimler')}
               className="w-full py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all"
               style={{
                 background: 'rgba(245,158,11,0.08)',
@@ -393,7 +391,7 @@ export default function MonthlyStats() {
             </div>
 
             <button
-              onClick={() => navigate('/tasks')}
+              onClick={() => setActiveModule('gorevler')}
               className="w-full py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all"
               style={{
                 background: 'rgba(99,102,241,0.08)',

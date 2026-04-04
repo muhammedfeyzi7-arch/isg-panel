@@ -194,8 +194,8 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
               </p>
             </div>
 
-            {/* Görsel önizleme */}
-            {dosyaVeri && tutanak.dosyaTipi?.startsWith('image/') ? (
+            {/* Görsel önizleme — Storage URL veya base64 */}
+            {dosyaVeri && (tutanak.dosyaTipi?.startsWith('image/') || dosyaVeri.startsWith('http')) ? (
               <div
                 className="rounded-xl overflow-hidden"
                 style={{ border: '1px solid rgba(52,211,153,0.2)', background: 'var(--bg-item)' }}

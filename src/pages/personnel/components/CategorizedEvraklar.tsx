@@ -18,11 +18,27 @@ interface Props {
 
 /* ── Ana Bileşen ───────────────────────────────────────────── */
 export default function CategorizedEvraklar({ evraklar, personelAdi }: Props) {
-  const { addToast, getEvrakFile } = useApp();
+  const { addToast, getEvrakFile, uploadBase64ToStorage, updateEvrak } = useApp();
   const [zipLoading, setZipLoading] = useState<string | null>(null);
 
   /* ── Tek Dosya İndir ─────────────────────────────────────── */
-  const handleEvrakDownload = (ev: Evrak) => {
+  const handleEvrakDownload = async (ev: Evrak) => {
+    // Storage URL öncelikli
+    const storageUrl = ev.dosyaUrl;
+    if (storageUrl && storageUrl.startsWith('http')) {
+      try {
+        const res = await fetch(storageUrl);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = ev.dosyaAdi || ev.ad;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        addToast(`"${ev.dosyaAdi || ev.ad}" indiriliyor...`, 'success');
+        return;
+      } catch { /* fallback */ }
+    }
+    // localStorage fallback + migrate
     const veri = getEvrakFile(ev.id) || ev.dosyaVeri;
     if (!veri) { addToast('İndirilebilir dosya bulunamadı.', 'error'); return; }
     try {
@@ -34,13 +50,14 @@ export default function CategorizedEvraklar({ evraklar, personelAdi }: Props) {
       const blob = new Blob([u8arr], { type: mime });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = ev.dosyaAdi || ev.ad;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      link.href = url; link.download = ev.dosyaAdi || ev.ad;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       addToast(`"${ev.dosyaAdi || ev.ad}" indiriliyor...`, 'success');
+      // Arka planda Storage'a migrate et
+      uploadBase64ToStorage(veri, 'evrak', ev.id, ev.dosyaAdi).then(url2 => {
+        if (url2) updateEvrak(ev.id, { dosyaUrl: url2 } as Parameters<typeof updateEvrak>[1]);
+      });
     } catch {
       addToast('Dosya indirilemedi.', 'error');
     }

@@ -36,7 +36,7 @@ const statusConfig = {
 };
 
 export default function EvraklarPage() {
-  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, getEvrakFile, addToast, quickCreate, setQuickCreate } = useApp();
+  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, getEvrakFile, uploadBase64ToStorage, addToast, quickCreate, setQuickCreate } = useApp();
   const location = useLocation();
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -123,30 +123,69 @@ export default function EvraklarPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleDownload = (ev: typeof filtered[0]) => {
-    const veri = getEvrakFile(ev.id) || ev.dosyaVeri;
-    if (!veri) { addToast('İndirilebilir dosya bulunamadı. Lütfen evrakı tekrar yükleyin.', 'error'); return; }
+  const resolveEvrakUrl = async (ev: typeof filtered[0]): Promise<string | null> => {
+    // 1. Storage URL varsa direkt kullan (en güvenilir — tüm cihazlarda çalışır)
+    if (ev.dosyaUrl && ev.dosyaUrl.startsWith('http')) return ev.dosyaUrl;
+    // 2. Evrak tipinde dosyaVeri alanı varsa (yeni yükleme, henüz Storage'a gitmemiş)
+    if (ev.dosyaVeri && ev.dosyaVeri.startsWith('data:')) {
+      const url = await uploadBase64ToStorage(ev.dosyaVeri, 'evrak', ev.id, ev.dosyaAdi);
+      if (url) {
+        updateEvrak(ev.id, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
+        return url;
+      }
+      return ev.dosyaVeri; // fallback: base64
+    }
+    // 3. localStorage fallback (aynı cihaz, eski kayıt)
+    const veri = getEvrakFile(ev.id);
+    if (veri && veri.startsWith('data:')) {
+      // Arka planda Storage'a migrate et
+      uploadBase64ToStorage(veri, 'evrak', ev.id, ev.dosyaAdi).then(url => {
+        if (url) updateEvrak(ev.id, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
+      });
+      return veri;
+    }
+    // 4. Hiçbir kaynak yok
+    return null;
+  };
+
+  const handleDownload = async (ev: typeof filtered[0]) => {
+    const src = await resolveEvrakUrl(ev);
+    if (!src) { addToast('İndirilebilir dosya bulunamadı. Lütfen evrakı tekrar yükleyin.', 'error'); return; }
     try {
-      const arr = veri.split(',');
-      const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
-      const bstr = atob(arr[1]);
-      const u8arr = new Uint8Array(bstr.length);
-      for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-      const blob = new Blob([u8arr], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url; link.download = ev.dosyaAdi || 'evrak';
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (src.startsWith('http')) {
+        const res = await fetch(src);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = ev.dosyaAdi || 'evrak';
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else {
+        const arr = src.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+        const bstr = atob(arr[1]);
+        const u8arr = new Uint8Array(bstr.length);
+        for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+        const blob = new Blob([u8arr], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = ev.dosyaAdi || 'evrak';
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
       addToast(`"${ev.dosyaAdi}" indiriliyor...`, 'success');
     } catch { addToast('Dosya indirilemedi.', 'error'); }
   };
 
-  const handlePreview = (ev: typeof filtered[0]) => {
-    const veri = getEvrakFile(ev.id) || ev.dosyaVeri;
-    if (!veri) { addToast('Önizlenecek dosya bulunamadı.', 'error'); return; }
+  const handlePreview = async (ev: typeof filtered[0]) => {
+    const src = await resolveEvrakUrl(ev);
+    if (!src) { addToast('Önizlenecek dosya bulunamadı.', 'error'); return; }
+    if (src.startsWith('http')) {
+      window.open(src, '_blank');
+      return;
+    }
     try {
-      const arr = veri.split(',');
+      const arr = src.split(',');
       const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
       const bstr = atob(arr[1]);
       const u8arr = new Uint8Array(bstr.length);
@@ -157,15 +196,32 @@ export default function EvraklarPage() {
     } catch { addToast('Dosya açılamadı.', 'error'); }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.ad.trim()) { addToast('Evrak adı zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     const autoDurum = calcEvrakDurum(form.dosyaAdi, form.gecerlilikTarihi);
-    // Kategoriyi kayıt anında hesapla ve sakla
     const kategori = getEvrakKategori(form.tur, form.ad);
     const savedForm = { ...form, durum: autoDurum, kategori };
-    if (editingId) { updateEvrak(editingId, savedForm); addToast('Evrak güncellendi.', 'success'); }
-    else { addEvrak(savedForm); addToast('Evrak eklendi.', 'success'); }
+
+    if (editingId) {
+      updateEvrak(editingId, savedForm);
+      // Yeni dosya seçildiyse Storage'a yükle
+      if (form.dosyaVeri && form.dosyaAdi) {
+        uploadBase64ToStorage(form.dosyaVeri, 'evrak', editingId, form.dosyaAdi).then(url => {
+          if (url) updateEvrak(editingId, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
+        });
+      }
+      addToast('Evrak güncellendi.', 'success');
+    } else {
+      const newEvrak = addEvrak(savedForm);
+      // Dosya varsa Storage'a yükle
+      if (form.dosyaVeri && form.dosyaAdi && newEvrak?.id) {
+        uploadBase64ToStorage(form.dosyaVeri, 'evrak', newEvrak.id, form.dosyaAdi).then(url => {
+          if (url) updateEvrak(newEvrak.id, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
+        });
+      }
+      addToast('Evrak eklendi.', 'success');
+    }
     setFormOpen(false);
   };
 
@@ -314,8 +370,8 @@ export default function EvraklarPage() {
                     </td>
                     <td>
                       <div className="flex items-center gap-1 justify-end">
-                        {ev.dosyaAdi && <ABtn icon="ri-eye-line" color="#60A5FA" onClick={() => handlePreview(ev)} title="Görüntüle" />}
-                        {ev.dosyaAdi && <ABtn icon="ri-download-line" color="#10B981" onClick={() => handleDownload(ev)} title="Dosyayı İndir" />}
+                        <ABtn icon="ri-eye-line" color={ev.dosyaAdi || ev.dosyaUrl ? '#60A5FA' : '#475569'} onClick={() => handlePreview(ev)} title="Görüntüle" />
+                        <ABtn icon="ri-download-line" color={ev.dosyaAdi || ev.dosyaUrl ? '#10B981' : '#475569'} onClick={() => handleDownload(ev)} title="Dosyayı İndir" />
                         <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(ev)} title="Düzenle" />
                         <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
                       </div>

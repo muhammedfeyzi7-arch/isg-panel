@@ -70,6 +70,7 @@ export interface Evrak {
   dosyaBoyutu?: number;
   dosyaTipi?: string;
   dosyaVeri?: string;
+  dosyaUrl?: string;
   notlar: string;
   olusturmaTarihi: string;
   silinmis?: boolean;
@@ -220,6 +221,7 @@ export interface Tutanak {
   dosyaBoyutu?: number;
   dosyaTipi?: string;
   dosyaVeri?: string;
+  dosyaUrl?: string;
   sahadenetimId?: string;
   notlar: string;
   olusturmaTarihi: string;
