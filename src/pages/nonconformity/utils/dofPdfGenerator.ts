@@ -1,4 +1,5 @@
 import type { Uygunsuzluk, Firma, Personel } from '../../../types';
+import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
 function esc(v: unknown): string {
   return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, ' ');
@@ -9,8 +10,28 @@ function fmtDate(d?: string) {
   return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-// Supabase Storage URL'ini base64'e çevir (cross-origin print sorunu için)
-async function urlToBase64(url: string): Promise<string | null> {
+/**
+ * Herhangi bir kaynak (filePath, http URL, base64) → base64 string
+ * filePath ise önce signed URL üretir, sonra fetch eder
+ */
+async function resolveToBase64(src: string | undefined | null): Promise<string | null> {
+  if (!src) return null;
+
+  // Zaten base64
+  if (src.startsWith('data:')) return src;
+
+  // http/https URL — direkt fetch
+  if (src.startsWith('http://') || src.startsWith('https://')) {
+    return fetchToBase64(src);
+  }
+
+  // filePath — önce signed URL üret
+  const signedUrl = await getSignedUrlFromPath(src);
+  if (!signedUrl) return null;
+  return fetchToBase64(signedUrl);
+}
+
+async function fetchToBase64(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, { cache: 'force-cache' });
     if (!response.ok) return null;
@@ -24,16 +45,6 @@ async function urlToBase64(url: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-// Fotoğraf src'sini hazırla: URL ise base64'e çevir, base64 ise direkt kullan
-async function resolvePhotoSrc(src: string | undefined): Promise<string | null> {
-  if (!src) return null;
-  if (src.startsWith('data:')) return src; // zaten base64
-  if (src.startsWith('http://') || src.startsWith('https://')) {
-    return await urlToBase64(src);
-  }
-  return null;
 }
 
 function severityBadge(severity: string): string {
@@ -58,7 +69,6 @@ function buildHtml(
   const acik = records.filter(r => r.durum === 'Açık').length;
   const kapandi = records.filter(r => r.durum === 'Kapandı').length;
 
-  // Firma dağılımı özeti
   const firmaDagilim = Object.entries(
     records.reduce<Record<string, number>>((acc, r) => {
       const ad = firmalar.find(f => f.id === r.firmaId)?.ad ?? 'Bilinmiyor';
@@ -69,7 +79,7 @@ function buildHtml(
 
   const photoCell = (src: string | undefined) => src
     ? `<img src="${src}" style="max-width:88px;max-height:66px;object-fit:cover;border-radius:5px;border:1px solid #E2E8F0;display:block;margin:0 auto;" alt="foto" />`
-    : `<span style="color:#CBD5E1;font-size:11px;display:block;text-align:center;">—</span>`;
+    : `<span style="color:#9CA3AF;font-size:11px;display:block;text-align:center;">—</span>`;
 
   const rows = records.map((r, i) => {
     const firma = firmalar.find(f => f.id === r.firmaId);
@@ -77,7 +87,6 @@ function buildHtml(
     const acilisFoto = r.acilisFotoMevcut ? photoMap.get(`${r.id}_acilis`) : undefined;
     const kapatmaFoto = r.kapatmaFotoMevcut ? photoMap.get(`${r.id}_kapatma`) : undefined;
     const isKapandi = r.durum === 'Kapandı';
-    // Excel zebra: çift satır #F8FAFC, tek satır #FFFFFF
     const rowBg = i % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
 
     const durumBadge = isKapandi
@@ -118,7 +127,7 @@ function buildHtml(
     <tr>
       <td style="padding:5px 10px;font-size:11px;color:#374151;border-bottom:1px solid #F1F5F9;">${esc(ad)}</td>
       <td style="padding:5px 10px;font-size:11px;font-weight:700;color:#1E293B;text-align:center;border-bottom:1px solid #F1F5F9;">${count}</td>
-      <td style="padding:5px 10px;font-size:11px;color:#64748B;text-align:center;border-bottom:1px solid #F1F5F9;">${Math.round((count / total) * 100)}%</td>
+      <td style="padding:5px 10px;font-size:11px;color:#374151;text-align:center;border-bottom:1px solid #F1F5F9;">${Math.round((count / total) * 100)}%</td>
     </tr>`).join('');
 
   return `<!DOCTYPE html>
@@ -131,12 +140,9 @@ function buildHtml(
   body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#1E293B;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .page{width:1060px;margin:0 auto;padding:28px 32px 40px}
 
-  /* ── Üst şerit ── */
   .top-bar{height:5px;background:linear-gradient(90deg,#EF4444 0%,#F97316 55%,#FCD34D 100%);margin-bottom:22px;border-radius:2px}
 
-  /* ── Header ── */
   .header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:16px;border-bottom:2px solid #E2E8F0;margin-bottom:18px}
-  .hdr-left{}
   .hdr-badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;background:#EF4444;color:#fff;margin-bottom:6px}
   .hdr-title{font-size:22px;font-weight:800;color:#0F172A;letter-spacing:-0.3px}
   .hdr-sub{font-size:11px;color:#64748B;margin-top:3px}
@@ -144,7 +150,6 @@ function buildHtml(
   .hdr-date{font-size:12px;font-weight:600;color:#374151}
   .hdr-label{font-size:10px;color:#94A3B8;margin-top:2px}
 
-  /* ── Özet kartlar ── */
   .summary{display:flex;gap:10px;margin-bottom:18px}
   .sum-box{flex:1;border:1px solid #E2E8F0;border-radius:8px;padding:12px 16px;text-align:center;position:relative;overflow:hidden}
   .sum-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
@@ -153,13 +158,12 @@ function buildHtml(
   .sum-kapandi::before{background:#22C55E}
   .sum-oran::before{background:#F97316}
   .sum-num{font-size:24px;font-weight:800;color:#0F172A;line-height:1}
-  .sum-label{font-size:10px;color:#64748B;margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+  .sum-label{font-size:10px;color:#374151;margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
   .sum-acik .sum-num{color:#DC2626}
   .sum-kapandi .sum-num{color:#16A34A}
   .sum-oran .sum-num{color:#EA580C}
 
-  /* ── Ana tablo ── */
-  .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#64748B;margin-bottom:8px;padding-left:2px}
+  .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#374151;margin-bottom:8px;padding-left:2px}
   table.dof-table{width:100%;border-collapse:collapse;border:1px solid #D1D5DB;font-size:12px;border-radius:6px;overflow:hidden}
   table.dof-table thead tr{background:#1E293B}
   table.dof-table thead th{
@@ -169,24 +173,22 @@ function buildHtml(
     font-weight:700;
     text-transform:uppercase;
     letter-spacing:0.8px;
-    color:#94A3B8;
-    border-right:1px solid rgba(255,255,255,0.07);
+    color:#E2E8F0;
+    border-right:1px solid rgba(255,255,255,0.1);
     border-bottom:3px solid #EF4444;
   }
   table.dof-table thead th:last-child{border-right:none}
   table.dof-table thead th.th-left{text-align:left}
 
-  /* ── Firma özet tablosu ── */
   .firma-section{margin-top:20px;display:flex;gap:16px;align-items:flex-start}
   .firma-table-wrap{flex:1}
   table.firma-table{width:100%;border-collapse:collapse;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;font-size:11px}
   table.firma-table thead tr{background:#334155}
-  table.firma-table thead th{padding:8px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#94A3B8;border-bottom:2px solid #EF4444}
+  table.firma-table thead th{padding:8px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:2px solid #EF4444}
   table.firma-table thead th:not(:first-child){text-align:center}
 
-  /* ── Footer ── */
-  .footer{display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:12px;border-top:1px solid #E2E8F0;font-size:10px;color:#94A3B8}
-  .footer-brand{font-weight:700;color:#64748B}
+  .footer{display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:12px;border-top:1px solid #E2E8F0;font-size:10px;color:#64748B}
+  .footer-brand{font-weight:700;color:#374151}
 
   @media print{
     body{background:#fff!important}
@@ -282,30 +284,27 @@ export async function printDofRaporu(
   personeller: Personel[],
   getPhoto: (id: string, type: 'acilis' | 'kapatma') => string | undefined,
 ): Promise<void> {
-  // Tüm fotoğrafları önceden base64'e çevir (cross-origin print sorunu için)
   const photoMap = new Map<string, string>();
   const photoJobs: Promise<void>[] = [];
 
   records.forEach(r => {
-    if (r.acilisFotoMevcut) {
-      const src = getPhoto(r.id, 'acilis');
-      if (src) {
-        photoJobs.push(
-          resolvePhotoSrc(src).then(b64 => {
-            if (b64) photoMap.set(`${r.id}_acilis`, b64);
-          }),
-        );
-      }
+    // getPhoto'dan gelen değer filePath, http URL veya base64 olabilir
+    const acilisSrc = r.acilisFotoMevcut ? (getPhoto(r.id, 'acilis') ?? r.acilisFotoUrl) : undefined;
+    const kapatmaSrc = r.kapatmaFotoMevcut ? (getPhoto(r.id, 'kapatma') ?? r.kapatmaFotoUrl) : undefined;
+
+    if (acilisSrc) {
+      photoJobs.push(
+        resolveToBase64(acilisSrc).then(b64 => {
+          if (b64) photoMap.set(`${r.id}_acilis`, b64);
+        }),
+      );
     }
-    if (r.kapatmaFotoMevcut) {
-      const src = getPhoto(r.id, 'kapatma');
-      if (src) {
-        photoJobs.push(
-          resolvePhotoSrc(src).then(b64 => {
-            if (b64) photoMap.set(`${r.id}_kapatma`, b64);
-          }),
-        );
-      }
+    if (kapatmaSrc) {
+      photoJobs.push(
+        resolveToBase64(kapatmaSrc).then(b64 => {
+          if (b64) photoMap.set(`${r.id}_kapatma`, b64);
+        }),
+      );
     }
   });
 
@@ -332,77 +331,43 @@ export async function printDofRaporu(
   win.addEventListener('afterprint', () => clearTimeout(fb));
 }
 
-// Fotoğraf URL'sini base64'e çevir (Excel için)
-async function photoUrlToBase64(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { cache: 'force-cache' });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
-
 export async function exportDofToExcel(
   records: Uygunsuzluk[],
   firmalar: Firma[],
   personeller: Personel[],
   getPhoto?: (id: string, type: 'acilis' | 'kapatma') => string | undefined,
 ): Promise<void> {
-  // Fotoğrafları önceden çek (URL → base64)
+  // Tüm fotoğrafları base64'e çevir — filePath, http URL veya base64 desteklenir
   const photoMap = new Map<string, string>();
-  if (getPhoto) {
-    const jobs: Promise<void>[] = [];
-    records.forEach(r => {
-      if (r.acilisFotoMevcut) {
-        const src = getPhoto(r.id, 'acilis') ?? r.acilisFotoUrl;
-        if (src && src.startsWith('http')) {
-          jobs.push(photoUrlToBase64(src).then(b64 => { if (b64) photoMap.set(`${r.id}_acilis`, b64); }));
-        } else if (src && src.startsWith('data:')) {
-          photoMap.set(`${r.id}_acilis`, src);
-        }
-      }
-      if (r.kapatmaFotoMevcut) {
-        const src = getPhoto(r.id, 'kapatma') ?? r.kapatmaFotoUrl;
-        if (src && src.startsWith('http')) {
-          jobs.push(photoUrlToBase64(src).then(b64 => { if (b64) photoMap.set(`${r.id}_kapatma`, b64); }));
-        } else if (src && src.startsWith('data:')) {
-          photoMap.set(`${r.id}_kapatma`, src);
-        }
-      }
-    });
-    await Promise.all(jobs);
-  } else {
-    // getPhoto verilmemişse direkt URL'leri kullan
-    const jobs: Promise<void>[] = [];
-    records.forEach(r => {
-      if (r.acilisFotoUrl && r.acilisFotoUrl.startsWith('http')) {
-        jobs.push(photoUrlToBase64(r.acilisFotoUrl).then(b64 => { if (b64) photoMap.set(`${r.id}_acilis`, b64); }));
-      }
-      if (r.kapatmaFotoUrl && r.kapatmaFotoUrl.startsWith('http')) {
-        jobs.push(photoUrlToBase64(r.kapatmaFotoUrl).then(b64 => { if (b64) photoMap.set(`${r.id}_kapatma`, b64); }));
-      }
-    });
-    await Promise.all(jobs);
-  }
+  const jobs: Promise<void>[] = [];
+
+  records.forEach(r => {
+    const acilisSrc = getPhoto
+      ? (getPhoto(r.id, 'acilis') ?? r.acilisFotoUrl)
+      : r.acilisFotoUrl;
+    const kapatmaSrc = getPhoto
+      ? (getPhoto(r.id, 'kapatma') ?? r.kapatmaFotoUrl)
+      : r.kapatmaFotoUrl;
+
+    if (acilisSrc) {
+      jobs.push(resolveToBase64(acilisSrc).then(b64 => { if (b64) photoMap.set(`${r.id}_acilis`, b64); }));
+    }
+    if (kapatmaSrc) {
+      jobs.push(resolveToBase64(kapatmaSrc).then(b64 => { if (b64) photoMap.set(`${r.id}_kapatma`, b64); }));
+    }
+  });
+
+  await Promise.all(jobs);
 
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'ISG Denetim Sistemi';
   wb.created = new Date();
 
-  // ── Ana Sayfa ──
   const ws = wb.addWorksheet('DÖF Raporu', {
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
   });
 
-  // Sütun tanımları
   ws.columns = [
     { header: 'No', key: 'no', width: 6 },
     { header: 'DÖF No', key: 'dofNo', width: 16 },
@@ -421,7 +386,6 @@ export async function exportDofToExcel(
     { header: 'Kapanış Fotoğrafı', key: 'kapatmaFoto', width: 22 },
   ];
 
-  // Başlık satırı stili
   const headerRow = ws.getRow(1);
   headerRow.height = 30;
   headerRow.eachCell(cell => {
@@ -433,7 +397,6 @@ export async function exportDofToExcel(
     };
   });
 
-  // Veri satırları
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const firma = firmalar.find(f => f.id === r.firmaId);
@@ -462,7 +425,6 @@ export async function exportDofToExcel(
     const dataRow = ws.addRow(rowData);
     dataRow.height = 80;
 
-    // Satır stili
     dataRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
       cell.alignment = { vertical: 'middle', wrapText: true };
@@ -470,16 +432,11 @@ export async function exportDofToExcel(
         bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
         right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
       };
-      // Durum sütunu rengi (col 13)
       if (colNumber === 13) {
         const val = cell.value as string;
-        if (val === 'Açık') {
-          cell.font = { bold: true, color: { argb: 'FFDC2626' }, size: 11 };
-        } else if (val === 'Kapandı') {
-          cell.font = { bold: true, color: { argb: 'FF16A34A' }, size: 11 };
-        }
+        if (val === 'Açık') cell.font = { bold: true, color: { argb: 'FFDC2626' }, size: 11 };
+        else if (val === 'Kapandı') cell.font = { bold: true, color: { argb: 'FF16A34A' }, size: 11 };
       }
-      // Önem sütunu rengi (col 12)
       if (colNumber === 12) {
         const val = cell.value as string;
         const sevColors: Record<string, string> = {
@@ -489,7 +446,6 @@ export async function exportDofToExcel(
       }
     });
 
-    // Fotoğrafları ekle (col 14 = Açılış, col 15 = Kapanış)
     const acilisB64 = photoMap.get(`${r.id}_acilis`);
     const kapatmaB64 = photoMap.get(`${r.id}_kapatma`);
 
@@ -500,39 +456,38 @@ export async function exportDofToExcel(
         const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
         const ext = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : 'jpeg';
         const imageId = wb.addImage({ base64: data, extension: ext as 'jpeg' | 'png' | 'gif' });
-        // Satır index (0-based): i+1 (başlık row=0)
         ws.addImage(imageId, {
           tl: { col: col - 1, row: i + 1 },
           br: { col: col, row: i + 2 },
           editAs: 'oneCell',
         });
-        // Hücredeki metni temizle
         const cell = dataRow.getCell(col);
         cell.value = '';
       } catch { /* fotoğraf eklenemezse sessizce geç */ }
     };
 
-    if (acilisB64) await addPhoto(acilisB64, 14);
-    else {
+    if (acilisB64) {
+      await addPhoto(acilisB64, 14);
+    } else {
       const cell = dataRow.getCell(14);
-      cell.value = r.acilisFotoUrl ? '🔗 Fotoğraf var (URL)' : '—';
-      cell.font = { color: { argb: r.acilisFotoUrl ? 'FF6366F1' : 'FF9CA3AF' }, size: 10 };
+      cell.value = r.acilisFotoMevcut ? 'Fotoğraf yüklenemedi' : '—';
+      cell.font = { color: { argb: r.acilisFotoMevcut ? 'FFCA8A04' : 'FF9CA3AF' }, size: 10 };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
     }
 
-    if (kapatmaB64) await addPhoto(kapatmaB64, 15);
-    else {
+    if (kapatmaB64) {
+      await addPhoto(kapatmaB64, 15);
+    } else {
       const cell = dataRow.getCell(15);
-      cell.value = r.kapatmaFotoUrl ? '🔗 Fotoğraf var (URL)' : '—';
-      cell.font = { color: { argb: r.kapatmaFotoUrl ? 'FF16A34A' : 'FF9CA3AF' }, size: 10 };
+      cell.value = r.kapatmaFotoMevcut ? 'Fotoğraf yüklenemedi' : '—';
+      cell.font = { color: { argb: r.kapatmaFotoMevcut ? 'FFCA8A04' : 'FF9CA3AF' }, size: 10 };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
     }
   }
 
-  // Freeze header row
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-  // ── Özet Sayfası ──
+  // Özet sayfası
   const wsSummary = wb.addWorksheet('Özet');
   wsSummary.columns = [{ header: '', key: 'label', width: 30 }, { header: '', key: 'value', width: 22 }];
 
@@ -564,7 +519,6 @@ export async function exportDofToExcel(
     row.height = 22;
   });
 
-  // Excel dosyasını indir
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
