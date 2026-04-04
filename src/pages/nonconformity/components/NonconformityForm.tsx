@@ -76,14 +76,16 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
     setSaving(true);
     try {
       if (editRecord) {
-        // Storage URL ise direkt kullan; base64 ise Storage'a yükle
+        // Storage filePath veya URL ise direkt kullan; base64 ise Storage'a yükle
         let acilisFotoUrl: string | undefined;
-        if (form.acilisFoto && form.acilisFoto.startsWith('http')) {
-          acilisFotoUrl = form.acilisFoto;
-        } else if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
+        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
+          // base64 → Storage'a yükle
           const uploaded = await setUygunsuzlukPhoto(editRecord.id, 'acilis', form.acilisFoto);
           acilisFotoUrl = uploaded ?? undefined;
           if (!uploaded) addToast('Fotoğraf yüklenemedi, kayıt yine de güncellendi.', 'warning');
+        } else if (form.acilisFoto) {
+          // http URL veya filePath — direkt kullan
+          acilisFotoUrl = form.acilisFoto;
         }
 
         updateUygunsuzluk(editRecord.id, {
@@ -97,17 +99,17 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
         logAction('uygunsuzluk_updated', 'Uygunsuzluklar', editRecord.id, form.baslik, 'Uygunsuzluk güncellendi.');
         addToast('Uygunsuzluk güncellendi.', 'success');
       } else {
-        // Yeni kayıt: önce geçici ID oluştur, fotoğrafı yükle, sonra kaydet
+        // Yeni kayıt: ImageUpload zaten Storage'a yükledi, filePath döndürdü
         let acilisFotoUrl: string | undefined;
-        if (form.acilisFoto && form.acilisFoto.startsWith('http')) {
-          // ImageUpload zaten Storage URL döndürdü
-          acilisFotoUrl = form.acilisFoto;
-        } else if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
-          // base64 → geçici ID ile Storage'a yükle
+        if (form.acilisFoto && form.acilisFoto.startsWith('data:')) {
+          // base64 fallback → geçici ID ile Storage'a yükle
           const tempId = `temp-${Date.now()}`;
           const uploaded = await setUygunsuzlukPhoto(tempId, 'acilis', form.acilisFoto);
           acilisFotoUrl = uploaded ?? undefined;
           if (!uploaded) addToast('Fotoğraf yüklenemedi, kayıt yine de oluşturuldu.', 'warning');
+        } else if (form.acilisFoto) {
+          // ImageUpload'dan gelen filePath veya http URL — direkt kullan
+          acilisFotoUrl = form.acilisFoto;
         }
 
         addUygunsuzluk({

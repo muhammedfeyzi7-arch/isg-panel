@@ -28,18 +28,19 @@ export default function KapatmaModal({ record, onClose }: Props) {
     try {
       const now = new Date().toISOString();
 
-      // ImageUpload artık direkt Storage URL döndürüyor
-      // Eğer hâlâ base64 ise (fallback) Storage'a yükle
+      // ImageUpload artık direkt Storage filePath döndürüyor
+      // base64 ise (fallback) Storage'a yükle; filePath veya http URL ise direkt kullan
       let kapatmaFotoUrl: string | undefined;
-      if (foto.startsWith('http')) {
-        kapatmaFotoUrl = foto;
-      } else if (foto.startsWith('data:')) {
+      if (foto.startsWith('data:')) {
         const url = await setUygunsuzlukPhoto(record.id, 'kapatma', foto);
         if (!url) {
           addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
           return;
         }
         kapatmaFotoUrl = url;
+      } else {
+        // filePath veya http URL — direkt kullan
+        kapatmaFotoUrl = foto;
       }
 
       updateUygunsuzluk(record.id, {

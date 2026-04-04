@@ -951,8 +951,17 @@ export default function EkipmanlarPage() {
                           {ekipman.dosyaUrl && (
                             <button onClick={async () => {
                               const url = await getSignedUrlFromPath(ekipman.dosyaUrl!);
-                              if (url) window.open(url, '_blank');
-                              else addToast('Belge erişim linki alınamadı.', 'error');
+                              if (url) {
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.target = '_blank';
+                                a.rel = 'noopener noreferrer';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                              } else {
+                                addToast('Belge erişim linki alınamadı.', 'error');
+                              }
                             }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Belgeyi Görüntüle"><i className="ri-eye-line text-sm" /></button>
                           )}
                           {ekipman.dosyaUrl && (
