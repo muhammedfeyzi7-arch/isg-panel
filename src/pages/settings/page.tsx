@@ -136,18 +136,25 @@ export default function SettingsPage() {
       };
       zip.file('isg_veriler.json', JSON.stringify(exportData, null, 2));
 
-      // Evrak dosyalarını ayrı klasöre koy
+      // Evrak dosyalarını Storage URL'den fetch edip ZIP'e ekle
       const evrakFolder = zip.folder('evraklar');
-      evraklar.filter(e => !e.silinmis && e.dosyaVeri).forEach(e => {
-        try {
-          const base64 = e.dosyaVeri!.split(',')[1];
-          if (base64 && evrakFolder) {
+      const evrakPromises = evraklar
+        .filter(e => !e.silinmis && (e as typeof e & { dosyaUrl?: string }).dosyaUrl)
+        .map(async e => {
+          const dosyaUrl = (e as typeof e & { dosyaUrl?: string }).dosyaUrl!;
+          try {
+            const res = await fetch(dosyaUrl);
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const arrayBuffer = await blob.arrayBuffer();
             const ext = e.dosyaAdi?.split('.').pop() || 'pdf';
             const personelAd = personeller.find(p => p.id === e.personelId)?.adSoyad?.replace(/\s+/g, '_') || 'firma';
-            evrakFolder.file(`${personelAd}_${e.ad.replace(/\s+/g, '_')}.${ext}`, base64, { base64: true });
-          }
-        } catch { /* skip bad file */ }
-      });
+            const fileName = `${personelAd}_${e.ad.replace(/\s+/g, '_')}.${ext}`;
+            evrakFolder?.file(fileName, arrayBuffer);
+          } catch { /* dosya indirilemedi, atla */ }
+        });
+
+      await Promise.all(evrakPromises);
 
       const content = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(content);

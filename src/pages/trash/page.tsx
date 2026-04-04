@@ -14,10 +14,10 @@ export default function CopKutusuPage() {
     restoreEvrak, permanentDeleteEvrak,
     restoreEgitim, permanentDeleteEgitim,
     restoreMuayene, permanentDeleteMuayene,
-    deleteEkipman,
+    restoreEkipman, permanentDeleteEkipman,
     deleteUygunsuzluk,
-    deleteTutanak,
-    deleteIsIzni,
+    restoreTutanak, permanentDeleteTutanak,
+    restoreIsIzni, permanentDeleteIsIzni,
     addToast,
   } = useApp();
 
@@ -75,10 +75,13 @@ export default function CopKutusuPage() {
         : '';
       addToast(`Firma geri yüklendi.${ekBilgi}`, 'success');
     }
-    if (tip === 'personeller') { restorePersonel(id); addToast('Personel geri yüklendi.', 'success'); }
-    if (tip === 'evraklar')    { restoreEvrak(id);    addToast('Evrak geri yüklendi.', 'success'); }
-    if (tip === 'egitimler')   { restoreEgitim(id);   addToast('Eğitim geri yüklendi.', 'success'); }
-    if (tip === 'muayeneler')  { restoreMuayene(id);  addToast('Sağlık evrakı geri yüklendi.', 'success'); }
+    if (tip === 'personeller')    { restorePersonel(id);  addToast('Personel geri yüklendi.', 'success'); }
+    if (tip === 'evraklar')       { restoreEvrak(id);     addToast('Evrak geri yüklendi.', 'success'); }
+    if (tip === 'egitimler')      { restoreEgitim(id);    addToast('Eğitim geri yüklendi.', 'success'); }
+    if (tip === 'muayeneler')     { restoreMuayene(id);   addToast('Sağlık evrakı geri yüklendi.', 'success'); }
+    if (tip === 'ekipmanlar')     { restoreEkipman(id);   addToast('Ekipman geri yüklendi.', 'success'); }
+    if (tip === 'tutanaklar')     { restoreTutanak(id);   addToast('Tutanak geri yüklendi.', 'success'); }
+    if (tip === 'is_izinleri')    { restoreIsIzni(id);    addToast('İş izni geri yüklendi.', 'success'); }
   };
 
   const handlePermanentDelete = () => {
@@ -89,15 +92,15 @@ export default function CopKutusuPage() {
     if (tip === 'evraklar')       permanentDeleteEvrak(id);
     if (tip === 'egitimler')      permanentDeleteEgitim(id);
     if (tip === 'muayeneler')     permanentDeleteMuayene(id);
-    if (tip === 'ekipmanlar')     deleteEkipman(id);
+    if (tip === 'ekipmanlar')     permanentDeleteEkipman(id);
     if (tip === 'uygunsuzluklar') deleteUygunsuzluk(id);
-    if (tip === 'tutanaklar')     deleteTutanak(id);
-    if (tip === 'is_izinleri')    deleteIsIzni(id);
+    if (tip === 'tutanaklar')     permanentDeleteTutanak(id);
+    if (tip === 'is_izinleri')    permanentDeleteIsIzni(id);
     addToast('Kayıt kalıcı olarak silindi.', 'info');
     setPermDeleteItem(null);
   };
 
-  const canRestore = (tip: Tab) => ['firmalar', 'personeller', 'evraklar', 'egitimler', 'muayeneler'].includes(tip);
+  const canRestore = (tip: Tab) => ['firmalar', 'personeller', 'evraklar', 'egitimler', 'muayeneler', 'ekipmanlar', 'tutanaklar', 'is_izinleri'].includes(tip);
 
   const tabs: { id: Tab; label: string; icon: string; count: number; color: string }[] = [
     { id: 'firmalar',       label: 'Firmalar',       icon: 'ri-building-2-line',      count: deletedFirmalar.length,       color: '#3B82F6' },
@@ -148,7 +151,7 @@ export default function CopKutusuPage() {
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
           Silinen kayıtlar buradan <strong style={{ color: 'var(--text-primary)' }}>geri yüklenebilir</strong>.
           Kalıcı silme işlemi <strong className="text-red-400">geri alınamaz</strong> — dikkatli kullanın.
-          Ekipman, saha denetim, tutanak ve iş izni kayıtları için yalnızca <strong style={{ color: 'var(--text-primary)' }}>kalıcı silme</strong> mevcut.
+          Saha denetim kayıtları için yalnızca <strong style={{ color: 'var(--text-primary)' }}>kalıcı silme</strong> mevcut.
         </p>
       </div>
 
@@ -463,10 +466,13 @@ export default function CopKutusuPage() {
                       {ek.durum}
                     </span>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] px-2 py-1 rounded-lg font-medium"
-                        style={{ background: 'rgba(239,68,68,0.08)', color: '#F87171', border: '1px solid rgba(239,68,68,0.15)' }}>
-                        Geri yükleme yok
-                      </span>
+                      <button onClick={() => handleRestore(ek.id, 'ekipmanlar')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                        style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.25)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; }}>
+                        <i className="ri-arrow-go-back-line" /> Geri Yükle
+                      </button>
                       <button onClick={() => setPermDeleteItem({ id: ek.id, tip: 'ekipmanlar', ad: ek.ad })}
                         className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
                         style={{ color: '#EF4444' }} title="Kalıcı Sil"
@@ -514,10 +520,6 @@ export default function CopKutusuPage() {
                       {u.severity}
                     </span>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] px-2 py-1 rounded-lg font-medium"
-                        style={{ background: 'rgba(239,68,68,0.08)', color: '#F87171', border: '1px solid rgba(239,68,68,0.15)' }}>
-                        Geri yükleme yok
-                      </span>
                       <button onClick={() => setPermDeleteItem({ id: u.id, tip: 'uygunsuzluklar', ad: u.baslik })}
                         className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
                         style={{ color: '#EF4444' }} title="Kalıcı Sil"
@@ -566,10 +568,13 @@ export default function CopKutusuPage() {
                       {t.durum}
                     </span>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] px-2 py-1 rounded-lg font-medium"
-                        style={{ background: 'rgba(239,68,68,0.08)', color: '#F87171', border: '1px solid rgba(239,68,68,0.15)' }}>
-                        Geri yükleme yok
-                      </span>
+                      <button onClick={() => handleRestore(t.id, 'tutanaklar')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                        style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.25)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; }}>
+                        <i className="ri-arrow-go-back-line" /> Geri Yükle
+                      </button>
                       <button onClick={() => setPermDeleteItem({ id: t.id, tip: 'tutanaklar', ad: t.baslik })}
                         className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
                         style={{ color: '#EF4444' }} title="Kalıcı Sil"
@@ -615,10 +620,13 @@ export default function CopKutusuPage() {
                       {iz.durum}
                     </span>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] px-2 py-1 rounded-lg font-medium"
-                        style={{ background: 'rgba(239,68,68,0.08)', color: '#F87171', border: '1px solid rgba(239,68,68,0.15)' }}>
-                        Geri yükleme yok
-                      </span>
+                      <button onClick={() => handleRestore(iz.id, 'is_izinleri')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                        style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.25)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; }}>
+                        <i className="ri-arrow-go-back-line" /> Geri Yükle
+                      </button>
                       <button onClick={() => setPermDeleteItem({ id: iz.id, tip: 'is_izinleri', ad: `${iz.izinNo} - ${iz.tip}` })}
                         className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
                         style={{ color: '#EF4444' }} title="Kalıcı Sil"
@@ -655,7 +663,7 @@ export default function CopKutusuPage() {
                 &quot;{permDeleteItem?.ad}&quot; kalıcı olarak silinecek
               </p>
               <p className="text-sm mt-1.5" style={{ color: '#94A3B8' }}>
-                Bu işlem <strong className="text-red-400">geri alınamaz</strong>. Kayıt sistemden tamamen silinecek.
+                Bu işlem <strong className="text-red-400">geri alınamaz</strong>. Kayıt sistemden tamamen kaldırılacak.
               </p>
               {permDeleteItem && !canRestore(permDeleteItem.tip) && (
                 <p className="text-xs mt-2 px-2 py-1.5 rounded-lg"

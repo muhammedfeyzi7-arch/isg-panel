@@ -59,7 +59,7 @@ export default function FirmalarPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar,
     addFirma, updateFirma, deleteFirma, addToast, quickCreate, setQuickCreate,
-    getFirmaLogo, setFirmaLogo, getEvrakFile,
+    setFirmaLogo, org,
   } = useApp();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
   const [search, setSearch] = useState('');
@@ -70,6 +70,7 @@ export default function FirmalarPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyFirma });
   const [logoVeri, setLogoVeri] = useState<string>('');
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const [personelDetailId, setPersonelDetailId] = useState<string | null>(null);
@@ -103,28 +104,36 @@ export default function FirmalarPage() {
   const openEdit = (f: Firma) => {
     setForm({ ...f });
     setEditingId(f.id);
-    setLogoVeri(getFirmaLogo(f.id) || '');
+    // logoUrl doğrudan firma objesinden okunur
+    setLogoVeri((f as Firma & { logoUrl?: string }).logoUrl || '');
     setFormOpen(true);
   };
 
   const handleLogoChange = (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => setLogoVeri(e.target?.result as string);
-    reader.readAsDataURL(file);
+    setPendingLogoFile(file);
+    // Önizleme için geçici object URL
+    const previewUrl = URL.createObjectURL(file);
+    setLogoVeri(previewUrl);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.ad.trim()) { addToast('Firma adı zorunludur.', 'error'); return; }
+
     if (editingId) {
       updateFirma(editingId, form);
-      if (logoVeri) setFirmaLogo(editingId, logoVeri);
+      if (pendingLogoFile) {
+        await setFirmaLogo(editingId, pendingLogoFile);
+      }
       addToast('Firma başarıyla güncellendi.', 'success');
     } else {
       const yeniFirma = addFirma(form);
-      if (logoVeri) setFirmaLogo(yeniFirma.id, logoVeri);
+      if (pendingLogoFile) {
+        await setFirmaLogo(yeniFirma.id, pendingLogoFile);
+      }
       addToast('Firma başarıyla eklendi.', 'success');
     }
+    setPendingLogoFile(null);
     setFormOpen(false);
   };
 
@@ -262,7 +271,7 @@ export default function FirmalarPage() {
                       <button onClick={() => setDetailId(firma.id)} className="group cursor-pointer text-left">
                         <div className="flex items-center gap-2.5">
                           {(() => {
-                            const logoUrl = getFirmaLogo(firma.id);
+                            const logoUrl = (firma as Firma & { logoUrl?: string }).logoUrl;
                             return logoUrl ? (
                               <div className="w-8 h-8 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <img src={logoUrl} alt={firma.ad} className="w-full h-full object-contain p-0.5" />

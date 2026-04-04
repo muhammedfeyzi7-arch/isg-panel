@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase'; // fetchEkipmanFromDb için gerekli
+import { uploadBase64ToStorage } from '../../utils/fileUpload';
 import Modal from '../../components/base/Modal';
 import ImageUpload from '../nonconformity/components/ImageUpload';
 import type { Ekipman, EkipmanStatus, EkipmanSahaFoto, UygunsuzlukSeverity } from '../../types';
@@ -122,7 +123,7 @@ function UygunsuzlukModal({
     if (!firmaId) { addToast('Firma bilgisi eksik.', 'error'); return; }
     setSaving(true);
     try {
-      const rec = addUygunsuzluk({
+      const rec = await addUygunsuzluk({
         baslik: baslik.trim(),
         aciklama: aciklama.trim(),
         onlem: '',
@@ -136,7 +137,7 @@ function UygunsuzlukModal({
         acilisFotoMevcut: !!foto,
         kapatmaFotoMevcut: false,
       });
-      if (foto && foto.startsWith('data:')) {
+      if (foto && foto.startsWith('data:') && rec?.id) {
         const url = await setUygunsuzlukPhoto(rec.id, 'acilis', foto);
         if (url) updateUygunsuzluk(rec.id, { acilisFotoUrl: url });
       }
@@ -219,34 +220,19 @@ function FotoModal({
     if (!foto.startsWith('data:')) { addToast('Geçersiz fotoğraf formatı.', 'error'); return; }
     setSaving(true);
     try {
-      const [meta, data] = foto.split(',');
-      const mimeMatch = meta.match(/data:([^;]+);/);
-      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-      const ext = mime.split('/')[1]?.split('+')[0] ?? 'jpg';
-      const byteString = atob(data);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const blob = new Blob([ab], { type: mime });
-
       const fotoId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
-      const filePath = `ekipman-saha/${ekipmanId}/${fotoId}.${ext}`;
+      const orgId = ekipman?.firmaId ? `ekipman-saha` : 'ekipman-saha';
 
-      const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, blob, { upsert: false, contentType: mime });
-
-      if (uploadError) {
-        console.error('[FotoModal] Upload error:', uploadError);
-        addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
-        return;
-      }
-
-      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
-      const publicUrl = urlData?.publicUrl;
+      // Merkezi uploadBase64ToStorage kullan — path: {orgId}/ekipman-saha/{fotoId}
+      const publicUrl = await uploadBase64ToStorage(
+        foto,
+        orgId,
+        `ekipman-saha/${ekipmanId}`,
+        fotoId,
+      );
 
       if (!publicUrl) {
-        addToast('Fotoğraf URL alınamadı.', 'error');
+        addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
         return;
       }
 
@@ -377,17 +363,14 @@ function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
 export default function QrDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { ekipmanlar, firmalar, org, dataLoading, getEkipmanFile, evraklar } = useApp();
+  const { ekipmanlar, firmalar, org, dataLoading, evraklar } = useApp();
 
   const [localEkipman, setLocalEkipman] = useState<Ekipman | null | undefined>(undefined);
   const [localLoading, setLocalLoading] = useState(true);
   const [showKontrol, setShowKontrol] = useState(false);
   const [showUygunsuzluk, setShowUygunsuzluk] = useState(false);
   const [showFoto, setShowFoto] = useState(false);
-  const [showEvrak, setShowEvrak] = useState(false);
-  const [evrakVeri, setEvrakVeri] = useState('');
-  const [evrakAdi, setEvrakAdi] = useState('');
-  const [evrakTipi, setEvrakTipi] = useState('');
+
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const fetchedRef = useRef(false);
 
@@ -446,13 +429,8 @@ export default function QrDetailPage() {
   );
 
   const handleOpenBelge = () => {
-    if (!localEkipman) return;
-    const veri = getEkipmanFile(localEkipman.id);
-    if (!veri) return;
-    setEvrakVeri(veri);
-    setEvrakAdi(localEkipman.dosyaAdi || 'Ekipman Belgesi');
-    setEvrakTipi(localEkipman.dosyaTipi || '');
-    setShowEvrak(true);
+    if (!localEkipman?.dosyaUrl) return;
+    window.open(localEkipman.dosyaUrl, '_blank');
   };
 
   const firma = firmalar.find(f => f.id === localEkipman?.firmaId);
@@ -494,7 +472,7 @@ export default function QrDetailPage() {
   const days = getDaysUntil(localEkipman.sonrakiKontrolTarihi);
   const isOverdue = days < 0;
   const isUrgent = days >= 0 && days <= 30;
-  const hasBelge = !!(localEkipman.dosyaAdi && getEkipmanFile(localEkipman.id));
+  const hasBelge = !!localEkipman.dosyaUrl;
   const sahaFotolar = localEkipman.sahaFotolari ?? [];
 
   return (
@@ -845,13 +823,7 @@ export default function QrDetailPage() {
         ekipmanId={localEkipman.id}
         onUploaded={handleAfterSave}
       />
-      <EvrakModal
-        open={showEvrak}
-        onClose={() => setShowEvrak(false)}
-        dosyaVeri={evrakVeri}
-        dosyaAdi={evrakAdi}
-        dosyaTipi={evrakTipi}
-      />
+
       {lightboxUrl && (
         <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       )}

@@ -245,19 +245,58 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Welcome Banner ── */}
+      {/* ── Welcome Banner — Onboarding ── */}
       {isEmpty && (
-        <div className="rounded-xl p-4 flex items-start gap-3 animate-fade-in"
-          style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.04))', border: '1px solid rgba(99,102,241,0.15)' }}>
-          <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
-            <i className="ri-rocket-line text-white text-sm" />
+        <div className="rounded-2xl overflow-hidden animate-fade-in"
+          style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.03))', border: '1px solid rgba(99,102,241,0.18)' }}>
+          {/* Header */}
+          <div className="px-5 pt-5 pb-4 flex items-start gap-4" style={{ borderBottom: '1px solid rgba(99,102,241,0.12)' }}>
+            <div className="w-11 h-11 flex items-center justify-center rounded-2xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
+              <i className="ri-rocket-2-line text-white text-lg" />
+            </div>
+            <div>
+              <p className="font-extrabold text-[15px]" style={{ color: 'var(--text-primary)' }}>ISG Denetim&apos;e Hoş Geldiniz!</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Sistemi 3 adımda kurabilirsiniz. Aşağıdaki adımları sırayla tamamlayın.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>ISG Denetim&apos;e Hoş Geldiniz!</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Sistemi kullanmaya başlamak için sol menüden <strong>Firmalar</strong> modülüne giderek ilk firmanızı ekleyin.
-            </p>
+          {/* Steps */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style={{ borderColor: 'rgba(99,102,241,0.1)' }}>
+            {[
+              { step: '1', icon: 'ri-building-2-line', color: '#60A5FA', bg: 'rgba(96,165,250,0.12)', title: 'Firma Ekle', desc: 'Sol menüden "Firmalar" modülüne giderek ilk firmanızı oluşturun.', module: 'firmalar' },
+              { step: '2', icon: 'ri-team-line', color: '#34D399', bg: 'rgba(52,211,153,0.12)', title: 'Personel Ekle', desc: 'Firmaya bağlı çalışanları "Personeller" modülünden kaydedin.', module: 'personeller' },
+              { step: '3', icon: 'ri-file-add-line', color: '#FBBF24', bg: 'rgba(251,191,36,0.12)', title: 'Evrak Yükle', desc: '"Evraklar" modülünden belgeleri yükleyin, sistem takibi otomatik yapar.', module: 'evraklar' },
+            ].map((item) => (
+              <button
+                key={item.step}
+                onClick={() => setActiveModule(item.module as Parameters<typeof setActiveModule>[0])}
+                className="flex items-start gap-3 px-5 py-4 text-left cursor-pointer transition-all group"
+                style={{ background: 'transparent' }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${item.color}08`; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 flex items-center justify-center rounded-xl"
+                    style={{ background: item.bg, border: `1px solid ${item.color}30` }}>
+                    <i className={`${item.icon} text-sm`} style={{ color: item.color }} />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                      style={{ background: `${item.color}18`, color: item.color }}>
+                      Adım {item.step}
+                    </span>
+                  </div>
+                  <p className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
+                  <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>{item.desc}</p>
+                </div>
+                <i className="ri-arrow-right-s-line text-sm flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ color: item.color }} />
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -662,8 +701,8 @@ function DashEmptyState({ icon, text, subtext, color = '#475569' }: { icon: stri
         <i className={`${icon} text-xl`} style={{ color: `${color}70` }} />
       </div>
       <div className="text-center">
-        <p className="text-[12.5px] font-medium" style={{ color: 'var(--text-muted)' }}>{text}</p>
-        <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{subtext}</p>
+        <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{text}</p>
+        <p className="text-[11px] mt-0.5 leading-relaxed max-w-[200px]" style={{ color: 'var(--text-muted)' }}>{subtext}</p>
       </div>
     </div>
   );
@@ -761,15 +800,19 @@ function UpcomingTabs({
 function InsightEmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-8 gap-2.5">
-      <div className="w-12 h-12 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.15)' }}>
-        <i className="ri-check-double-line text-xl" style={{ color: '#10B981' }} />
+      <div className="w-14 h-14 flex items-center justify-center rounded-2xl"
+        style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+        <i className="ri-shield-check-line text-2xl" style={{ color: '#10B981' }} />
       </div>
       <div className="text-center">
-        <p className="text-[12.5px] font-semibold" style={{ color: '#34D399' }}>Yaklaşan süre yok</p>
-        <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Tüm kayıtlar güncel durumda</p>
-        <div className="flex items-center justify-center gap-1.5 mt-2">
+        <p className="text-[13px] font-bold" style={{ color: '#34D399' }}>Her şey yolunda!</p>
+        <p className="text-[11.5px] mt-1 leading-relaxed max-w-[200px]" style={{ color: 'var(--text-muted)' }}>
+          Önümüzdeki 60 günde süresi dolacak kayıt bulunmuyor.
+        </p>
+        <div className="flex items-center justify-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-full mx-auto w-fit"
+          style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
           <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-          <span className="text-[10.5px] font-medium" style={{ color: '#34D399' }}>Sistem sağlıklı</span>
+          <span className="text-[10.5px] font-semibold" style={{ color: '#34D399' }}>Sistem sağlıklı çalışıyor</span>
         </div>
       </div>
     </div>

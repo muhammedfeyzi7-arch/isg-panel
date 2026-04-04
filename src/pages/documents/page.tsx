@@ -36,7 +36,7 @@ const statusConfig = {
 };
 
 export default function EvraklarPage() {
-  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, getEvrakFile, uploadBase64ToStorage, addToast, quickCreate, setQuickCreate } = useApp();
+  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, addToast, quickCreate, setQuickCreate, org } = useApp();
   const location = useLocation();
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -103,98 +103,43 @@ export default function EvraklarPage() {
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
   const getPersonelAd = (id?: string) => id ? (personeller.find(p => p.id === id)?.adSoyad || '—') : 'Firma Evrakı';
 
-  const openAdd = () => { setForm({ ...emptyEvrak }); setEditingId(null); setFormOpen(true); };
-  const openEdit = (e: Evrak) => { setForm({ ...e }); setEditingId(e.id); setFormOpen(true); };
+  const openAdd = () => { setForm({ ...emptyEvrak }); setEditingId(null); setPendingFile(null); setFormOpen(true); };
+  const openEdit = (e: Evrak) => { setForm({ ...e }); setEditingId(e.id); setPendingFile(null); setFormOpen(true); };
+
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const handleFileChange = (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const veri = e.target?.result as string;
-      setForm(prev => ({
-        ...prev,
-        dosyaAdi: file.name,
-        dosyaBoyutu: file.size,
-        dosyaTipi: file.type,
-        yuklemeTarihi: new Date().toISOString().split('T')[0],
-        dosyaVeri: veri,
-      }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const resolveEvrakUrl = async (ev: typeof filtered[0]): Promise<string | null> => {
-    // 1. Storage URL varsa direkt kullan (en güvenilir — tüm cihazlarda çalışır)
-    if (ev.dosyaUrl && ev.dosyaUrl.startsWith('http')) return ev.dosyaUrl;
-    // 2. Evrak tipinde dosyaVeri alanı varsa (yeni yükleme, henüz Storage'a gitmemiş)
-    if (ev.dosyaVeri && ev.dosyaVeri.startsWith('data:')) {
-      const url = await uploadBase64ToStorage(ev.dosyaVeri, 'evrak', ev.id, ev.dosyaAdi);
-      if (url) {
-        updateEvrak(ev.id, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
-        return url;
-      }
-      return ev.dosyaVeri; // fallback: base64
-    }
-    // 3. localStorage fallback (aynı cihaz, eski kayıt)
-    const veri = getEvrakFile(ev.id);
-    if (veri && veri.startsWith('data:')) {
-      // Arka planda Storage'a migrate et
-      uploadBase64ToStorage(veri, 'evrak', ev.id, ev.dosyaAdi).then(url => {
-        if (url) updateEvrak(ev.id, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
-      });
-      return veri;
-    }
-    // 4. Hiçbir kaynak yok
-    return null;
+    setPendingFile(file);
+    setForm(prev => ({
+      ...prev,
+      dosyaAdi: file.name,
+      dosyaBoyutu: file.size,
+      dosyaTipi: file.type,
+      yuklemeTarihi: new Date().toISOString().split('T')[0],
+    }));
   };
 
   const handleDownload = async (ev: typeof filtered[0]) => {
-    const src = await resolveEvrakUrl(ev);
-    if (!src) { addToast('İndirilebilir dosya bulunamadı. Lütfen evrakı tekrar yükleyin.', 'error'); return; }
+    if (!ev.dosyaUrl) { addToast('İndirilebilir dosya bulunamadı. Lütfen evrakı tekrar yükleyin.', 'error'); return; }
     try {
-      if (src.startsWith('http')) {
-        const res = await fetch(src);
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url; link.download = ev.dosyaAdi || 'evrak';
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      } else {
-        const arr = src.split(',');
-        const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
-        const bstr = atob(arr[1]);
-        const u8arr = new Uint8Array(bstr.length);
-        for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-        const blob = new Blob([u8arr], { type: mime });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url; link.download = ev.dosyaAdi || 'evrak';
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
+      const res = await fetch(ev.dosyaUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = ev.dosyaAdi || 'evrak';
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       addToast(`"${ev.dosyaAdi}" indiriliyor...`, 'success');
     } catch { addToast('Dosya indirilemedi.', 'error'); }
   };
 
-  const handlePreview = async (ev: typeof filtered[0]) => {
-    const src = await resolveEvrakUrl(ev);
-    if (!src) { addToast('Önizlenecek dosya bulunamadı.', 'error'); return; }
-    if (src.startsWith('http')) {
-      window.open(src, '_blank');
-      return;
-    }
-    try {
-      const arr = src.split(',');
-      const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
-      const bstr = atob(arr[1]);
-      const u8arr = new Uint8Array(bstr.length);
-      for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-      const blob = new Blob([u8arr], { type: mime });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch { addToast('Dosya açılamadı.', 'error'); }
+  const handlePreview = (ev: typeof filtered[0]) => {
+    if (!ev.dosyaUrl) { addToast('Önizlenecek dosya bulunamadı.', 'error'); return; }
+    window.open(ev.dosyaUrl, '_blank');
   };
+
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const handleSave = async () => {
     if (!form.ad.trim()) { addToast('Evrak adı zorunludur.', 'error'); return; }
@@ -203,25 +148,41 @@ export default function EvraklarPage() {
     const kategori = getEvrakKategori(form.tur, form.ad);
     const savedForm = { ...form, durum: autoDurum, kategori };
 
+    const { uploadFileToStorage } = await import('@/utils/fileUpload');
+    const orgId = org?.id ?? 'unknown';
+
     if (editingId) {
       updateEvrak(editingId, savedForm);
-      // Yeni dosya seçildiyse Storage'a yükle
-      if (form.dosyaVeri && form.dosyaAdi) {
-        uploadBase64ToStorage(form.dosyaVeri, 'evrak', editingId, form.dosyaAdi).then(url => {
-          if (url) updateEvrak(editingId, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
+      if (pendingFile) {
+        setUploadingFile(true);
+        uploadFileToStorage(pendingFile, orgId, 'evrak', editingId).then(url => {
+          setUploadingFile(false);
+          if (url) {
+            updateEvrak(editingId, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
+            addToast('Dosya buluta kaydedildi.', 'success');
+          } else {
+            addToast('Dosya yüklenemedi, lütfen tekrar deneyin.', 'error');
+          }
         });
       }
       addToast('Evrak güncellendi.', 'success');
     } else {
       const newEvrak = addEvrak(savedForm);
-      // Dosya varsa Storage'a yükle
-      if (form.dosyaVeri && form.dosyaAdi && newEvrak?.id) {
-        uploadBase64ToStorage(form.dosyaVeri, 'evrak', newEvrak.id, form.dosyaAdi).then(url => {
-          if (url) updateEvrak(newEvrak.id, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
+      if (pendingFile && newEvrak?.id) {
+        setUploadingFile(true);
+        uploadFileToStorage(pendingFile, orgId, 'evrak', newEvrak.id).then(url => {
+          setUploadingFile(false);
+          if (url) {
+            updateEvrak(newEvrak.id, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
+            addToast('Dosya buluta kaydedildi.', 'success');
+          } else {
+            addToast('Dosya yüklenemedi — evrak kaydedildi ama dosya eksik. Düzenle ile tekrar yükleyin.', 'error');
+          }
         });
       }
       addToast('Evrak eklendi.', 'success');
     }
+    setPendingFile(null);
     setFormOpen(false);
   };
 
@@ -351,12 +312,28 @@ export default function EvraklarPage() {
                   <tr key={ev.id}>
                     <td>
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.15)' }}>
-                          <i className="ri-file-text-line text-xs" style={{ color: '#60A5FA' }} />
+                        <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                          style={{ background: ev.dosyaUrl ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${ev.dosyaUrl ? 'rgba(59,130,246,0.15)' : 'rgba(245,158,11,0.2)'}` }}>
+                          <i className={ev.dosyaUrl ? 'ri-file-text-line text-xs' : 'ri-file-warning-line text-xs'}
+                            style={{ color: ev.dosyaUrl ? '#60A5FA' : '#F59E0B' }} />
                         </div>
                         <div>
                           <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
-                          <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
+                            {!ev.dosyaUrl && ev.dosyaAdi && (
+                              <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md"
+                                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+                                Dosya yükleniyor...
+                              </span>
+                            )}
+                            {ev.dosyaUrl && (
+                              <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md"
+                                style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                <i className="ri-cloud-line mr-0.5" />Bulutta
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>

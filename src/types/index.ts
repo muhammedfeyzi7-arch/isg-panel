@@ -96,6 +96,7 @@ export interface Egitim {
   belgeDosyaBoyutu?: number;
   belgeDosyaTipi?: string;
   belgeDosyaVeri?: string;
+  belgeDosyaUrl?: string;
   notlar: string;
   olusturmaTarihi: string;
   silinmis?: boolean;
@@ -119,6 +120,7 @@ export interface Muayene {
   dosyaBoyutu?: number;
   dosyaTipi?: string;
   dosyaVeri?: string;
+  dosyaUrl?: string;
   olusturmaTarihi: string;
   silinmis?: boolean;
   silinmeTarihi?: string;
@@ -179,6 +181,7 @@ export interface Ekipman {
   dosyaBoyutu?: number;
   dosyaTipi?: string;
   dosyaVeri?: string;
+  dosyaUrl?: string;
   notlar: string;
   sahaFotolari?: EkipmanSahaFoto[];
   olusturmaTarihi: string;
@@ -248,7 +251,7 @@ export interface IsIzniEvrak {
   dosyaAdi: string;
   dosyaBoyutu: number;
   dosyaTipi: string;
-  dosyaVeri: string;
+  dosyaUrl?: string;
   notlar?: string;
 }
 
@@ -279,7 +282,7 @@ export interface IsIzni {
   belgeDosyaAdi?: string;
   belgeDosyaBoyutu?: number;
   belgeDosyaTipi?: string;
-  belgeDosyaVeri?: string;
+  belgeDosyaUrl?: string;
 }
 
 export interface AppData {

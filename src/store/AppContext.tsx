@@ -6,7 +6,16 @@ import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
 import { useOrganization } from '../hooks/useOrganization';
 import { logActivity } from '../utils/activityLog';
+import { supabase } from '../lib/supabase';
 import type { Toast } from '../types';
+
+interface KontrolFormuBildirim {
+  id: string;
+  ad: string;
+  kategori: string;
+  sonrakiKontrolTarihi?: string;
+  firmaId?: string;
+}
 
 export interface Bildirim {
   id: string;
@@ -203,7 +212,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [quickCreate, setQuickCreate] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
-  const [okunanlar, setOkunanlar] = useState<Set<string>>(new Set());
+  const [okunanlar, setOkunanlar] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('isg_okunan_bildirimler');
+      return saved ? new Set<string>(JSON.parse(saved) as string[]) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const [kontrolFormlar, setKontrolFormlar] = useState<KontrolFormuBildirim[]>([]);
+
+  // Kontrol formlarını Supabase'den çek (bildirim için)
+  useEffect(() => {
+    if (!org?.id) return;
+    let cancelled = false;
+    supabase
+      .from('kontrol_formlari')
+      .select('id, ad, kategori, sonraki_kontrol_tarihi, firma_id')
+      .eq('organization_id', org.id)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setKontrolFormlar(data.map(r => ({
+          id: r.id,
+          ad: r.ad,
+          kategori: r.kategori ?? '',
+          sonrakiKontrolTarihi: r.sonraki_kontrol_tarihi ?? undefined,
+          firmaId: r.firma_id ?? undefined,
+        })));
+      });
+    return () => { cancelled = true; };
+  }, [org?.id]);
 
   // Sync user info into store's currentUser (including full_name from user_metadata)
   useEffect(() => {
@@ -380,50 +418,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    // ── Kontrol Formları (localStorage) ──
-    try {
-      const raw = localStorage.getItem('isg_kontrol_formlari');
-      if (raw) {
-        const formlar = JSON.parse(raw) as Array<{
-          id: string; ad: string; kategori: string;
-          sonrakiKontrolTarihi?: string; firmaId?: string;
-        }>;
-        formlar.forEach(f => {
-          if (!f.sonrakiKontrolTarihi) return;
-          const d = parseDate(f.sonrakiKontrolTarihi);
-          if (!d) return;
-          const kalanGun = getDaysRemaining(f.sonrakiKontrolTarihi)!;
-          const firma = store.firmalar.find(x => x.id === f.firmaId);
-          const detay = `${f.kategori}${firma ? ' — ' + firma.ad : ''}`;
+    // ── Kontrol Formları (Supabase) ──
+    kontrolFormlar.forEach(f => {
+      if (!f.sonrakiKontrolTarihi) return;
+      const d = parseDate(f.sonrakiKontrolTarihi);
+      if (!d) return;
+      const kalanGun = getDaysRemaining(f.sonrakiKontrolTarihi)!;
+      const firma = store.firmalar.find(x => x.id === f.firmaId);
+      const detay = `${f.kategori}${firma ? ' — ' + firma.ad : ''}`;
 
-          if (kalanGun < 0) {
-            result.push({
-              id: `kontrol_formu_gecikti_${f.id}`,
-              tip: 'kontrol_formu_gecikti',
-              mesaj: `${f.ad} kontrolü gecikti`,
-              detay: `${detay} — ${Math.abs(kalanGun)} gün gecikti`,
-              tarih: f.sonrakiKontrolTarihi,
-              okundu: okunanlar.has(`kontrol_formu_gecikti_${f.id}`),
-              kalanGun,
-            });
-          } else if (kalanGun <= 30) {
-            result.push({
-              id: `kontrol_formu_yaklasan_${f.id}`,
-              tip: 'kontrol_formu_yaklasan',
-              mesaj: `${f.ad} kontrol tarihi yaklaşıyor`,
-              detay: `${detay} — ${kalanGun === 0 ? 'Bugün son gün!' : `${kalanGun} gün kaldı`}`,
-              tarih: f.sonrakiKontrolTarihi,
-              okundu: okunanlar.has(`kontrol_formu_yaklasan_${f.id}`),
-              kalanGun,
-            });
-          }
+      if (kalanGun < 0) {
+        result.push({
+          id: `kontrol_formu_gecikti_${f.id}`,
+          tip: 'kontrol_formu_gecikti',
+          mesaj: `${f.ad} kontrolü gecikti`,
+          detay: `${detay} — ${Math.abs(kalanGun)} gün gecikti`,
+          tarih: f.sonrakiKontrolTarihi,
+          okundu: okunanlar.has(`kontrol_formu_gecikti_${f.id}`),
+          kalanGun,
+        });
+      } else if (kalanGun <= 30) {
+        result.push({
+          id: `kontrol_formu_yaklasan_${f.id}`,
+          tip: 'kontrol_formu_yaklasan',
+          mesaj: `${f.ad} kontrol tarihi yaklaşıyor`,
+          detay: `${detay} — ${kalanGun === 0 ? 'Bugün son gün!' : `${kalanGun} gün kaldı`}`,
+          tarih: f.sonrakiKontrolTarihi,
+          okundu: okunanlar.has(`kontrol_formu_yaklasan_${f.id}`),
+          kalanGun,
         });
       }
-    } catch { /* localStorage parse hatası — sessizce geç */ }
+    });
 
     return result.sort((a, b) => a.kalanGun - b.kalanGun);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar]);
+  }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar, kontrolFormlar]);
 
   const okunmamisBildirimSayisi = useMemo(
     () => bildirimler.filter(b => !b.okundu).length,
@@ -431,11 +460,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const bildirimOku = useCallback((id: string) => {
-    setOkunanlar(prev => new Set([...prev, id]));
+    setOkunanlar(prev => {
+      const next = new Set([...prev, id]);
+      try { localStorage.setItem('isg_okunan_bildirimler', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
   }, []);
 
   const tumunuOku = useCallback(() => {
-    setOkunanlar(new Set(bildirimler.map(b => b.id)));
+    const ids = bildirimler.map(b => b.id);
+    setOkunanlar(prev => {
+      const next = new Set([...prev, ...ids]);
+      try { localStorage.setItem('isg_okunan_bildirimler', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
   }, [bildirimler]);
 
   const clearMustChangePassword = useCallback(async () => {

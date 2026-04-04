@@ -5,6 +5,7 @@ import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import type { Muayene, MuayeneResult } from '../../types';
 import { getEvrakKategori } from '../../utils/evrakKategori';
 import XLSXStyle from 'xlsx-js-style';
+import { uploadFileToStorage, downloadFromUrl, downloadFromBase64 } from '@/utils/fileUpload';
 
 const RESULT_CONFIG: Record<MuayeneResult, { label: string; color: string; bg: string; icon: string }> = {
   'Çalışabilir': { label: 'Çalışabilir', color: '#34D399', bg: 'rgba(52,211,153,0.12)', icon: 'ri-checkbox-circle-line' },
@@ -159,7 +160,7 @@ function exportMuayenelerToExcel(
 }
 
 export default function MuayenelerPage() {
-  const { muayeneler, evraklar, personeller, firmalar, addMuayene, updateMuayene, deleteMuayene, addToast, quickCreate, setQuickCreate } = useApp();
+  const { muayeneler, evraklar, personeller, firmalar, addMuayene, updateMuayene, deleteMuayene, addToast, quickCreate, setQuickCreate, org } = useApp();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -241,39 +242,53 @@ export default function MuayenelerPage() {
   const openAdd = () => { setEditId(null); setForm(defaultForm); setShowModal(true); };
   const openEdit = (m: Muayene) => {
     setEditId(m.id);
+    setPendingFile(null);
     setForm({
       personelId: m.personelId, firmaId: m.firmaId, muayeneTarihi: m.muayeneTarihi,
       sonrakiTarih: m.sonrakiTarih, sonuc: m.sonuc, hastane: m.hastane,
       doktor: m.doktor, notlar: m.notlar, belgeMevcut: m.belgeMevcut,
       dosyaAdi: m.dosyaAdi || '', dosyaBoyutu: m.dosyaBoyutu || 0,
-      dosyaTipi: m.dosyaTipi || '', dosyaVeri: m.dosyaVeri || '',
+      dosyaTipi: m.dosyaTipi || '', dosyaVeri: '',
     });
     setShowModal(true);
   };
 
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
   const handleFileChange = (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      const veri = e.target?.result as string;
-      setForm(p => ({
-        ...p, dosyaAdi: file.name, dosyaBoyutu: file.size,
-        dosyaTipi: file.type, dosyaVeri: veri, belgeMevcut: true,
-      }));
-    };
-    reader.readAsDataURL(file);
+    setPendingFile(file);
+    setForm(p => ({
+      ...p, dosyaAdi: file.name, dosyaBoyutu: file.size,
+      dosyaTipi: file.type, belgeMevcut: true,
+    }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.personelId) { addToast('Personel seçimi zorunludur.', 'error'); return; }
     if (!form.muayeneTarihi) { addToast('Muayene tarihi zorunludur.', 'error'); return; }
+
+    const { uploadFileToStorage } = await import('@/utils/fileUpload');
+    const orgId = org?.id ?? 'unknown';
+
     if (editId) {
       updateMuayene(editId, form);
+      if (pendingFile) {
+        uploadFileToStorage(pendingFile, orgId, 'saglik', editId).then(url => {
+          if (url) updateMuayene(editId, { dosyaUrl: url });
+        });
+      }
       addToast('Sağlık evrakı güncellendi.', 'success');
     } else {
-      addMuayene(form);
+      const newM = addMuayene(form);
+      if (pendingFile && newM?.id) {
+        uploadFileToStorage(pendingFile, orgId, 'saglik', newM.id).then(url => {
+          if (url) updateMuayene(newM.id, { dosyaUrl: url });
+        });
+      }
       addToast('Sağlık evrakı eklendi.', 'success');
     }
+    setPendingFile(null);
     setShowModal(false);
   };
 
@@ -415,6 +430,12 @@ export default function MuayenelerPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-1.5 justify-end">
+                          {(m.dosyaUrl || m.dosyaAdi) && (
+                            <>
+                              <button onClick={() => { if (m.dosyaUrl) window.open(m.dosyaUrl, '_blank'); else addToast('Dosya bu cihazda mevcut değil. Lütfen tekrar yükleyin.', 'warning'); }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Görüntüle"><i className="ri-eye-line text-sm" /></button>
+                              <button onClick={async () => { if (m.dosyaUrl) { const { downloadFromUrl } = await import('@/utils/fileUpload'); const ok = await downloadFromUrl(m.dosyaUrl, m.dosyaAdi || 'belge'); if (!ok) addToast('Dosya indirilemedi.', 'error'); } else addToast('Dosya bu cihazda mevcut değil. Lütfen tekrar yükleyin.', 'warning'); }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="İndir"><i className="ri-download-line text-sm" /></button>
+                            </>
+                          )}
                           <button onClick={() => openEdit(m)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>
                           <button onClick={() => setDeleteId(m.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>
                         </div>

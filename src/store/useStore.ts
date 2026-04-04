@@ -5,26 +5,29 @@ import type {
 } from '../types';
 import { getEvrakKategori } from '../utils/evrakKategori';
 import { supabase } from '../lib/supabase';
-
-// ──────── File binary helpers (localStorage — binary stays local) ────────
-function getFileKey(orgId: string, type: string, id: string): string {
-  return `isg_org_file_${orgId}_${type}_${id}`;
-}
-function saveFileData(orgId: string, type: string, id: string, veri: string): void {
-  try { localStorage.setItem(getFileKey(orgId, type, id), veri); } catch { /* storage full */ }
-}
-function getFileData(orgId: string, type: string, id: string): string | undefined {
-  return localStorage.getItem(getFileKey(orgId, type, id)) ?? undefined;
-}
-function removeFileData(orgId: string, type: string, id: string): void {
-  try { localStorage.removeItem(getFileKey(orgId, type, id)); } catch { /* ignore */ }
-}
+import { uploadFileToStorage } from '../utils/fileUpload';
 
 // ──────── ID & numbering ────────
 function genId(): string {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
 }
 
+// ── Supabase RPC ile race-condition-safe numara üretimi ──
+async function generateRecordNoFromDB(type: 'dof' | 'tutanak' | 'is_izni'): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.rpc('generate_record_no', { record_type: type });
+    if (error) {
+      console.error(`[ISG] generateRecordNo RPC error (${type}):`, error);
+      return null;
+    }
+    return data as string;
+  } catch (err) {
+    console.error(`[ISG] generateRecordNo unexpected error (${type}):`, err);
+    return null;
+  }
+}
+
+// Fallback: frontend'de üret (RPC başarısız olursa)
 export function generateTutanakNo(existing: { tutanakNo: string }[]): string {
   const year = new Date().getFullYear();
   const prefix = `TTK-${year}-`;
@@ -58,7 +61,7 @@ export function generateIsIzniNo(existing: { izinNo: string }[]): string {
   return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
 }
 
-const defaultUser: CurrentUser = { id: 'u1', ad: '', email: '', rol: 'Admin' }; // v2
+const defaultUser: CurrentUser = { id: 'u1', ad: '', email: '', rol: 'Admin' };
 
 export type LogFn = (
   actionType: string, module: string, recordId: string, recordName?: string, description?: string,
@@ -148,25 +151,49 @@ export function useStore(
   useEffect(() => { orgIdRef.current = organizationId; }, [organizationId]);
   useEffect(() => { userIdRef.current = userId; }, [userId]);
 
-  // ── Pending saves queue (saves queued before org is loaded) ──
+  // ── Pending saves queue ──
   const pendingSavesRef = useRef<{ table: string; item: { id: string } & Record<string, unknown> }[]>([]);
 
-  // Flush pending saves when orgId + userId become available
-  useEffect(() => {
-    if (!organizationId || !userId || orgLoading) return;
+  // Flush fonksiyonu — org hazır olunca pending queue'yu gönder
+  const flushPendingSaves = useCallback(() => {
+    const orgId = orgIdRef.current;
+    const uid = userIdRef.current;
+    if (!orgId || !uid) return;
     if (pendingSavesRef.current.length === 0) return;
     const pending = [...pendingSavesRef.current];
     pendingSavesRef.current = [];
-    console.log(`[ISG] Flushing ${pending.length} pending saves for org=${organizationId}`);
+    console.log(`[ISG] Flushing ${pending.length} pending saves for org=${orgId}`);
     pending.forEach(({ table, item }) => {
-      dbUpsert(table, item, userId, organizationId).then(() => {
+      dbUpsert(table, item, uid, orgId).then(() => {
         console.log(`[ISG] Pending save OK ${table}/${item.id} ✓`);
       }).catch(err => {
         console.error(`[ISG] Pending save FAILED ${table}/${item.id}:`, err);
+        // Başarısız olanı tekrar queue'ya ekle
+        pendingSavesRef.current.push({ table, item });
         onSaveErrorRef.current?.(`Bekleyen kayıt hatası (${table}): ${err instanceof Error ? err.message : String(err)}`);
       });
     });
-  }, [organizationId, userId, orgLoading]);
+  }, []);
+
+  // org/user hazır olunca flush
+  useEffect(() => {
+    if (!organizationId || !userId || orgLoading) return;
+    flushPendingSaves();
+  }, [organizationId, userId, orgLoading, flushPendingSaves]);
+
+  // ── Online event listener — internet gelince pending saves flush et ──
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[ISG] Network online — flushing pending saves...');
+      flushPendingSaves();
+    };
+    window.addEventListener('online', handleOnline);
+    // Sayfa açıldığında zaten online ise de flush et
+    if (navigator.onLine) flushPendingSaves();
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [flushPendingSaves]);
 
   // ── Stable setters ──
   const setFirmalar = useCallback((u: Firma[] | ((p: Firma[]) => Firma[])) => { _setFirmalar(u); }, []);
@@ -198,12 +225,11 @@ export function useStore(
     });
   }, []);
 
-  // ── DB write helpers (use refs to always get latest ids) ──
+  // ── DB write helpers ──
   const saveToDb = useCallback(async (table: string, item: { id: string } & Record<string, unknown>) => {
     const orgId = orgIdRef.current;
     const uid = userIdRef.current;
     if (!orgId || !uid) {
-      // Queue the save — will be flushed once org becomes available
       console.warn(`[ISG] SAVE QUEUED ${table}/${item.id}: orgId=${orgId} userId=${uid} not ready yet`);
       pendingSavesRef.current.push({ table, item });
       return;
@@ -258,9 +284,6 @@ export function useStore(
         supabase
           .from(table)
           .select('id, data, created_at')
-          // Filter by organization_id so ALL org members see the same shared data.
-          // This is the correct multi-tenant approach — any user in the org can access all org data.
-          // RLS "select_org" policies allow this for all organization members.
           .eq('organization_id', organizationId)
           .order('created_at', { ascending: false }),
       ),
@@ -350,7 +373,7 @@ export function useStore(
         { event: '*', schema: 'public', table, filter: `organization_id=eq.${organizationId}` } as Parameters<typeof channel.on>[1],
         (payload: { eventType: string; new: { user_id?: string } }) => {
           const remoteUserId = (payload.new as { user_id?: string })?.user_id;
-          if (remoteUserId && remoteUserId === userId) return; // skip own changes
+          if (remoteUserId && remoteUserId === userId) return;
           reloadTable(table);
           const MODULE_NAMES: Record<string, string> = {
             firmalar: 'Firmalar', personeller: 'Personeller', evraklar: 'Evraklar',
@@ -447,7 +470,6 @@ export function useStore(
       return u;
     }));
 
-    // Persist all cascade changes
     updatedItems.forEach(({ table, item }) => saveToDb(table, item));
     logFnRef.current?.('firma_deleted', 'Firmalar', id, undefined, 'Firma silindi.');
   }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, saveToDb]);
@@ -487,9 +509,6 @@ export function useStore(
   }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, saveToDb]);
 
   const permanentDeleteFirma = useCallback((id: string) => {
-    const orgId = orgIdRef.current ?? '';
-    removeFileData(orgId, 'firmalogo', id);
-
     let personelIds: string[] = [];
     let evrakIds: string[] = [];
     let egitimIds: string[] = [];
@@ -498,7 +517,7 @@ export function useStore(
     let gorevIds: string[] = [];
 
     setPersoneller(prev => { personelIds = prev.filter(p => p.firmaId === id).map(p => p.id); return prev.filter(p => p.firmaId !== id); });
-    setEvraklar(prev => { evrakIds = prev.filter(e => e.firmaId === id).map(e => e.id); evrakIds.forEach(eid => removeFileData(orgId, 'evrak', eid)); return prev.filter(e => e.firmaId !== id); });
+    setEvraklar(prev => { evrakIds = prev.filter(e => e.firmaId === id).map(e => e.id); return prev.filter(e => e.firmaId !== id); });
     setEgitimler(prev => { egitimIds = prev.filter(e => e.firmaId === id).map(e => e.id); return prev.filter(e => e.firmaId !== id); });
     setMuayeneler(prev => prev.filter(m => m.firmaId !== id));
     setUygunsuzluklar(prev => { uygIds = prev.filter(u => u.firmaId === id).map(u => u.id); return prev.filter(u => u.firmaId !== id); });
@@ -506,7 +525,6 @@ export function useStore(
     setGorevler(prev => { gorevIds = prev.filter(g => g.firmaId === id).map(g => g.id); return prev.filter(g => g.firmaId !== id); });
     setFirmalar(prev => prev.filter(f => f.id !== id));
 
-    // Cascade permanent deletes from Supabase
     deleteFromDb('firmalar', id);
     deleteManyFromDb('personeller', personelIds);
     deleteManyFromDb('evraklar', evrakIds);
@@ -565,22 +583,19 @@ export function useStore(
 
   // ──────── EVRAK ────────
   const addEvrak = useCallback((evrak: Omit<Evrak, 'id' | 'olusturmaTarihi'>) => {
-    const orgId = orgIdRef.current ?? '';
     const id = genId();
-    const { dosyaVeri, ...rest } = evrak;
+    // dosyaVeri (base64) artık kabul edilmiyor — sadece dosyaUrl kullanılır
+    const { dosyaVeri: _ignored, ...rest } = evrak as Evrak & { dosyaVeri?: string };
     const kategori = evrak.kategori || getEvrakKategori(evrak.tur, evrak.ad);
     const newEvrak: Evrak = { ...rest, kategori, id, olusturmaTarihi: new Date().toISOString() };
-    if (dosyaVeri) saveFileData(orgId, 'evrak', id, dosyaVeri);
     setEvraklar(prev => [newEvrak, ...prev]);
     saveToDb('evraklar', newEvrak as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('evrak_created', 'Evraklar', id, newEvrak.ad, `${newEvrak.ad} evrakı eklendi.`);
-    return { ...newEvrak, dosyaVeri };
+    return newEvrak;
   }, [setEvraklar, saveToDb]);
 
   const updateEvrak = useCallback((id: string, updates: Partial<Evrak>) => {
-    const orgId = orgIdRef.current ?? '';
-    const { dosyaVeri, ...rest } = updates;
-    if (dosyaVeri) saveFileData(orgId, 'evrak', id, dosyaVeri);
+    const { dosyaVeri: _ignored, ...rest } = updates as Partial<Evrak> & { dosyaVeri?: string };
     let updated: Evrak | null = null;
     setEvraklar(prev => prev.map(e => {
       if (e.id !== id) return e;
@@ -614,20 +629,15 @@ export function useStore(
   }, [setEvraklar, saveToDb]);
 
   const permanentDeleteEvrak = useCallback((id: string) => {
-    removeFileData(orgIdRef.current ?? '', 'evrak', id);
     setEvraklar(prev => prev.filter(e => e.id !== id));
     deleteFromDb('evraklar', id);
   }, [setEvraklar, deleteFromDb]);
 
-  const getEvrakFile = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'evrak', id), []);
-
   // ──────── EĞİTİM ────────
   const addEgitim = useCallback((egitim: Omit<Egitim, 'id' | 'olusturmaTarihi'>) => {
-    const orgId = orgIdRef.current ?? '';
     const id = genId();
-    const { belgeDosyaVeri, ...rest } = egitim;
+    const { belgeDosyaVeri: _ignored, ...rest } = egitim as Egitim & { belgeDosyaVeri?: string };
     const newEgitim: Egitim = { ...rest, id, olusturmaTarihi: new Date().toISOString() };
-    if (belgeDosyaVeri) saveFileData(orgId, 'egitim', id, belgeDosyaVeri);
     setEgitimler(prev => [newEgitim, ...prev]);
     saveToDb('egitimler', newEgitim as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('egitim_created', 'Eğitimler', id, newEgitim.ad, `${newEgitim.ad} eğitimi oluşturuldu.`);
@@ -635,9 +645,7 @@ export function useStore(
   }, [setEgitimler, saveToDb]);
 
   const updateEgitim = useCallback((id: string, updates: Partial<Egitim>) => {
-    const orgId = orgIdRef.current ?? '';
-    const { belgeDosyaVeri, ...rest } = updates;
-    if (belgeDosyaVeri) saveFileData(orgId, 'egitim', id, belgeDosyaVeri);
+    const { belgeDosyaVeri: _ignored, ...rest } = updates as Partial<Egitim> & { belgeDosyaVeri?: string };
     let updated: Egitim | null = null;
     setEgitimler(prev => prev.map(e => {
       if (e.id !== id) return e;
@@ -648,7 +656,6 @@ export function useStore(
   }, [setEgitimler, saveToDb]);
 
   const deleteEgitim = useCallback((id: string) => {
-    // Soft-delete: is_deleted = true → çöp kutusuna gider
     let updated: Egitim | null = null;
     setEgitimler(prev => prev.map(e => {
       if (e.id !== id) return e;
@@ -670,12 +677,9 @@ export function useStore(
   }, [setEgitimler, saveToDb]);
 
   const permanentDeleteEgitim = useCallback((id: string) => {
-    removeFileData(orgIdRef.current ?? '', 'egitim', id);
     setEgitimler(prev => prev.filter(e => e.id !== id));
     deleteFromDb('egitimler', id);
   }, [setEgitimler, deleteFromDb]);
-
-  const getEgitimFile = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'egitim', id), []);
 
   // ──────── MUAYENE ────────
   const addMuayene = useCallback((muayene: Omit<Muayene, 'id' | 'olusturmaTarihi'>) => {
@@ -696,7 +700,6 @@ export function useStore(
   }, [setMuayeneler, saveToDb]);
 
   const deleteMuayene = useCallback((id: string) => {
-    // Soft-delete: is_deleted = true → çöp kutusuna gider
     let updated: Muayene | null = null;
     setMuayeneler(prev => prev.map(m => {
       if (m.id !== id) return m;
@@ -723,10 +726,12 @@ export function useStore(
   }, [setMuayeneler, deleteFromDb]);
 
   // ──────── UYGUNSUZLUK ────────
-  const addUygunsuzluk = useCallback((u: Omit<Uygunsuzluk, 'id' | 'olusturmaTarihi'>) => {
+  const addUygunsuzluk = useCallback(async (u: Omit<Uygunsuzluk, 'id' | 'olusturmaTarihi'>) => {
     const id = genId();
     const now = new Date().toISOString();
-    const acilisNo = generateDofNo(uygRef.current);
+    // Supabase RPC ile race-condition-safe numara üret, fallback: frontend
+    const rpcNo = await generateRecordNoFromDB('dof');
+    const acilisNo = rpcNo ?? generateDofNo(uygRef.current);
     const durum = u.kapatmaFotoMevcut ? 'Kapandı' as const : 'Açık' as const;
     const newU: Uygunsuzluk = { ...u, id, durum, olusturmaTarihi: now, acilisNo };
     setUygunsuzluklar(prev => [newU, ...prev]);
@@ -749,84 +754,28 @@ export function useStore(
   }, [setUygunsuzluklar, saveToDb]);
 
   const deleteUygunsuzluk = useCallback((id: string) => {
-    const orgId = orgIdRef.current ?? '';
-    removeFileData(orgId, 'uyg_acilis', id);
-    removeFileData(orgId, 'uyg_kapatma', id);
-    setUygunsuzluklar(prev => prev.filter(u => u.id !== id));
-    deleteFromDb('uygunsuzluklar', id);
-  }, [setUygunsuzluklar, deleteFromDb]);
-
-  // ── Uygunsuzluk fotoğrafları: Supabase Storage üzerinden kalıcı saklama ──
-  const ensureUploadsBucket = useCallback(async () => {
-    // Bucket zaten Supabase'de oluşturuldu (public: true), bu kontrol sadece güvenlik için
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const exists = buckets?.some(b => b.id === 'uploads');
-    if (!exists) {
-      await supabase.storage.createBucket('uploads', { public: true, fileSizeLimit: 10485760 });
-    }
-  }, []);
-
-  /**
-   * Genel dosya yükleme yardımcısı — base64 → Storage → public URL
-   * @param base64 data URL (data:mime;base64,...)
-   * @param pathPrefix örn: "evrak", "ekipman", "saglik"
-   * @param id kayıt ID'si (dosya adı olarak kullanılır)
-   * @param ext dosya uzantısı (opsiyonel, mime'den çıkarılır)
-   */
-  const uploadBase64ToStorage = useCallback(async (
-    base64: string,
-    pathPrefix: string,
-    id: string,
-    fileName?: string,
-  ): Promise<string | null> => {
-    try {
-      const orgId = orgIdRef.current ?? 'unknown';
-      const [meta, data] = base64.split(',');
-      const mimeMatch = meta.match(/data:([^;]+);/);
-      const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-      const ext = fileName?.split('.').pop() ?? mime.split('/')[1]?.split('+')[0] ?? 'bin';
-      const filePath = `${pathPrefix}/${orgId}/${id}.${ext}`;
-
-      const byteString = atob(data);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const blob = new Blob([ab], { type: mime });
-
-      const { error } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, blob, { upsert: true, contentType: mime });
-
-      if (error) {
-        console.error(`[ISG] Storage upload error (${pathPrefix}):`, error);
-        return null;
-      }
-
-      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
-      return urlData?.publicUrl ?? null;
-    } catch (err) {
-      console.error(`[ISG] uploadBase64ToStorage error (${pathPrefix}):`, err);
-      return null;
-    }
-  }, []);
+    let updated: Uygunsuzluk | null = null;
+    setUygunsuzluklar(prev => prev.map(u => {
+      if (u.id !== id) return u;
+      updated = { ...u, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      return updated;
+    }));
+    if (updated) saveToDb('uygunsuzluklar', updated as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('uygunsuzluk_deleted', 'Uygunsuzluklar', id, undefined, 'Uygunsuzluk silindi.');
+  }, [setUygunsuzluklar, saveToDb]);
 
   const getUygunsuzlukPhoto = useCallback((id: string, type: 'acilis' | 'kapatma'): string | undefined => {
-    // Supabase Storage public URL'ini döndür (tüm cihazlardan erişilebilir)
     const record = uygRef.current.find(u => u.id === id);
     if (record) {
       const url = type === 'acilis' ? record.acilisFotoUrl : record.kapatmaFotoUrl;
       if (url) return url;
     }
-    // localStorage fallback kaldırıldı — başka cihazlarda çalışmıyor
-    // Eski kayıtlar için URL yoksa undefined döner, UI "Fotoğraf yok" gösterir
     return undefined;
   }, []);
 
   const setUygunsuzlukPhoto = useCallback(async (id: string, type: 'acilis' | 'kapatma', base64: string): Promise<string | null> => {
     try {
-      await ensureUploadsBucket();
-
-      // base64'ü Blob'a çevir
+      const orgId = orgIdRef.current ?? 'unknown';
       const [meta, data] = base64.split(',');
       const mimeMatch = meta.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
@@ -836,47 +785,30 @@ export function useStore(
       const ia = new Uint8Array(ab);
       for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
       const blob = new Blob([ab], { type: mime });
+      const file = new File([blob], `${type}-${id}.${ext}`, { type: mime });
 
-      const orgId = orgIdRef.current ?? 'unknown';
-      // Benzersiz dosya adı — aynı ID için üzerine yaz (upsert)
-      const filePath = `uygunsuzluk/${orgId}/${type}/${id}.${ext}`;
-
-      const { error } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, blob, { upsert: true, contentType: mime });
-
-      if (error) {
-        console.error('[ISG] Storage upload error:', error);
-        return null;
-      }
-
-      // Public URL al — cache buster ekle (tarayıcı eski versiyonu cache'lemesini önler)
-      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
-      const publicUrl = urlData?.publicUrl ?? null;
-      console.log(`[ISG] Photo uploaded to Storage: ${publicUrl}`);
-      return publicUrl;
+      // Tek standart path: {orgId}/{module}/{id}.{ext}
+      const url = await uploadFileToStorage(file, orgId, `uygunsuzluk-${type}`, id);
+      console.log(`[ISG] Photo uploaded to Storage: ${url}`);
+      return url;
     } catch (err) {
       console.error('[ISG] setUygunsuzlukPhoto error:', err);
       return null;
     }
-  }, [ensureUploadsBucket]);
+  }, []);
 
   // ──────── EKİPMAN ────────
   const addEkipman = useCallback((e: Omit<Ekipman, 'id' | 'olusturmaTarihi'>) => {
-    const orgId = orgIdRef.current ?? '';
     const id = genId();
-    const { dosyaVeri, ...rest } = e;
+    const { dosyaVeri: _ignored, ...rest } = e as Ekipman & { dosyaVeri?: string };
     const newE: Ekipman = { ...rest, id, olusturmaTarihi: new Date().toISOString() };
-    if (dosyaVeri) saveFileData(orgId, 'ekipman', id, dosyaVeri);
     setEkipmanlar(prev => [newE, ...prev]);
     saveToDb('ekipmanlar', newE as unknown as { id: string } & Record<string, unknown>);
     return newE;
   }, [setEkipmanlar, saveToDb]);
 
   const updateEkipman = useCallback((id: string, updates: Partial<Ekipman>) => {
-    const orgId = orgIdRef.current ?? '';
-    const { dosyaVeri, ...rest } = updates;
-    if (dosyaVeri) saveFileData(orgId, 'ekipman', id, dosyaVeri);
+    const { dosyaVeri: _ignored, ...rest } = updates as Partial<Ekipman> & { dosyaVeri?: string };
     let updated: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
@@ -887,12 +819,30 @@ export function useStore(
   }, [setEkipmanlar, saveToDb]);
 
   const deleteEkipman = useCallback((id: string) => {
-    removeFileData(orgIdRef.current ?? '', 'ekipman', id);
+    let updated: Ekipman | null = null;
+    setEkipmanlar(prev => prev.map(e => {
+      if (e.id !== id) return e;
+      updated = { ...e, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      return updated;
+    }));
+    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('ekipman_deleted', 'Ekipmanlar', id, undefined, 'Ekipman silindi.');
+  }, [setEkipmanlar, saveToDb]);
+
+  const restoreEkipman = useCallback((id: string) => {
+    let updated: Ekipman | null = null;
+    setEkipmanlar(prev => prev.map(e => {
+      if (e.id !== id) return e;
+      updated = { ...e, silinmis: false as const, silinmeTarihi: undefined };
+      return updated;
+    }));
+    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+  }, [setEkipmanlar, saveToDb]);
+
+  const permanentDeleteEkipman = useCallback((id: string) => {
     setEkipmanlar(prev => prev.filter(e => e.id !== id));
     deleteFromDb('ekipmanlar', id);
   }, [setEkipmanlar, deleteFromDb]);
-
-  const getEkipmanFile = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'ekipman', id), []);
 
   // ──────── GÖREV ────────
   const addGorev = useCallback((g: Omit<Gorev, 'id' | 'olusturmaTarihi'>) => {
@@ -919,63 +869,21 @@ export function useStore(
   }, [setGorevler, deleteFromDb]);
 
   // ──────── TUTANAK ────────
-  const uploadTutanakFile = useCallback(async (
-    id: string,
-    dosyaVeri: string,
-    dosyaTipi: string,
-    dosyaAdi: string,
-  ): Promise<string | null> => {
-    try {
-      const orgId = orgIdRef.current ?? 'unknown';
-      const ext = dosyaAdi.split('.').pop() ?? (dosyaTipi.includes('pdf') ? 'pdf' : dosyaTipi.includes('png') ? 'png' : 'jpg');
-      const filePath = `tutanak/${orgId}/${id}.${ext}`;
-
-      // base64 → Blob
-      const [meta, data] = dosyaVeri.split(',');
-      const mimeMatch = meta.match(/data:([^;]+);/);
-      const mime = mimeMatch ? mimeMatch[1] : dosyaTipi;
-      const byteString = atob(data);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const blob = new Blob([ab], { type: mime });
-
-      const { error } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, blob, { upsert: true, contentType: mime });
-
-      if (error) {
-        console.error('[ISG] Tutanak file upload error:', error);
-        return null;
-      }
-
-      const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
-      return urlData?.publicUrl ?? null;
-    } catch (err) {
-      console.error('[ISG] uploadTutanakFile error:', err);
-      return null;
-    }
-  }, []);
-
-  const addTutanak = useCallback((t: Omit<Tutanak, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
-    const orgId = orgIdRef.current ?? '';
+  const addTutanak = useCallback(async (t: Omit<Tutanak, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
     const now = new Date().toISOString();
     const id = genId();
-    const { dosyaVeri, ...rest } = t;
-    const tutanakNo = generateTutanakNo(tutRef.current);
+    const { dosyaVeri: _ignored, ...rest } = t as Tutanak & { dosyaVeri?: string };
+    const rpcNo = await generateRecordNoFromDB('tutanak');
+    const tutanakNo = rpcNo ?? generateTutanakNo(tutRef.current);
     const newT: Tutanak = { ...rest, id, tutanakNo, olusturmaTarihi: now, guncellemeTarihi: now };
-    // localStorage fallback (sync) — async Storage upload tutanak page'de yapılır
-    if (dosyaVeri) saveFileData(orgId, 'tutanak', id, dosyaVeri);
     setTutanaklar(prev => [newT, ...prev]);
     saveToDb('tutanaklar', newT as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('tutanak_created', 'Tutanaklar', id, newT.baslik, `${newT.tutanakNo} - ${newT.baslik} tutanağı oluşturuldu.`);
-    return { ...newT, dosyaVeri };
+    return newT;
   }, [setTutanaklar, saveToDb]);
 
   const updateTutanak = useCallback((id: string, updates: Partial<Tutanak>) => {
-    const orgId = orgIdRef.current ?? '';
-    const { dosyaVeri, ...rest } = updates;
-    if (dosyaVeri) saveFileData(orgId, 'tutanak', id, dosyaVeri);
+    const { dosyaVeri: _ignored, ...rest } = updates as Partial<Tutanak> & { dosyaVeri?: string };
     let updated: Tutanak | null = null;
     setTutanaklar(prev => prev.map(t => {
       if (t.id !== id) return t;
@@ -986,18 +894,37 @@ export function useStore(
   }, [setTutanaklar, saveToDb]);
 
   const deleteTutanak = useCallback((id: string) => {
-    removeFileData(orgIdRef.current ?? '', 'tutanak', id);
+    let updated: Tutanak | null = null;
+    setTutanaklar(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      updated = { ...t, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      return updated;
+    }));
+    if (updated) saveToDb('tutanaklar', updated as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('tutanak_deleted', 'Tutanaklar', id, undefined, 'Tutanak silindi.');
+  }, [setTutanaklar, saveToDb]);
+
+  const restoreTutanak = useCallback((id: string) => {
+    let updated: Tutanak | null = null;
+    setTutanaklar(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      updated = { ...t, silinmis: false as const, silinmeTarihi: undefined };
+      return updated;
+    }));
+    if (updated) saveToDb('tutanaklar', updated as unknown as { id: string } & Record<string, unknown>);
+  }, [setTutanaklar, saveToDb]);
+
+  const permanentDeleteTutanak = useCallback((id: string) => {
     setTutanaklar(prev => prev.filter(t => t.id !== id));
     deleteFromDb('tutanaklar', id);
   }, [setTutanaklar, deleteFromDb]);
 
-  const getTutanakFile = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'tutanak', id), []);
-
   // ──────── İŞ İZNİ ────────
-  const addIsIzni = useCallback((iz: Omit<IsIzni, 'id' | 'izinNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
+  const addIsIzni = useCallback(async (iz: Omit<IsIzni, 'id' | 'izinNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
     const now = new Date().toISOString();
     const id = genId();
-    const izinNo = generateIsIzniNo(isIzRef.current);
+    const rpcNo = await generateRecordNoFromDB('is_izni');
+    const izinNo = rpcNo ?? generateIsIzniNo(isIzRef.current);
     const newIz: IsIzni = { ...iz, id, izinNo, olusturmaTarihi: now, guncellemeTarihi: now };
     setIsIzinleri(prev => [newIz, ...prev]);
     saveToDb('is_izinleri', newIz as unknown as { id: string } & Record<string, unknown>);
@@ -1017,19 +944,76 @@ export function useStore(
   }, [setIsIzinleri, saveToDb]);
 
   const deleteIsIzni = useCallback((id: string) => {
+    let updated: IsIzni | null = null;
+    setIsIzinleri(prev => prev.map(iz => {
+      if (iz.id !== id) return iz;
+      updated = { ...iz, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      return updated;
+    }));
+    if (updated) saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('is_izni_deleted', 'İş İzinleri', id, undefined, 'İş izni silindi.');
+  }, [setIsIzinleri, saveToDb]);
+
+  const restoreIsIzni = useCallback((id: string) => {
+    let updated: IsIzni | null = null;
+    setIsIzinleri(prev => prev.map(iz => {
+      if (iz.id !== id) return iz;
+      updated = { ...iz, silinmis: false as const, silinmeTarihi: undefined };
+      return updated;
+    }));
+    if (updated) saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
+  }, [setIsIzinleri, saveToDb]);
+
+  const permanentDeleteIsIzni = useCallback((id: string) => {
     setIsIzinleri(prev => prev.filter(iz => iz.id !== id));
     deleteFromDb('is_izinleri', id);
-    logFnRef.current?.('is_izni_deleted', 'İş İzinleri', id, undefined, 'İş izni silindi.');
+    logFnRef.current?.('is_izni_perm_deleted', 'İş İzinleri', id, undefined, 'İş izni kalıcı silindi.');
   }, [setIsIzinleri, deleteFromDb]);
 
-  // ──────── LOGO ────────
-  const getFirmaLogo = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'firmalogo', id), []);
-  const setFirmaLogo = useCallback((id: string, logo: string) => saveFileData(orgIdRef.current ?? '', 'firmalogo', id, logo), []);
-  const clearFirmaLogo = useCallback((id: string) => removeFileData(orgIdRef.current ?? '', 'firmalogo', id), []);
+  // ──────── LOGO — Supabase Storage ────────
+  /**
+   * Firma logosunu Storage'a yükle ve URL'yi firmalar tablosuna kaydet.
+   * Artık localStorage kullanılmıyor — tüm cihazlarda çalışır.
+   * file: File objesi veya zaten yüklenmiş URL string'i kabul eder.
+   */
+  const setFirmaLogo = useCallback(async (firmaId: string, fileOrUrl: File | string): Promise<string | null> => {
+    if (typeof fileOrUrl === 'string') {
+      // Zaten bir URL — sadece DB'ye kaydet
+      updateFirma(firmaId, { logoUrl: fileOrUrl } as Partial<Firma>);
+      return fileOrUrl;
+    }
+    const orgId = orgIdRef.current ?? 'unknown';
+    const url = await uploadFileToStorage(fileOrUrl, orgId, 'firma-logo', firmaId);
+    if (url) {
+      updateFirma(firmaId, { logoUrl: url } as Partial<Firma>);
+    }
+    return url;
+  }, [updateFirma]);
 
-  // ──────── PERSONEL FOTO ────────
-  const getPersonelFoto = useCallback((id: string) => getFileData(orgIdRef.current ?? '', 'personelfoto', id), []);
-  const setPersonelFoto = useCallback((id: string, foto: string) => saveFileData(orgIdRef.current ?? '', 'personelfoto', id, foto), []);
+
+
+  // ──────── PERSONEL FOTO — Supabase Storage ────────
+  /**
+   * Personel fotoğrafını Storage'a yükle ve URL'yi personeller tablosuna kaydet.
+   */
+  const setPersonelFoto = useCallback(async (personelId: string, file: File): Promise<string | null> => {
+    const orgId = orgIdRef.current ?? 'unknown';
+    const url = await uploadFileToStorage(file, orgId, 'personel-foto', personelId);
+    if (url) {
+      updatePersonel(personelId, { fotoUrl: url } as Partial<Personel>);
+    }
+    return url;
+  }, [updatePersonel]);
+
+  const getPersonelFoto = useCallback((personelId: string): string | null => {
+    const p = _setPersoneller.length !== undefined
+      ? undefined
+      : undefined;
+    void p;
+    // fotoUrl doğrudan personel state'inden okunur
+    const found = personeller.find(x => x.id === personelId);
+    return found?.fotoUrl ?? null;
+  }, [personeller]);
 
   // ──────── CURRENT USER ────────
   const updateCurrentUser = useCallback((updates: Partial<CurrentUser>) => {
@@ -1043,16 +1027,15 @@ export function useStore(
     isSaving: false,
     addFirma, updateFirma, deleteFirma, restoreFirma, permanentDeleteFirma,
     addPersonel, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
-    addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak, getEvrakFile,
-    addEgitim, updateEgitim, deleteEgitim, restoreEgitim, permanentDeleteEgitim, getEgitimFile,
+    addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak,
+    addEgitim, updateEgitim, deleteEgitim, restoreEgitim, permanentDeleteEgitim,
     addMuayene, updateMuayene, deleteMuayene, restoreMuayene, permanentDeleteMuayene,
     addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, getUygunsuzlukPhoto, setUygunsuzlukPhoto,
-    addEkipman, updateEkipman, deleteEkipman, getEkipmanFile,
+    addEkipman, updateEkipman, deleteEkipman, restoreEkipman, permanentDeleteEkipman,
     addGorev, updateGorev, deleteGorev,
-    addTutanak, updateTutanak, deleteTutanak, getTutanakFile, uploadTutanakFile,
-    uploadBase64ToStorage,
-    addIsIzni, updateIsIzni, deleteIsIzni,
-    getFirmaLogo, setFirmaLogo, clearFirmaLogo,
+    addTutanak, updateTutanak, deleteTutanak, restoreTutanak, permanentDeleteTutanak,
+    addIsIzni, updateIsIzni, deleteIsIzni, restoreIsIzni, permanentDeleteIsIzni,
+    setFirmaLogo,
     getPersonelFoto, setPersonelFoto,
     updateCurrentUser,
   };

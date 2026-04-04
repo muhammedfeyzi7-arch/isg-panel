@@ -6,6 +6,7 @@ import { generateIsIzniNo } from '@/store/useStore';
 import Modal from '@/components/base/Modal';
 import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
 import IsIzniImport from './components/IsIzniImport';
+import { uploadFileToStorage } from '@/utils/fileUpload';
 
 const TIP_CONFIG: Record<IsIzniTip, { color: string; bg: string; icon: string }> = {
   'Sıcak Çalışma':      { color: '#F97316', bg: 'rgba(249,115,22,0.12)',   icon: 'ri-fire-line' },
@@ -48,13 +49,12 @@ const emptyForm = {
   belgeDosyaAdi: '',
   belgeDosyaBoyutu: 0,
   belgeDosyaTipi: '',
-  belgeDosyaVeri: '',
 };
 
 export default function IsIzniPage() {
   const {
     isIzinleri, firmalar, personeller, currentUser,
-    addIsIzni, updateIsIzni, deleteIsIzni, addToast, quickCreate, setQuickCreate,
+    addIsIzni, updateIsIzni, deleteIsIzni, addToast, quickCreate, setQuickCreate, org,
   } = useApp();
   const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
 
@@ -73,6 +73,7 @@ export default function IsIzniPage() {
   const [statusChangeId, setStatusChangeId] = useState<string | null>(null);
   const [showEvrakModal, setShowEvrakModal] = useState<string | null>(null);
   const [evrakForm, setEvrakForm] = useState({ ad: '', tur: '', notlar: '', dosya: null as File | null });
+  const [pendingBelge, setPendingBelge] = useState<File | null>(null);
   const evrakFileRef = useRef<HTMLInputElement>(null);
   const formFileRef = useRef<HTMLInputElement>(null);
 
@@ -135,6 +136,7 @@ export default function IsIzniPage() {
 
   const openEdit = (iz: IsIzni) => {
     setEditId(iz.id);
+    setPendingBelge(null);
     setForm({
       tip: iz.tip, firmaId: iz.firmaId, bolum: iz.bolum, sorumlu: iz.sorumlu,
       calisanlar: iz.calisanlar, selectedCalisanIds: [], calisanSayisi: iz.calisanSayisi,
@@ -146,7 +148,6 @@ export default function IsIzniPage() {
       belgeDosyaAdi: iz.belgeDosyaAdi ?? '',
       belgeDosyaBoyutu: iz.belgeDosyaBoyutu ?? 0,
       belgeDosyaTipi: iz.belgeDosyaTipi ?? '',
-      belgeDosyaVeri: '',
     });
     setShowModal(true);
   };
@@ -156,18 +157,27 @@ export default function IsIzniPage() {
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.baslamaTarihi) { addToast('Başlama tarihi zorunludur.', 'error'); return; }
 
-    const { selectedCalisanIds: _ids, belgeDosyaVeri: _bdv, ...saveDataBase } = form;
-    const saveData = {
-      ...saveDataBase,
-      belgeDosyaVeri: form.belgeMevcut ? form.belgeDosyaVeri : '',
-    };
+    const { selectedCalisanIds: _ids, ...saveData } = form;
+    const orgId = org?.id ?? 'unknown';
 
     if (editId) {
       updateIsIzni(editId, saveData);
+      if (pendingBelge) {
+        uploadFileToStorage(pendingBelge, orgId, 'is-izni', editId).then(url => {
+          if (url) updateIsIzni(editId, { belgeDosyaUrl: url });
+        });
+      }
       addToast('İş izni güncellendi.', 'success');
       setShowModal(false);
+      setPendingBelge(null);
     } else {
       const newIz = addIsIzni(saveData);
+      if (pendingBelge && newIz?.id) {
+        uploadFileToStorage(pendingBelge, orgId, 'is-izni', newIz.id).then(url => {
+          if (url) updateIsIzni(newIz.id, { belgeDosyaUrl: url });
+        });
+      }
+      setPendingBelge(null);
       setShowModal(false);
       setSavedIsIzni(newIz);
       setShowBelgeModal(true);
@@ -212,7 +222,7 @@ export default function IsIzniPage() {
   };
 
   /* Evrak işlemleri */
-  const handleEvrakEkle = () => {
+  const handleEvrakEkle = async () => {
     if (!showEvrakModal || !evrakForm.ad.trim() || !evrakForm.dosya) {
       addToast('Evrak adı ve dosya zorunludur.', 'error');
       return;
@@ -220,26 +230,39 @@ export default function IsIzniPage() {
     const iz = isIzinleri.find(i => i.id === showEvrakModal);
     if (!iz) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const yeniEvrak = {
-        id: Math.random().toString(36).substring(2),
-        ad: evrakForm.ad,
-        tur: evrakForm.tur || 'Belge',
-        yuklemeTarihi: new Date().toISOString(),
-        dosyaAdi: evrakForm.dosya!.name,
-        dosyaBoyutu: evrakForm.dosya!.size,
-        dosyaTipi: evrakForm.dosya!.type,
-        dosyaVeri: e.target?.result as string,
-        notlar: evrakForm.notlar,
-      };
-      const mevcutEvraklar = iz.evraklar || [];
-      updateIsIzni(iz.id, { evraklar: [...mevcutEvraklar, yeniEvrak] });
-      addToast(`"${evrakForm.ad}" evrakı eklendi.`, 'success');
-      setShowEvrakModal(null);
-      setEvrakForm({ ad: '', tur: '', notlar: '', dosya: null });
+    const orgId = org?.id ?? 'unknown';
+    const evrakId = Math.random().toString(36).substring(2);
+
+    // Önce kaydı oluştur (dosyaUrl olmadan)
+    const yeniEvrak = {
+      id: evrakId,
+      ad: evrakForm.ad,
+      tur: evrakForm.tur || 'Belge',
+      yuklemeTarihi: new Date().toISOString(),
+      dosyaAdi: evrakForm.dosya.name,
+      dosyaBoyutu: evrakForm.dosya.size,
+      dosyaTipi: evrakForm.dosya.type,
+      dosyaUrl: '',
+      notlar: evrakForm.notlar,
     };
-    reader.readAsDataURL(evrakForm.dosya);
+    const mevcutEvraklar = iz.evraklar || [];
+    updateIsIzni(iz.id, { evraklar: [...mevcutEvraklar, yeniEvrak] });
+
+    // Storage'a yükle ve URL'yi güncelle
+    const url = await uploadFileToStorage(evrakForm.dosya, orgId, 'is-izni-evrak', evrakId);
+    if (url) {
+      const guncelIz = isIzinleri.find(i => i.id === showEvrakModal);
+      if (guncelIz) {
+        const guncelEvraklar = (guncelIz.evraklar || []).map(e =>
+          e.id === evrakId ? { ...e, dosyaUrl: url } : e
+        );
+        updateIsIzni(iz.id, { evraklar: guncelEvraklar });
+      }
+    }
+
+    addToast(`"${evrakForm.ad}" evrakı eklendi.`, 'success');
+    setShowEvrakModal(null);
+    setEvrakForm({ ad: '', tur: '', notlar: '', dosya: null });
   };
 
   const handleEvrakSil = (izId: string, evrakId: string) => {
@@ -659,9 +682,7 @@ export default function IsIzniPage() {
                       const file = e.dataTransfer.files[0];
                       if (!file) return;
                       if (file.size > 10 * 1024 * 1024) { addToast('Dosya 10MB\'ı aşamaz.', 'error'); return; }
-                      const reader = new FileReader();
-                      reader.onload = ev => sf('belgeDosyaVeri', ev.target?.result as string);
-                      reader.readAsDataURL(file);
+                      setPendingBelge(file);
                       sf('belgeDosyaAdi', file.name);
                       sf('belgeDosyaBoyutu', file.size);
                       sf('belgeDosyaTipi', file.type);
@@ -695,9 +716,7 @@ export default function IsIzniPage() {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     if (file.size > 10 * 1024 * 1024) { addToast('Dosya 10MB\'ı aşamaz.', 'error'); return; }
-                    const reader = new FileReader();
-                    reader.onload = ev => sf('belgeDosyaVeri', ev.target?.result as string);
-                    reader.readAsDataURL(file);
+                    setPendingBelge(file);
                     sf('belgeDosyaAdi', file.name);
                     sf('belgeDosyaBoyutu', file.size);
                     sf('belgeDosyaTipi', file.type);
@@ -854,15 +873,18 @@ export default function IsIzniPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <a
-                          href={evrak.dosyaVeri}
-                          download={evrak.dosyaAdi}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
-                          style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
-                          title="İndir"
-                        >
-                          <i className="ri-download-line text-xs" />
-                        </a>
+                        {evrak.dosyaUrl && (
+                          <a
+                            href={evrak.dosyaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                            style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
+                            title="İndir / Görüntüle"
+                          >
+                            <i className="ri-download-line text-xs" />
+                          </a>
+                        )}
                         {canEdit && (
                           <button
                             onClick={() => handleEvrakSil(viewRecord.id, evrak.id)}
@@ -915,7 +937,7 @@ export default function IsIzniPage() {
             <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Bu iş iznini silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>İş izni çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
 

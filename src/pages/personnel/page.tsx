@@ -105,7 +105,7 @@ export default function PersonellerPage() {
   const [kartvizitId, setKartvizitId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyPersonel });
-  const [fotoVeri, setFotoVeri] = useState<string | null>(null);
+  const [pendingFotoFile, setPendingFotoFile] = useState<File | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importLoading, setImportLoading] = useState(false);
@@ -524,32 +524,30 @@ export default function PersonellerPage() {
 
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
 
-  const openAdd = () => { setForm({ ...emptyPersonel }); setEditingId(null); setFotoVeri(null); setFormOpen(true); };
-  const openEdit = (p: Personel) => { setForm({ ...p }); setEditingId(p.id); setFotoVeri(null); setFormOpen(true); };
+  const openAdd = () => { setForm({ ...emptyPersonel }); setEditingId(null); setPendingFotoFile(null); setFormOpen(true); };
+  const openEdit = (p: Personel) => { setForm({ ...p }); setEditingId(p.id); setPendingFotoFile(null); setFormOpen(true); };
 
   const handleSave = () => {
     if (!form.adSoyad.trim()) { addToast('Ad Soyad zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (editingId) {
       updatePersonel(editingId, form);
-      if (fotoVeri) setPersonelFoto(editingId, fotoVeri);
+      if (pendingFotoFile) setPersonelFoto(editingId, pendingFotoFile);
       addToast('Personel güncellendi.', 'success');
     } else {
       const newP = addPersonel(form);
-      if (fotoVeri) setPersonelFoto(newP.id, fotoVeri);
+      if (pendingFotoFile) setPersonelFoto(newP.id, pendingFotoFile);
       addToast('Personel eklendi.', 'success');
     }
     setFormOpen(false);
-    setFotoVeri(null);
+    setPendingFotoFile(null);
   };
 
   const handleFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { addToast('Lütfen bir resim dosyası seçin.', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = (ev) => { setFotoVeri(ev.target?.result as string); };
-    reader.readAsDataURL(file);
+    setPendingFotoFile(file);
     e.target.value = '';
   };
 
@@ -696,14 +694,15 @@ export default function PersonellerPage() {
       )}
 
       {/* ── Form Modal ── */}
-      <Modal open={formOpen} onClose={() => { setFormOpen(false); setFotoVeri(null); }} title={editingId ? 'Personel Düzenle' : 'Yeni Personel Ekle'} size="xl" icon="ri-user-line"
+      <Modal open={formOpen} onClose={() => { setFormOpen(false); setPendingFotoFile(null); }} title={editingId ? 'Personel Düzenle' : 'Yeni Personel Ekle'} size="xl" icon="ri-user-line"
         footer={<><button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button><button onClick={handleSave} className="btn-primary"><i className="ri-save-line" /> Kaydet</button></>}>
         <div className="space-y-4">
           {/* Photo upload section */}
           <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
             <div className="flex-shrink-0">
               {(() => {
-                const displayFoto = fotoVeri || (editingId ? getPersonelFoto(editingId) : null);
+                const previewUrl = pendingFotoFile ? URL.createObjectURL(pendingFotoFile) : null;
+                const displayFoto = previewUrl || (editingId ? getPersonelFoto(editingId) : null);
                 return (
                   <PersonelAvatar
                     adSoyad={form.adSoyad || '?'}
@@ -727,12 +726,12 @@ export default function PersonellerPage() {
                   onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.15)'; }}
                 >
                   <i className="ri-upload-2-line" />
-                  {fotoVeri || (editingId && getPersonelFoto(editingId)) ? 'Fotoğrafı Değiştir' : 'Fotoğraf Yükle'}
+                  {pendingFotoFile || (editingId && getPersonelFoto(editingId)) ? 'Fotoğrafı Değiştir' : 'Fotoğraf Yükle'}
                 </button>
-                {(fotoVeri) && (
+                {(pendingFotoFile) && (
                   <button
                     type="button"
-                    onClick={() => setFotoVeri(null)}
+                    onClick={() => setPendingFotoFile(null)}
                     className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg cursor-pointer"
                     style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}
                   >

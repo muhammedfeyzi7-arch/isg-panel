@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useApp } from '../../../store/AppContext';
 import { getEvrakKategori, KATEGORI_META } from '../../../utils/evrakKategori';
+import { uploadFileToStorage } from '../../../utils/fileUpload';
 import type { EvrakStatus } from '../../../types';
 
 const EVRAK_TURLERI = [
@@ -12,7 +13,6 @@ const EVRAK_TURLERI = [
 interface FileItem {
   id: string;
   file: File;
-  dataUrl: string;
   evrakAdi: string;
   tur: string;
   gecerlilikTarihi: string;
@@ -37,7 +37,7 @@ function calcDurum(dosyaAdi: string, gecerlilikTarihi: string): EvrakStatus {
 }
 
 export default function BulkEvrakUpload({ open, onClose }: Props) {
-  const { firmalar, personeller, addEvrak, addToast, theme } = useApp();
+  const { firmalar, personeller, addEvrak, addToast, theme, org } = useApp();
   const dropRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isDark = theme === 'dark';
@@ -65,15 +65,7 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
     onClose();
   };
 
-  const readFile = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target?.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-  const addFiles = useCallback(async (newFiles: File[]) => {
+  const addFiles = useCallback((newFiles: File[]) => {
     const today = new Date().toISOString().split('T')[0];
     const items: FileItem[] = [];
 
@@ -86,12 +78,10 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
         addToast(`${file.name} — 10MB sınırını aşıyor, atlandı.`, 'warning');
         continue;
       }
-      const dataUrl = await readFile(file);
       const nameWithoutExt = file.name.replace(/\.[^.]+$/, '');
       items.push({
         id: Math.random().toString(36).slice(2),
         file,
-        dataUrl,
         evrakAdi: nameWithoutExt,
         tur: 'Diğer',
         gecerlilikTarihi: '',
@@ -127,11 +117,23 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
 
     setUploading(true);
     let successCount = 0;
+    const orgId = org?.id ?? 'unknown';
 
     for (const item of files) {
       setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'uploading' } : f));
       try {
         const kategori = getEvrakKategori(item.tur, item.evrakAdi);
+
+        // Önce Storage'a yükle — başarısız olursa kayıt oluşturma
+        const tempId = Math.random().toString(36).slice(2);
+        const url = await uploadFileToStorage(item.file, orgId, 'evrak', tempId);
+        if (!url) {
+          addToast(`${item.file.name} — dosya yüklenemedi, kayıt oluşturulmadı.`, 'error');
+          setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'error' } : f));
+          continue;
+        }
+
+        // Upload başarılı → evrak kaydını oluştur
         addEvrak({
           ad: item.evrakAdi,
           tur: item.tur,
@@ -143,10 +145,11 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
           dosyaAdi: item.file.name,
           dosyaBoyutu: item.file.size,
           dosyaTipi: item.file.type,
-          dosyaVeri: item.dataUrl,
+          dosyaUrl: url,
           notlar: '',
           kategori,
         });
+
         setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'done' } : f));
         successCount++;
       } catch {
@@ -450,7 +453,7 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
                   Her dosya için <strong style={{ color: textPrimary }}>evrak adı</strong>,{' '}
                   <strong style={{ color: textPrimary }}>türü</strong> ve{' '}
                   <strong style={{ color: textPrimary }}>geçerlilik tarihi</strong> girebilirsiniz.
-                  Geçerlilik tarihi boş bırakılırsa durum otomatik hesaplanır.
+                  Dosyalar Supabase Storage&apos;a yüklenir, tüm cihazlardan erişilebilir.
                 </p>
               </div>
             </div>

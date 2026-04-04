@@ -1,7 +1,9 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '@/store/AppContext';
 import Modal from '@/components/base/Modal';
 import { usePermissions } from '@/hooks/usePermissions';
+import { supabase } from '@/lib/supabase';
+import { uploadFileToStorage, downloadFromUrl } from '@/utils/fileUpload';
 
 /* ── Tipler ─────────────────────────────────────────────────── */
 type FormKategori = 'Tümü' | 'Ekipman Kontrolleri' | 'Çalışma Alanı Kontrolleri' | 'Personel ve KKD Kontrolleri' | 'Çevre ve Hijyen Kontrolleri' | 'Periyodik Kontroller' | 'Diğer';
@@ -16,7 +18,7 @@ interface KontrolFormu {
   dosyaAdi: string;
   dosyaBoyutu: number;
   dosyaTipi: string;
-  dosyaVeri: string;
+  dosyaUrl?: string;
   etiketler: string[];
   olusturanKisi: string;
   olusturmaTarihi: string;
@@ -60,19 +62,6 @@ function formatBoyut(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const STORAGE_KEY = 'isg_kontrol_formlari';
-
-function loadForms(): KontrolFormu[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as KontrolFormu[]) : [];
-  } catch { return []; }
-}
-
-function saveForms(forms: KontrolFormu[]): void {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(forms)); } catch { /* storage full */ }
-}
-
 /* ── Tarih yardımcıları ─────────────────────────────────────── */
 function kontrolDurumu(sonrakiTarih?: string): { label: string; color: string; bg: string; icon: string } | null {
   if (!sonrakiTarih) return null;
@@ -85,16 +74,16 @@ function kontrolDurumu(sonrakiTarih?: string): { label: string; color: string; b
   if (fark < 0) return { label: `${Math.abs(fark)} gün gecikti`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', icon: 'ri-alarm-warning-line' };
   if (fark === 0) return { label: 'Bugün son gün', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', icon: 'ri-time-line' };
   if (fark <= 7) return { label: `${fark} gün kaldı`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', icon: 'ri-timer-line' };
-  if (fark <= 30) return { label: `${fark} gün kaldı`, color: '#10B981', bg: 'rgba(16,185,129,0.1)', icon: 'ri-calendar-check-line' };
   return { label: `${fark} gün kaldı`, color: '#10B981', bg: 'rgba(16,185,129,0.1)', icon: 'ri-calendar-check-line' };
 }
 
 /* ── Ana Bileşen ─────────────────────────────────────────────── */
 export default function KontrolFormlariPage() {
-  const { firmalar, currentUser, addToast } = useApp();
+  const { firmalar, currentUser, addToast, org } = useApp();
   const { canCreate, canEdit, canDelete } = usePermissions();
 
-  const [formlar, setFormlar] = useState<KontrolFormu[]>(loadForms);
+  const [formlar, setFormlar] = useState<KontrolFormu[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [katFilter, setKatFilter] = useState<FormKategori>('Tümü');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -104,21 +93,59 @@ export default function KontrolFormlariPage() {
   const [viewForm, setViewForm] = useState<KontrolFormu | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const [form, setForm] = useState({
     ad: '', kategori: 'Ekipman Kontrolleri' as Exclude<FormKategori, 'Tümü'>,
     aciklama: '', firmaId: '',
     etiketler: [] as string[], etiketInput: '',
-    dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '',
+    dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '',
     sonKontrolTarihi: '', sonrakiKontrolTarihi: '',
   });
 
   const aktivFirmalar = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
+  const orgId = org?.id ?? null;
 
-  const persist = (updated: KontrolFormu[]) => {
-    setFormlar(updated);
-    saveForms(updated);
-  };
+  /* ── Supabase yükle ── */
+  const loadFormlar = useCallback(async () => {
+    if (!orgId) { setLoading(false); return; }
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('kontrol_formlari')
+      .select('id, data, created_at')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      addToast('Kontrol formları yüklenemedi.', 'error');
+      setLoading(false);
+      return;
+    }
+    setFormlar((data ?? []).map(r => r.data as KontrolFormu));
+    setLoading(false);
+  }, [orgId, addToast]);
+
+  useEffect(() => { loadFormlar(); }, [loadFormlar]);
+
+  /* ── Supabase kaydet ── */
+  const saveForm = useCallback(async (item: KontrolFormu) => {
+    if (!orgId) return;
+    const { error } = await supabase.from('kontrol_formlari').upsert({
+      id: item.id,
+      organization_id: orgId,
+      user_id: (await supabase.auth.getUser()).data.user?.id,
+      data: item,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) addToast('Form kaydedilemedi: ' + error.message, 'error');
+  }, [orgId, addToast]);
+
+  /* ── Supabase sil ── */
+  const deleteFormFromDb = useCallback(async (id: string) => {
+    if (!orgId) return;
+    const { error } = await supabase.from('kontrol_formlari').delete().eq('id', id);
+    if (error) addToast('Form silinemedi.', 'error');
+  }, [orgId, addToast]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -141,83 +168,111 @@ export default function KontrolFormlariPage() {
 
   const handleFileChange = (file: File) => {
     if (file.size > 20 * 1024 * 1024) { addToast('Dosya 20MB\'ı aşamaz.', 'error'); return; }
-    setUploading(true);
-    const reader = new FileReader();
-    reader.onload = e => {
-      sf('dosyaVeri', e.target?.result as string);
-      sf('dosyaAdi', file.name);
-      sf('dosyaBoyutu', file.size);
-      sf('dosyaTipi', file.type);
-      setUploading(false);
-    };
-    reader.readAsDataURL(file);
+    setPendingFile(file);
+    sf('dosyaAdi', file.name);
+    sf('dosyaBoyutu', file.size);
+    sf('dosyaTipi', file.type);
   };
 
   const openAdd = () => {
     setEditId(null);
-    setForm({ ad: '', kategori: 'Ekipman Kontrolleri', aciklama: '', firmaId: '', etiketler: [], etiketInput: '', dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '', sonKontrolTarihi: '', sonrakiKontrolTarihi: '' });
+    setPendingFile(null);
+    setForm({ ad: '', kategori: 'Ekipman Kontrolleri', aciklama: '', firmaId: '', etiketler: [], etiketInput: '', dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', sonKontrolTarihi: '', sonrakiKontrolTarihi: '' });
     setShowModal(true);
   };
 
   const openEdit = (f: KontrolFormu) => {
     setEditId(f.id);
-    setForm({ ad: f.ad, kategori: f.kategori, aciklama: f.aciklama, firmaId: f.firmaId, etiketler: f.etiketler, etiketInput: '', dosyaAdi: f.dosyaAdi, dosyaBoyutu: f.dosyaBoyutu, dosyaTipi: f.dosyaTipi, dosyaVeri: '', sonKontrolTarihi: f.sonKontrolTarihi ?? '', sonrakiKontrolTarihi: f.sonrakiKontrolTarihi ?? '' });
+    setPendingFile(null);
+    setForm({ ad: f.ad, kategori: f.kategori, aciklama: f.aciklama, firmaId: f.firmaId, etiketler: f.etiketler, etiketInput: '', dosyaAdi: f.dosyaAdi, dosyaBoyutu: f.dosyaBoyutu, dosyaTipi: f.dosyaTipi, sonKontrolTarihi: f.sonKontrolTarihi ?? '', sonrakiKontrolTarihi: f.sonrakiKontrolTarihi ?? '' });
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.ad.trim()) { addToast('Form adı zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
-    if (!editId && !form.dosyaVeri) { addToast('Dosya yüklenmesi zorunludur.', 'error'); return; }
+    if (!editId && !pendingFile) { addToast('Dosya yüklenmesi zorunludur.', 'error'); return; }
 
+    setUploading(true);
     const now = new Date().toISOString();
-    if (editId) {
-      const updated = formlar.map(f => {
-        if (f.id !== editId) return f;
-        return {
-          ...f, ad: form.ad, kategori: form.kategori, aciklama: form.aciklama,
-          firmaId: form.firmaId,
-          etiketler: form.etiketler,
+
+    try {
+      if (editId) {
+        const existing = formlar.find(f => f.id === editId);
+        if (!existing) return;
+        let dosyaUrl = existing.dosyaUrl;
+        let dosyaAdi = existing.dosyaAdi;
+        let dosyaBoyutu = existing.dosyaBoyutu;
+        let dosyaTipi = existing.dosyaTipi;
+
+        if (pendingFile && orgId) {
+          const url = await uploadFileToStorage(pendingFile, orgId, 'kontrol-formu', editId);
+          if (url) {
+            dosyaUrl = url;
+            dosyaAdi = form.dosyaAdi;
+            dosyaBoyutu = form.dosyaBoyutu;
+            dosyaTipi = form.dosyaTipi;
+          }
+        }
+
+        const updated: KontrolFormu = {
+          ...existing,
+          ad: form.ad, kategori: form.kategori, aciklama: form.aciklama,
+          firmaId: form.firmaId, etiketler: form.etiketler,
           sonKontrolTarihi: form.sonKontrolTarihi || undefined,
           sonrakiKontrolTarihi: form.sonrakiKontrolTarihi || undefined,
-          ...(form.dosyaVeri ? { dosyaAdi: form.dosyaAdi, dosyaBoyutu: form.dosyaBoyutu, dosyaTipi: form.dosyaTipi, dosyaVeri: form.dosyaVeri } : {}),
+          dosyaAdi, dosyaBoyutu, dosyaTipi, dosyaUrl,
         };
-      });
-      persist(updated);
-      addToast('Form güncellendi.', 'success');
-    } else {
-      const yeni: KontrolFormu = {
-        id: crypto.randomUUID(),
-        ad: form.ad, kategori: form.kategori, aciklama: form.aciklama,
-        firmaId: form.firmaId,
-        yuklemeTarihi: now, dosyaAdi: form.dosyaAdi, dosyaBoyutu: form.dosyaBoyutu,
-        dosyaTipi: form.dosyaTipi, dosyaVeri: form.dosyaVeri,
-        etiketler: form.etiketler, olusturanKisi: currentUser.ad,
-        olusturmaTarihi: now,
-        sonKontrolTarihi: form.sonKontrolTarihi || undefined,
-        sonrakiKontrolTarihi: form.sonrakiKontrolTarihi || undefined,
-      };
-      persist([yeni, ...formlar]);
-      addToast(`"${form.ad}" formu yüklendi.`, 'success');
+        setFormlar(prev => prev.map(f => f.id === editId ? updated : f));
+        await saveForm(updated);
+        addToast('Form güncellendi.', 'success');
+      } else {
+        const id = crypto.randomUUID();
+        let dosyaUrl: string | undefined;
+
+        if (pendingFile && orgId) {
+          const url = await uploadFileToStorage(pendingFile, orgId, 'kontrol-formu', id);
+          dosyaUrl = url ?? undefined;
+        }
+
+        const yeni: KontrolFormu = {
+          id,
+          ad: form.ad, kategori: form.kategori, aciklama: form.aciklama,
+          firmaId: form.firmaId,
+          yuklemeTarihi: now, dosyaAdi: form.dosyaAdi, dosyaBoyutu: form.dosyaBoyutu,
+          dosyaTipi: form.dosyaTipi, dosyaUrl,
+          etiketler: form.etiketler, olusturanKisi: currentUser.ad,
+          olusturmaTarihi: now,
+          sonKontrolTarihi: form.sonKontrolTarihi || undefined,
+          sonrakiKontrolTarihi: form.sonrakiKontrolTarihi || undefined,
+        };
+        setFormlar(prev => [yeni, ...prev]);
+        await saveForm(yeni);
+        addToast(`"${form.ad}" formu yüklendi.`, 'success');
+      }
+    } finally {
+      setUploading(false);
+      setPendingFile(null);
+      setShowModal(false);
     }
-    setShowModal(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteId) return;
-    persist(formlar.filter(f => f.id !== deleteId));
+    setFormlar(prev => prev.filter(f => f.id !== deleteId));
+    await deleteFormFromDb(deleteId);
     addToast('Form silindi.', 'success');
     setDeleteId(null);
   };
 
-  const handleDownload = (f: KontrolFormu) => {
-    const link = document.createElement('a');
-    link.href = f.dosyaVeri;
-    link.download = f.dosyaAdi;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast(`"${f.dosyaAdi}" indiriliyor...`, 'success');
+  const handleDownload = async (f: KontrolFormu) => {
+    if (!f.dosyaUrl) { addToast('Dosya bulunamadı.', 'error'); return; }
+    const ok = await downloadFromUrl(f.dosyaUrl, f.dosyaAdi);
+    if (ok) {
+      addToast(`"${f.dosyaAdi}" indiriliyor...`, 'success');
+    } else {
+      addToast('Dosya indirilemedi.', 'error');
+    }
   };
 
   const addEtiket = () => {
@@ -320,7 +375,12 @@ export default function KontrolFormlariPage() {
       </div>
 
       {/* Form Listesi */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="isg-card rounded-xl py-20 text-center">
+          <i className="ri-loader-4-line animate-spin text-3xl" style={{ color: '#6366F1' }} />
+          <p className="text-sm mt-3" style={{ color: 'var(--text-muted)' }}>Yükleniyor...</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="isg-card rounded-xl py-20 text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
             style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
@@ -350,11 +410,8 @@ export default function KontrolFormlariPage() {
                 onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}
                 onClick={() => setViewForm(f)}
               >
-                {/* Üst renk bandı */}
                 <div className="h-1.5 w-full" style={{ background: cfg.color }} />
-
                 <div className="p-4 flex flex-col gap-3 flex-1">
-                  {/* Başlık satırı */}
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
                       style={{ background: `${fileColor}18`, border: `1px solid ${fileColor}30` }}>
@@ -369,12 +426,10 @@ export default function KontrolFormlariPage() {
                     </div>
                   </div>
 
-                  {/* Açıklama */}
                   {f.aciklama && (
                     <p className="text-xs leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>{f.aciklama}</p>
                   )}
 
-                  {/* Meta bilgiler */}
                   <div className="space-y-1.5">
                     {firma && (
                       <div className="flex items-center gap-2">
@@ -408,7 +463,6 @@ export default function KontrolFormlariPage() {
                     )}
                   </div>
 
-                  {/* Sonraki kontrol durum badge */}
                   {durum && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
                       style={{ background: durum.bg, border: `1px solid ${durum.color}25` }}>
@@ -417,7 +471,6 @@ export default function KontrolFormlariPage() {
                     </div>
                   )}
 
-                  {/* Etiketler */}
                   {f.etiketler.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {f.etiketler.slice(0, 3).map(et => (
@@ -434,7 +487,6 @@ export default function KontrolFormlariPage() {
                     </div>
                   )}
 
-                  {/* Dosya bilgisi + aksiyonlar */}
                   <div className="flex items-center justify-between pt-3 mt-auto"
                     style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -493,7 +545,7 @@ export default function KontrolFormlariPage() {
           <>
             <button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
             <button onClick={handleSave} disabled={uploading} className="btn-primary whitespace-nowrap">
-              <i className={editId ? 'ri-save-line' : 'ri-upload-line'} />
+              <i className={uploading ? 'ri-loader-4-line animate-spin' : editId ? 'ri-save-line' : 'ri-upload-line'} />
               {uploading ? 'Yükleniyor...' : editId ? 'Güncelle' : 'Yükle'}
             </button>
           </>
@@ -501,21 +553,16 @@ export default function KontrolFormlariPage() {
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Form Adı */}
             <div className="sm:col-span-2">
               <label className="form-label">Form Adı *</label>
               <input value={form.ad} onChange={e => sf('ad', e.target.value)} placeholder="Örn: Yüksekte Çalışma Risk Analizi..." className={inp} />
             </div>
-
-            {/* Kategori */}
             <div>
               <label className="form-label">Kategori *</label>
               <select value={form.kategori} onChange={e => sf('kategori', e.target.value)} className={inp}>
                 {KATEGORILER.map(k => <option key={k} value={k}>{k}</option>)}
               </select>
             </div>
-
-            {/* Firma */}
             <div>
               <label className="form-label">Firma *</label>
               <select value={form.firmaId} onChange={e => sf('firmaId', e.target.value)} className={inp}>
@@ -523,36 +570,18 @@ export default function KontrolFormlariPage() {
                 {aktivFirmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
               </select>
             </div>
-
-            {/* Son Kontrol Tarihi */}
             <div>
               <label className="form-label">Son Kontrol Tarihi</label>
-              <input
-                type="date"
-                value={form.sonKontrolTarihi}
-                onChange={e => sf('sonKontrolTarihi', e.target.value)}
-                className={inp}
-              />
+              <input type="date" value={form.sonKontrolTarihi} onChange={e => sf('sonKontrolTarihi', e.target.value)} className={inp} />
             </div>
-
-            {/* Sonraki Kontrol Tarihi */}
             <div>
               <label className="form-label">Sonraki Kontrol Tarihi</label>
-              <input
-                type="date"
-                value={form.sonrakiKontrolTarihi}
-                onChange={e => sf('sonrakiKontrolTarihi', e.target.value)}
-                className={inp}
-              />
+              <input type="date" value={form.sonrakiKontrolTarihi} onChange={e => sf('sonrakiKontrolTarihi', e.target.value)} className={inp} />
             </div>
-
-            {/* Açıklama */}
             <div className="sm:col-span-2">
               <label className="form-label">Açıklama</label>
               <textarea value={form.aciklama} onChange={e => sf('aciklama', e.target.value)} placeholder="Form hakkında kısa açıklama..." rows={2} maxLength={500} className={`${inp} resize-y`} />
             </div>
-
-            {/* Etiketler */}
             <div className="sm:col-span-2">
               <label className="form-label">Etiketler</label>
               <div className="flex gap-2">
@@ -581,8 +610,6 @@ export default function KontrolFormlariPage() {
                 </div>
               )}
             </div>
-
-            {/* Dosya Yükleme */}
             <div className="sm:col-span-2">
               <label className="form-label">
                 Dosya {!editId && '*'}
@@ -599,12 +626,7 @@ export default function KontrolFormlariPage() {
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)'; e.currentTarget.style.background = 'rgba(99,102,241,0.03)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-item)'; }}
               >
-                {uploading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <i className="ri-loader-4-line animate-spin text-xl" style={{ color: '#6366F1' }} />
-                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Yükleniyor...</span>
-                  </div>
-                ) : form.dosyaAdi ? (
+                {form.dosyaAdi ? (
                   <div className="flex items-center justify-center gap-3">
                     <div className="w-10 h-10 flex items-center justify-center rounded-xl"
                       style={{ background: `${dosyaRengi(form.dosyaTipi)}18` }}>
@@ -669,7 +691,6 @@ export default function KontrolFormlariPage() {
           }
         >
           <div className="space-y-4">
-            {/* Kategori + dosya tipi */}
             <div className="flex items-center gap-3 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold"
                 style={{ background: KAT_CONFIG[viewForm.kategori].bg, color: KAT_CONFIG[viewForm.kategori].color }}>
@@ -690,7 +711,6 @@ export default function KontrolFormlariPage() {
               })()}
             </div>
 
-            {/* Kontrol tarihleri — öne çıkan alan */}
             {(viewForm.sonKontrolTarihi || viewForm.sonrakiKontrolTarihi) && (
               <div className="grid grid-cols-2 gap-3">
                 {viewForm.sonKontrolTarihi && (
@@ -729,7 +749,6 @@ export default function KontrolFormlariPage() {
               </div>
             )}
 
-            {/* Bilgi grid */}
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: 'Firma', value: firmalar.find(x => x.id === viewForm.firmaId)?.ad ?? '—', icon: 'ri-building-2-line' },
@@ -752,7 +771,6 @@ export default function KontrolFormlariPage() {
               ))}
             </div>
 
-            {/* Açıklama */}
             {viewForm.aciklama && (
               <div className="px-4 py-3 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
                 <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-faint)' }}>Açıklama</p>
@@ -760,7 +778,6 @@ export default function KontrolFormlariPage() {
               </div>
             )}
 
-            {/* Etiketler */}
             {viewForm.etiketler.length > 0 && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>Etiketler</p>
@@ -772,13 +789,6 @@ export default function KontrolFormlariPage() {
                     </span>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Dosya önizleme (görsel ise) */}
-            {viewForm.dosyaTipi.startsWith('image/') && (
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
-                <img src={viewForm.dosyaVeri} alt={viewForm.ad} className="w-full object-contain max-h-64" />
               </div>
             )}
           </div>

@@ -18,46 +18,21 @@ interface Props {
 
 /* ── Ana Bileşen ───────────────────────────────────────────── */
 export default function CategorizedEvraklar({ evraklar, personelAdi }: Props) {
-  const { addToast, getEvrakFile, uploadBase64ToStorage, updateEvrak } = useApp();
+  const { addToast } = useApp();
   const [zipLoading, setZipLoading] = useState<string | null>(null);
 
   /* ── Tek Dosya İndir ─────────────────────────────────────── */
   const handleEvrakDownload = async (ev: Evrak) => {
-    // Storage URL öncelikli
-    const storageUrl = ev.dosyaUrl;
-    if (storageUrl && storageUrl.startsWith('http')) {
-      try {
-        const res = await fetch(storageUrl);
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url; link.download = ev.dosyaAdi || ev.ad;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        addToast(`"${ev.dosyaAdi || ev.ad}" indiriliyor...`, 'success');
-        return;
-      } catch { /* fallback */ }
-    }
-    // localStorage fallback + migrate
-    const veri = getEvrakFile(ev.id) || ev.dosyaVeri;
-    if (!veri) { addToast('İndirilebilir dosya bulunamadı.', 'error'); return; }
+    if (!ev.dosyaUrl) { addToast('İndirilebilir dosya bulunamadı.', 'error'); return; }
     try {
-      const arr = veri.split(',');
-      const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
-      const bstr = atob(arr[1]);
-      const u8arr = new Uint8Array(bstr.length);
-      for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-      const blob = new Blob([u8arr], { type: mime });
+      const res = await fetch(ev.dosyaUrl);
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url; link.download = ev.dosyaAdi || ev.ad;
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       addToast(`"${ev.dosyaAdi || ev.ad}" indiriliyor...`, 'success');
-      // Arka planda Storage'a migrate et
-      uploadBase64ToStorage(veri, 'evrak', ev.id, ev.dosyaAdi).then(url2 => {
-        if (url2) updateEvrak(ev.id, { dosyaUrl: url2 } as Parameters<typeof updateEvrak>[1]);
-      });
     } catch {
       addToast('Dosya indirilemedi.', 'error');
     }
@@ -67,8 +42,8 @@ export default function CategorizedEvraklar({ evraklar, personelAdi }: Props) {
   const handleZipDownload = async (kategoriId: EvrakKategoriId | 'all') => {
     const hedef =
       kategoriId === 'all'
-        ? evraklar.filter(e => e.dosyaAdi)
-        : evraklar.filter(e => e.dosyaAdi && getEvrakKategori(e.tur, e.ad) === kategoriId);
+        ? evraklar.filter(e => e.dosyaAdi && e.dosyaUrl)
+        : evraklar.filter(e => e.dosyaAdi && e.dosyaUrl && getEvrakKategori(e.tur, e.ad) === kategoriId);
 
     if (hedef.length === 0) { addToast('İndirilecek dosya bulunamadı.', 'warning'); return; }
 
@@ -78,19 +53,29 @@ export default function CategorizedEvraklar({ evraklar, personelAdi }: Props) {
       let count = 0;
 
       for (const ev of hedef) {
-        const veri = getEvrakFile(ev.id) || ev.dosyaVeri;
-        if (!veri) continue;
-        const base64 = veri.split(',')[1];
-        if (!base64) continue;
+        if (!ev.dosyaUrl) continue;
+        try {
+          const res = await fetch(ev.dosyaUrl);
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const base64 = await new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1] ?? '');
+            };
+            reader.readAsDataURL(blob);
+          });
 
-        if (kategoriId === 'all') {
-          const meta = KATEGORI_META[getEvrakKategori(ev.tur, ev.ad)];
-          const folder = zip.folder(meta.label);
-          folder?.file(ev.dosyaAdi || `${ev.ad}.bin`, base64, { base64: true });
-        } else {
-          zip.file(ev.dosyaAdi || `${ev.ad}.bin`, base64, { base64: true });
-        }
-        count++;
+          if (kategoriId === 'all') {
+            const meta = KATEGORI_META[getEvrakKategori(ev.tur, ev.ad)];
+            const folder = zip.folder(meta.label);
+            folder?.file(ev.dosyaAdi || `${ev.ad}.bin`, base64, { base64: true });
+          } else {
+            zip.file(ev.dosyaAdi || `${ev.ad}.bin`, base64, { base64: true });
+          }
+          count++;
+        } catch { /* bu dosyayı atla */ }
       }
 
       if (count === 0) { addToast('Dosya içeriği bulunamadı.', 'warning'); return; }
@@ -123,7 +108,7 @@ export default function CategorizedEvraklar({ evraklar, personelAdi }: Props) {
     }))
     .filter(g => g.evraklar.length > 0);
 
-  const indirilabilir = evraklar.filter(e => e.dosyaAdi).length;
+  const indirilabilir = evraklar.filter(e => e.dosyaAdi && e.dosyaUrl).length;
 
   /* ── Boş Durum ───────────────────────────────────────────── */
   if (evraklar.length === 0) {

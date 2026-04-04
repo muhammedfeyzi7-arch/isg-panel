@@ -4,6 +4,7 @@ import type { Egitim, EgitimStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge from '../../components/base/Badge';
 import XLSXStyle from 'xlsx-js-style';
+import { uploadFileToStorage, downloadFromUrl } from '@/utils/fileUpload';
 
 const EGITIM_TURLERI = [
   'İşe Giriş ve Oryantasyon Eğitimi',
@@ -36,32 +37,7 @@ function getStatusColor(s: string): 'sky' | 'green' | 'amber' {
     aciklama: '', belgeDosyaAdi: '', belgeDosyaBoyutu: 0, belgeDosyaTipi: '', belgeDosyaVeri: '', notlar: '',
   };
 
-function downloadFromDataUrl(dataUrl: string, filename: string): void {
-  try {
-    const arr = dataUrl.split(',');
-    const mime = arr[0].match(/:(.*?);/)?.[1] || '';
-    const bstr = atob(arr[1]);
-    const n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
-    const blob = new Blob([u8arr], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch {
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-}
+// downloadFromDataUrl → fileUpload utility'ye taşındı
 
 function exportEgitimlerToExcel(
   egitimler: Egitim[],
@@ -186,7 +162,7 @@ function exportEgitimlerToExcel(
 }
 
 export default function EgitimlerPage() {
-  const { egitimler, firmalar, personeller, addEgitim, updateEgitim, deleteEgitim, getEgitimFile, addToast, quickCreate, setQuickCreate } = useApp();
+  const { egitimler, firmalar, personeller, addEgitim, updateEgitim, deleteEgitim, org, addToast, quickCreate, setQuickCreate } = useApp();
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -199,6 +175,7 @@ export default function EgitimlerPage() {
   const [form, setForm] = useState({ ...emptyEgitim });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -230,28 +207,38 @@ export default function EgitimlerPage() {
 
   const getFirmaAd = (id: string) => firmalar.find(fi => fi.id === id)?.ad || '—';
 
-  const openAdd = () => { setForm({ ...emptyEgitim }); setEditingId(null); setFormOpen(true); };
+  const openAdd = () => { setForm({ ...emptyEgitim }); setEditingId(null); setPendingFile(null); setFormOpen(true); };
   const openEdit = (e: Egitim) => {
     setForm({ ...e, belgeDosyaVeri: '' });
     setEditingId(e.id);
+    setPendingFile(null);
     setFormOpen(true);
   };
 
   const handleFileChange = (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const veri = ev.target?.result as string;
-      setForm(prev => ({ ...prev, belgeDosyaAdi: file.name, belgeDosyaBoyutu: file.size, belgeDosyaTipi: file.type, belgeDosyaVeri: veri, belgeMevcut: true, durum: 'Tamamlandı' }));
-    };
-    reader.readAsDataURL(file);
+    setPendingFile(file);
+    setForm(prev => ({
+      ...prev,
+      belgeDosyaAdi: file.name,
+      belgeDosyaBoyutu: file.size,
+      belgeDosyaTipi: file.type,
+      belgeMevcut: true,
+      durum: 'Tamamlandı',
+    }));
   };
 
-  const handleBelgeIndir = (e: Egitim) => {
-    const veri = getEgitimFile(e.id) || e.belgeDosyaVeri;
-    if (!veri) { addToast('Bu eğitim için indirilebilir belge bulunamadı.', 'error'); return; }
-    downloadFromDataUrl(veri, e.belgeDosyaAdi || 'egitim-belgesi');
-    addToast(`"${e.belgeDosyaAdi}" indiriliyor...`, 'success');
+  const handleBelgeIndir = async (e: Egitim) => {
+    if (e.belgeDosyaUrl) {
+      const ok = await downloadFromUrl(e.belgeDosyaUrl, e.belgeDosyaAdi || 'egitim-belgesi');
+      if (ok) { addToast(`"${e.belgeDosyaAdi}" indiriliyor...`, 'success'); return; }
+    }
+    addToast('Bu eğitim için indirilebilir belge bulunamadı. Lütfen belgeyi tekrar yükleyin.', 'error');
+  };
+
+  const handleBelgeGoruntule = (e: Egitim) => {
+    if (e.belgeDosyaUrl) { window.open(e.belgeDosyaUrl, '_blank'); return; }
+    addToast('Görüntülenecek belge bulunamadı.', 'error');
   };
 
   const toggleKatilimci = (id: string) => {
@@ -263,16 +250,29 @@ export default function EgitimlerPage() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.ad.trim()) { addToast('Eğitim türü/adı zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
+    const orgId = org?.id ?? 'unknown';
+
     if (editingId) {
       updateEgitim(editingId, form);
+      if (pendingFile) {
+        uploadFileToStorage(pendingFile, orgId, 'egitim', editingId).then(url => {
+          if (url) updateEgitim(editingId, { belgeDosyaUrl: url });
+        });
+      }
       addToast('Eğitim güncellendi.', 'success');
     } else {
-      addEgitim(form);
+      const newEgitim = addEgitim(form);
+      if (pendingFile) {
+        uploadFileToStorage(pendingFile, orgId, 'egitim', newEgitim.id).then(url => {
+          if (url) updateEgitim(newEgitim.id, { belgeDosyaUrl: url });
+        });
+      }
       addToast('Eğitim eklendi.', 'success');
     }
+    setPendingFile(null);
     setFormOpen(false);
   };
 
@@ -415,6 +415,7 @@ export default function EgitimlerPage() {
                       <td>
                         <div className="flex items-center gap-1 justify-end">
                           <ABtn icon="ri-eye-line" color="#60A5FA" onClick={() => setDetailId(eg.id)} title="Detay" />
+                          {(eg.belgeDosyaUrl) && <ABtn icon="ri-external-link-line" color="#34D399" onClick={() => handleBelgeGoruntule(eg)} title="Görüntüle" />}
                           <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(eg)} title="Düzenle" />
                           <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
                         </div>

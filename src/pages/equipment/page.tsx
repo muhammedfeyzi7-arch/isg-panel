@@ -343,7 +343,7 @@ function getDaysUntil(dateStr: string): number {
 }
 
 export default function EkipmanlarPage() {
-  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, getEkipmanFile, addToast, quickCreate, setQuickCreate } = useApp();
+  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, addToast, quickCreate, setQuickCreate, org } = useApp();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -412,6 +412,7 @@ export default function EkipmanlarPage() {
 
   const openEdit = (ekipman: Ekipman) => {
     setEditId(ekipman.id);
+    setPendingFile(null);
     setForm({
       ad: ekipman.ad, tur: ekipman.tur, firmaId: ekipman.firmaId,
       bulunduguAlan: ekipman.bulunduguAlan, seriNo: ekipman.seriNo,
@@ -424,40 +425,49 @@ export default function EkipmanlarPage() {
     setShowModal(true);
   };
 
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
   const handleFileChange = (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const veri = e.target?.result as string;
-      setForm(prev => ({ ...prev, dosyaAdi: file.name, dosyaBoyutu: file.size, dosyaTipi: file.type, dosyaVeri: veri }));
-    };
-    reader.readAsDataURL(file);
+    setPendingFile(file);
+    setForm(prev => ({ ...prev, dosyaAdi: file.name, dosyaBoyutu: file.size, dosyaTipi: file.type }));
   };
 
-  const handleFileDownload = (ekipman: Ekipman) => {
-    const veri = getEkipmanFile(ekipman.id);
-    if (!veri) { addToast('Bu ekipman için yüklenmiş belge bulunamadı.', 'error'); return; }
-    const link = document.createElement('a');
-    link.href = veri;
-    link.download = ekipman.dosyaAdi || 'ekipman-belgesi';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast(`"${ekipman.dosyaAdi}" indiriliyor...`, 'success');
+  const handleFileDownload = async (ekipman: Ekipman) => {
+    if (ekipman.dosyaUrl) {
+      const { downloadFromUrl } = await import('@/utils/fileUpload');
+      const ok = await downloadFromUrl(ekipman.dosyaUrl, ekipman.dosyaAdi || 'ekipman-belgesi');
+      if (ok) { addToast(`"${ekipman.dosyaAdi}" indiriliyor...`, 'success'); return; }
+    }
+    addToast('Bu ekipman için yüklenmiş belge bulunamadı.', 'error');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.ad.trim()) { addToast('Ekipman adı zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.tur) { addToast('Ekipman türü zorunludur.', 'error'); return; }
 
+    const { uploadFileToStorage } = await import('@/utils/fileUpload');
+    const orgId = org?.id ?? 'unknown';
+
     if (editId) {
       updateEkipman(editId, form);
+      if (pendingFile) {
+        uploadFileToStorage(pendingFile, orgId, 'ekipman', editId).then(url => {
+          if (url) updateEkipman(editId, { dosyaUrl: url });
+        });
+      }
       addToast('Ekipman başarıyla güncellendi.', 'success');
     } else {
-      addEkipman(form);
+      const newE = addEkipman(form);
+      if (pendingFile && newE?.id) {
+        uploadFileToStorage(pendingFile, orgId, 'ekipman', newE.id).then(url => {
+          if (url) updateEkipman(newE.id, { dosyaUrl: url });
+        });
+      }
       addToast('Ekipman başarıyla eklendi.', 'success');
     }
+    setPendingFile(null);
     setShowModal(false);
   };
 
@@ -900,7 +910,10 @@ export default function EkipmanlarPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-2">
-                          {ekipman.dosyaAdi && (
+                          {ekipman.dosyaUrl && (
+                            <button onClick={() => window.open(ekipman.dosyaUrl, '_blank')} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Belgeyi Görüntüle"><i className="ri-eye-line text-sm" /></button>
+                          )}
+                          {ekipman.dosyaUrl && (
                             <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Belgeyi İndir"><i className="ri-download-2-line text-sm" /></button>
                           )}
                           <button onClick={() => setQrEkipman(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(168,85,247,0.1)', color: '#A855F7' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.1)'; }} title="QR Kod"><i className="ri-qr-code-line text-sm" /></button>
@@ -1152,7 +1165,7 @@ export default function EkipmanlarPage() {
             <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu ekipmanı silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Ekipman çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
 

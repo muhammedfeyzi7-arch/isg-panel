@@ -11,20 +11,21 @@ export interface Permissions {
 /**
  * Returns the current user's permission flags based on their org role.
  * - admin    → full access (create, edit, delete)
- * - member   → full access except settings
+ * - member   → create + edit, NO delete
  * - denetci  → read-only (no create/edit/delete)
  */
 export function usePermissions(): Permissions {
   const { org } = useApp();
-  const role = org?.role ?? 'member';
+  const role = (org?.role ?? 'member').toLowerCase();
 
+  const isAdmin    = role === 'admin';
   const isReadOnly = role === 'denetci';
 
   return {
     canCreate: !isReadOnly,
-    canEdit: !isReadOnly,
-    canDelete: !isReadOnly,
+    canEdit:   !isReadOnly,
+    canDelete: isAdmin,          // sadece admin silebilir
     isReadOnly,
-    role,
+    role: org?.role ?? 'member',
   };
 }
