@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useApp } from '../../store/AppContext';
 
 const iconMap = {
@@ -41,15 +42,33 @@ export default function ToastContainer() {
   const isDark = theme === 'dark';
   const styleMap = getStyleMap(isDark);
 
-  return (
-    <div className="fixed top-5 right-5 z-[999999] flex flex-col gap-2.5 pointer-events-none">
+  const content = (
+    <div
+      style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        zIndex: 999999,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        pointerEvents: 'none',
+      }}
+    >
       {toasts.map(toast => {
         const s = styleMap[toast.type];
         return (
           <div
             key={toast.id}
-            className="pointer-events-auto flex items-center gap-3 px-4 py-3.5 min-w-[320px] max-w-sm animate-slide-in"
+            className="animate-slide-in"
             style={{
+              pointerEvents: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 16px',
+              minWidth: '320px',
+              maxWidth: '420px',
               background: s.background,
               border: s.border,
               borderRadius: '14px',
@@ -59,16 +78,48 @@ export default function ToastContainer() {
             }}
           >
             <div
-              className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: `${s.iconColor}20`, border: `1px solid ${s.iconColor}40` }}
+              style={{
+                width: '28px',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '10px',
+                flexShrink: 0,
+                background: `${s.iconColor}20`,
+                border: `1px solid ${s.iconColor}40`,
+              }}
             >
               <i className={`${iconMap[toast.type]} text-sm`} style={{ color: s.iconColor }} />
             </div>
-            <p className="text-sm font-semibold flex-1 leading-tight" style={{ color: s.textColor }}>{toast.message}</p>
+            <p
+              style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                flex: 1,
+                lineHeight: '1.4',
+                color: s.textColor,
+                margin: 0,
+              }}
+            >
+              {toast.message}
+            </p>
             <button
               onClick={() => removeToast(toast.id)}
-              className="w-6 h-6 flex items-center justify-center rounded-lg cursor-pointer transition-colors flex-shrink-0"
-              style={{ color: isDark ? '#94A3B8' : '#64748B' }}
+              style={{
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                flexShrink: 0,
+                color: isDark ? '#94A3B8' : '#64748B',
+                background: 'transparent',
+                border: 'none',
+                transition: 'all 0.15s',
+              }}
               onMouseEnter={e => {
                 e.currentTarget.style.color = isDark ? '#F1F5F9' : '#0F172A';
                 e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
@@ -85,4 +136,6 @@ export default function ToastContainer() {
       })}
     </div>
   );
+
+  return createPortal(content, document.body);
 }

@@ -17,14 +17,26 @@ const STATUS_CFG = {
   'Yaklaşan': { color: '#FBBF24', bg: 'rgba(251,191,36,0.12)', icon: 'ri-time-line' },
 };
 
-function isPdf(url: string | null) {
-  if (!url) return false;
-  return url.toLowerCase().includes('.pdf') || url.toLowerCase().includes('pdf');
+function isPdf(url: string | null, fileName?: string | null) {
+  if (!url && !fileName) return false;
+  // Önce dosya adına bak (signed URL'lerde uzantı encode edilmiş olabilir)
+  if (fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf') return true;
+  }
+  if (url) return url.toLowerCase().includes('.pdf');
+  return false;
 }
 
-function isImage(url: string | null) {
-  if (!url) return false;
-  return /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+function isImage(url: string | null, fileName?: string | null) {
+  if (!url && !fileName) return false;
+  // Önce dosya adına bak
+  if (fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    if (ext && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) return true;
+  }
+  if (url) return /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+  return false;
 }
 
 export default function DocViewModal({ doc, firmalar, onClose, onEdit }: Props) {
@@ -134,17 +146,17 @@ export default function DocViewModal({ doc, firmalar, onClose, onEdit }: Props) 
                 <i className="ri-download-2-line" /> İndir
               </button>
             </div>
-            {isPdf(resolvedUrl) && (
+            {isPdf(resolvedUrl, doc.file_name) && (
               <div className="w-full" style={{ height: '420px' }}>
                 <iframe src={`${resolvedUrl}#toolbar=1&navpanes=0`} className="w-full h-full" title={doc.title} style={{ border: 'none' }} />
               </div>
             )}
-            {isImage(resolvedUrl) && (
+            {isImage(resolvedUrl, doc.file_name) && (
               <div className="flex items-center justify-center p-4" style={{ background: 'var(--bg-main)', minHeight: '200px' }}>
                 <img src={resolvedUrl} alt={doc.title} className="max-w-full max-h-96 rounded-lg object-contain" />
               </div>
             )}
-            {!isPdf(resolvedUrl) && !isImage(resolvedUrl) && (
+            {!isPdf(resolvedUrl, doc.file_name) && !isImage(resolvedUrl, doc.file_name) && (
               <div className="flex flex-col items-center justify-center py-10 gap-3" style={{ background: 'var(--bg-main)' }}>
                 <div className="w-14 h-14 flex items-center justify-center rounded-2xl" style={{ background: 'rgba(99,102,241,0.1)' }}>
                   <i className="ri-file-word-line text-3xl" style={{ color: '#818CF8' }} />

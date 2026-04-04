@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getSignedUrlFromPath } from '@/utils/fileUpload';
 import type { CompanyDocument } from '@/types';
 
 interface UseCompanyDocumentsOptions {
@@ -119,8 +120,8 @@ export function useCompanyDocuments({ organizationId }: UseCompanyDocumentsOptio
         .from('evraklar')
         .upload(path, file, { upsert: true });
       if (uploadErr) throw uploadErr;
-      const { data } = supabase.storage.from('evraklar').getPublicUrl(path);
-      return { url: data.publicUrl, error: null };
+      // filePath döner — görüntüleme anında signed URL üretilir
+      return { url: path, error: null };
     } catch (e) {
       return { url: null, error: e instanceof Error ? e.message : 'Dosya yüklenemedi' };
     }

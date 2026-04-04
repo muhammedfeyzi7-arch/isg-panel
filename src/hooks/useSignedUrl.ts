@@ -1,36 +1,57 @@
 import { useState, useEffect, useRef } from 'react';
 import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
-export function useSignedUrl(filePath: string | null | undefined, bucket = 'uploads'): string | null {
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+export interface SignedUrlResult {
+  url: string | null;
+  loading: boolean;
+}
+
+export function useSignedUrl(filePath: string | null | undefined, bucket = 'uploads'): SignedUrlResult {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!filePath) { setSignedUrl(null); return; }
-
-    // base64 veya tam URL ise direkt kullan — signed URL üretmeye gerek yok
-    if (filePath.startsWith('data:') || filePath.startsWith('http')) {
-      setSignedUrl(filePath);
+    if (!filePath) {
+      setUrl(null);
+      setLoading(false);
       return;
     }
 
+    // base64 veya tam URL ise direkt kullan — signed URL üretmeye gerek yok
+    if (filePath.startsWith('data:') || filePath.startsWith('http')) {
+      setUrl(filePath);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
     const fetchUrl = async () => {
-      const url = await getSignedUrlFromPath(filePath, bucket);
-      setSignedUrl(url);
+      const resolved = await getSignedUrlFromPath(filePath, bucket);
+      setUrl(resolved);
+      setLoading(false);
     };
 
     void fetchUrl();
 
+    // 50 dakikada bir yenile (signed URL 1 saat geçerli)
     timerRef.current = setInterval(() => { void fetchUrl(); }, 50 * 60 * 1000);
 
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [filePath, bucket]);
 
-  return signedUrl;
+  return { url, loading };
 }
 
 export function useSignedUrls(filePaths: (string | null | undefined)[]): Record<string, string> {
   const [urls, setUrls] = useState<Record<string, string>>({});
+
+  // Stable key: sadece geçerli path'leri join et, max 2000 char ile sınırla
+  const stableKey = filePaths
+    .filter((p): p is string => !!p)
+    .join('|')
+    .slice(0, 2000);
 
   useEffect(() => {
     const validPaths = filePaths.filter((p): p is string => !!p);
@@ -47,8 +68,8 @@ export function useSignedUrls(filePaths: (string | null | undefined)[]): Record<
             results[path] = path;
             return;
           }
-          const url = await getSignedUrlFromPath(path);
-          if (url) results[path] = url;
+          const resolved = await getSignedUrlFromPath(path);
+          if (resolved) results[path] = resolved;
         }),
       );
       if (!cancelled) setUrls(results);
@@ -56,9 +77,12 @@ export function useSignedUrls(filePaths: (string | null | undefined)[]): Record<
 
     void fetchAll();
 
-    return () => { cancelled = true; };
+    // 50 dakikada bir yenile (signed URL 1 saat geçerli)
+    const interval = setInterval(() => { void fetchAll(); }, 50 * 60 * 1000);
+
+    return () => { cancelled = true; clearInterval(interval); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePaths.join(',')]);
+  }, [stableKey]);
 
   return urls;
 }

@@ -1059,6 +1059,23 @@ export default function TutanaklarPage() {
               />
             </div>
 
+            {/* Durum */}
+            <div>
+              <label className="form-label">Durum</label>
+              <select
+                value={form.durum}
+                onChange={e => sf('durum', e.target.value as TutanakStatus)}
+                className={inp}
+              >
+                {(Object.keys(STS_CONFIG) as TutanakStatus[]).map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>
+                Yeni tutanaklar varsayılan olarak <strong>Taslak</strong> oluşturulur
+              </p>
+            </div>
+
             {/* Açıklama */}
             <div className="sm:col-span-2">
               <label className="form-label">Açıklama *</label>

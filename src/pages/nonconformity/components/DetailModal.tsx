@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Modal from '../../../components/base/Modal';
 import { useApp } from '../../../store/AppContext';
 import type { Uygunsuzluk } from '../../../types';
@@ -19,9 +19,9 @@ export default function DetailModal({ record, onClose, onKapat, onEdit }: Props)
   const acilisRaw = record ? (getUygunsuzlukPhoto(record.id, 'acilis') ?? null) : null;
   const kapatmaRaw = record ? (getUygunsuzlukPhoto(record.id, 'kapatma') ?? null) : null;
 
-  // Signed URL'e çevir (filePath ise) — base64 ve tam URL'ler de desteklenir
-  const acilisFoto = useSignedUrl(acilisRaw);
-  const kapatmaFoto = useSignedUrl(kapatmaRaw);
+  // Signed URL'e çevir — loading state ile
+  const { url: acilisFoto, loading: acilisLoading } = useSignedUrl(acilisRaw);
+  const { url: kapatmaFoto, loading: kapatmaLoading } = useSignedUrl(kapatmaRaw);
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   useEffect(() => {}, [record]);
@@ -39,6 +39,51 @@ export default function DetailModal({ record, onClose, onKapat, onEdit }: Props)
       <p className="text-sm" style={{ color: value ? 'var(--text-primary)' : '#475569' }}>{value || '—'}</p>
     </div>
   );
+
+  const PhotoSlot = ({
+    foto,
+    loading: isLoading,
+    hasRaw,
+    alt,
+    emptyLabel,
+    borderColor = 'rgba(51,65,85,0.3)',
+  }: {
+    foto: string | null;
+    loading: boolean;
+    hasRaw: string | null;
+    alt: string;
+    emptyLabel: string;
+    borderColor?: string;
+  }) => {
+    if (isLoading && hasRaw) {
+      return (
+        <div className="flex items-center justify-center rounded-xl" style={{ height: '120px', background: 'rgba(15,23,42,0.3)', border: '1px dashed rgba(51,65,85,0.4)' }}>
+          <div className="text-center">
+            <i className="ri-loader-line text-2xl block mb-1 animate-spin" style={{ color: '#475569' }} />
+            <p className="text-xs" style={{ color: '#475569' }}>Yükleniyor...</p>
+          </div>
+        </div>
+      );
+    }
+    if (foto) {
+      return (
+        <img
+          src={foto}
+          alt={alt}
+          className="w-full rounded-xl object-cover"
+          style={{ maxHeight: '200px', objectFit: 'contain', background: '#0F172A', border: `1px solid ${borderColor}` }}
+        />
+      );
+    }
+    return (
+      <div className="flex items-center justify-center rounded-xl" style={{ height: '120px', background: 'rgba(15,23,42,0.3)', border: '1px dashed rgba(51,65,85,0.4)' }}>
+        <div className="text-center">
+          <i className="ri-image-line text-2xl block mb-1" style={{ color: '#475569' }} />
+          <p className="text-xs" style={{ color: '#475569' }}>{emptyLabel}</p>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Modal
@@ -120,29 +165,24 @@ export default function DetailModal({ record, onClose, onKapat, onEdit }: Props)
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#64748B' }}>Açılış Fotoğrafı</p>
-            {acilisFoto ? (
-              <img src={acilisFoto} alt="Açılış" className="w-full rounded-xl object-cover" style={{ maxHeight: '200px', objectFit: 'contain', background: '#0F172A', border: '1px solid rgba(51,65,85,0.3)' }} />
-            ) : (
-              <div className="flex items-center justify-center rounded-xl" style={{ height: '120px', background: 'rgba(15,23,42,0.3)', border: '1px dashed rgba(51,65,85,0.4)' }}>
-                <div className="text-center">
-                  <i className="ri-image-line text-2xl block mb-1" style={{ color: '#475569' }} />
-                  <p className="text-xs" style={{ color: '#475569' }}>Fotoğraf yok</p>
-                </div>
-              </div>
-            )}
+            <PhotoSlot
+              foto={acilisFoto}
+              loading={acilisLoading}
+              hasRaw={acilisRaw}
+              alt="Açılış"
+              emptyLabel="Fotoğraf yok"
+            />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#64748B' }}>Kapatma Fotoğrafı</p>
-            {kapatmaFoto ? (
-              <img src={kapatmaFoto} alt="Kapatma" className="w-full rounded-xl object-cover" style={{ maxHeight: '200px', objectFit: 'contain', background: '#0F172A', border: '1px solid rgba(34,197,94,0.3)' }} />
-            ) : (
-              <div className="flex items-center justify-center rounded-xl" style={{ height: '120px', background: 'rgba(15,23,42,0.3)', border: '1px dashed rgba(51,65,85,0.4)' }}>
-                <div className="text-center">
-                  <i className="ri-image-line text-2xl block mb-1" style={{ color: '#475569' }} />
-                  <p className="text-xs" style={{ color: '#475569' }}>Henüz yüklenmedi</p>
-                </div>
-              </div>
-            )}
+            <PhotoSlot
+              foto={kapatmaFoto}
+              loading={kapatmaLoading}
+              hasRaw={kapatmaRaw}
+              alt="Kapatma"
+              emptyLabel="Henüz yüklenmedi"
+              borderColor="rgba(34,197,94,0.3)"
+            />
           </div>
         </div>
 

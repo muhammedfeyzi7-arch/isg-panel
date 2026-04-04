@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useApp } from '@/store/AppContext';
 import { uploadFileToStorage, getSignedUrlFromPath } from '@/utils/fileUpload';
 
@@ -38,7 +38,7 @@ export default function ImageUpload({
   };
 
   // value prop değişince preview güncelle
-  useState(() => { void resolvePreview(value); });
+  useEffect(() => { void resolvePreview(value); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const uploadToStorage = async (file: File): Promise<string | null> => {
     try {
