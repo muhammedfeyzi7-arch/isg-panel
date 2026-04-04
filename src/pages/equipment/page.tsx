@@ -4,6 +4,8 @@ import Modal from '../../components/base/Modal';
 import QrModal from './components/QrModal';
 import type { Ekipman, EkipmanStatus } from '../../types';
 import XLSXStyle from 'xlsx-js-style';
+import { uploadFileToStorage, downloadFromUrl, validateFile } from '@/utils/fileUpload';
+
 const EKIPMAN_TURLERI = [
   'İş Makinesi', 'Kaldırma Ekipmanı', 'Basınçlı Kap', 'Elektrikli Ekipman',
   'İskele / Platform', 'Koruyucu Donanım', 'Yangın Söndürücü', 'İlk Yardım Kiti',
@@ -357,6 +359,8 @@ export default function EkipmanlarPage() {
   const [importPreview, setImportPreview] = useState<{ row: number; ad: string; status: 'ok' | 'error'; message: string }[] | null>(null);
   const [importing, setImporting] = useState(false);
   const [qrEkipman, setQrEkipman] = useState<Ekipman | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -407,6 +411,7 @@ export default function EkipmanlarPage() {
   const openAdd = () => {
     setEditId(null);
     setForm(defaultForm);
+    setPendingFile(null);
     setShowModal(true);
   };
 
@@ -425,17 +430,16 @@ export default function EkipmanlarPage() {
     setShowModal(true);
   };
 
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-
   const handleFileChange = (file?: File) => {
     if (!file) return;
+    const err = validateFile(file, 10);
+    if (err) { addToast(err, 'error'); return; }
     setPendingFile(file);
     setForm(prev => ({ ...prev, dosyaAdi: file.name, dosyaBoyutu: file.size, dosyaTipi: file.type }));
   };
 
   const handleFileDownload = async (ekipman: Ekipman) => {
     if (ekipman.dosyaUrl) {
-      const { downloadFromUrl } = await import('@/utils/fileUpload');
       const ok = await downloadFromUrl(ekipman.dosyaUrl, ekipman.dosyaAdi || 'ekipman-belgesi');
       if (ok) { addToast(`"${ekipman.dosyaAdi}" indiriliyor...`, 'success'); return; }
     }
@@ -447,33 +451,50 @@ export default function EkipmanlarPage() {
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.tur) { addToast('Ekipman türü zorunludur.', 'error'); return; }
 
-    const { uploadFileToStorage } = await import('@/utils/fileUpload');
     const orgId = org?.id ?? 'unknown';
+    setUploading(true);
 
-    if (editId) {
-      updateEkipman(editId, form);
-      if (pendingFile) {
-        uploadFileToStorage(pendingFile, orgId, 'ekipman', editId).then(url => {
-          if (url) updateEkipman(editId, { dosyaUrl: url });
-        });
+    try {
+      if (editId) {
+        // Düzenleme: dosya varsa önce yükle
+        if (pendingFile) {
+          const url = await uploadFileToStorage(pendingFile, orgId, 'ekipman', editId);
+          if (!url) {
+            addToast('Dosya yüklenemedi. Lütfen tekrar deneyin.', 'error');
+            return;
+          }
+          updateEkipman(editId, { ...form, dosyaUrl: url });
+        } else {
+          updateEkipman(editId, form);
+        }
+        addToast('Ekipman başarıyla güncellendi.', 'success');
+      } else {
+        // Yeni kayıt: dosya varsa önce yükle, sonra kayıt oluştur
+        if (pendingFile) {
+          const tempId = crypto.randomUUID();
+          const url = await uploadFileToStorage(pendingFile, orgId, 'ekipman', tempId);
+          if (!url) {
+            addToast('Dosya yüklenemedi. Ekipman kaydı oluşturulmadı.', 'error');
+            return;
+          }
+          addEkipman({ ...form, dosyaUrl: url });
+        } else {
+          addEkipman(form);
+        }
+        addToast('Ekipman başarıyla eklendi.', 'success');
       }
-      addToast('Ekipman başarıyla güncellendi.', 'success');
-    } else {
-      const newE = addEkipman(form);
-      if (pendingFile && newE?.id) {
-        uploadFileToStorage(pendingFile, orgId, 'ekipman', newE.id).then(url => {
-          if (url) updateEkipman(newE.id, { dosyaUrl: url });
-        });
-      }
-      addToast('Ekipman başarıyla eklendi.', 'success');
+      setPendingFile(null);
+      setShowModal(false);
+    } finally {
+      setUploading(false);
     }
-    setPendingFile(null);
-    setShowModal(false);
   };
 
   const handleDelete = () => {
     if (!deleteId) return;
     deleteEkipman(deleteId);
+    // QR modal açıksa ve silinen ekipmansa kapat
+    if (qrEkipman?.id === deleteId) setQrEkipman(null);
     addToast('Ekipman silindi.', 'success');
     setDeleteId(null);
   };
@@ -855,6 +876,8 @@ export default function EkipmanlarPage() {
                   const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
                   const isUrgent = days >= 0 && days <= 30;
                   const isOverdue = days < 0;
+                  // Dosya durumu: dosyaAdi var ama dosyaUrl yoksa "yüklenemedi"
+                  const hasFileError = ekipman.dosyaAdi && !ekipman.dosyaUrl;
                   return (
                     <tr key={ekipman.id}>
                       <td>
@@ -910,6 +933,11 @@ export default function EkipmanlarPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-2">
+                          {hasFileError && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Dosya yüklenemedi">
+                              <i className="ri-error-warning-line" />
+                            </span>
+                          )}
                           {ekipman.dosyaUrl && (
                             <button onClick={() => window.open(ekipman.dosyaUrl, '_blank')} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Belgeyi Görüntüle"><i className="ri-eye-line text-sm" /></button>
                           )}
@@ -933,16 +961,19 @@ export default function EkipmanlarPage() {
       {/* Add/Edit Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => { if (!uploading) setShowModal(false); }}
         title={editId ? 'Ekipman Düzenle' : 'Yeni Ekipman Ekle'}
         size="lg"
         icon="ri-tools-line"
         footer={
           <>
-            <button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleSave} className="btn-primary whitespace-nowrap">
-              <i className={editId ? 'ri-save-line' : 'ri-add-line'} />
-              {editId ? 'Güncelle' : 'Ekle'}
+            <button onClick={() => { if (!uploading) setShowModal(false); }} disabled={uploading} className="btn-secondary whitespace-nowrap disabled:opacity-50">İptal</button>
+            <button onClick={handleSave} disabled={uploading} className="btn-primary whitespace-nowrap disabled:opacity-50">
+              {uploading ? (
+                <><i className="ri-loader-4-line animate-spin" /> Yükleniyor...</>
+              ) : (
+                <><i className={editId ? 'ri-save-line' : 'ri-add-line'} />{editId ? 'Güncelle' : 'Ekle'}</>
+              )}
             </button>
           </>
         }
@@ -1100,7 +1131,7 @@ export default function EkipmanlarPage() {
                   className="rounded-xl p-4 text-center cursor-pointer transition-all duration-200"
                   style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
                   onClick={() => fileRef.current?.click()}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; e.currentTarget.style.background = 'rgba(59,130,246,0.04)'; }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.4)'; e.currentTarget.style.background = 'rgba(52,211,153,0.04)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
                   onDragOver={e => e.preventDefault()}
                   onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
@@ -1112,14 +1143,14 @@ export default function EkipmanlarPage() {
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-medium text-slate-200">{form.dosyaAdi}</p>
-                        <p className="text-xs" style={{ color: '#475569' }}>{form.dosyaBoyutu ? `${(form.dosyaBoyutu / 1024).toFixed(1)} KB` : ''} — Değiştirmek için tıklayın</p>
+                        <p className="text-xs mt-1" style={{ color: '#475569' }}>{form.dosyaBoyutu ? `${(form.dosyaBoyutu / 1024).toFixed(1)} KB` : ''} — Değiştirmek için tıklayın</p>
                       </div>
                     </div>
                   ) : (
                     <>
                       <i className="ri-upload-cloud-2-line text-2xl mb-1.5" style={{ color: '#334155' }} />
                       <p className="text-sm font-medium text-slate-400">Belgeyi sürükleyin veya tıklayın</p>
-                      <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG • Maks. 5MB</p>
+                      <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG • Maks. 10MB</p>
                     </>
                   )}
                 </div>
@@ -1185,14 +1216,14 @@ export default function EkipmanlarPage() {
         }
       >
         <div className="space-y-4">
-          <div className="rounded-xl p-3.5" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
+          <div className="rounded-xl p-3.5" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)' }}>
             <p className="text-xs font-semibold mb-1" style={{ color: '#60A5FA' }}>Kullanım Kılavuzu</p>
             <ul className="text-xs space-y-1" style={{ color: '#94A3B8' }}>
               <li>• Önce <strong style={{ color: '#60A5FA' }}>Şablon İndir</strong> ile Excel şablonunu indirin</li>
               <li>• Şablonu doldurun (Excel veya CSV olarak kaydedin)</li>
               <li>• Durum değerleri: Uygun / Uygun Değil / Bakımda / Hurda</li>
               <li>• Tarih formatı: GG.AA.YYYY (örn: 15.03.2025)</li>
-              <li>• Firma adı sistemdeki firma adıyla birebir eşleşmeli</li>
+              <li>• Firma adı sistemdeki firma adıyla birebir eslesmeli</li>
             </ul>
           </div>
 

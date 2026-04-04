@@ -79,6 +79,9 @@ export default function UygunsuzluklarPage() {
   const handleDelete = () => {
     if (!deleteId) return;
     deleteUygunsuzluk(deleteId);
+    // Silinen kayıt herhangi bir modalda açıksa kapat
+    if (detailRecord?.id === deleteId) setDetailRecord(null);
+    if (kapatmaRecord?.id === deleteId) setKapatmaRecord(null);
     addToast('Uygunsuzluk silindi.', 'success');
     setDeleteId(null);
   };

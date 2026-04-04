@@ -20,6 +20,9 @@ const sizeClasses = {
   xl: 'max-w-5xl',
 };
 
+// Global counter to track open modals — prevents scroll unlock when nested modals close
+let openModalCount = 0;
+
 export default function Modal({
   open,
   isOpen,
@@ -40,14 +43,22 @@ export default function Modal({
 
   useEffect(() => {
     if (!visible) return;
+    openModalCount++;
     document.body.style.overflow = 'hidden';
+
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
     };
     document.addEventListener('keydown', handler, true);
+
     return () => {
       document.removeEventListener('keydown', handler, true);
-      document.body.style.overflow = '';
+      openModalCount--;
+      // Only restore scroll when ALL modals are closed
+      if (openModalCount <= 0) {
+        openModalCount = 0;
+        document.body.style.overflow = '';
+      }
     };
   }, [visible, onClose]);
 

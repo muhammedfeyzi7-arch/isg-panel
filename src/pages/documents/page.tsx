@@ -6,6 +6,7 @@ import Modal from '../../components/base/Modal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import { getEvrakKategori, KATEGORI_META } from '../../utils/evrakKategori';
 import BulkEvrakUpload from './components/BulkEvrakUpload';
+import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
 const EVRAK_TURLERI = ['Kimlik', 'EK-2', 'Sağlık Raporu', 'Sürücü Belgesi', 'SRC', 'Sertifika / MYK / Diploma', 'Oryantasyon Eğitimi', 'İşbaşı Eğitimi', 'İş Sözleşmesi', 'Diğer'];
 
@@ -47,6 +48,7 @@ export default function EvraklarPage() {
   const [form, setForm] = useState({ ...emptyEvrak });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // PersonelDetayModal'dan "Evrak Ekle" butonuyla gelindiğinde pre-fill
@@ -123,7 +125,10 @@ export default function EvraklarPage() {
   const handleDownload = async (ev: typeof filtered[0]) => {
     if (!ev.dosyaUrl) { addToast('İndirilebilir dosya bulunamadı. Lütfen evrakı tekrar yükleyin.', 'error'); return; }
     try {
-      const res = await fetch(ev.dosyaUrl);
+      // dosyaUrl filePath veya signed URL olabilir — her iki durumu destekle
+      const resolvedUrl = await getSignedUrlFromPath(ev.dosyaUrl);
+      if (!resolvedUrl) { addToast('Dosya erişim linki alınamadı.', 'error'); return; }
+      const res = await fetch(resolvedUrl);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -134,49 +139,56 @@ export default function EvraklarPage() {
     } catch { addToast('Dosya indirilemedi.', 'error'); }
   };
 
-  const handlePreview = (ev: typeof filtered[0]) => {
+  const handlePreview = async (ev: typeof filtered[0]) => {
     if (!ev.dosyaUrl) { addToast('Önizlenecek dosya bulunamadı.', 'error'); return; }
-    window.open(ev.dosyaUrl, '_blank');
+    // dosyaUrl filePath veya signed URL olabilir — her iki durumu destekle
+    const resolvedUrl = await getSignedUrlFromPath(ev.dosyaUrl);
+    if (!resolvedUrl) { addToast('Dosya erişim linki alınamadı.', 'error'); return; }
+    window.open(resolvedUrl, '_blank');
   };
 
   const handleSave = async () => {
+    if (saving) return;
     if (!form.ad.trim()) { addToast('Evrak adı zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
-    const autoDurum = calcEvrakDurum(form.dosyaAdi, form.gecerlilikTarihi);
-    const kategori = getEvrakKategori(form.tur, form.ad);
-    const savedForm = { ...form, durum: autoDurum, kategori };
+    setSaving(true);
+    try {
+      const autoDurum = calcEvrakDurum(form.dosyaAdi, form.gecerlilikTarihi);
+      const kategori = getEvrakKategori(form.tur, form.ad);
+      const savedForm = { ...form, durum: autoDurum, kategori };
 
-    const { uploadFileToStorage } = await import('@/utils/fileUpload');
-    const orgId = org?.id ?? 'unknown';
+      const { uploadFileToStorage } = await import('@/utils/fileUpload');
+      const orgId = org?.id ?? 'unknown';
 
-    if (editingId) {
-      // Düzenleme: önce dosya yükle (varsa), sonra güncelle
-      let dosyaUrl: string | undefined;
-      if (pendingFile) {
-        dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'evrak', editingId) ?? undefined;
-        if (!dosyaUrl) {
-          addToast('Dosya yüklenemedi. Lütfen tekrar deneyin.', 'error');
-          return;
+      if (editingId) {
+        let dosyaUrl: string | undefined;
+        if (pendingFile) {
+          dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'evrak', editingId) ?? undefined;
+          if (!dosyaUrl) {
+            addToast('Dosya yüklenemedi. Lütfen tekrar deneyin.', 'error');
+            return;
+          }
         }
-      }
-      updateEvrak(editingId, { ...savedForm, ...(dosyaUrl ? { dosyaUrl } : {}) });
-      addToast('Evrak güncellendi.', 'success');
-    } else {
-      // Yeni kayıt: önce dosya yükle (varsa), sonra kayıt oluştur
-      let dosyaUrl: string | undefined;
-      if (pendingFile) {
-        const tempId = crypto.randomUUID();
-        dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'evrak', tempId) ?? undefined;
-        if (!dosyaUrl) {
-          addToast('Dosya yüklenemedi. Evrak kaydı oluşturulmadı.', 'error');
-          return;
+        updateEvrak(editingId, { ...savedForm, ...(dosyaUrl ? { dosyaUrl } : {}) });
+        addToast('Evrak güncellendi.', 'success');
+      } else {
+        let dosyaUrl: string | undefined;
+        if (pendingFile) {
+          const tempId = crypto.randomUUID();
+          dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'evrak', tempId) ?? undefined;
+          if (!dosyaUrl) {
+            addToast('Dosya yüklenemedi. Evrak kaydı oluşturulmadı.', 'error');
+            return;
+          }
         }
+        addEvrak({ ...savedForm, ...(dosyaUrl ? { dosyaUrl } : {}) });
+        addToast('Evrak eklendi.', 'success');
       }
-      addEvrak({ ...savedForm, ...(dosyaUrl ? { dosyaUrl } : {}) });
-      addToast('Evrak eklendi.', 'success');
+      setPendingFile(null);
+      setFormOpen(false);
+    } finally {
+      setSaving(false);
     }
-    setPendingFile(null);
-    setFormOpen(false);
   };
 
   const handleDelete = (id: string) => {
@@ -359,7 +371,7 @@ export default function EvraklarPage() {
         footer={
           <>
             <button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button>
-            <button onClick={handleSave} className="btn-primary"><i className="ri-save-line" /> Kaydet</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary"><i className="ri-save-line" /> Kaydet</button>
           </>
         }
       >

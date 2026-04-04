@@ -1,10 +1,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
-};
+// CORS — sadece bilinen origin'lere izin ver
+const ALLOWED_ORIGINS = [
+  'https://readdy.ai',
+  'https://app.readdy.ai',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))
+    ? origin
+    : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 const VALID_ROLES = ['admin', 'denetci', 'member'];
 
@@ -26,6 +40,9 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('Origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -94,7 +111,6 @@ Deno.serve(async (req) => {
     }
     
     console.log('[AUTH] Fallback verification succeeded for user:', fallbackUser.id);
-    // Continue with fallback user
     return await handleRequest(req, fallbackUser.id, fallbackUser.email ?? '', adminClient, corsHeaders, normalizeRole);
   }
 
@@ -330,7 +346,6 @@ async function handleRequest(
 
     console.log('[CREATE USER] DB insert successful:', insertData?.user_id);
 
-    // Try profiles upsert (best effort, don't fail if it errors)
     try {
       await adminClient
         .from('profiles')

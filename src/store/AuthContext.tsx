@@ -28,7 +28,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     Object.keys(localStorage).forEach((key) => {
       if (key.startsWith('sb-')) localStorage.removeItem(key);
     });
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith('sb-')) sessionStorage.removeItem(key);
+    });
   }, []);
+
+  const handleAuthError = useCallback(async (error: Error | unknown) => {
+    const errMsg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+    const isRefreshTokenError = 
+      errMsg.includes('refresh token') ||
+      errMsg.includes('invalid') ||
+      errMsg.includes('not found') ||
+      errMsg.includes('expired') ||
+      errMsg.includes('revoked') ||
+      errMsg.includes('invalid refresh token');
+    
+    if (isRefreshTokenError) {
+      clearAuthStorage();
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // Ignore signOut errors
+      }
+      setSession(null);
+      // Redirect to login if not already there
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login');
+      }
+    }
+  }, [clearAuthStorage]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -39,48 +67,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Load existing session on mount
     supabase.auth.getSession().then(({ data: { session: s }, error }) => {
       if (error) {
-        const errMsg = error.message?.toLowerCase() ?? '';
-        if (
-          errMsg.includes('refresh token') ||
-          errMsg.includes('invalid') ||
-          errMsg.includes('not found') ||
-          errMsg.includes('expired') ||
-          errMsg.includes('failed to fetch') ||
-          errMsg.includes('network')
-        ) {
-          clearAuthStorage();
-        }
-        supabase.auth.signOut().catch(() => {});
-        setSession(null);
+        handleAuthError(error);
       } else {
         setSession(s);
       }
       setLoading(false);
-    }).catch(() => {
-      // Network error — clear stale tokens and show login
-      clearAuthStorage();
-      setSession(null);
+    }).catch((err) => {
+      // Network or token error — clear stale tokens and show login
+      handleAuthError(err);
       setLoading(false);
     });
 
     // Subscribe to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
       if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
         setSession(s);
       } else if (event === 'SIGNED_OUT') {
         setSession(null);
         clearAuthStorage();
-      } else if ((event as string) === 'TOKEN_REFRESH_FAILED') {
-        setSession(null);
-        clearAuthStorage();
-        supabase.auth.signOut().catch(() => {});
+      } else if ((event as string) === 'TOKEN_REFRESH_FAILED' || (event as string) === 'USER_DELETED') {
+        await handleAuthError(new Error('Refresh token invalid'));
       } else {
         setSession(s);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [clearAuthStorage]);
+  }, [clearAuthStorage, handleAuthError]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
     if (!isSupabaseConfigured) {
@@ -89,6 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!email.trim()) return { error: 'E-posta adresi boş olamaz.' };
     if (password.length < 4) return { error: 'Şifre en az 4 karakter olmalıdır.' };
 
+    // Clear any stale tokens before login
+    clearAuthStorage();
+
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
@@ -96,16 +112,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!signInError) return { error: null };
 
+    // Handle specific auth errors
+    const errMsg = signInError.message?.toLowerCase() ?? '';
+    if (errMsg.includes('refresh token') || errMsg.includes('invalid')) {
+      clearAuthStorage();
+      return { error: 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.' };
+    }
+
     // Always return a friendly error — never expose raw Supabase messages
     return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
-  }, []);
+  }, [clearAuthStorage]);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    clearAuthStorage();
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch {
+      // Ignore signOut errors
+    }
     // Force full page reload to completely reset all in-memory state
-    // This prevents stale data from previous session appearing after re-login
     window.location.replace('/login');
-  }, []);
+  }, [clearAuthStorage]);
 
   const updatePassword = useCallback(async (newPassword: string): Promise<{ error: string | null }> => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });

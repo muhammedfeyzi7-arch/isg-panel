@@ -4,7 +4,7 @@ import type { Egitim, EgitimStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge from '../../components/base/Badge';
 import XLSXStyle from 'xlsx-js-style';
-import { uploadFileToStorage, downloadFromUrl } from '@/utils/fileUpload';
+import { uploadFileToStorage, downloadFromUrl, validateFile, getSignedUrlFromPath } from '@/utils/fileUpload';
 
 const EGITIM_TURLERI = [
   'İşe Giriş ve Oryantasyon Eğitimi',
@@ -30,12 +30,6 @@ function getStatusColor(s: string): 'sky' | 'green' | 'amber' {
   if (s === 'Eksik') return 'amber';
   return 'sky';
 }
-
-  const emptyEgitim: Omit<Egitim, 'id' | 'olusturmaTarihi'> = {
-    ad: '', firmaId: '', katilimciIds: [], tarih: '', gecerlilikSuresi: 12,
-    egitmen: '', yer: '', sure: 0, durum: 'Eksik', belgeMevcut: false,
-    aciklama: '', belgeDosyaAdi: '', belgeDosyaBoyutu: 0, belgeDosyaTipi: '', belgeDosyaVeri: '', notlar: '',
-  };
 
 // downloadFromDataUrl → fileUpload utility'ye taşındı
 
@@ -80,7 +74,7 @@ function exportEgitimlerToExcel(
   const dataRows1 = aktif.map((e, i) => {
     const firma = firmalar.find(f => f.id === e.firmaId);
     const katilimcilar = e.katilimciIds.map(id => personeller.find(p => p.id === id)?.adSoyad).filter(Boolean).join(', ');
-    return [i + 1, e.ad || '-', firma?.ad || '-', fmtDate(e.tarih), e.katilimciIds.length, katilimcilar || '-', e.gecerlilikSuresi ? `${e.gecerlilikSuresi} gün` : 'Süresiz', e.durum, e.belgeDosyaAdi ? 'Var' : 'Yok', e.aciklama || '-'];
+    return [i + 1, e.ad || '-', firma?.ad || '-', fmtDate(e.tarih), e.katilimciIds.length, katilimcilar || '-', e.gecerlilikSuresi ? `${e.gecerlilikSuresi} ay` : 'Süresiz', e.durum, e.belgeDosyaAdi ? 'Var' : 'Yok', e.aciklama || '-'];
   });
   const ws1Rows = [
     [`ISG EĞİTİM RAPORU — ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`, ...Array(COLS1.length - 1).fill('')],
@@ -167,11 +161,15 @@ export default function EgitimlerPage() {
   const [firmaFilter, setFirmaFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [belgeLoading, setBelgeLoading] = useState<string | null>(null);
+
+  // Single definition of emptyEgitim — gecerlilikSuresi is in AY (months)
   const emptyEgitim: Omit<Egitim, 'id' | 'olusturmaTarihi'> = {
     ad: '', firmaId: '', katilimciIds: [], tarih: '', gecerlilikSuresi: 12,
     egitmen: '', yer: '', sure: 0, durum: 'Eksik', belgeMevcut: false,
     aciklama: '', belgeDosyaAdi: '', belgeDosyaBoyutu: 0, belgeDosyaTipi: '', belgeDosyaVeri: '', notlar: '',
   };
+
   const [form, setForm] = useState({ ...emptyEgitim });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -185,6 +183,7 @@ export default function EgitimlerPage() {
       setFormOpen(true);
       setQuickCreate(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quickCreate, setQuickCreate]);
 
   const firmaPersoneller = useMemo(() => {
@@ -217,6 +216,8 @@ export default function EgitimlerPage() {
 
   const handleFileChange = (file?: File) => {
     if (!file) return;
+    const err = validateFile(file, 10);
+    if (err) { addToast(err, 'error'); return; }
     setPendingFile(file);
     setForm(prev => ({
       ...prev,
@@ -229,16 +230,44 @@ export default function EgitimlerPage() {
   };
 
   const handleBelgeIndir = async (e: Egitim) => {
-    if (e.belgeDosyaUrl) {
-      const ok = await downloadFromUrl(e.belgeDosyaUrl, e.belgeDosyaAdi || 'egitim-belgesi');
-      if (ok) { addToast(`"${e.belgeDosyaAdi}" indiriliyor...`, 'success'); return; }
+    if (!e.belgeDosyaUrl) {
+      addToast('Bu eğitim için indirilebilir belge bulunamadı. Lütfen belgeyi tekrar yükleyin.', 'error');
+      return;
     }
-    addToast('Bu eğitim için indirilebilir belge bulunamadı. Lütfen belgeyi tekrar yükleyin.', 'error');
+    setBelgeLoading(e.id);
+    try {
+      const signedUrl = await getSignedUrlFromPath(e.belgeDosyaUrl, 'uploads');
+      if (!signedUrl) {
+        addToast('Dosya açılamadı. Lütfen tekrar deneyin.', 'error');
+        return;
+      }
+      const ok = await downloadFromUrl(signedUrl, e.belgeDosyaAdi || 'egitim-belgesi');
+      if (ok) {
+        addToast(`"${e.belgeDosyaAdi}" indiriliyor...`, 'success');
+      } else {
+        addToast('Dosya indirilemedi. Lütfen tekrar deneyin.', 'error');
+      }
+    } finally {
+      setBelgeLoading(null);
+    }
   };
 
-  const handleBelgeGoruntule = (e: Egitim) => {
-    if (e.belgeDosyaUrl) { window.open(e.belgeDosyaUrl, '_blank'); return; }
-    addToast('Görüntülenecek belge bulunamadı.', 'error');
+  const handleBelgeGoruntule = async (e: Egitim) => {
+    if (!e.belgeDosyaUrl) {
+      addToast('Görüntülenecek belge bulunamadı.', 'error');
+      return;
+    }
+    setBelgeLoading(e.id);
+    try {
+      const signedUrl = await getSignedUrlFromPath(e.belgeDosyaUrl, 'uploads');
+      if (!signedUrl) {
+        addToast('Dosya açılamadı. Lütfen tekrar deneyin.', 'error');
+        return;
+      }
+      window.open(signedUrl, '_blank');
+    } finally {
+      setBelgeLoading(null);
+    }
   };
 
   const toggleKatilimci = (id: string) => {
@@ -387,7 +416,10 @@ export default function EgitimlerPage() {
               <tbody>
                 {filtered.map(eg => {
                   const stc = STATUS_CFG[eg.durum as EgitimStatus] || STATUS_CFG['Planlandı'];
-                  const hasBelge = eg.belgeDosyaAdi || eg.belgeMevcut;
+                  // Belge sadece URL varsa "Mevcut" göster
+                  const hasBelge = !!eg.belgeDosyaUrl;
+                  const hasFileError = eg.belgeDosyaAdi && !eg.belgeDosyaUrl;
+                  const isLoadingBelge = belgeLoading === eg.id;
                   return (
                     <tr key={eg.id}>
                       <td>
@@ -411,11 +443,15 @@ export default function EgitimlerPage() {
                       </td>
                       <td className="hidden sm:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'}</span></td>
                       <td className="hidden lg:table-cell">
-                        {hasBelge ? (
-                          <button onClick={() => handleBelgeIndir(eg)} className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-all whitespace-nowrap" style={{ color: '#34D399' }}
+                        {hasFileError ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                            <i className="ri-error-warning-line" />Yüklenemedi
+                          </span>
+                        ) : hasBelge ? (
+                          <button onClick={() => handleBelgeIndir(eg)} disabled={isLoadingBelge} className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-all whitespace-nowrap disabled:opacity-50" style={{ color: '#34D399' }}
                             onMouseEnter={e => { e.currentTarget.style.opacity = '0.7'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
-                            <i className="ri-file-check-line text-sm" />
-                            {eg.belgeDosyaAdi ? <span className="max-w-[80px] truncate">{eg.belgeDosyaAdi}</span> : <span>Mevcut</span>}
+                            {isLoadingBelge ? <i className="ri-loader-4-line animate-spin text-sm" /> : <i className="ri-file-check-line text-sm" />}
+                            <span className="max-w-[80px] truncate">{eg.belgeDosyaAdi || 'Mevcut'}</span>
                           </button>
                         ) : (
                           <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Belge yok</span>
@@ -424,7 +460,11 @@ export default function EgitimlerPage() {
                       <td>
                         <div className="flex items-center gap-1 justify-end">
                           <ABtn icon="ri-eye-line" color="#60A5FA" onClick={() => setDetailId(eg.id)} title="Detay" />
-                          {(eg.belgeDosyaUrl) && <ABtn icon="ri-external-link-line" color="#34D399" onClick={() => handleBelgeGoruntule(eg)} title="Görüntüle" />}
+                          {eg.belgeDosyaUrl && (
+                            isLoadingBelge
+                              ? <div className="w-8 h-8 flex items-center justify-center"><i className="ri-loader-4-line animate-spin text-sm" style={{ color: '#34D399' }} /></div>
+                              : <ABtn icon="ri-external-link-line" color="#34D399" onClick={() => handleBelgeGoruntule(eg)} title="Görüntüle" />
+                          )}
                           <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(eg)} title="Düzenle" />
                           <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
                         </div>
@@ -520,7 +560,7 @@ export default function EgitimlerPage() {
 
           {/* Belge / Evrak Yükleme */}
           <div className="sm:col-span-2">
-            <label className="form-label">Eğitim Belgesi / Evrak (PDF / JPG / PNG)</label>
+            <label className="form-label">Eğitim Belgesi / Evrak (PDF / JPG / PNG — Maks. 10MB)</label>
             <div
               className="rounded-xl p-5 text-center cursor-pointer transition-all duration-200"
               style={{ border: '2px dashed var(--border-main)', background: 'var(--bg-item)' }}
@@ -544,7 +584,7 @@ export default function EgitimlerPage() {
                 <>
                   <i className="ri-upload-cloud-2-line text-2xl mb-2" style={{ color: 'var(--text-faint)' }} />
                   <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Belge sürükleyin veya tıklayın</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG • Maks. 5MB</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG • Maks. 10MB</p>
                 </>
               )}
             </div>
@@ -612,9 +652,14 @@ export default function EgitimlerPage() {
                   <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{detailEgitim.belgeDosyaAdi}</p>
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{detailEgitim.belgeDosyaBoyutu ? `${(detailEgitim.belgeDosyaBoyutu / 1024).toFixed(1)} KB` : ''}</p>
                 </div>
-                <button onClick={() => handleBelgeIndir(detailEgitim)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap" style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.22)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; }}>
-                  <i className="ri-download-line" /> İndir
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleBelgeGoruntule(detailEgitim)} disabled={belgeLoading === detailEgitim.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap disabled:opacity-50" style={{ background: 'rgba(96,165,250,0.12)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.25)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.22)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.12)'; }}>
+                    {belgeLoading === detailEgitim.id ? <i className="ri-loader-4-line animate-spin" /> : <i className="ri-eye-line" />} Görüntüle
+                  </button>
+                  <button onClick={() => handleBelgeIndir(detailEgitim)} disabled={belgeLoading === detailEgitim.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap disabled:opacity-50" style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.22)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; }}>
+                    {belgeLoading === detailEgitim.id ? <i className="ri-loader-4-line animate-spin" /> : <i className="ri-download-line" />} İndir
+                  </button>
+                </div>
               </div>
             )}
           </div>

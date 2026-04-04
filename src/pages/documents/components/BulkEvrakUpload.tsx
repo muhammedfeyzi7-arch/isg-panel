@@ -118,6 +118,7 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
 
     setUploading(true);
     let successCount = 0;
+    let errorCount = 0;
     const orgId = org?.id ?? 'unknown';
 
     for (const item of files) {
@@ -129,8 +130,8 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
         const tempId = Math.random().toString(36).slice(2);
         const url = await uploadFileToStorage(item.file, orgId, 'evrak', tempId);
         if (!url) {
-          addToast(`${item.file.name} — dosya yüklenemedi, kayıt oluşturulmadı.`, 'error');
           setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'error' } : f));
+          errorCount++;
           continue;
         }
 
@@ -155,12 +156,20 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
         successCount++;
       } catch {
         setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'error' } : f));
+        errorCount++;
       }
     }
 
     setUploading(false);
-    addToast(`${successCount} evrak başarıyla yüklendi.`, 'success');
-    setTimeout(() => { handleClose(); }, 800);
+
+    if (successCount > 0) addToast(`${successCount} evrak başarıyla yüklendi.`, 'success');
+    if (errorCount > 0) {
+      addToast(`${errorCount} dosya yüklenemedi — aşağıda kırmızı ile işaretlendi.`, 'error');
+      // Hata varsa modal KAPANMAZ — kullanıcı görsün
+      return;
+    }
+    // Tüm dosyalar başarılıysa 1.5sn sonra kapat
+    setTimeout(() => { handleClose(); }, 1500);
   };
 
   if (!open) return null;

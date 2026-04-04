@@ -5,7 +5,7 @@ import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import type { Muayene, MuayeneResult } from '../../types';
 import { getEvrakKategori } from '../../utils/evrakKategori';
 import XLSXStyle from 'xlsx-js-style';
-import { uploadFileToStorage, downloadFromUrl, downloadFromBase64 } from '@/utils/fileUpload';
+import { uploadFileToStorage, downloadFromUrl, downloadFromBase64, validateFile, getSignedUrlFromPath } from '@/utils/fileUpload';
 
 const RESULT_CONFIG: Record<MuayeneResult, { label: string; color: string; bg: string; icon: string }> = {
   'Çalışabilir': { label: 'Çalışabilir', color: '#34D399', bg: 'rgba(52,211,153,0.12)', icon: 'ri-checkbox-circle-line' },
@@ -167,8 +167,12 @@ export default function MuayenelerPage() {
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewId, setViewId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Muayene, 'id' | 'olusturmaTarihi'>>(defaultForm);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [belgeLoading, setBelgeLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (quickCreate === 'muayeneler') {
@@ -239,7 +243,7 @@ export default function MuayenelerPage() {
     return { total, uygun, yaklasan, gecmis };
   }, [aktifMuayeneler]);
 
-  const openAdd = () => { setEditId(null); setForm(defaultForm); setShowModal(true); };
+  const openAdd = () => { setEditId(null); setForm(defaultForm); setPendingFile(null); setShowModal(true); };
   const openEdit = (m: Muayene) => {
     setEditId(m.id);
     setPendingFile(null);
@@ -253,10 +257,10 @@ export default function MuayenelerPage() {
     setShowModal(true);
   };
 
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-
   const handleFileChange = (file?: File) => {
     if (!file) return;
+    const err = validateFile(file, 10);
+    if (err) { addToast(err, 'error'); return; }
     setPendingFile(file);
     setForm(p => ({
       ...p, dosyaAdi: file.name, dosyaBoyutu: file.size,
@@ -268,35 +272,83 @@ export default function MuayenelerPage() {
     if (!form.personelId) { addToast('Personel seçimi zorunludur.', 'error'); return; }
     if (!form.muayeneTarihi) { addToast('Muayene tarihi zorunludur.', 'error'); return; }
 
-    const { uploadFileToStorage } = await import('@/utils/fileUpload');
     const orgId = org?.id ?? 'unknown';
+    setUploading(true);
 
-    if (editId) {
-      updateMuayene(editId, form);
-      if (pendingFile) {
-        uploadFileToStorage(pendingFile, orgId, 'saglik', editId).then(url => {
-          if (url) updateMuayene(editId, { dosyaUrl: url });
-        });
+    try {
+      if (editId) {
+        // Düzenleme: dosya varsa önce yükle
+        if (pendingFile) {
+          const url = await uploadFileToStorage(pendingFile, orgId, 'saglik', editId);
+          if (!url) {
+            addToast('Dosya yüklenemedi. Lütfen tekrar deneyin.', 'error');
+            return;
+          }
+          updateMuayene(editId, { ...form, dosyaUrl: url });
+        } else {
+          updateMuayene(editId, form);
+        }
+        addToast('Sağlık evrakı güncellendi.', 'success');
+      } else {
+        // Yeni kayıt: dosya varsa önce yükle, sonra kayıt oluştur
+        if (pendingFile) {
+          const tempId = crypto.randomUUID();
+          const url = await uploadFileToStorage(pendingFile, orgId, 'saglik', tempId);
+          if (!url) {
+            addToast('Dosya yüklenemedi. Kayıt oluşturulmadı.', 'error');
+            return;
+          }
+          addMuayene({ ...form, dosyaUrl: url });
+        } else {
+          addMuayene(form);
+        }
+        addToast('Sağlık evrakı eklendi.', 'success');
       }
-      addToast('Sağlık evrakı güncellendi.', 'success');
-    } else {
-      const newM = addMuayene(form);
-      if (pendingFile && newM?.id) {
-        uploadFileToStorage(pendingFile, orgId, 'saglik', newM.id).then(url => {
-          if (url) updateMuayene(newM.id, { dosyaUrl: url });
-        });
-      }
-      addToast('Sağlık evrakı eklendi.', 'success');
+      setPendingFile(null);
+      setShowModal(false);
+    } finally {
+      setUploading(false);
     }
-    setPendingFile(null);
-    setShowModal(false);
   };
 
   const handleDelete = () => {
     if (!deleteId) return;
     deleteMuayene(deleteId);
+    // Eğer silinen kayıt görüntüleniyorsa modalı kapat
+    if (viewId === deleteId) setViewId(null);
     addToast('Sağlık evrakı silindi.', 'success');
     setDeleteId(null);
+  };
+
+  const handleViewFile = async (m: Muayene) => {
+    if (!m.dosyaUrl) return;
+    setBelgeLoading(m.id);
+    try {
+      const signedUrl = await getSignedUrlFromPath(m.dosyaUrl, 'uploads');
+      if (!signedUrl) {
+        addToast('Dosya açılamadı. Lütfen tekrar deneyin.', 'error');
+        return;
+      }
+      window.open(signedUrl, '_blank');
+    } finally {
+      setBelgeLoading(null);
+    }
+  };
+
+  const handleDownloadFile = async (m: Muayene) => {
+    if (!m.dosyaUrl) return;
+    setBelgeLoading(m.id);
+    try {
+      const signedUrl = await getSignedUrlFromPath(m.dosyaUrl, 'uploads');
+      if (!signedUrl) {
+        addToast('Dosya indirilemedi. Lütfen tekrar deneyin.', 'error');
+        return;
+      }
+      const ok = await downloadFromUrl(signedUrl, m.dosyaAdi || 'belge');
+      if (!ok) addToast('Dosya indirilemedi.', 'error');
+    } finally {
+      setBelgeLoading(null);
+    }
   };
 
   return (
@@ -393,6 +445,8 @@ export default function MuayenelerPage() {
                   const days = getDaysUntil(m.sonrakiTarih);
                   const isOverdue = days < 0;
                   const isUrgent = days >= 0 && days <= 30;
+                  // Dosya durumu: dosyaAdi var ama dosyaUrl yoksa "yüklenemedi"
+                  const hasFileError = m.dosyaAdi && !m.dosyaUrl;
                   return (
                     <tr key={m.id}>
                       <td>
@@ -424,16 +478,48 @@ export default function MuayenelerPage() {
                         </span>
                       </td>
                       <td className="hidden md:table-cell">
-                        {m.belgeMevcut
-                          ? <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}><i className="ri-file-check-line" />Mevcut</span>
-                          : <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Yok</span>}
+                        {hasFileError ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                            <i className="ri-error-warning-line" />Yüklenemedi
+                          </span>
+                        ) : m.dosyaUrl ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}>
+                            <i className="ri-file-check-line" />Mevcut
+                          </span>
+                        ) : (
+                          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Yok</span>
+                        )}
                       </td>
                       <td>
                         <div className="flex items-center gap-1.5 justify-end">
-                          {(m.dosyaUrl || m.dosyaAdi) && (
+                          {m.dosyaUrl && (
                             <>
-                              <button onClick={() => { if (m.dosyaUrl) window.open(m.dosyaUrl, '_blank'); else addToast('Dosya bu cihazda mevcut değil. Lütfen tekrar yükleyin.', 'warning'); }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Görüntüle"><i className="ri-eye-line text-sm" /></button>
-                              <button onClick={async () => { if (m.dosyaUrl) { const { downloadFromUrl } = await import('@/utils/fileUpload'); const ok = await downloadFromUrl(m.dosyaUrl, m.dosyaAdi || 'belge'); if (!ok) addToast('Dosya indirilemedi.', 'error'); } else addToast('Dosya bu cihazda mevcut değil. Lütfen tekrar yükleyin.', 'warning'); }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="İndir"><i className="ri-download-line text-sm" /></button>
+                              <button
+                                onClick={() => handleViewFile(m)}
+                                disabled={belgeLoading === m.id}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all disabled:opacity-50"
+                                style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }}
+                                title="Görüntüle"
+                              >
+                                {belgeLoading === m.id
+                                  ? <i className="ri-loader-4-line animate-spin text-sm" />
+                                  : <i className="ri-eye-line text-sm" />}
+                              </button>
+                              <button
+                                onClick={() => handleDownloadFile(m)}
+                                disabled={belgeLoading === m.id}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all disabled:opacity-50"
+                                style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }}
+                                title="İndir"
+                              >
+                                {belgeLoading === m.id
+                                  ? <i className="ri-loader-4-line animate-spin text-sm" />
+                                  : <i className="ri-download-line text-sm" />}
+                              </button>
                             </>
                           )}
                           <button onClick={() => openEdit(m)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>
@@ -449,7 +535,7 @@ export default function MuayenelerPage() {
         )}
       </div>
 
-      {/* ── Sağlık Evrakları (EK-2, Sağlık Raporu vb.) — sadece veri varsa göster ── */}
+      {/* ── Sağlık Evrakları — sadece veri varsa göster ── */}
       {filteredSaglikEvraklar.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
@@ -524,15 +610,19 @@ export default function MuayenelerPage() {
       {/* Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => { if (!uploading) setShowModal(false); }}
         title={editId ? 'Sağlık Evrakı Düzenle' : 'Yeni Sağlık Evrakı Ekle'}
         size="lg"
         icon="ri-heart-pulse-line"
         footer={
           <>
-            <button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleSave} className="btn-primary whitespace-nowrap">
-              <i className={editId ? 'ri-save-line' : 'ri-add-line'} />{editId ? 'Güncelle' : 'Ekle'}
+            <button onClick={() => { if (!uploading) setShowModal(false); }} disabled={uploading} className="btn-secondary whitespace-nowrap disabled:opacity-50">İptal</button>
+            <button onClick={handleSave} disabled={uploading} className="btn-primary whitespace-nowrap">
+              {uploading ? (
+                <><i className="ri-loader-4-line animate-spin" /> Yükleniyor...</>
+              ) : (
+                <><i className={editId ? 'ri-save-line' : 'ri-add-line'} />{editId ? 'Güncelle' : 'Ekle'}</>
+              )}
             </button>
           </>
         }
@@ -587,7 +677,7 @@ export default function MuayenelerPage() {
           </div>
           {form.belgeMevcut && (
             <div className="sm:col-span-2">
-              <label className="form-label">Belge Dosyası (PDF / JPG / PNG)</label>
+              <label className="form-label">Belge Dosyası (PDF / JPG / PNG — Maks. 10MB)</label>
               <div
                 className="rounded-xl p-5 text-center cursor-pointer transition-all duration-200"
                 style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
@@ -606,7 +696,7 @@ export default function MuayenelerPage() {
                       <p className="text-sm font-medium text-slate-200">{form.dosyaAdi}</p>
                       <p className="text-xs" style={{ color: '#475569' }}>{form.dosyaBoyutu ? `${(form.dosyaBoyutu / 1024).toFixed(1)} KB` : ''}</p>
                     </div>
-                    <button onClick={e => { e.stopPropagation(); setForm(p => ({ ...p, dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '' })); }} className="ml-2 w-6 h-6 flex items-center justify-center rounded-full cursor-pointer" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
+                    <button onClick={e => { e.stopPropagation(); setPendingFile(null); setForm(p => ({ ...p, dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '' })); }} className="ml-2 w-6 h-6 flex items-center justify-center rounded-full cursor-pointer" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}>
                       <i className="ri-close-line text-xs" />
                     </button>
                   </div>

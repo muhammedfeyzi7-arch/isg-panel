@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
-import { supabase } from '../../lib/supabase'; // fetchEkipmanFromDb için gerekli
-import { uploadBase64ToStorage } from '../../utils/fileUpload';
+import { supabase } from '../../lib/supabase';
+import { uploadBase64ToStorage, getSignedUrlFromPath } from '../../utils/fileUpload';
+import { useSignedUrls } from '../../hooks/useSignedUrl';
 import Modal from '../../components/base/Modal';
 import ImageUpload from '../nonconformity/components/ImageUpload';
 import type { Ekipman, EkipmanStatus, EkipmanSahaFoto, UygunsuzlukSeverity } from '../../types';
@@ -202,7 +203,7 @@ function UygunsuzlukModal({
 function FotoModal({
   open, onClose, ekipmanAd, ekipmanId, onUploaded,
 }: { open: boolean; onClose: () => void; ekipmanAd: string; ekipmanId: string; onUploaded: () => void }) {
-  const { updateEkipman, ekipmanlar, currentUser, addToast } = useApp();
+  const { updateEkipman, ekipmanlar, currentUser, addToast, org } = useApp();
   const [foto, setFoto] = useState<string | null>(null);
   const [aciklama, setAciklama] = useState('');
   const [saving, setSaving] = useState(false);
@@ -218,27 +219,29 @@ function FotoModal({
   const handleSave = async () => {
     if (!foto) { addToast('Fotoğraf seçiniz.', 'error'); return; }
     if (!foto.startsWith('data:')) { addToast('Geçersiz fotoğraf formatı.', 'error'); return; }
+    if (saving) return;
     setSaving(true);
     try {
       const fotoId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
-      const orgId = ekipman?.firmaId ? `ekipman-saha` : 'ekipman-saha';
+      // ✅ Gerçek org ID kullan — AppContext'ten al
+      const orgId = org?.id ?? 'unknown';
 
-      // Merkezi uploadBase64ToStorage kullan — path: {orgId}/ekipman-saha/{fotoId}
-      const publicUrl = await uploadBase64ToStorage(
+      // filePath döner (signed URL değil)
+      const filePath = await uploadBase64ToStorage(
         foto,
         orgId,
         `ekipman-saha/${ekipmanId}`,
         fotoId,
       );
 
-      if (!publicUrl) {
+      if (!filePath) {
         addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
         return;
       }
 
       const yeniFoto: EkipmanSahaFoto = {
         id: fotoId,
-        url: publicUrl,
+        url: filePath, // filePath kaydedilir, görüntüleme anında signed URL üretilir
         aciklama: aciklama.trim(),
         tarih: new Date().toISOString(),
         yukleyenKisi: currentUser.ad || 'Kullanıcı',
@@ -266,7 +269,11 @@ function FotoModal({
         <>
           <button onClick={handleClose} className="btn-secondary whitespace-nowrap">İptal</button>
           <button onClick={handleSave} disabled={saving || !foto} className="btn-primary whitespace-nowrap disabled:opacity-50">
-            <i className="ri-upload-cloud-line mr-1" />{saving ? 'Yükleniyor...' : 'Yükle'}
+            {saving ? (
+              <><i className="ri-loader-4-line animate-spin mr-1" />Yükleniyor...</>
+            ) : (
+              <><i className="ri-upload-cloud-line mr-1" />Yükle</>
+            )}
           </button>
         </>
       }
@@ -428,9 +435,16 @@ export default function QrDetailPage() {
     e => !e.silinmis && e.firmaId === localEkipman?.firmaId && e.ad?.toLowerCase().includes(localEkipman?.ad?.toLowerCase() ?? '')
   );
 
-  const handleOpenBelge = () => {
+  // Saha fotoğraflarının signed URL'lerini görüntüleme anında üret
+  const sahaFotolar = localEkipman?.sahaFotolari ?? [];
+  const fotoFilePaths = sahaFotolar.map(f => f.url);
+  const signedFotoUrls = useSignedUrls(fotoFilePaths);
+
+  const handleOpenBelge = async () => {
     if (!localEkipman?.dosyaUrl) return;
-    window.open(localEkipman.dosyaUrl, '_blank');
+    // dosyaUrl artık filePath olabilir — signed URL üret
+    const url = await getSignedUrlFromPath(localEkipman.dosyaUrl);
+    if (url) window.open(url, '_blank');
   };
 
   const firma = firmalar.find(f => f.id === localEkipman?.firmaId);
@@ -473,7 +487,6 @@ export default function QrDetailPage() {
   const isOverdue = days < 0;
   const isUrgent = days >= 0 && days <= 30;
   const hasBelge = !!localEkipman.dosyaUrl;
-  const sahaFotolar = localEkipman.sahaFotolari ?? [];
 
   return (
     <div className="min-h-screen" style={{ background: '#0B1120' }}>
@@ -500,7 +513,6 @@ export default function QrDetailPage() {
 
       {/* ── Hero Kartı ── */}
       <div className="relative overflow-hidden" style={{ background: sc.gradient, borderBottom: `1px solid ${sc.border}` }}>
-        {/* Dekoratif arka plan dairesi */}
         <div
           className="absolute -top-12 -right-12 w-48 h-48 rounded-full opacity-10"
           style={{ background: sc.color }}
@@ -680,58 +692,64 @@ export default function QrDetailPage() {
 
             {/* Grid görünüm — 2 sütun */}
             <div className="grid grid-cols-2 gap-2 mb-3">
-              {[...sahaFotolar].reverse().slice(0, 4).map((foto) => (
-                <button
-                  key={foto.id}
-                  onClick={() => setLightboxUrl(foto.url)}
-                  className="relative rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all"
-                  style={{ aspectRatio: '1/1', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(51,65,85,0.35)' }}
-                >
-                  <img
-                    src={foto.url}
-                    alt={foto.aciklama || 'Saha fotoğrafı'}
-                    className="w-full h-full object-cover"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                  <div className="absolute inset-0 flex items-end p-2" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }}>
-                    <p className="text-xs text-white leading-tight line-clamp-2">
-                      {foto.aciklama || new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {[...sahaFotolar].reverse().slice(0, 4).map((foto) => {
+                const displayUrl = signedFotoUrls[foto.url] || foto.url;
+                return (
+                  <button
+                    key={foto.id}
+                    onClick={() => setLightboxUrl(displayUrl)}
+                    className="relative rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all"
+                    style={{ aspectRatio: '1/1', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(51,65,85,0.35)' }}
+                  >
+                    <img
+                      src={displayUrl}
+                      alt={foto.aciklama || 'Saha fotoğrafı'}
+                      className="w-full h-full object-cover"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <div className="absolute inset-0 flex items-end p-2" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }}>
+                      <p className="text-xs text-white leading-tight line-clamp-2">
+                        {foto.aciklama || new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Tüm fotoğraflar — liste görünüm */}
             {sahaFotolar.length > 4 && (
               <div className="space-y-2">
-                {[...sahaFotolar].reverse().slice(4).map((foto) => (
-                  <button
-                    key={foto.id}
-                    onClick={() => setLightboxUrl(foto.url)}
-                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all active:scale-95 text-left"
-                    style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(51,65,85,0.3)' }}
-                  >
-                    <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0" style={{ background: 'rgba(51,65,85,0.4)' }}>
-                      <img src={foto.url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {foto.aciklama && <p className="text-sm font-medium truncate" style={{ color: '#CBD5E1' }}>{foto.aciklama}</p>}
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {foto.yukleyenKisi && (
-                          <span className="text-xs flex items-center gap-1" style={{ color: '#64748B' }}>
-                            <i className="ri-user-line text-xs" />{foto.yukleyenKisi}
-                          </span>
-                        )}
-                        <span className="text-xs flex items-center gap-1" style={{ color: '#64748B' }}>
-                          <i className="ri-time-line text-xs" />
-                          {new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </span>
+                {[...sahaFotolar].reverse().slice(4).map((foto) => {
+                  const displayUrl = signedFotoUrls[foto.url] || foto.url;
+                  return (
+                    <button
+                      key={foto.id}
+                      onClick={() => setLightboxUrl(displayUrl)}
+                      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all active:scale-95 text-left"
+                      style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(51,65,85,0.3)' }}
+                    >
+                      <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0" style={{ background: 'rgba(51,65,85,0.4)' }}>
+                        <img src={displayUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       </div>
-                    </div>
-                    <i className="ri-zoom-in-line text-sm flex-shrink-0" style={{ color: '#475569' }} />
-                  </button>
-                ))}
+                      <div className="flex-1 min-w-0">
+                        {foto.aciklama && <p className="text-sm font-medium truncate" style={{ color: '#CBD5E1' }}>{foto.aciklama}</p>}
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          {foto.yukleyenKisi && (
+                            <span className="text-xs flex items-center gap-1" style={{ color: '#64748B' }}>
+                              <i className="ri-user-line text-xs" />{foto.yukleyenKisi}
+                            </span>
+                          )}
+                          <span className="text-xs flex items-center gap-1" style={{ color: '#64748B' }}>
+                            <i className="ri-time-line text-xs" />
+                            {new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                      </div>
+                      <i className="ri-zoom-in-line text-sm flex-shrink-0" style={{ color: '#475569' }} />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

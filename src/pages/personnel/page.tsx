@@ -109,6 +109,7 @@ export default function PersonellerPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importLoading, setImportLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -524,23 +525,29 @@ export default function PersonellerPage() {
 
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
 
-  const openAdd = () => { setForm({ ...emptyPersonel }); setEditingId(null); setPendingFotoFile(null); setFormOpen(true); };
+  const openAdd = () => { setForm({ ...emptyPersonel }); setEditingId(null); setFormOpen(true); setQuickCreate(null); };
   const openEdit = (p: Personel) => { setForm({ ...p }); setEditingId(p.id); setPendingFotoFile(null); setFormOpen(true); };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     if (!form.adSoyad.trim()) { addToast('Ad Soyad zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
-    if (editingId) {
-      updatePersonel(editingId, form);
-      if (pendingFotoFile) setPersonelFoto(editingId, pendingFotoFile);
-      addToast('Personel güncellendi.', 'success');
-    } else {
-      const newP = addPersonel(form);
-      if (pendingFotoFile) setPersonelFoto(newP.id, pendingFotoFile);
-      addToast('Personel eklendi.', 'success');
+    setSaving(true);
+    try {
+      if (editingId) {
+        updatePersonel(editingId, form);
+        if (pendingFotoFile) setPersonelFoto(editingId, pendingFotoFile);
+        addToast('Personel güncellendi.', 'success');
+      } else {
+        const newP = addPersonel(form);
+        if (pendingFotoFile) setPersonelFoto(newP.id, pendingFotoFile);
+        addToast('Personel eklendi.', 'success');
+      }
+      setFormOpen(false);
+      setPendingFotoFile(null);
+    } finally {
+      setSaving(false);
     }
-    setFormOpen(false);
-    setPendingFotoFile(null);
   };
 
   const handleFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -551,7 +558,13 @@ export default function PersonellerPage() {
     e.target.value = '';
   };
 
-  const handleDelete = (id: string) => { deletePersonel(id); setDeleteConfirm(null); setDetailId(null); addToast('Personel silindi.', 'info'); };
+  const handleDelete = (id: string) => {
+    deletePersonel(id);
+    setDeleteConfirm(null);
+    // Silinen kayıt detay modalda açıksa kapat
+    if (detailId === id) setDetailId(null);
+    addToast('Personel silindi.', 'info');
+  };
 
   const f = (field: keyof typeof form) => form[field] as string;
   const set = (field: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [field]: value }));
@@ -575,7 +588,7 @@ export default function PersonellerPage() {
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{personeller.filter(p => !p.silinmis).length} personel kayıtlı</span>
             <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>{aktifCount} aktif</span>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,182,212,0.1)', color: '#06B6D4' }}>{aktifCount} aktif</span>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -695,7 +708,7 @@ export default function PersonellerPage() {
 
       {/* ── Form Modal ── */}
       <Modal open={formOpen} onClose={() => { setFormOpen(false); setPendingFotoFile(null); }} title={editingId ? 'Personel Düzenle' : 'Yeni Personel Ekle'} size="xl" icon="ri-user-line"
-        footer={<><button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button><button onClick={handleSave} className="btn-primary"><i className="ri-save-line" /> Kaydet</button></>}>
+        footer={<><button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button><button onClick={handleSave} disabled={saving} className="btn-primary"><i className="ri-save-line" /> Kaydet</button></>}>
         <div className="space-y-4">
           {/* Photo upload section */}
           <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>

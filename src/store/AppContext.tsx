@@ -207,6 +207,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setActiveModule = useCallback((m: string) => {
     setActiveModuleState(m);
     try { localStorage.setItem('isg_active_module', m); } catch { /* ignore */ }
+    // Modül değişince sayfayı en üste kaydır
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -379,7 +381,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const suresi = eg.gecerlilikSuresi ?? 0;
       if (suresi <= 0) return; // Geçerlilik süresi tanımlanmamış → uyarı üretme
       const bitis = new Date(egitimTarihi);
-      bitis.setDate(bitis.getDate() + suresi);
+      // gecerlilikSuresi AY cinsinden — ay bazlı hesapla
+      bitis.setMonth(bitis.getMonth() + suresi);
       bitis.setHours(0, 0, 0, 0);
       if (isNaN(bitis.getTime())) return; // Hesaplama sonucu geçersizse atla
       const tarihStr = bitis.toISOString().split('T')[0];

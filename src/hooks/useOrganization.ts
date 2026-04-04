@@ -263,38 +263,27 @@ export function useOrganization(user: User | null) {
   const joinOrg = async (inviteCode: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Kullanıcı bulunamadı.' };
     try {
-      const { data: targetOrg } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .eq('invite_code', inviteCode.trim().toUpperCase())
-        .maybeSingle();
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) return { error: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };
 
-      if (!targetOrg) return { error: 'Geçersiz davet kodu.' };
+      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/join-organization`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ invite_code: inviteCode.trim() }),
+      });
 
-      // Check if already a member
-      const { data: alreadyMember } = await supabase
-        .from('user_organizations')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('organization_id', targetOrg.id)
-        .maybeSingle();
+      const data = await res.json() as { error?: string; success?: boolean };
 
-      if (alreadyMember) return { error: 'Bu organizasyona zaten üyesiniz.' };
+      if (res.status === 429) {
+        return { error: data.error ?? 'Çok fazla deneme yaptınız. Lütfen 1 dakika bekleyin.' };
+      }
 
-      const { error: memberError } = await supabase
-        .from('user_organizations')
-        .insert({
-          user_id: user.id,
-          organization_id: targetOrg.id,
-          role: 'member',
-          email: user.email ?? '',
-          is_active: true,
-          must_change_password: false,
-        });
-
-      if (memberError) {
-        if (memberError.message.includes('duplicate')) return { error: 'Bu organizasyona zaten üyesiniz.' };
-        return { error: memberError.message };
+      if (!res.ok || data.error) {
+        return { error: data.error ?? 'Organizasyona katılırken hata oluştu.' };
       }
 
       await loadOrg();

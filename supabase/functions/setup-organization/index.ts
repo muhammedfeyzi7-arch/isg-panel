@@ -1,12 +1,29 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { jwtVerify } from 'https://esm.sh/jose@5';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// CORS — sadece bilinen origin'lere izin ver
+const ALLOWED_ORIGINS = [
+  'https://readdy.ai',
+  'https://app.readdy.ai',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowed = origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))
+    ? origin
+    : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  };
+}
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('Origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -55,7 +72,6 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
   const user = { id: userId, email: userEmail, user_metadata: userMetadata };
 
   try {
@@ -80,7 +96,19 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // No active org — create a new one
+    // No active org — check org limit before creating
+    const { count: orgCount } = await supabase
+      .from('organizations')
+      .select('id', { count: 'exact', head: true })
+      .eq('created_by', user.id);
+
+    if ((orgCount ?? 0) >= 3) {
+      return new Response(JSON.stringify({ error: 'Maksimum 3 organizasyon oluşturabilirsiniz.' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Create new org
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const orgName = user.user_metadata?.full_name

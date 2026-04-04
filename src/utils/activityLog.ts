@@ -15,16 +15,21 @@ export interface ActivityLogPayload {
 
 /**
  * Writes an activity log entry to the activity_logs table.
- * Called by any user performing actions — all org members can see the unified log.
+ *
+ * SECURITY NOTE:
+ * - RLS policy enforces: user_id = auth.uid() AND organization_id = get_my_org_id()
+ * - Client cannot spoof user_id (RLS rejects if user_id !== auth.uid())
+ * - user_name and user_role are informational only — not used for access control
+ * - organization_id is validated server-side via get_my_org_id()
  */
 export async function logActivity(payload: ActivityLogPayload): Promise<void> {
   try {
     const { error } = await supabase.from('activity_logs').insert({
       organization_id: payload.organizationId,
-      user_id: payload.userId,
+      user_id: payload.userId,       // RLS enforces this === auth.uid()
       user_email: payload.userEmail,
       user_name: payload.userName,
-      user_role: payload.userRole,
+      user_role: payload.userRole,   // informational only
       action_type: payload.actionType,
       module: payload.module ?? null,
       record_id: payload.recordId ?? null,

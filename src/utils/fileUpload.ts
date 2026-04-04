@@ -1,8 +1,64 @@
 import { supabase } from '@/lib/supabase';
 
 /**
+ * Dosya doğrulama — boyut ve tip kontrolü
+ * @returns null if valid, error message string if invalid
+ */
+export function validateFile(file: File, maxMB = 10): string | null {
+  const maxBytes = maxMB * 1024 * 1024;
+  if (file.size > maxBytes) {
+    return `Dosya boyutu ${maxMB}MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB).`;
+  }
+  const allowed = /\.(pdf|jpg|jpeg|png)$/i;
+  if (!allowed.test(file.name)) {
+    return 'Sadece PDF, JPG ve PNG dosyaları desteklenmektedir.';
+  }
+  return null;
+}
+
+/**
+ * Signed URL üret — private bucket için güvenli erişim
+ * URL 1 saat geçerli, sadece giriş yapmış kullanıcılar erişebilir
+ */
+export async function getSignedUrl(
+  filePath: string,
+  bucket = 'uploads',
+  expiresIn = 3600,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(filePath, expiresIn);
+    if (error || !data?.signedUrl) {
+      console.error('[fileUpload] getSignedUrl error:', error);
+      return null;
+    }
+    return data.signedUrl;
+  } catch (err) {
+    console.error('[fileUpload] getSignedUrl exception:', err);
+    return null;
+  }
+}
+
+/**
+ * Stored path'ten signed URL üret
+ * DB'de saklanan path formatı: {orgId}/{module}/{uuid}.{ext}
+ */
+export async function getSignedUrlFromPath(
+  storedPath: string,
+  bucket = 'uploads',
+): Promise<string | null> {
+  if (!storedPath) return null;
+  // Eğer zaten tam URL ise path'i çıkar
+  const pathMatch = storedPath.match(/\/storage\/v1\/object\/(?:public|sign)\/[^/]+\/(.+?)(?:\?|$)/);
+  const cleanPath = pathMatch ? pathMatch[1] : storedPath;
+  return getSignedUrl(cleanPath, bucket);
+}
+
+/**
  * Merkezi dosya yükleme yardımcısı
- * File objesi → Supabase Storage → public URL
+ * File objesi → Supabase Storage (private) → storage PATH döner (DB'ye kaydedilir)
+ * NOT: Artık signed URL değil, filePath döner. Görüntüleme için getSignedUrlFromPath kullan.
  */
 export async function uploadFileToStorage(
   file: File,
@@ -24,8 +80,8 @@ export async function uploadFileToStorage(
       return null;
     }
 
-    const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
-    return data?.publicUrl ?? null;
+    // DB'ye filePath kaydet — expire olmaz, görüntüleme anında signed URL üretilir
+    return filePath;
   } catch (err) {
     console.error(`[fileUpload] Unexpected error (${module}):`, err);
     return null;
@@ -33,7 +89,7 @@ export async function uploadFileToStorage(
 }
 
 /**
- * base64 data URL → Supabase Storage → public URL
+ * base64 data URL → Supabase Storage (private) → filePath döner
  */
 export async function uploadBase64ToStorage(
   base64: string,
@@ -64,8 +120,8 @@ export async function uploadBase64ToStorage(
       return null;
     }
 
-    const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(filePath);
-    return urlData?.publicUrl ?? null;
+    // DB'ye filePath kaydet — expire olmaz
+    return filePath;
   } catch (err) {
     console.error(`[fileUpload] base64 error (${module}):`, err);
     return null;
@@ -74,6 +130,7 @@ export async function uploadBase64ToStorage(
 
 /**
  * URL'den dosya indir (fetch → blob → download)
+ * Signed URL'ler için de çalışır
  */
 export async function downloadFromUrl(url: string, fileName: string): Promise<boolean> {
   try {
