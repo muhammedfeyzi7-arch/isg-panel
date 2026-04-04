@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../store/AppContext';
 
 interface ModalProps {
@@ -54,12 +55,12 @@ export default function Modal({
 
   const isDark = theme === 'dark';
 
-  return (
+  const modalContent = (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -74,6 +75,7 @@ export default function Modal({
           background: 'rgba(0,0,0,0.65)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 0,
         }}
         onClick={onClose}
       />
@@ -199,4 +201,6 @@ export default function Modal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

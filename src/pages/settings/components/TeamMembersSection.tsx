@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../../store/AppContext';
 import { useAuth } from '../../../store/AuthContext';
 import { supabase } from '../../../lib/supabase';
@@ -543,10 +544,10 @@ export default function TeamMembersSection() {
       </div>
 
       {/* ── Add User Modal ── */}
-      {showAddModal && (
+      {showAddModal && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
           onClick={e => { if (e.target === e.currentTarget) setShowAddModal(false); }}
         >
           <div
@@ -691,14 +692,15 @@ export default function TeamMembersSection() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Reset Password Modal ── */}
-      {resetTarget && (
+      {resetTarget && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
           onClick={e => { if (e.target === e.currentTarget) { setResetTarget(null); setResetPassword(''); } }}
         >
           <div
@@ -766,14 +768,15 @@ export default function TeamMembersSection() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Delete Confirm Modal ── */}
-      {deleteConfirm && (
+      {deleteConfirm && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
           onClick={e => { if (e.target === e.currentTarget) setDeleteConfirm(null); }}
         >
           <div className="w-full max-w-sm rounded-2xl p-6 space-y-4" style={{ background: isDark ? '#0D1526' : '#fff', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(15,23,42,0.15)' }}>
@@ -806,7 +809,8 @@ export default function TeamMembersSection() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

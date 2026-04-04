@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../../store/AppContext';
 import { getEvrakKategori, KATEGORI_META } from '../../../utils/evrakKategori';
 import { uploadFileToStorage } from '../../../utils/fileUpload';
@@ -179,10 +180,10 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
   const cardBg       = isDark ? 'rgba(255,255,255,0.03)'       : 'rgba(15,23,42,0.02)';
   const cardBorder   = isDark ? 'rgba(255,255,255,0.07)'       : 'rgba(15,23,42,0.08)';
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', zIndex: 99999 }}
       onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div
@@ -507,6 +508,7 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

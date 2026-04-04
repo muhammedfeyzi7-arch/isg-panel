@@ -3,6 +3,7 @@
  * Modern SaaS-style horizontal layout with dark/light mode support.
  */
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '@/store/AppContext';
 import PersonelAvatar from '@/components/base/PersonelAvatar';
 
@@ -137,16 +138,17 @@ export default function PersonelKartvizit({ personelId, onClose }: Props) {
     ? personel.tc.replace(/^(\d{3})(\d{4})(\d{4})$/, '$1 **** $3')
     : null;
 
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 flex items-center justify-center p-4"
       style={{
         background: 'rgba(0,0,0,0.72)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
         opacity: 0,
         transition: 'opacity 0.22s ease',
+        zIndex: 99999,
       }}
       onClick={handleOverlayClick}
     >
@@ -361,6 +363,7 @@ export default function PersonelKartvizit({ personelId, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

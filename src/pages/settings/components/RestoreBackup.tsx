@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../../store/AppContext';
 import { supabase } from '../../../lib/supabase';
 
@@ -580,10 +581,10 @@ export default function RestoreBackup() {
       </div>
 
       {/* Confirm Modal */}
-      {showConfirm && (
+      {showConfirm && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
           onClick={e => { if (e.target === e.currentTarget) setShowConfirm(false); }}
         >
           <div
@@ -657,7 +658,8 @@ export default function RestoreBackup() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
