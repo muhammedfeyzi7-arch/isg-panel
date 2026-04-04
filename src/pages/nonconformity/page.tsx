@@ -9,34 +9,27 @@ import ReportBuilder from './components/ReportBuilder';
 import DofImport from './components/DofImport';
 import Modal from '../../components/base/Modal';
 import { usePermissions } from '../../hooks/usePermissions';
-import { supabase } from '../../lib/supabase';
 
 export default function UygunsuzluklarPage() {
   const {
     uygunsuzluklar, firmalar, personeller,
     deleteUygunsuzluk, addUygunsuzluk, addToast, quickCreate, setQuickCreate,
-    org, dataLoading,
+    org, dataLoading, refreshData,
   } = useApp();
   const { canEdit, canCreate, canDelete, isReadOnly, role } = usePermissions();
 
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = useCallback(async () => {
-    if (!org?.id || refreshing) return;
+    if (refreshing || dataLoading) return;
     setRefreshing(true);
     try {
-      const { data } = await supabase
-        .from('uygunsuzluklar')
-        .select('id, data, created_at')
-        .eq('organization_id', org.id)
-        .order('created_at', { ascending: false });
-      if (data) {
-        addToast('Veriler güncellendi.', 'success');
-      }
+      await refreshData();
+      addToast('Veriler güncellendi.', 'success');
     } finally {
-      setTimeout(() => setRefreshing(false), 800);
+      setRefreshing(false);
     }
-  }, [org?.id, refreshing, addToast]);
+  }, [refreshing, dataLoading, refreshData, addToast]);
 
   const canCreateNonconformity = canCreate || role === 'denetci';
   const canCloseNonconformity = canEdit || role === 'denetci';

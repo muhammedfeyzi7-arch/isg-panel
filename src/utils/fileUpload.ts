@@ -153,10 +153,26 @@ export async function downloadFromUrl(url: string, fileName: string): Promise<bo
 
 /**
  * URL'den base64'e çevir (Excel/Word embed için)
+ * filePath ise önce signed URL üretir, sonra fetch eder
  */
-export async function urlToBase64(url: string): Promise<string | null> {
+export async function urlToBase64(urlOrPath: string): Promise<string | null> {
+  if (!urlOrPath) return null;
   try {
-    const res = await fetch(url, { cache: 'force-cache' });
+    // filePath ise signed URL üret
+    let fetchUrl = urlOrPath;
+    if (!urlOrPath.startsWith('data:') && !urlOrPath.startsWith('http://') && !urlOrPath.startsWith('https://')) {
+      const signed = await getSignedUrlFromPath(urlOrPath);
+      if (!signed) return null;
+      fetchUrl = signed;
+    }
+    // base64 ise direkt döndür
+    if (fetchUrl.startsWith('data:')) return fetchUrl;
+
+    const res = await fetch(fetchUrl, {
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-store',
+    });
     if (!res.ok) return null;
     const blob = await res.blob();
     return new Promise((resolve) => {

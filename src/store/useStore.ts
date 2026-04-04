@@ -261,6 +261,73 @@ export function useStore(
     }
   }, []);
 
+  // ── Core data loader (reusable) ──
+  const loadAllData = useCallback(async (orgId: string) => {
+    const TABLES = [
+      'firmalar', 'personeller', 'evraklar', 'egitimler',
+      'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar', 'is_izinleri',
+    ] as const;
+
+    const results = await Promise.all(
+      TABLES.map(table =>
+        supabase
+          .from(table)
+          .select('id, data, created_at')
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false }),
+      ),
+    );
+
+    const [
+      firmaRes, personelRes, evrakRes, egitimRes,
+      muayeneRes, uygRes, ekipmanRes, gorevRes, tutanakRes, isIzRes,
+    ] = results;
+
+    const getRows = <T>(res: typeof firmaRes): T[] => {
+      if (res.error) { console.error('[ISG] Load error:', res.error); return []; }
+      return (res.data ?? []).map(row => row.data as T);
+    };
+
+    const KAN: Record<string, string> = {
+      'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-',
+      'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-',
+    };
+
+    setFirmalar(getRows<Firma>(firmaRes));
+    setPersoneller(getRows<Personel>(personelRes).map(p => ({
+      ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
+    })));
+    setEvraklar(getRows<Evrak>(evrakRes).map(e => ({
+      ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
+    })));
+    setEgitimler(getRows<Egitim>(egitimRes));
+    setMuayeneler(getRows<Muayene>(muayeneRes));
+    setUygunsuzluklar(getRows<Uygunsuzluk>(uygRes).map(u => {
+      let durum = u.durum as string;
+      if (durum === 'Kapatıldı') durum = 'Kapandı';
+      if (durum === 'İncelemede') durum = 'Açık';
+      return { ...u, durum: durum as UygunsuzlukStatus };
+    }));
+    setEkipmanlar(getRows<Ekipman>(ekipmanRes));
+    setGorevler(getRows<Gorev>(gorevRes));
+    setTutanaklar(getRows<Tutanak>(tutanakRes));
+    setIsIzinleri(getRows<IsIzni>(isIzRes));
+
+    console.log(`[ISG] Data loaded ✓ firms=${firmaRes.data?.length ?? 0} personnel=${personelRes.data?.length ?? 0}`);
+  }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, setTutanaklar, setIsIzinleri]);
+
+  // ── Public refresh function — called by UI refresh buttons ──
+  const refreshAllData = useCallback(async () => {
+    const orgId = orgIdRef.current;
+    if (!orgId) return;
+    setDataLoading(true);
+    try {
+      await loadAllData(orgId);
+    } finally {
+      setDataLoading(false);
+    }
+  }, [loadAllData]);
+
   // ── Load from Supabase ──
   useEffect(() => {
     if (orgLoading) return;
@@ -275,59 +342,7 @@ export function useStore(
     setDataLoading(true);
     console.log(`[ISG] Loading data for org=${organizationId} user=${userId}`);
 
-    const TABLES = [
-      'firmalar', 'personeller', 'evraklar', 'egitimler',
-      'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar', 'is_izinleri',
-    ] as const;
-
-    Promise.all(
-      TABLES.map(table =>
-        supabase
-          .from(table)
-          .select('id, data, created_at')
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false }),
-      ),
-    ).then(results => {
-      const [
-        firmaRes, personelRes, evrakRes, egitimRes,
-        muayeneRes, uygRes, ekipmanRes, gorevRes, tutanakRes, isIzRes,
-      ] = results;
-
-      const getRows = <T>(res: typeof firmaRes): T[] => {
-        if (res.error) {
-          console.error('[ISG] Load error:', res.error);
-          return [];
-        }
-        return (res.data ?? []).map(row => row.data as T);
-      };
-
-      const KAN: Record<string, string> = {
-        'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-',
-        'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-',
-      };
-
-      setFirmalar(getRows<Firma>(firmaRes));
-      setPersoneller(getRows<Personel>(personelRes).map(p => ({
-        ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
-      })));
-      setEvraklar(getRows<Evrak>(evrakRes).map(e => ({
-        ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
-      })));
-      setEgitimler(getRows<Egitim>(egitimRes));
-      setMuayeneler(getRows<Muayene>(muayeneRes));
-      setUygunsuzluklar(getRows<Uygunsuzluk>(uygRes).map(u => {
-        let durum = u.durum as string;
-        if (durum === 'Kapatıldı') durum = 'Kapandı';
-        if (durum === 'İncelemede') durum = 'Açık';
-        return { ...u, durum: durum as UygunsuzlukStatus };
-      }));
-      setEkipmanlar(getRows<Ekipman>(ekipmanRes));
-      setGorevler(getRows<Gorev>(gorevRes));
-      setTutanaklar(getRows<Tutanak>(tutanakRes));
-      setIsIzinleri(getRows<IsIzni>(isIzRes));
-
-      console.log(`[ISG] Data loaded ✓ firms=${firmaRes.data?.length ?? 0} personnel=${personelRes.data?.length ?? 0}`);
+    loadAllData(organizationId).then(() => {
       setDataLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1026,6 +1041,7 @@ export function useStore(
     uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, isIzinleri, currentUser,
     dataLoading,
     isSaving: false,
+    refreshAllData,
     addFirma, updateFirma, deleteFirma, restoreFirma, permanentDeleteFirma,
     addPersonel, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
     addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak,

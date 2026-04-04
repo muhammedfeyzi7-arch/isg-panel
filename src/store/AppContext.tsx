@@ -67,6 +67,7 @@ interface AppContextType extends StoreType {
   regenerateInviteCode: () => Promise<{ error: string | null; newCode?: string }>;
   refetchOrg: () => Promise<void>;
   logAction: (actionType: string, module: string, recordId: string, recordName?: string, description?: string) => void;
+  refreshData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -500,6 +501,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       regenerateInviteCode,
       refetchOrg,
       logAction,
+      refreshData: store.refreshAllData,
     }}>
       {children}
     </AppContext.Provider>

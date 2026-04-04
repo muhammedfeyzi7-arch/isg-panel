@@ -440,11 +440,31 @@ export default function QrDetailPage() {
   const fotoFilePaths = sahaFotolar.map(f => f.url);
   const signedFotoUrls = useSignedUrls(fotoFilePaths);
 
+  const [belgeUrl, setBelgeUrl] = useState<string | null>(null);
+  const [belgeAdi, setBelgeAdi] = useState<string>('');
+  const [belgeTipi, setBelgeTipi] = useState<string>('');
+  const [showBelge, setShowBelge] = useState(false);
+
   const handleOpenBelge = async () => {
     if (!localEkipman?.dosyaUrl) return;
-    // dosyaUrl artık filePath olabilir — signed URL üret
-    const url = await getSignedUrlFromPath(localEkipman.dosyaUrl);
-    if (url) window.open(url, '_blank');
+    try {
+      // dosyaUrl filePath olabilir — signed URL üret
+      let url = localEkipman.dosyaUrl;
+      if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:')) {
+        const signed = await getSignedUrlFromPath(localEkipman.dosyaUrl);
+        if (!signed) { return; }
+        url = signed;
+      }
+      // Mobilde window.open çalışmayabilir — modal ile göster
+      const ext = (localEkipman.dosyaAdi || url).split('.').pop()?.toLowerCase() ?? '';
+      const mimeMap: Record<string, string> = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' };
+      setBelgeUrl(url);
+      setBelgeAdi(localEkipman.dosyaAdi || 'Ekipman Belgesi');
+      setBelgeTipi(mimeMap[ext] || 'application/octet-stream');
+      setShowBelge(true);
+    } catch {
+      // ignore
+    }
   };
 
   const firma = firmalar.find(f => f.id === localEkipman?.firmaId);
@@ -844,6 +864,16 @@ export default function QrDetailPage() {
 
       {lightboxUrl && (
         <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      )}
+
+      {showBelge && belgeUrl && (
+        <EvrakModal
+          open={showBelge}
+          onClose={() => setShowBelge(false)}
+          dosyaVeri={belgeUrl}
+          dosyaAdi={belgeAdi}
+          dosyaTipi={belgeTipi}
+        />
       )}
     </div>
   );
