@@ -8,11 +8,34 @@ import Modal from '../../components/base/Modal';
 import ImageUpload from '../nonconformity/components/ImageUpload';
 import type { Ekipman, EkipmanStatus, EkipmanSahaFoto, UygunsuzlukSeverity } from '../../types';
 
-const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: string; border: string; icon: string; gradient: string; glow: string }> = {
-  'Uygun':       { label: 'Uygun',       color: '#34D399', bg: 'rgba(52,211,153,0.15)',  border: 'rgba(52,211,153,0.35)',  icon: 'ri-checkbox-circle-fill', gradient: 'linear-gradient(160deg, rgba(52,211,153,0.18) 0%, rgba(16,185,129,0.06) 60%, rgba(11,17,32,0) 100%)', glow: 'rgba(52,211,153,0.25)' },
-  'Uygun Değil': { label: 'Uygun Değil', color: '#F87171', bg: 'rgba(248,113,113,0.15)', border: 'rgba(248,113,113,0.35)', icon: 'ri-close-circle-fill',     gradient: 'linear-gradient(160deg, rgba(248,113,113,0.18) 0%, rgba(239,68,68,0.06) 60%, rgba(11,17,32,0) 100%)', glow: 'rgba(248,113,113,0.25)' },
-  'Bakımda':     { label: 'Bakımda',     color: '#FBBF24', bg: 'rgba(251,191,36,0.15)',  border: 'rgba(251,191,36,0.35)',  icon: 'ri-tools-fill',            gradient: 'linear-gradient(160deg, rgba(251,191,36,0.18) 0%, rgba(245,158,11,0.06) 60%, rgba(11,17,32,0) 100%)', glow: 'rgba(251,191,36,0.25)' },
-  'Hurda':       { label: 'Hurda',       color: '#94A3B8', bg: 'rgba(148,163,184,0.15)', border: 'rgba(148,163,184,0.35)', icon: 'ri-delete-bin-fill',       gradient: 'linear-gradient(160deg, rgba(148,163,184,0.18) 0%, rgba(100,116,139,0.06) 60%, rgba(11,17,32,0) 100%)', glow: 'rgba(148,163,184,0.25)' },
+const STATUS_CONFIG: Record<EkipmanStatus, {
+  label: string; color: string; bg: string; border: string; icon: string;
+  gradient: string; glowColor: string; heroGradient: string;
+}> = {
+  'Uygun': {
+    label: 'Uygun', color: '#34D399', bg: 'rgba(52,211,153,0.15)', border: 'rgba(52,211,153,0.4)',
+    icon: 'ri-checkbox-circle-fill', glowColor: 'rgba(52,211,153,0.3)',
+    gradient: 'linear-gradient(135deg, rgba(52,211,153,0.18) 0%, rgba(16,185,129,0.06) 100%)',
+    heroGradient: 'linear-gradient(160deg, rgba(52,211,153,0.22) 0%, rgba(11,17,32,0) 60%)',
+  },
+  'Uygun Değil': {
+    label: 'Uygun Değil', color: '#F87171', bg: 'rgba(248,113,113,0.15)', border: 'rgba(248,113,113,0.4)',
+    icon: 'ri-close-circle-fill', glowColor: 'rgba(248,113,113,0.3)',
+    gradient: 'linear-gradient(135deg, rgba(248,113,113,0.18) 0%, rgba(239,68,68,0.06) 100%)',
+    heroGradient: 'linear-gradient(160deg, rgba(248,113,113,0.22) 0%, rgba(11,17,32,0) 60%)',
+  },
+  'Bakımda': {
+    label: 'Bakımda', color: '#FBBF24', bg: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.4)',
+    icon: 'ri-tools-fill', glowColor: 'rgba(251,191,36,0.3)',
+    gradient: 'linear-gradient(135deg, rgba(251,191,36,0.18) 0%, rgba(245,158,11,0.06) 100%)',
+    heroGradient: 'linear-gradient(160deg, rgba(251,191,36,0.22) 0%, rgba(11,17,32,0) 60%)',
+  },
+  'Hurda': {
+    label: 'Hurda', color: '#94A3B8', bg: 'rgba(148,163,184,0.15)', border: 'rgba(148,163,184,0.4)',
+    icon: 'ri-delete-bin-fill', glowColor: 'rgba(148,163,184,0.25)',
+    gradient: 'linear-gradient(135deg, rgba(148,163,184,0.18) 0%, rgba(100,116,139,0.06) 100%)',
+    heroGradient: 'linear-gradient(160deg, rgba(148,163,184,0.18) 0%, rgba(11,17,32,0) 60%)',
+  },
 };
 
 const SEV_OPTIONS: UygunsuzlukSeverity[] = ['Düşük', 'Orta', 'Yüksek', 'Kritik'];
@@ -236,19 +259,8 @@ function FotoModal({
     try {
       const fotoId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
       const orgId = org?.id ?? 'unknown';
-
-      const filePath = await uploadBase64ToStorage(
-        foto,
-        orgId,
-        `ekipman-saha/${ekipmanId}`,
-        fotoId,
-      );
-
-      if (!filePath) {
-        addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error');
-        return;
-      }
-
+      const filePath = await uploadBase64ToStorage(foto, orgId, `ekipman-saha/${ekipmanId}`, fotoId);
+      if (!filePath) { addToast('Fotoğraf yüklenemedi. Lütfen tekrar deneyin.', 'error'); return; }
       const yeniFoto: EkipmanSahaFoto = {
         id: fotoId,
         url: filePath,
@@ -256,12 +268,8 @@ function FotoModal({
         tarih: new Date().toISOString(),
         yukleyenKisi: currentUser.ad || 'Kullanıcı',
       };
-
       const mevcutFotolar = ekipman?.sahaFotolari ?? [];
-      updateEkipman(ekipmanId, {
-        sahaFotolari: [...mevcutFotolar, yeniFoto],
-      });
-
+      updateEkipman(ekipmanId, { sahaFotolari: [...mevcutFotolar, yeniFoto] });
       addToast('Fotoğraf başarıyla yüklendi.', 'success');
       handleClose();
       setTimeout(() => onUploaded(), 800);
@@ -279,11 +287,7 @@ function FotoModal({
         <>
           <button onClick={handleClose} className="btn-secondary whitespace-nowrap">İptal</button>
           <button onClick={handleSave} disabled={saving || !foto} className="btn-primary whitespace-nowrap disabled:opacity-50">
-            {saving ? (
-              <><i className="ri-loader-4-line animate-spin mr-1" />Yükleniyor...</>
-            ) : (
-              <><i className="ri-upload-cloud-line mr-1" />Yükle</>
-            )}
+            {saving ? <><i className="ri-loader-4-line animate-spin mr-1" />Yükleniyor...</> : <><i className="ri-upload-cloud-line mr-1" />Yükle</>}
           </button>
         </>
       }
@@ -309,7 +313,6 @@ function EvrakModal({
 }: { open: boolean; onClose: () => void; dosyaVeri: string; dosyaAdi: string; dosyaTipi: string }) {
   const isImage = dosyaTipi?.startsWith('image/');
   const isPdf = dosyaTipi === 'application/pdf';
-
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = dosyaVeri;
@@ -318,7 +321,6 @@ function EvrakModal({
     link.click();
     document.body.removeChild(link);
   };
-
   return (
     <Modal isOpen={open} onClose={onClose} title={dosyaAdi || 'Belge'} size="lg" icon="ri-file-text-line"
       footer={
@@ -331,19 +333,15 @@ function EvrakModal({
       }
     >
       <div className="flex flex-col items-center gap-4">
-        {isImage && (
-          <img src={dosyaVeri} alt={dosyaAdi} className="max-w-full rounded-xl object-contain" style={{ maxHeight: '60vh' }} />
-        )}
-        {isPdf && (
-          <iframe src={dosyaVeri} title={dosyaAdi} className="w-full rounded-xl" style={{ height: '60vh', border: 'none' }} />
-        )}
+        {isImage && <img src={dosyaVeri} alt={dosyaAdi} className="max-w-full rounded-xl object-contain" style={{ maxHeight: '60vh' }} />}
+        {isPdf && <iframe src={dosyaVeri} title={dosyaAdi} className="w-full rounded-xl" style={{ height: '60vh', border: 'none' }} />}
         {!isImage && !isPdf && (
           <div className="text-center py-8">
             <div className="w-16 h-16 flex items-center justify-center rounded-2xl mx-auto mb-4" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
               <i className="ri-file-line text-3xl" style={{ color: '#34D399' }} />
             </div>
             <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{dosyaAdi}</p>
-            <p className="text-xs mt-1" style={{ color: '#64748B' }}>Bu dosya türü önizlenemiyor. İndirmek için butona tıklayın.</p>
+            <p className="text-xs mt-1" style={{ color: '#64748B' }}>Bu dosya türü önizlenemiyor.</p>
           </div>
         )}
       </div>
@@ -354,24 +352,11 @@ function EvrakModal({
 // ── Fotoğraf Lightbox ──
 function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.95)' }}
-      onClick={onClose}
-    >
-      <button
-        className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full cursor-pointer transition-all"
-        style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
-        onClick={onClose}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.95)' }} onClick={onClose}>
+      <button className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full cursor-pointer" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }} onClick={onClose}>
         <i className="ri-close-line text-xl" />
       </button>
-      <img
-        src={url}
-        alt="Saha fotoğrafı"
-        className="max-w-full max-h-full rounded-2xl object-contain"
-        onClick={e => e.stopPropagation()}
-      />
+      <img src={url} alt="Saha fotoğrafı" className="max-w-full max-h-full rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
     </div>
   );
 }
@@ -401,11 +386,7 @@ export default function QrDetailPage() {
   const fetchEkipmanFromDb = useCallback(async () => {
     if (!id) return;
     try {
-      const { data, error } = await supabase
-        .from('ekipmanlar')
-        .select('data')
-        .eq('id', id)
-        .maybeSingle();
+      const { data, error } = await supabase.from('ekipmanlar').select('data').eq('id', id).maybeSingle();
       if (error) {
         const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
         setLocalEkipman(fromStore ?? null);
@@ -432,10 +413,7 @@ export default function QrDetailPage() {
   useEffect(() => {
     if (dataLoading || localEkipman !== undefined) return;
     const fromStore = ekipmanlar.find(e => e.id === id && !e.silinmis);
-    if (fromStore) {
-      setLocalEkipman(fromStore);
-      setLocalLoading(false);
-    }
+    if (fromStore) { setLocalEkipman(fromStore); setLocalLoading(false); }
   }, [dataLoading, ekipmanlar, id, localEkipman]);
 
   useEffect(() => {
@@ -444,9 +422,7 @@ export default function QrDetailPage() {
     if (fromStore) setLocalEkipman(fromStore);
   }, [ekipmanlar, id]);
 
-  const handleAfterSave = useCallback(() => {
-    fetchEkipmanFromDb();
-  }, [fetchEkipmanFromDb]);
+  const handleAfterSave = useCallback(() => { fetchEkipmanFromDb(); }, [fetchEkipmanFromDb]);
 
   const ekipmanEvraklari = evraklar.filter(
     e => !e.silinmis && e.firmaId === localEkipman?.firmaId && e.ad?.toLowerCase().includes(localEkipman?.ad?.toLowerCase() ?? '')
@@ -467,7 +443,7 @@ export default function QrDetailPage() {
       let url = localEkipman.dosyaUrl;
       if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:')) {
         const signed = await getSignedUrlFromPath(localEkipman.dosyaUrl);
-        if (!signed) { return; }
+        if (!signed) return;
         url = signed;
       }
       const ext = (localEkipman.dosyaAdi || url).split('.').pop()?.toLowerCase() ?? '';
@@ -476,14 +452,12 @@ export default function QrDetailPage() {
       setBelgeAdi(localEkipman.dosyaAdi || 'Ekipman Belgesi');
       setBelgeTipi(mimeMap[ext] || 'application/octet-stream');
       setShowBelge(true);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   };
 
   const firma = firmalar.find(f => f.id === localEkipman?.firmaId);
 
-  // Yükleniyor
+  // ── Loading ──
   if (localLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #060D1A 0%, #0B1120 50%, #0D1525 100%)' }}>
@@ -494,25 +468,29 @@ export default function QrDetailPage() {
               <i className="ri-qr-code-line text-3xl" style={{ color: '#34D399' }} />
             </div>
           </div>
-          <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4" style={{ borderColor: 'rgba(52,211,153,0.3)', borderTopColor: '#34D399' }} />
-          <p className="text-sm font-medium" style={{ color: '#64748B' }}>Ekipman yükleniyor...</p>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full animate-bounce" style={{ background: '#34D399', animationDelay: '0ms' }} />
+            <div className="w-2 h-2 rounded-full animate-bounce" style={{ background: '#34D399', animationDelay: '150ms' }} />
+            <div className="w-2 h-2 rounded-full animate-bounce" style={{ background: '#34D399', animationDelay: '300ms' }} />
+          </div>
+          <p className="text-sm font-medium" style={{ color: '#475569' }}>Ekipman yükleniyor...</p>
         </div>
       </div>
     );
   }
 
-  // Bulunamadı
+  // ── Not Found ──
   if (!localEkipman || localEkipman.silinmis) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'linear-gradient(135deg, #060D1A 0%, #0B1120 50%, #0D1525 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'linear-gradient(135deg, #060D1A 0%, #0B1120 100%)' }}>
         <div className="text-center max-w-sm">
-          <div className="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div className="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
             <i className="ri-error-warning-line text-5xl" style={{ color: '#EF4444' }} />
           </div>
-          <h2 className="text-xl font-bold mb-2" style={{ color: '#F1F5F9' }}>Ekipman Bulunamadı</h2>
-          <p className="text-sm mb-6" style={{ color: '#64748B' }}>Bu QR koda ait ekipman kaydı mevcut değil veya silinmiş.</p>
-          <button onClick={() => navigate('/')} className="btn-primary whitespace-nowrap">
-            <i className="ri-home-line mr-1" />Ana Sayfaya Dön
+          <h2 className="text-2xl font-bold mb-3" style={{ color: '#F1F5F9' }}>Ekipman Bulunamadı</h2>
+          <p className="text-sm mb-8 leading-relaxed" style={{ color: '#64748B' }}>Bu QR koda ait ekipman kaydı mevcut değil veya silinmiş.</p>
+          <button onClick={() => navigate('/')} className="btn-primary whitespace-nowrap px-6 py-3">
+            <i className="ri-home-line mr-2" />Ana Sayfaya Dön
           </button>
         </div>
       </div>
@@ -526,14 +504,14 @@ export default function QrDetailPage() {
   const hasBelge = !!localEkipman.dosyaUrl;
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #060D1A 0%, #0B1120 50%, #0D1525 100%)' }}>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #060D1A 0%, #0B1120 40%, #0D1525 100%)' }}>
 
       {/* ── Top Bar ── */}
       <div
         className="sticky top-0 z-20 px-4 py-3 flex items-center justify-between"
         style={{
-          background: 'rgba(6,13,26,0.92)',
-          borderBottom: '1px solid rgba(52,211,153,0.12)',
+          background: 'rgba(6,13,26,0.85)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
         }}
@@ -541,26 +519,25 @@ export default function QrDetailPage() {
         <button
           onClick={handleGoBack}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl cursor-pointer transition-all active:scale-90"
-          style={{ background: 'rgba(52,211,153,0.08)', color: '#34D399', border: '1px solid rgba(52,211,153,0.18)' }}
+          style={{ background: 'rgba(255,255,255,0.06)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.08)' }}
         >
           <i className="ri-arrow-left-s-line text-lg" />
-          <span className="text-xs font-semibold">Geri</span>
+          <span className="text-xs font-medium">Geri</span>
         </button>
 
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}>
             <i className="ri-qr-code-line text-xs" style={{ color: '#34D399' }} />
           </div>
-          <span className="text-sm font-bold tracking-wide" style={{ color: '#E2E8F0' }}>QR Saha Modu</span>
+          <span className="text-sm font-bold tracking-wide" style={{ color: '#CBD5E1' }}>QR Saha</span>
         </div>
 
         <div className="w-16" />
       </div>
 
-      {/* ── HERO BÖLÜMÜ ── */}
+      {/* ── HERO SECTION ── */}
       <div className="relative overflow-hidden">
-        {/* Arka plan degrade + glow */}
-        <div className="absolute inset-0" style={{ background: sc.gradient }} />
+        {/* Animated background glow */}
         <div
           className="absolute -top-20 -right-20 w-72 h-72 rounded-full opacity-20 blur-3xl"
           style={{ background: sc.color }}
@@ -570,39 +547,28 @@ export default function QrDetailPage() {
           style={{ background: sc.color }}
         />
 
-        {/* Dekoratif grid pattern */}
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage: `radial-gradient(circle, ${sc.color} 1px, transparent 1px)`,
-            backgroundSize: '28px 28px',
-          }}
-        />
+        {/* Hero gradient overlay */}
+        <div className="absolute inset-0" style={{ background: sc.heroGradient }} />
 
-        <div className="relative px-5 pt-7 pb-6">
-          {/* Üst satır: durum badge + seri no */}
+        <div className="relative px-5 pt-8 pb-6">
+          {/* Status + Serial row */}
           <div className="flex items-center justify-between mb-5">
             <span
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold"
               style={{
                 background: sc.bg,
                 color: sc.color,
                 border: `1px solid ${sc.border}`,
-                boxShadow: `0 0 16px ${sc.glow}`,
+                boxShadow: `0 0 20px ${sc.glowColor}`,
               }}
             >
-              <i className={`${sc.icon} text-sm`} />
+              <i className={`${sc.icon} text-base`} />
               {sc.label}
             </span>
             {localEkipman.seriNo && (
               <span
-                className="text-xs font-mono font-bold px-2.5 py-1.5 rounded-xl"
-                style={{
-                  background: 'rgba(15,23,42,0.7)',
-                  color: '#94A3B8',
-                  border: '1px solid rgba(51,65,85,0.5)',
-                  backdropFilter: 'blur(8px)',
-                }}
+                className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#64748B', border: '1px solid rgba(255,255,255,0.08)' }}
               >
                 S/N: {localEkipman.seriNo}
               </span>
@@ -610,51 +576,44 @@ export default function QrDetailPage() {
           </div>
 
           {/* Ekipman adı — büyük ve etkileyici */}
-          <h1
-            className="text-3xl font-black leading-tight mb-2 tracking-tight"
-            style={{ color: '#F8FAFC', textShadow: `0 0 40px ${sc.glow}` }}
-          >
+          <h1 className="text-3xl font-black leading-tight mb-2 tracking-tight" style={{ color: '#F8FAFC' }}>
             {localEkipman.ad}
           </h1>
 
           {/* Firma */}
           {firma && (
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-5 h-5 flex items-center justify-center rounded-md" style={{ background: 'rgba(51,65,85,0.6)' }}>
+              <div className="w-5 h-5 flex items-center justify-center rounded-md" style={{ background: 'rgba(255,255,255,0.08)' }}>
                 <i className="ri-building-line text-xs" style={{ color: '#64748B' }} />
               </div>
-              <span className="text-sm font-medium" style={{ color: '#94A3B8' }}>{firma.ad}</span>
+              <span className="text-sm font-medium" style={{ color: '#64748B' }}>{firma.ad}</span>
             </div>
           )}
 
-          {/* Chips: tür + alan */}
+          {/* Chips row */}
           <div className="flex flex-wrap gap-2">
             {localEkipman.tur && (
               <span
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium"
-                style={{
-                  background: 'rgba(15,23,42,0.6)',
-                  color: '#94A3B8',
-                  border: '1px solid rgba(51,65,85,0.4)',
-                  backdropFilter: 'blur(8px)',
-                }}
+                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold"
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <i className="ri-settings-3-line" />
-                {localEkipman.tur}
+                <i className="ri-settings-3-line" />{localEkipman.tur}
               </span>
             )}
             {localEkipman.bulunduguAlan && (
               <span
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium"
-                style={{
-                  background: 'rgba(15,23,42,0.6)',
-                  color: '#94A3B8',
-                  border: '1px solid rgba(51,65,85,0.4)',
-                  backdropFilter: 'blur(8px)',
-                }}
+                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold"
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <i className="ri-map-pin-line" />
-                {localEkipman.bulunduguAlan}
+                <i className="ri-map-pin-line" />{localEkipman.bulunduguAlan}
+              </span>
+            )}
+            {localEkipman.marka && (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold"
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#94A3B8', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <i className="ri-price-tag-3-line" />{localEkipman.marka}
               </span>
             )}
           </div>
@@ -673,7 +632,7 @@ export default function QrDetailPage() {
           >
             <div
               className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-              style={{ background: isOverdue ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.12)' }}
+              style={{ background: isOverdue ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)' }}
             >
               <i
                 className={`${isOverdue ? 'ri-alarm-warning-fill' : 'ri-time-fill'} text-base`}
@@ -681,79 +640,44 @@ export default function QrDetailPage() {
               />
             </div>
             <div>
-              <p className="text-xs font-bold" style={{ color: isOverdue ? '#EF4444' : '#F59E0B' }}>
-                {isOverdue ? `Kontrol ${Math.abs(days)} gün gecikmiş!` : `Kontrol tarihi ${days} gün sonra`}
+              <p className="text-sm font-bold" style={{ color: isOverdue ? '#EF4444' : '#F59E0B' }}>
+                {isOverdue ? `Kontrol ${Math.abs(days)} gün gecikmiş!` : `Kontrol ${days} gün sonra`}
               </p>
-              <p className="text-xs mt-0.5" style={{ color: isOverdue ? 'rgba(239,68,68,0.7)' : 'rgba(245,158,11,0.7)' }}>
+              <p className="text-xs" style={{ color: isOverdue ? 'rgba(239,68,68,0.7)' : 'rgba(245,158,11,0.7)' }}>
                 {isOverdue ? 'Acil kontrol gerekiyor' : 'Yaklaşan kontrol tarihi'}
               </p>
             </div>
           </div>
         )}
+
+        {/* Bottom border glow */}
+        <div className="h-px w-full" style={{ background: `linear-gradient(90deg, transparent 0%, ${sc.color}40 50%, transparent 100%)` }} />
       </div>
 
-      <div className="px-4 pt-5 pb-12 max-w-lg mx-auto space-y-5">
+      <div className="px-4 pt-6 pb-12 max-w-lg mx-auto space-y-6">
 
-        {/* ── Detay Bilgileri ── */}
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{
-            background: 'rgba(13,21,37,0.8)',
-            border: '1px solid rgba(51,65,85,0.3)',
-            backdropFilter: 'blur(12px)',
-          }}
-        >
-          <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(51,65,85,0.25)' }}>
-            <div className="w-6 h-6 flex items-center justify-center rounded-md" style={{ background: 'rgba(51,65,85,0.5)' }}>
-              <i className="ri-information-line text-xs" style={{ color: '#64748B' }} />
-            </div>
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#475569' }}>Ekipman Bilgileri</p>
-          </div>
-          <div className="divide-y" style={{ borderColor: 'rgba(51,65,85,0.18)' }}>
-            {[
-              { icon: 'ri-price-tag-3-line', label: 'Marka / Model', value: [localEkipman.marka, localEkipman.model].filter(Boolean).join(' / ') || null },
-              { icon: 'ri-calendar-check-line', label: 'Son Kontrol', value: localEkipman.sonKontrolTarihi ? new Date(localEkipman.sonKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null },
-              { icon: 'ri-calendar-2-line', label: 'Sonraki Kontrol', value: localEkipman.sonrakiKontrolTarihi ? new Date(localEkipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null, valueColor: isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : undefined },
-              ...(localEkipman.aciklama ? [{ icon: 'ri-file-text-line', label: 'Açıklama', value: localEkipman.aciklama }] : []),
-            ].map((row, i) => row.value ? (
-              <div key={i} className="flex items-center gap-3 px-4 py-3.5">
-                <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(51,65,85,0.4)' }}>
-                  <i className={`${row.icon} text-sm`} style={{ color: '#64748B' }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium" style={{ color: '#475569' }}>{row.label}</p>
-                  <p className="text-sm font-semibold mt-0.5 break-words" style={{ color: row.valueColor || '#CBD5E1' }}>{row.value}</p>
-                </div>
-              </div>
-            ) : null)}
-          </div>
-        </div>
-
-        {/* ── Hızlı Aksiyonlar ── */}
+        {/* ── Hızlı Aksiyonlar — 3 büyük kart ── */}
         <div>
-          <div className="flex items-center gap-2 mb-4 px-1">
-            <div className="h-px flex-1" style={{ background: 'rgba(51,65,85,0.4)' }} />
-            <p className="text-xs font-bold uppercase tracking-widest px-2" style={{ color: '#475569' }}>Hızlı Aksiyonlar</p>
-            <div className="h-px flex-1" style={{ background: 'rgba(51,65,85,0.4)' }} />
-          </div>
+          <p className="text-xs font-bold uppercase tracking-widest mb-4 px-1 flex items-center gap-2" style={{ color: '#334155' }}>
+            <span className="w-4 h-px inline-block" style={{ background: '#334155' }} />
+            Hızlı Aksiyonlar
+            <span className="flex-1 h-px inline-block" style={{ background: 'rgba(51,65,85,0.4)' }} />
+          </p>
 
           <div className="space-y-3">
             {/* Kontrol Yap */}
             <button
               onClick={() => setShowKontrol(true)}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl cursor-pointer transition-all active:scale-95 text-left group"
+              className="w-full group relative overflow-hidden flex items-center gap-4 px-5 py-5 rounded-2xl cursor-pointer transition-all active:scale-[0.98] text-left"
               style={{
                 background: 'linear-gradient(135deg, rgba(52,211,153,0.1) 0%, rgba(52,211,153,0.04) 100%)',
-                border: '1px solid rgba(52,211,153,0.22)',
+                border: '1px solid rgba(52,211,153,0.25)',
               }}
             >
+              <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity" style={{ background: 'rgba(52,211,153,0.08)' }} />
               <div
-                className="w-14 h-14 flex items-center justify-center rounded-2xl flex-shrink-0 transition-all"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(52,211,153,0.2) 0%, rgba(16,185,129,0.12) 100%)',
-                  border: '1px solid rgba(52,211,153,0.3)',
-                  boxShadow: '0 0 20px rgba(52,211,153,0.15)',
-                }}
+                className="w-14 h-14 flex items-center justify-center rounded-2xl flex-shrink-0"
+                style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.25)' }}
               >
                 <i className="ri-checkbox-circle-line text-2xl" style={{ color: '#34D399' }} />
               </div>
@@ -762,8 +686,8 @@ export default function QrDetailPage() {
                 <p className="text-xs leading-relaxed" style={{ color: '#475569' }}>Durumu güncelle, kontrol tarihi kaydet</p>
               </div>
               <div
-                className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
-                style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}
+                className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(52,211,153,0.12)' }}
               >
                 <i className="ri-arrow-right-s-line text-lg" style={{ color: '#34D399' }} />
               </div>
@@ -772,19 +696,16 @@ export default function QrDetailPage() {
             {/* Uygunsuzluk Bildir */}
             <button
               onClick={() => setShowUygunsuzluk(true)}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl cursor-pointer transition-all active:scale-95 text-left"
+              className="w-full group relative overflow-hidden flex items-center gap-4 px-5 py-5 rounded-2xl cursor-pointer transition-all active:scale-[0.98] text-left"
               style={{
                 background: 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(239,68,68,0.04) 100%)',
-                border: '1px solid rgba(239,68,68,0.22)',
+                border: '1px solid rgba(239,68,68,0.25)',
               }}
             >
+              <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity" style={{ background: 'rgba(239,68,68,0.08)' }} />
               <div
                 className="w-14 h-14 flex items-center justify-center rounded-2xl flex-shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(239,68,68,0.18) 0%, rgba(220,38,38,0.1) 100%)',
-                  border: '1px solid rgba(239,68,68,0.3)',
-                  boxShadow: '0 0 20px rgba(239,68,68,0.12)',
-                }}
+                style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)' }}
               >
                 <i className="ri-alert-line text-2xl" style={{ color: '#F87171' }} />
               </div>
@@ -793,8 +714,8 @@ export default function QrDetailPage() {
                 <p className="text-xs leading-relaxed" style={{ color: '#475569' }}>Tespit edilen sorunu kayıt altına al</p>
               </div>
               <div
-                className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
-                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}
+                className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.12)' }}
               >
                 <i className="ri-arrow-right-s-line text-lg" style={{ color: '#F87171' }} />
               </div>
@@ -803,19 +724,16 @@ export default function QrDetailPage() {
             {/* Fotoğraf Yükle */}
             <button
               onClick={() => setShowFoto(true)}
-              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl cursor-pointer transition-all active:scale-95 text-left"
+              className="w-full group relative overflow-hidden flex items-center gap-4 px-5 py-5 rounded-2xl cursor-pointer transition-all active:scale-[0.98] text-left"
               style={{
                 background: 'linear-gradient(135deg, rgba(251,191,36,0.1) 0%, rgba(251,191,36,0.04) 100%)',
-                border: '1px solid rgba(251,191,36,0.22)',
+                border: '1px solid rgba(251,191,36,0.25)',
               }}
             >
+              <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity" style={{ background: 'rgba(251,191,36,0.08)' }} />
               <div
                 className="w-14 h-14 flex items-center justify-center rounded-2xl flex-shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(251,191,36,0.18) 0%, rgba(245,158,11,0.1) 100%)',
-                  border: '1px solid rgba(251,191,36,0.3)',
-                  boxShadow: '0 0 20px rgba(251,191,36,0.1)',
-                }}
+                style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.25)' }}
               >
                 <i className="ri-camera-line text-2xl" style={{ color: '#FBBF24' }} />
               </div>
@@ -824,8 +742,8 @@ export default function QrDetailPage() {
                 <p className="text-xs leading-relaxed" style={{ color: '#475569' }}>Saha fotoğrafı çek ve sisteme kaydet</p>
               </div>
               <div
-                className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
-                style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.2)' }}
+                className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(251,191,36,0.12)' }}
               >
                 <i className="ri-arrow-right-s-line text-lg" style={{ color: '#FBBF24' }} />
               </div>
@@ -833,16 +751,55 @@ export default function QrDetailPage() {
           </div>
         </div>
 
+        {/* ── Detay Bilgileri ── */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest mb-4 px-1 flex items-center gap-2" style={{ color: '#334155' }}>
+            <span className="w-4 h-px inline-block" style={{ background: '#334155' }} />
+            Ekipman Bilgileri
+            <span className="flex-1 h-px inline-block" style={{ background: 'rgba(51,65,85,0.4)' }} />
+          </p>
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            {[
+              { icon: 'ri-price-tag-3-line', label: 'Marka / Model', value: [localEkipman.marka, localEkipman.model].filter(Boolean).join(' / ') || null },
+              { icon: 'ri-calendar-check-line', label: 'Son Kontrol', value: localEkipman.sonKontrolTarihi ? new Date(localEkipman.sonKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null },
+              {
+                icon: 'ri-calendar-2-line', label: 'Sonraki Kontrol',
+                value: localEkipman.sonrakiKontrolTarihi ? new Date(localEkipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null,
+                valueColor: isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : undefined,
+              },
+              ...(localEkipman.aciklama ? [{ icon: 'ri-file-text-line', label: 'Açıklama', value: localEkipman.aciklama }] : []),
+            ].filter(row => row.value).map((row, i, arr) => (
+              <div
+                key={i}
+                className="flex items-center gap-4 px-4 py-3.5"
+                style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
+              >
+                <div
+                  className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                >
+                  <i className={`${row.icon} text-sm`} style={{ color: '#475569' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs mb-0.5" style={{ color: '#334155' }}>{row.label}</p>
+                  <p className="text-sm font-semibold break-words" style={{ color: row.valueColor || '#CBD5E1' }}>{row.value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ── Saha Fotoğrafları ── */}
         {sahaFotolar.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-3 px-1">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 flex items-center justify-center rounded-md" style={{ background: 'rgba(251,191,36,0.12)' }}>
-                  <i className="ri-image-line text-xs" style={{ color: '#FBBF24' }} />
-                </div>
-                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#475569' }}>Saha Fotoğrafları</p>
-              </div>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: '#334155' }}>
+                <span className="w-4 h-px inline-block" style={{ background: '#334155' }} />
+                Saha Fotoğrafları
+              </p>
               <span
                 className="text-xs px-2.5 py-1 rounded-full font-bold"
                 style={{ background: 'rgba(251,191,36,0.1)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.2)' }}
@@ -851,7 +808,7 @@ export default function QrDetailPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="grid grid-cols-2 gap-2 mb-2">
               {[...sahaFotolar].reverse().slice(0, 4).map((foto) => {
                 const displayUrl = signedFotoUrls[foto.url] || foto.url;
                 return (
@@ -859,11 +816,7 @@ export default function QrDetailPage() {
                     key={foto.id}
                     onClick={() => setLightboxUrl(displayUrl)}
                     className="relative rounded-2xl overflow-hidden cursor-pointer active:scale-95 transition-all"
-                    style={{
-                      aspectRatio: '1/1',
-                      background: 'rgba(13,21,37,0.8)',
-                      border: '1px solid rgba(51,65,85,0.3)',
-                    }}
+                    style={{ aspectRatio: '1/1', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     <img
                       src={displayUrl}
@@ -875,9 +828,6 @@ export default function QrDetailPage() {
                       <p className="text-xs text-white leading-tight line-clamp-2 font-medium">
                         {foto.aciklama || new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
                       </p>
-                    </div>
-                    <div className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(0,0,0,0.5)' }}>
-                      <i className="ri-zoom-in-line text-xs text-white" />
                     </div>
                   </button>
                 );
@@ -893,26 +843,19 @@ export default function QrDetailPage() {
                       key={foto.id}
                       onClick={() => setLightboxUrl(displayUrl)}
                       className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all active:scale-95 text-left"
-                      style={{ background: 'rgba(13,21,37,0.7)', border: '1px solid rgba(51,65,85,0.25)' }}
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                     >
-                      <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0" style={{ background: 'rgba(51,65,85,0.4)' }}>
+                      <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         <img src={displayUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         {foto.aciklama && <p className="text-sm font-medium truncate" style={{ color: '#CBD5E1' }}>{foto.aciklama}</p>}
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          {foto.yukleyenKisi && (
-                            <span className="text-xs flex items-center gap-1" style={{ color: '#64748B' }}>
-                              <i className="ri-user-line text-xs" />{foto.yukleyenKisi}
-                            </span>
-                          )}
-                          <span className="text-xs flex items-center gap-1" style={{ color: '#64748B' }}>
-                            <i className="ri-time-line text-xs" />
-                            {new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </span>
+                          {foto.yukleyenKisi && <span className="text-xs flex items-center gap-1" style={{ color: '#475569' }}><i className="ri-user-line text-xs" />{foto.yukleyenKisi}</span>}
+                          <span className="text-xs flex items-center gap-1" style={{ color: '#475569' }}><i className="ri-time-line text-xs" />{new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                         </div>
                       </div>
-                      <i className="ri-zoom-in-line text-sm flex-shrink-0" style={{ color: '#475569' }} />
+                      <i className="ri-zoom-in-line text-sm flex-shrink-0" style={{ color: '#334155' }} />
                     </button>
                   );
                 })}
@@ -924,30 +867,24 @@ export default function QrDetailPage() {
         {/* ── Belgeler ── */}
         {(hasBelge || ekipmanEvraklari.length > 0) && (
           <div>
-            <div className="flex items-center gap-2 mb-3 px-1">
-              <div className="w-6 h-6 flex items-center justify-center rounded-md" style={{ background: 'rgba(52,211,153,0.1)' }}>
-                <i className="ri-folder-open-line text-xs" style={{ color: '#34D399' }} />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#475569' }}>Belgeler</p>
-            </div>
-            <div
-              className="rounded-2xl overflow-hidden"
-              style={{ background: 'rgba(13,21,37,0.8)', border: '1px solid rgba(51,65,85,0.3)' }}
-            >
+            <p className="text-xs font-bold uppercase tracking-widest mb-4 px-1 flex items-center gap-2" style={{ color: '#334155' }}>
+              <span className="w-4 h-px inline-block" style={{ background: '#334155' }} />
+              Belgeler
+              <span className="flex-1 h-px inline-block" style={{ background: 'rgba(51,65,85,0.4)' }} />
+            </p>
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               {hasBelge && (
                 <button
                   onClick={handleOpenBelge}
-                  className="w-full flex items-center gap-3 px-4 py-4 cursor-pointer transition-all text-left"
-                  style={{ borderBottom: ekipmanEvraklari.length > 0 ? '1px solid rgba(51,65,85,0.2)' : 'none' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.05)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                  className="w-full flex items-center gap-3 px-4 py-4 cursor-pointer transition-all text-left active:bg-white/5"
+                  style={{ borderBottom: ekipmanEvraklari.length > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
                 >
-                  <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                  <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}>
                     <i className="ri-file-check-line text-base" style={{ color: '#34D399' }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate" style={{ color: '#CBD5E1' }}>{localEkipman.dosyaAdi || 'Ekipman Belgesi'}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>Görüntüle / İndir</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#475569' }}>Görüntüle / İndir</p>
                   </div>
                   <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#34D399' }} />
                 </button>
@@ -956,14 +893,14 @@ export default function QrDetailPage() {
                 <div
                   key={evrak.id}
                   className="flex items-center gap-3 px-4 py-4"
-                  style={{ borderBottom: idx < ekipmanEvraklari.length - 1 ? '1px solid rgba(51,65,85,0.2)' : 'none' }}
+                  style={{ borderBottom: idx < ekipmanEvraklari.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
                 >
-                  <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(148,163,184,0.1)', border: '1px solid rgba(148,163,184,0.2)' }}>
+                  <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(148,163,184,0.1)', border: '1px solid rgba(148,163,184,0.15)' }}>
                     <i className="ri-file-text-line text-base" style={{ color: '#94A3B8' }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate" style={{ color: '#CBD5E1' }}>{evrak.ad}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
+                    <p className="text-xs mt-0.5" style={{ color: '#475569' }}>
                       {evrak.tur || 'Evrak'}
                       {evrak.gecerlilikTarihi && ` — ${new Date(evrak.gecerlilikTarihi).toLocaleDateString('tr-TR')} tarihine kadar`}
                     </p>
@@ -986,8 +923,8 @@ export default function QrDetailPage() {
 
         {/* ── Footer ── */}
         <div
-          className="flex items-center justify-between pt-3 pb-2 px-1"
-          style={{ borderTop: '1px solid rgba(51,65,85,0.2)' }}
+          className="flex items-center justify-between pt-4 pb-2"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
         >
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 flex items-center justify-center rounded-md" style={{ background: 'rgba(52,211,153,0.1)' }}>
@@ -997,50 +934,20 @@ export default function QrDetailPage() {
           </div>
           <button
             onClick={() => navigate('/')}
-            className="text-xs cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-            style={{ color: '#475569', background: 'rgba(51,65,85,0.2)', border: '1px solid rgba(51,65,85,0.3)' }}
+            className="text-xs cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all active:scale-95"
+            style={{ color: '#475569', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
           >
-            <i className="ri-home-line" />
-            <span>Ana Sayfa</span>
+            <i className="ri-home-line" />Ana Sayfa
           </button>
         </div>
       </div>
 
       {/* Modaller */}
-      <KontrolModal
-        open={showKontrol}
-        onClose={() => setShowKontrol(false)}
-        ekipmanAd={localEkipman.ad}
-        ekipmanId={localEkipman.id}
-        onSaved={handleAfterSave}
-      />
-      <UygunsuzlukModal
-        open={showUygunsuzluk}
-        onClose={() => setShowUygunsuzluk(false)}
-        ekipmanAd={localEkipman.ad}
-        firmaId={localEkipman.firmaId}
-      />
-      <FotoModal
-        open={showFoto}
-        onClose={() => setShowFoto(false)}
-        ekipmanAd={localEkipman.ad}
-        ekipmanId={localEkipman.id}
-        onUploaded={handleAfterSave}
-      />
-
-      {lightboxUrl && (
-        <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
-      )}
-
-      {showBelge && belgeUrl && (
-        <EvrakModal
-          open={showBelge}
-          onClose={() => setShowBelge(false)}
-          dosyaVeri={belgeUrl}
-          dosyaAdi={belgeAdi}
-          dosyaTipi={belgeTipi}
-        />
-      )}
+      <KontrolModal open={showKontrol} onClose={() => setShowKontrol(false)} ekipmanAd={localEkipman.ad} ekipmanId={localEkipman.id} onSaved={handleAfterSave} />
+      <UygunsuzlukModal open={showUygunsuzluk} onClose={() => setShowUygunsuzluk(false)} ekipmanAd={localEkipman.ad} firmaId={localEkipman.firmaId} />
+      <FotoModal open={showFoto} onClose={() => setShowFoto(false)} ekipmanAd={localEkipman.ad} ekipmanId={localEkipman.id} onUploaded={handleAfterSave} />
+      {lightboxUrl && <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
+      {showBelge && belgeUrl && <EvrakModal open={showBelge} onClose={() => setShowBelge(false)} dosyaVeri={belgeUrl} dosyaAdi={belgeAdi} dosyaTipi={belgeTipi} />}
     </div>
   );
 }
