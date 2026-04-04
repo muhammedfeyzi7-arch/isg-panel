@@ -124,6 +124,19 @@ function UygunsuzlukModal({
     if (!firmaId) { addToast('Firma bilgisi eksik.', 'error'); return; }
     setSaving(true);
     try {
+      // foto: ImageUpload'dan gelen filePath (Storage'a zaten yüklendi) veya base64
+      let acilisFotoUrl: string | undefined;
+      let acilisFotoMevcut = false;
+
+      if (foto) {
+        if (!foto.startsWith('data:')) {
+          // filePath — Storage'a zaten yüklendi, direkt kaydet
+          acilisFotoUrl = foto;
+          acilisFotoMevcut = true;
+        }
+        // base64 ise addUygunsuzluk sonrası setUygunsuzlukPhoto ile yükle
+      }
+
       const rec = await addUygunsuzluk({
         baslik: baslik.trim(),
         aciklama: aciklama.trim(),
@@ -135,9 +148,12 @@ function UygunsuzlukModal({
         hedefTarih: '',
         notlar: `QR ile bildirildi — Ekipman: ${ekipmanAd}`,
         durum: 'Açık',
-        acilisFotoMevcut: !!foto,
+        acilisFotoMevcut: acilisFotoMevcut || (foto?.startsWith('data:') ?? false),
         kapatmaFotoMevcut: false,
+        ...(acilisFotoUrl ? { acilisFotoUrl } : {}),
       });
+
+      // base64 ise Storage'a yükle
       if (foto && foto.startsWith('data:') && rec?.id) {
         const url = await setUygunsuzlukPhoto(rec.id, 'acilis', foto);
         if (url) updateUygunsuzluk(rec.id, { acilisFotoUrl: url });

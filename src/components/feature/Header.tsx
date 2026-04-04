@@ -45,7 +45,24 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
     currentUser, setQuickCreate, theme, toggleTheme,
     bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
     firmalar, personeller, evraklar, tutanaklar,
+    refreshData, dataLoading,
   } = useApp();
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshDone, setRefreshDone] = useState(false);
+
+  const handleRefresh = async () => {
+    if (refreshing || dataLoading) return;
+    setRefreshing(true);
+    setRefreshDone(false);
+    try {
+      await refreshData();
+      setRefreshDone(true);
+      setTimeout(() => setRefreshDone(false), 2000);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const { logout, user } = useAuth();
 
   const [quickOpen, setQuickOpen]     = useState(false);
@@ -283,6 +300,25 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             </div>
           )}
         </div>
+
+        {/* Global Refresh Button */}
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing || dataLoading}
+          title="Verileri Yenile"
+          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0 disabled:opacity-50"
+          style={{
+            background: refreshDone ? 'rgba(52,211,153,0.12)' : iconBtnBg,
+            border: `1px solid ${refreshDone ? 'rgba(52,211,153,0.3)' : iconBtnBorder}`,
+          }}
+          onMouseEnter={e => { if (!refreshing) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = refreshDone ? 'rgba(52,211,153,0.12)' : iconBtnBg; }}
+        >
+          <i
+            className={`${refreshing ? 'ri-loader-4-line animate-spin' : refreshDone ? 'ri-check-line' : 'ri-refresh-line'} text-sm`}
+            style={{ color: refreshDone ? '#34D399' : refreshing ? '#60A5FA' : textMuted }}
+          />
+        </button>
 
         {/* Theme Toggle */}
         <button
