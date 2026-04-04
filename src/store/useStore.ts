@@ -84,12 +84,13 @@ async function dbUpsert(
   console.log(`[ISG] Saving ${table}/${item.id}`, { organization_id: organizationId, user_id: userId });
   const { data, error } = await supabase.from(table).upsert(payload).select('id');
   if (error) {
-    console.error(`[ISG] SAVE ERROR ${table}/${item.id}:`, error);
-    throw error;
+    const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
+    console.error(`[ISG] SAVE ERROR ${table}/${item.id}:`, errMsg, error);
+    throw new Error(errMsg);
   }
   if (!data || data.length === 0) {
-    const msg = `[ISG] SAVE SILENT FAIL ${table}/${item.id}: upsert returned 0 rows. Possible RLS block.`;
-    console.error(msg);
+    const msg = `SAVE SILENT FAIL ${table}/${item.id}: upsert returned 0 rows. Possible RLS block.`;
+    console.error(`[ISG] ${msg}`);
     throw new Error(msg);
   }
   console.log(`[ISG] SAVE OK ${table}/${item.id} ✓ (rows confirmed: ${data.length})`);

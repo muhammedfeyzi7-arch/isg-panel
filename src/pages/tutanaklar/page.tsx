@@ -276,7 +276,7 @@ async function generateWordDoc(
         children: [
           makeCell('TARİH', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1400, labelCell: true }),
           makeCell(tarihStr, { size: 20, color: '111827', width: 3600 }),
-          makeCell('OLUŞTURAN KİŞİ', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1600, labelCell: true }),
+          makeCell('OLUŞTURANAN KİŞİ', { bold: true, size: 18, color: ACCENT, bg: LABEL_BG, width: 1600, labelCell: true }),
           makeCell(tutanak.olusturanKisi || '—', { size: 20, color: '111827', width: 3400 }),
         ],
       }),
@@ -596,6 +596,7 @@ export default function TutanaklarPage() {
 
   const filtered = useMemo(() => tutanaklar
     .filter(t => {
+      if (t.silinmis) return false;
       const firma = firmalar.find(f => f.id === t.firmaId);
       const q = search.toLowerCase();
       return (
@@ -610,12 +611,15 @@ export default function TutanaklarPage() {
       return tb.localeCompare(ta);
     }), [tutanaklar, firmalar, search, firmaFilter, statusFilter]);
 
-  const stats = useMemo(() => ({
-    total: tutanaklar.length,
-    taslak: tutanaklar.filter(t => t.durum === 'Taslak').length,
-    tamamlandi: tutanaklar.filter(t => t.durum === 'Tamamlandı').length,
-    onaylandi: tutanaklar.filter(t => t.durum === 'Onaylandı').length,
-  }), [tutanaklar]);
+  const stats = useMemo(() => {
+    const aktif = tutanaklar.filter(t => !t.silinmis);
+    return {
+      total: aktif.length,
+      taslak: aktif.filter(t => t.durum === 'Taslak').length,
+      tamamlandi: aktif.filter(t => t.durum === 'Tamamlandı').length,
+      onaylandi: aktif.filter(t => t.durum === 'Onaylandı').length,
+    };
+  }, [tutanaklar]);
 
   /* ── Modal açma/kapama ──────────────────────────────────── */
   const openAdd = () => {
@@ -663,21 +667,32 @@ export default function TutanaklarPage() {
     const orgId = org?.id ?? 'unknown';
 
     if (editId) {
-      updateTutanak(editId, form);
+      // Düzenleme: önce dosya yükle (varsa), sonra güncelle
+      let dosyaUrl: string | undefined;
       if (pendingFile) {
-        uploadFileToStorage(pendingFile, orgId, 'tutanak', editId).then(url => {
-          if (url) updateTutanak(editId, { dosyaUrl: url });
-        });
+        dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'tutanak', editId) ?? undefined;
+        if (!dosyaUrl) {
+          addToast('Dosya yüklenemedi. Lütfen tekrar deneyin.', 'error');
+          return;
+        }
       }
+      updateTutanak(editId, { ...form, ...(dosyaUrl ? { dosyaUrl } : {}) });
       addToast('Tutanak güncellendi.', 'success');
     } else {
+      // Yeni kayıt: önce dosya yükle (varsa), sonra kayıt oluştur
       const tutanakNo = generateTutanakNo(tutanaklar);
-      const newT = addTutanak({ ...form, tutanakNo });
+      let dosyaUrl: string | undefined;
+
       if (pendingFile) {
-        uploadFileToStorage(pendingFile, orgId, 'tutanak', newT.id).then(url => {
-          if (url) updateTutanak(newT.id, { dosyaUrl: url });
-        });
+        const tempId = crypto.randomUUID();
+        dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'tutanak', tempId) ?? undefined;
+        if (!dosyaUrl) {
+          addToast('Dosya yüklenemedi. Tutanak oluşturulmadı.', 'error');
+          return;
+        }
       }
+
+      addTutanak({ ...form, tutanakNo, ...(dosyaUrl ? { dosyaUrl } : {}) });
       addToast(`Tutanak oluşturuldu: ${tutanakNo}`, 'success');
     }
     setPendingFile(null);
@@ -689,6 +704,8 @@ export default function TutanaklarPage() {
     deleteTutanak(deleteId);
     addToast('Tutanak silindi.', 'success');
     setDeleteId(null);
+    // Eğer silinen tutanak detay modalında açıksa kapat
+    if (viewId === deleteId) setViewId(null);
   };
 
   /* ── Dosya indirme ──────────────────────────────────────── */

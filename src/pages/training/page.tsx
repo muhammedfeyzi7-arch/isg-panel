@@ -256,20 +256,29 @@ export default function EgitimlerPage() {
     const orgId = org?.id ?? 'unknown';
 
     if (editingId) {
-      updateEgitim(editingId, form);
+      // Düzenleme: önce dosya yükle (varsa), sonra güncelle
+      let belgeDosyaUrl: string | undefined;
       if (pendingFile) {
-        uploadFileToStorage(pendingFile, orgId, 'egitim', editingId).then(url => {
-          if (url) updateEgitim(editingId, { belgeDosyaUrl: url });
-        });
+        belgeDosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'egitim', editingId) ?? undefined;
+        if (!belgeDosyaUrl) {
+          addToast('Belge yüklenemedi. Lütfen tekrar deneyin.', 'error');
+          return;
+        }
       }
+      updateEgitim(editingId, { ...form, ...(belgeDosyaUrl ? { belgeDosyaUrl } : {}) });
       addToast('Eğitim güncellendi.', 'success');
     } else {
-      const newEgitim = addEgitim(form);
+      // Yeni kayıt: önce dosya yükle (varsa), sonra kayıt oluştur
+      let belgeDosyaUrl: string | undefined;
       if (pendingFile) {
-        uploadFileToStorage(pendingFile, orgId, 'egitim', newEgitim.id).then(url => {
-          if (url) updateEgitim(newEgitim.id, { belgeDosyaUrl: url });
-        });
+        const tempId = crypto.randomUUID();
+        belgeDosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'egitim', tempId) ?? undefined;
+        if (!belgeDosyaUrl) {
+          addToast('Belge yüklenemedi. Eğitim kaydı oluşturulmadı.', 'error');
+          return;
+        }
       }
+      addEgitim({ ...form, ...(belgeDosyaUrl ? { belgeDosyaUrl, belgeMevcut: true, durum: 'Tamamlandı' as EgitimStatus } : {}) });
       addToast('Eğitim eklendi.', 'success');
     }
     setPendingFile(null);
@@ -561,7 +570,7 @@ export default function EgitimlerPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               <Badge label={STATUS_CFG[detailEgitim.durum as EgitimStatus]?.label ?? detailEgitim.durum} color={getStatusColor(detailEgitim.durum)} />
-              <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}>
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: 'rgba(59,102,241,0.1)', color: '#60A5FA', border: '1px solid rgba(59,102,241,0.2)' }}>
                 {getFirmaAd(detailEgitim.firmaId)}
               </span>
             </div>

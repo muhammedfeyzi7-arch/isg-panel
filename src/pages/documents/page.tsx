@@ -139,8 +139,6 @@ export default function EvraklarPage() {
     window.open(ev.dosyaUrl, '_blank');
   };
 
-  const [uploadingFile, setUploadingFile] = useState(false);
-
   const handleSave = async () => {
     if (!form.ad.trim()) { addToast('Evrak adı zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
@@ -152,34 +150,29 @@ export default function EvraklarPage() {
     const orgId = org?.id ?? 'unknown';
 
     if (editingId) {
-      updateEvrak(editingId, savedForm);
+      // Düzenleme: önce dosya yükle (varsa), sonra güncelle
+      let dosyaUrl: string | undefined;
       if (pendingFile) {
-        setUploadingFile(true);
-        uploadFileToStorage(pendingFile, orgId, 'evrak', editingId).then(url => {
-          setUploadingFile(false);
-          if (url) {
-            updateEvrak(editingId, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
-            addToast('Dosya buluta kaydedildi.', 'success');
-          } else {
-            addToast('Dosya yüklenemedi, lütfen tekrar deneyin.', 'error');
-          }
-        });
+        dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'evrak', editingId) ?? undefined;
+        if (!dosyaUrl) {
+          addToast('Dosya yüklenemedi. Lütfen tekrar deneyin.', 'error');
+          return;
+        }
       }
+      updateEvrak(editingId, { ...savedForm, ...(dosyaUrl ? { dosyaUrl } : {}) });
       addToast('Evrak güncellendi.', 'success');
     } else {
-      const newEvrak = addEvrak(savedForm);
-      if (pendingFile && newEvrak?.id) {
-        setUploadingFile(true);
-        uploadFileToStorage(pendingFile, orgId, 'evrak', newEvrak.id).then(url => {
-          setUploadingFile(false);
-          if (url) {
-            updateEvrak(newEvrak.id, { dosyaUrl: url } as Parameters<typeof updateEvrak>[1]);
-            addToast('Dosya buluta kaydedildi.', 'success');
-          } else {
-            addToast('Dosya yüklenemedi — evrak kaydedildi ama dosya eksik. Düzenle ile tekrar yükleyin.', 'error');
-          }
-        });
+      // Yeni kayıt: önce dosya yükle (varsa), sonra kayıt oluştur
+      let dosyaUrl: string | undefined;
+      if (pendingFile) {
+        const tempId = crypto.randomUUID();
+        dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'evrak', tempId) ?? undefined;
+        if (!dosyaUrl) {
+          addToast('Dosya yüklenemedi. Evrak kaydı oluşturulmadı.', 'error');
+          return;
+        }
       }
+      addEvrak({ ...savedForm, ...(dosyaUrl ? { dosyaUrl } : {}) });
       addToast('Evrak eklendi.', 'success');
     }
     setPendingFile(null);

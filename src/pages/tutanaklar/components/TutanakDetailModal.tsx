@@ -40,6 +40,26 @@ function InfoRow({ label, value, icon }: { label: string; value: string; icon?: 
   );
 }
 
+/** Dosyanın görsel olup olmadığını kontrol et */
+function isImageFile(dosyaTipi?: string, dosyaAdi?: string): boolean {
+  if (dosyaTipi && dosyaTipi.startsWith('image/')) return true;
+  if (dosyaAdi) {
+    const ext = dosyaAdi.split('.').pop()?.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext ?? '');
+  }
+  return false;
+}
+
+/** Dosyanın PDF olup olmadığını kontrol et */
+function isPdfFile(dosyaTipi?: string, dosyaAdi?: string): boolean {
+  if (dosyaTipi === 'application/pdf') return true;
+  if (dosyaAdi) {
+    const ext = dosyaAdi.split('.').pop()?.toLowerCase();
+    return ext === 'pdf';
+  }
+  return false;
+}
+
 export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose, onEdit, onWordDownload, wordLoading, canEdit }: Props) {
   if (!tutanak) return null;
 
@@ -51,6 +71,30 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
     if (onEdit) {
       onEdit(tutanak);
       onClose();
+    }
+  };
+
+  // Dosya URL'si: önce dosyaUrl, yoksa dosyaVeri (base64)
+  const fileUrl = tutanak.dosyaUrl || dosyaVeri;
+  const hasFile = !!(tutanak.dosyaAdi && fileUrl);
+  const isImage = isImageFile(tutanak.dosyaTipi, tutanak.dosyaAdi);
+  const isPdf = isPdfFile(tutanak.dosyaTipi, tutanak.dosyaAdi);
+
+  const handleFileDownload = async () => {
+    if (!fileUrl) return;
+    try {
+      const res = await fetch(fileUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = tutanak.dosyaAdi || 'tutanak-eki';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(fileUrl, '_blank');
     }
   };
 
@@ -194,16 +238,33 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
               </p>
             </div>
 
-            {/* Görsel önizleme — Storage URL veya base64 */}
-            {dosyaVeri && (tutanak.dosyaTipi?.startsWith('image/') || dosyaVeri.startsWith('http')) ? (
+            {/* Dosya yok badge */}
+            {!hasFile && (
+              <div
+                className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}
+              >
+                <div className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0"
+                  style={{ background: 'rgba(245,158,11,0.12)' }}>
+                  <i className="ri-file-warning-line text-base" style={{ color: '#F59E0B' }} />
+                </div>
+                <div>
+                  <p className="text-xs font-medium" style={{ color: 'var(--text-faint)' }}>Dosya Adı</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{tutanak.dosyaAdi}</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#F59E0B' }}>Dosya bulunamadı — tekrar yükleyin</p>
+                </div>
+              </div>
+            )}
+
+            {/* Görsel önizleme */}
+            {hasFile && isImage && (
               <div
                 className="rounded-xl overflow-hidden"
                 style={{ border: '1px solid rgba(52,211,153,0.2)', background: 'var(--bg-item)' }}
               >
-                {/* Görsel */}
                 <div className="flex items-center justify-center p-3" style={{ background: 'rgba(0,0,0,0.04)', minHeight: '120px' }}>
                   <img
-                    src={dosyaVeri}
+                    src={fileUrl}
                     alt={tutanak.dosyaAdi}
                     style={{
                       maxWidth: '100%',
@@ -214,7 +275,6 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
                     }}
                   />
                 </div>
-                {/* Dosya bilgisi */}
                 <div
                   className="flex items-center gap-3 px-4 py-3"
                   style={{ borderTop: '1px solid rgba(52,211,153,0.15)' }}
@@ -233,16 +293,63 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
                       </p>
                     ) : null}
                   </div>
-                  <span
-                    className="text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap"
-                    style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399' }}
+                  <button
+                    onClick={handleFileDownload}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                    style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399', border: '1px solid rgba(52,211,153,0.25)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.22)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.12)'; }}
                   >
-                    Önizleme
-                  </span>
+                    <i className="ri-download-line" /> İndir
+                  </button>
                 </div>
               </div>
-            ) : (
-              /* Görsel olmayan dosya — mevcut stil korundu */
+            )}
+
+            {/* PDF dosyası */}
+            {hasFile && isPdf && (
+              <div
+                className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}
+              >
+                <div className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0"
+                  style={{ background: 'rgba(239,68,68,0.12)' }}>
+                  <i className="ri-file-pdf-line text-base" style={{ color: '#F87171' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium" style={{ color: 'var(--text-faint)' }}>PDF Dosyası</p>
+                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{tutanak.dosyaAdi}</p>
+                  {tutanak.dosyaBoyutu ? (
+                    <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+                      {(tutanak.dosyaBoyutu / 1024).toFixed(1)} KB
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.open(fileUrl, '_blank')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                    style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+                  >
+                    <i className="ri-eye-line" /> Görüntüle
+                  </button>
+                  <button
+                    onClick={handleFileDownload}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                    style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }}
+                  >
+                    <i className="ri-download-line" /> İndir
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Diğer dosya türleri */}
+            {hasFile && !isImage && !isPdf && (
               <div
                 className="flex items-center gap-3 px-4 py-3 rounded-xl"
                 style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}
@@ -251,15 +358,24 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
                   style={{ background: 'rgba(52,211,153,0.12)' }}>
                   <i className="ri-attachment-2 text-base" style={{ color: '#34D399' }} />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium" style={{ color: 'var(--text-faint)' }}>Ek Dosya</p>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{tutanak.dosyaAdi}</p>
+                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{tutanak.dosyaAdi}</p>
                   {tutanak.dosyaBoyutu ? (
                     <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
                       {(tutanak.dosyaBoyutu / 1024).toFixed(1)} KB
                     </p>
                   ) : null}
                 </div>
+                <button
+                  onClick={handleFileDownload}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                  style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399', border: '1px solid rgba(52,211,153,0.25)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.22)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.12)'; }}
+                >
+                  <i className="ri-download-line" /> İndir
+                </button>
               </div>
             )}
           </div>
