@@ -163,6 +163,9 @@ export default function EgitimlerPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [belgeLoading, setBelgeLoading] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
   const handleRefresh = async () => {
     if (refreshing || dataLoading) return;
     setRefreshing(true);
@@ -187,11 +190,35 @@ export default function EgitimlerPage() {
     if (quickCreate === 'egitimler') {
       setForm({ ...emptyEgitim });
       setEditingId(null);
+      setPendingFile(null);
       setFormOpen(true);
       setQuickCreate(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quickCreate, setQuickCreate]);
+
+  // Bildirimden gelen kayıt açma
+  useEffect(() => {
+    const handleOpenRecord = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { module: string; recordId: string };
+      if (detail.module !== 'egitimler') return;
+      const eg = egitimler.find(x => x.id === detail.recordId);
+      if (eg) openEdit(eg);
+    };
+    window.addEventListener('isg_open_record', handleOpenRecord);
+    try {
+      const saved = localStorage.getItem('isg_open_record');
+      if (saved) {
+        const { module, recordId, ts } = JSON.parse(saved);
+        if (module === 'egitimler' && recordId && Date.now() - ts < 5000) {
+          const eg = egitimler.find(x => x.id === recordId);
+          if (eg) { openEdit(eg); localStorage.removeItem('isg_open_record'); }
+        }
+      }
+    } catch { /* ignore */ }
+    return () => window.removeEventListener('isg_open_record', handleOpenRecord);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [egitimler]);
 
   const firmaPersoneller = useMemo(() => {
     if (!form.firmaId) return [];
@@ -337,6 +364,21 @@ export default function EgitimlerPage() {
 
   const detailEgitim = egitimler.find(e => e.id === detailId);
 
+  const allSelected = filtered.length > 0 && filtered.every(e => selectedIds.has(e.id));
+  const toggleAll = () => allSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(filtered.map(e => e.id)));
+  const toggleOne = (id: string) => setSelectedIds(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const handleBulkDelete = () => {
+    Array.from(selectedIds).forEach(id => deleteEgitim(id));
+    addToast(`${selectedIds.size} eğitim silindi.`, 'success');
+    setSelectedIds(new Set());
+    setBulkDeleteConfirm(false);
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -411,10 +453,29 @@ export default function EgitimlerPage() {
         </div>
       ) : (
         <div className="isg-card rounded-2xl overflow-hidden">
+          {/* Toplu seçim aksiyonları */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2.5 flex-wrap" style={{ background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid rgba(99,102,241,0.2)' }}>
+              <span className="text-sm font-semibold" style={{ color: '#818CF8' }}>{selectedIds.size} kayıt seçildi</span>
+              <button
+                onClick={() => setBulkDeleteConfirm(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+              >
+                <i className="ri-delete-bin-line" /> Seçilenleri Sil
+              </button>
+              <button onClick={() => setSelectedIds(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+                Seçimi Kaldır
+              </button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full table-premium">
               <thead>
                 <tr>
+                  <th className="w-10 text-center">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                  </th>
                   <th className="text-left">Eğitim Türü</th>
                   <th className="text-left hidden md:table-cell">Firma</th>
                   <th className="text-left hidden lg:table-cell">Katılımcılar</th>
@@ -431,7 +492,10 @@ export default function EgitimlerPage() {
                   const hasFileError = eg.belgeDosyaAdi && !eg.belgeDosyaUrl;
                   const isLoadingBelge = belgeLoading === eg.id;
                   return (
-                    <tr key={eg.id}>
+                    <tr key={eg.id} style={{ background: selectedIds.has(eg.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                      <td className="text-center">
+                        <input type="checkbox" checked={selectedIds.has(eg.id)} onChange={() => toggleOne(eg.id)} className="cursor-pointer" />
+                      </td>
                       <td>
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: stc.bg, border: `1px solid ${stc.border}` }}>
@@ -600,6 +664,33 @@ export default function EgitimlerPage() {
             </div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={e => handleFileChange(e.target.files?.[0])} />
           </div>
+        </div>
+      </Modal>
+
+      {/* Bulk Delete Modal */}
+      <Modal
+        open={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        title="Toplu Silme"
+        size="sm"
+        icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
+              <i className="ri-delete-bin-line" /> {selectedIds.size} Kaydı Sil
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
+            <strong>{selectedIds.size}</strong> eğitim kaydı silinecek.
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
         </div>
       </Modal>
 

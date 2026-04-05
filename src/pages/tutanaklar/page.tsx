@@ -588,6 +588,10 @@ export default function TutanaklarPage() {
   const [form, setForm] = useState<Omit<Tutanak, 'id' | 'tutanakNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>>(emptyForm);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Toplu silme state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
   const viewTutanak = useMemo(() => tutanaklar.find(t => t.id === viewId) ?? null, [tutanaklar, viewId]);
 
   // Sadece aktif (silinmemiş) firmalar
@@ -618,6 +622,21 @@ export default function TutanaklarPage() {
       const tb = b.olusturmaTarihi ?? '';
       return tb.localeCompare(ta);
     }), [tutanaklar, firmalar, search, firmaFilter, statusFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every(t => selected.has(t.id));
+  const toggleAll = () => allSelected ? setSelected(new Set()) : setSelected(new Set(filtered.map(t => t.id)));
+  const toggleOne = (id: string) => setSelected(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const handleBulkDelete = () => {
+    selected.forEach(id => deleteTutanak(id));
+    addToast(`${selected.size} tutanak silindi.`, 'info');
+    setSelected(new Set());
+    setBulkDeleteConfirm(false);
+  };
 
   const stats = useMemo(() => {
     const aktif = tutanaklar.filter(t => !t.silinmis);
@@ -654,6 +673,8 @@ export default function TutanaklarPage() {
     setForm(prev => ({ ...prev, [field]: value }));
 
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  // FIX 4: useRef lock to prevent double-click duplicate submissions
+  const submittingRef = useRef<boolean>(false);
 
   const handleFileChange = (file?: File) => {
     if (!file) return;
@@ -670,41 +691,54 @@ export default function TutanaklarPage() {
     if (!form.baslik.trim()) { addToast('Başlık zorunludur.', 'error'); return; }
     if (!form.firmaId)       { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.aciklama.trim()) { addToast('Açıklama zorunludur.', 'error'); return; }
+    // FIX 4: Immediate ref lock — prevents double-click before state update
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     const { uploadFileToStorage } = await import('@/utils/fileUpload');
     const orgId = org?.id ?? 'unknown';
 
-    if (editId) {
-      // Düzenleme: önce dosya yükle (varsa), sonra güncelle
-      let dosyaUrl: string | undefined;
-      if (pendingFile) {
-        dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'tutanak', editId) ?? undefined;
-        if (!dosyaUrl) {
-          addToast('Dosya yüklenemedi. Lütfen tekrar deneyin.', 'error');
+    try {
+      if (editId) {
+        // Düzenleme: önce dosya yükle (varsa), sonra güncelle
+        let dosyaUrl: string | undefined;
+        if (pendingFile) {
+          dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'tutanak', editId) ?? undefined;
+          if (!dosyaUrl) {
+            addToast('Dosya yüklenemedi. Lütfen tekrar deneyin.', 'error');
+            return;
+          }
+        }
+        updateTutanak(editId, { ...form, ...(dosyaUrl ? { dosyaUrl } : {}) });
+        addToast('Tutanak güncellendi.', 'success');
+      } else {
+        // Yeni kayıt: önce kayıt oluştur, sonra dosya yükle (varsa)
+        const tutanakNo = generateTutanakNo(tutanaklar);
+        
+        // Create record first — addTutanak is async (RPC call)
+        const newTutanak = await addTutanak({ ...form, tutanakNo });
+        if (!newTutanak?.id) {
+          addToast('Tutanak oluşturulurken hata oluştu.', 'error');
           return;
         }
-      }
-      updateTutanak(editId, { ...form, ...(dosyaUrl ? { dosyaUrl } : {}) });
-      addToast('Tutanak güncellendi.', 'success');
-    } else {
-      // Yeni kayıt: önce dosya yükle (varsa), sonra kayıt oluştur
-      const tutanakNo = generateTutanakNo(tutanaklar);
-      let dosyaUrl: string | undefined;
-
-      if (pendingFile) {
-        const tempId = crypto.randomUUID();
-        dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'tutanak', tempId) ?? undefined;
-        if (!dosyaUrl) {
-          addToast('Dosya yüklenemedi. Tutanak oluşturulmadı.', 'error');
-          return;
+        
+        // Then upload file with the actual record ID
+        if (pendingFile) {
+          const dosyaUrl = await uploadFileToStorage(pendingFile, orgId, 'tutanak', newTutanak.id) ?? undefined;
+          if (dosyaUrl) {
+            updateTutanak(newTutanak.id, { dosyaUrl });
+          } else {
+            addToast('Dosya yüklenemedi.', 'error');
+          }
         }
+        
+        addToast(`Tutanak oluşturuldu: ${tutanakNo}`, 'success');
       }
-
-      addTutanak({ ...form, tutanakNo, ...(dosyaUrl ? { dosyaUrl } : {}) });
-      addToast(`Tutanak oluşturuldu: ${tutanakNo}`, 'success');
+      setPendingFile(null);
+      closeModal();
+    } finally {
+      submittingRef.current = false;
     }
-    setPendingFile(null);
-    closeModal();
   };
 
   const handleDelete = () => {
@@ -882,6 +916,23 @@ export default function TutanaklarPage() {
         )}
       </div>
 
+      {/* Toplu seçim aksiyonları */}
+      {selected.size > 0 && canDelete && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <span className="text-sm font-semibold" style={{ color: '#F87171' }}>{selected.size} tutanak seçildi</span>
+          <button
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
+            <i className="ri-delete-bin-line" /> Seçilenleri Sil
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+            Seçimi Kaldır
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="isg-card rounded-xl py-20 text-center">
@@ -899,6 +950,11 @@ export default function TutanaklarPage() {
             <table className="table-premium w-full">
               <thead>
                 <tr>
+                  {canDelete && (
+                    <th className="w-10 text-center">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                    </th>
+                  )}
                   <th className="text-left">Tutanak No</th>
                   <th className="text-left">Başlık</th>
                   <th className="text-left hidden md:table-cell">Firma</th>
@@ -914,7 +970,12 @@ export default function TutanaklarPage() {
                   const firma = firmalar.find(f => f.id === t.firmaId);
                   const stc = STS_CONFIG[t.durum];
                   return (
-                    <tr key={t.id}>
+                    <tr key={t.id} style={{ background: selected.has(t.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                      {canDelete && (
+                        <td className="text-center">
+                          <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleOne(t.id)} className="cursor-pointer" />
+                        </td>
+                      )}
                       <td>
                         <span className="text-sm font-mono font-semibold" style={{ color: '#60A5FA' }}>
                           {t.tutanakNo}
@@ -1198,6 +1259,34 @@ export default function TutanaklarPage() {
           <p className="text-xs" style={{ color: '#94A3B8' }}>
             Tutanak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.
           </p>
+        </div>
+      </Modal>
+
+      {/* ── Toplu Silme Onay Modal ── */}
+      <Modal
+        open={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        title="Toplu Silme Onayı"
+        size="sm"
+        icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
+              <i className="ri-delete-bin-line" /> {selected.size} Tutanağı Sil
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4"
+            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
+            <strong>{selected.size}</strong> tutanak çöp kutusuna taşınacak.
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Çöp kutusundan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
 

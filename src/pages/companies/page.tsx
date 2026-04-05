@@ -76,6 +76,10 @@ export default function FirmalarPage() {
   const [personelDetailId, setPersonelDetailId] = useState<string | null>(null);
   const [personelDetailTab, setPersonelDetailTab] = useState('bilgiler');
 
+  // Toplu silme state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
   useEffect(() => {
     if (quickCreate === 'firmalar') {
       setForm({ ...emptyFirma });
@@ -99,6 +103,21 @@ export default function FirmalarPage() {
       const tb = b.olusturmaTarihi ?? '';
       return tb.localeCompare(ta);
     }), [firmalar, search, statusFilter, tehlikeFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every(f => selected.has(f.id));
+  const toggleAll = () => allSelected ? setSelected(new Set()) : setSelected(new Set(filtered.map(f => f.id)));
+  const toggleOne = (id: string) => setSelected(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const handleBulkDelete = () => {
+    selected.forEach(id => deleteFirma(id));
+    addToast(`${selected.size} firma silindi.`, 'info');
+    setSelected(new Set());
+    setBulkDeleteConfirm(false);
+  };
 
   const openAdd = () => { setForm({ ...emptyFirma }); setEditingId(null); setLogoVeri(''); setFormOpen(true); };
   const openEdit = (f: Firma) => {
@@ -253,6 +272,23 @@ export default function FirmalarPage() {
         </div>
       </div>
 
+      {/* Toplu seçim aksiyonları */}
+      {selected.size > 0 && canDelete && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <span className="text-sm font-semibold" style={{ color: '#F87171' }}>{selected.size} firma seçildi</span>
+          <button
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
+            <i className="ri-delete-bin-line" /> Seçilenleri Sil
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+            Seçimi Kaldır
+          </button>
+        </div>
+      )}
+
       {/* ── Table ── */}
       {filtered.length === 0 ? (
         <EmptyState
@@ -270,6 +306,11 @@ export default function FirmalarPage() {
             <table className="w-full table-premium">
               <thead>
                 <tr>
+                  {canDelete && (
+                    <th className="w-10 text-center">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                    </th>
+                  )}
                   <th className="text-left">Firma Adı</th>
                   <th className="text-left hidden md:table-cell">Yetkili Kişi</th>
                   <th className="text-left hidden lg:table-cell">İletişim</th>
@@ -281,7 +322,12 @@ export default function FirmalarPage() {
               </thead>
               <tbody>
                 {filtered.map((firma) => (
-                  <tr key={firma.id}>
+                  <tr key={firma.id} style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                    {canDelete && (
+                      <td className="text-center">
+                        <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer" />
+                      </td>
+                    )}
                     <td>
                       <button onClick={() => setDetailId(firma.id)} className="group cursor-pointer text-left">
                         <div className="flex items-center gap-2.5">
@@ -558,6 +604,33 @@ export default function FirmalarPage() {
               </p>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Toplu Silme Onay Modal */}
+      <Modal
+        open={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        title="Toplu Silme Onayı"
+        size="sm"
+        icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary">İptal</button>
+            <button onClick={handleBulkDelete} className="btn-danger">
+              <i className="ri-delete-bin-line" /> {selected.size} Firmayı Sil
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
+            <strong>{selected.size}</strong> firma çöp kutusuna taşınacak.
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>İlgili personel ve evraklar da birlikte taşınır. Çöp kutusundan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
     </div>

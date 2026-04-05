@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Modal from '../../../components/base/Modal';
 import ImageUpload from './ImageUpload';
 import { useApp } from '../../../store/AppContext';
@@ -36,6 +36,8 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
   const { firmalar, personeller, addUygunsuzluk, updateUygunsuzluk, setUygunsuzlukPhoto, getUygunsuzlukPhoto, addToast, logAction } = useApp();
   const [form, setForm] = useState<FormState>(defaultForm);
   const [saving, setSaving] = useState(false);
+  // FIX 4: useRef lock to prevent double-click duplicate submissions
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -73,6 +75,8 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
   const handleSave = async () => {
     if (!form.baslik.trim()) { addToast('Başlık zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSaving(true);
     try {
       if (editRecord) {
@@ -127,6 +131,7 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
       onClose();
     } finally {
       setSaving(false);
+      submittingRef.current = false;
     }
   };
 

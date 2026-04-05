@@ -61,13 +61,18 @@ function getDaysUntil(dateStr: string): number {
 function KontrolModal({
   open, onClose, ekipmanAd, ekipmanId, onSaved,
 }: { open: boolean; onClose: () => void; ekipmanAd: string; ekipmanId: string; onSaved: () => void }) {
-  const { updateEkipman, ekipmanlar, addToast, currentUser } = useApp();
+  const { updateEkipman, addToast, currentUser, org } = useApp();
   const [durum, setDurum] = useState<EkipmanStatus>('Uygun');
   const [notlar, setNotlar] = useState('');
   const [sonrakiTarih, setSonrakiTarih] = useState('');
   const [saving, setSaving] = useState(false);
+  // FIX 4: useRef lock to prevent double-click duplicate submissions
+  const submittingRef = useRef(false);
 
   const handleSave = async () => {
+    // FIX 4: Immediate ref lock — prevents double-click before state update
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSaving(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
@@ -76,9 +81,23 @@ function KontrolModal({
         ? `[${today} - ${yapanKisi}] ${notlar.trim()}`
         : '';
 
-      // Mevcut kontrol geçmişini al ve yeni kaydı başa ekle
-      const mevcutEkipman = ekipmanlar.find(e => e.id === ekipmanId);
-      const mevcutGecmis: KontrolKayit[] = (mevcutEkipman as unknown as { kontrolGecmisi?: KontrolKayit[] })?.kontrolGecmisi ?? [];
+      // FIX 3: Always fetch latest from DB before updating kontrolGecmisi
+      // This prevents race condition where stale local state overwrites concurrent updates
+      let mevcutGecmis: KontrolKayit[] = [];
+      try {
+        const { data: freshData } = await supabase
+          .from('ekipmanlar')
+          .select('data')
+          .eq('id', ekipmanId)
+          .maybeSingle();
+        if (freshData?.data) {
+          mevcutGecmis = (freshData.data as unknown as { kontrolGecmisi?: KontrolKayit[] }).kontrolGecmisi ?? [];
+        }
+      } catch {
+        // Fallback to empty if fetch fails — still better than stale state
+        mevcutGecmis = [];
+      }
+
       const yeniKayit: KontrolKayit = {
         tarih: new Date().toISOString(),
         yapanKisi,
@@ -87,18 +106,21 @@ function KontrolModal({
       };
       const yeniGecmis = [yeniKayit, ...mevcutGecmis].slice(0, 50); // max 50 kayıt tut
 
+      // FIX 1: Denetci field restriction — pass role so store enforces whitelist
+      // Only sonKontrolTarihi, durum, kontrolGecmisi, notlar allowed for denetci
       updateEkipman(ekipmanId, {
         durum,
         sonKontrolTarihi: today,
         ...(sonrakiTarih ? { sonrakiKontrolTarihi: sonrakiTarih } : {}),
         notlar: notlarVal,
-        ...(({ kontrolGecmisi: yeniGecmis }) as unknown as Partial<Ekipman>),
-      });
+        kontrolGecmisi: yeniGecmis,
+      } as Partial<Ekipman>, org?.role?.toLowerCase());
       addToast('Kontrol kaydedildi.', 'success');
       onClose();
       setTimeout(() => onSaved(), 800);
     } finally {
       setSaving(false);
+      submittingRef.current = false;
     }
   };
 
@@ -307,12 +329,17 @@ function UygunsuzlukModal({
   const [severity, setSeverity] = useState<UygunsuzlukSeverity>('Orta');
   const [foto, setFoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // FIX 4: useRef lock to prevent double-click duplicate submissions
+  const submittingRef = useRef(false);
 
   const firma = firmalar.find(f => f.id === firmaId);
 
   const handleSave = async () => {
     if (!baslik.trim()) { addToast('Başlık zorunludur.', 'error'); return; }
     if (!firmaId) { addToast('Firma bilgisi eksik.', 'error'); return; }
+    // FIX 4: Immediate ref lock
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSaving(true);
     try {
       let acilisFotoUrl: string | undefined;
@@ -349,6 +376,7 @@ function UygunsuzlukModal({
       onClose();
     } finally {
       setSaving(false);
+      submittingRef.current = false;
     }
   };
 
@@ -410,6 +438,8 @@ function FotoModal({
   const [foto, setFoto] = useState<string | null>(null);
   const [aciklama, setAciklama] = useState('');
   const [saving, setSaving] = useState(false);
+  // FIX 4: useRef lock to prevent double-click duplicate uploads
+  const submittingRef = useRef(false);
 
   const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
 
@@ -422,7 +452,9 @@ function FotoModal({
   const handleSave = async () => {
     if (!foto) { addToast('Fotoğraf seçiniz.', 'error'); return; }
     if (!foto.startsWith('data:')) { addToast('Geçersiz fotoğraf formatı.', 'error'); return; }
-    if (saving) return;
+    // FIX 4: Immediate ref lock
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSaving(true);
     try {
       const fotoId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
@@ -448,7 +480,22 @@ function FotoModal({
         yukleyenKisi: currentUser.ad || 'Kullanıcı',
       };
 
-      const mevcutFotolar = ekipman?.sahaFotolari ?? [];
+      // FIX: Always fetch latest sahaFotolari from DB to prevent race condition
+      // (two users uploading simultaneously would overwrite each other's photos)
+      let mevcutFotolar: EkipmanSahaFoto[] = [];
+      try {
+        const { data: freshData } = await supabase
+          .from('ekipmanlar')
+          .select('data')
+          .eq('id', ekipmanId)
+          .maybeSingle();
+        if (freshData?.data) {
+          mevcutFotolar = (freshData.data as unknown as { sahaFotolari?: EkipmanSahaFoto[] }).sahaFotolari ?? [];
+        }
+      } catch {
+        mevcutFotolar = ekipman?.sahaFotolari ?? [];
+      }
+
       updateEkipman(ekipmanId, {
         sahaFotolari: [...mevcutFotolar, yeniFoto],
       });
@@ -461,6 +508,7 @@ function FotoModal({
       addToast('Fotoğraf yüklenirken hata oluştu.', 'error');
     } finally {
       setSaving(false);
+      submittingRef.current = false;
     }
   };
 

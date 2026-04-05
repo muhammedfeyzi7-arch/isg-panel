@@ -18,15 +18,22 @@ export interface ActivityLogPayload {
  *
  * SECURITY NOTE:
  * - RLS policy enforces: user_id = auth.uid() AND organization_id = get_my_org_id()
- * - Client cannot spoof user_id (RLS rejects if user_id !== auth.uid())
+ * - Client CANNOT spoof user_id — RLS rejects if user_id !== auth.uid()
  * - user_name and user_role are informational only — not used for access control
  * - organization_id is validated server-side via get_my_org_id()
+ * - FIX 2: user_id is taken from auth.uid() on backend, not from payload
  */
 export async function logActivity(payload: ActivityLogPayload): Promise<void> {
   try {
+    // SECURITY: user_id is sent from client but RLS WITH CHECK enforces user_id = auth.uid()
+    // So even if client sends wrong user_id, RLS will reject it.
+    // user_id column is NOT NULL so we must send it — but RLS validates it server-side.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) return; // Not authenticated — skip log
+
     const { error } = await supabase.from('activity_logs').insert({
       organization_id: payload.organizationId,
-      user_id: payload.userId,       // RLS enforces this === auth.uid()
+      user_id: user.id, // Always use auth.uid() — never trust payload.userId
       user_email: payload.userEmail,
       user_name: payload.userName,
       user_role: payload.userRole,   // informational only

@@ -174,6 +174,8 @@ export default function MuayenelerPage() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [belgeLoading, setBelgeLoading] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (quickCreate === 'muayeneler') {
@@ -183,6 +185,29 @@ export default function MuayenelerPage() {
       setQuickCreate(null);
     }
   }, [quickCreate, setQuickCreate]);
+
+  // Bildirimden gelen kayıt açma
+  useEffect(() => {
+    const handleOpenRecord = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { module: string; recordId: string };
+      if (detail.module !== 'muayeneler') return;
+      const m = muayeneler.find(x => x.id === detail.recordId);
+      if (m) openEdit(m);
+    };
+    window.addEventListener('isg_open_record', handleOpenRecord);
+    try {
+      const saved = localStorage.getItem('isg_open_record');
+      if (saved) {
+        const { module, recordId, ts } = JSON.parse(saved);
+        if (module === 'muayeneler' && recordId && Date.now() - ts < 5000) {
+          const m = muayeneler.find(x => x.id === recordId);
+          if (m) { openEdit(m); localStorage.removeItem('isg_open_record'); }
+        }
+      }
+    } catch { /* ignore */ }
+    return () => window.removeEventListener('isg_open_record', handleOpenRecord);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [muayeneler]);
 
   const filteredPersoneller = useMemo(
     () => form.firmaId ? personeller.filter(p => p.firmaId === form.firmaId && p.durum === 'Aktif' && !p.silinmis) : personeller.filter(p => p.durum === 'Aktif' && !p.silinmis),
@@ -243,6 +268,21 @@ export default function MuayenelerPage() {
     const gecmis = aktifMuayeneler.filter(m => getDaysUntil(m.sonrakiTarih) < 0).length;
     return { total, uygun, yaklasan, gecmis };
   }, [aktifMuayeneler]);
+
+  const allSelected = filtered.length > 0 && filtered.every(m => selectedIds.has(m.id));
+  const toggleAll = () => allSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(filtered.map(m => m.id)));
+  const toggleOne = (id: string) => setSelectedIds(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const handleBulkDelete = () => {
+    Array.from(selectedIds).forEach(id => deleteMuayene(id));
+    addToast(`${selectedIds.size} sağlık kaydı silindi.`, 'success');
+    setSelectedIds(new Set());
+    setBulkDeleteConfirm(false);
+  };
 
   const openAdd = () => { setEditId(null); setForm(defaultForm); setPendingFile(null); setShowModal(true); };
   const openEdit = (m: Muayene) => {
@@ -438,9 +478,27 @@ export default function MuayenelerPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-3 px-4 py-2.5 flex-wrap" style={{ background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid rgba(99,102,241,0.2)' }}>
+                <span className="text-sm font-semibold" style={{ color: '#818CF8' }}>{selectedIds.size} kayıt seçildi</span>
+                <button
+                  onClick={() => setBulkDeleteConfirm(true)}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+                  style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                >
+                  <i className="ri-delete-bin-line" /> Seçilenleri Sil
+                </button>
+                <button onClick={() => setSelectedIds(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+                  Seçimi Kaldır
+                </button>
+              </div>
+            )}
             <table className="table-premium w-full">
               <thead>
                 <tr>
+                  <th className="w-10 text-center">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                  </th>
                   <th className="text-left">Personel</th>
                   <th className="text-left hidden md:table-cell">Firma</th>
                   <th className="text-left hidden sm:table-cell">Muayene Tarihi</th>
@@ -462,7 +520,10 @@ export default function MuayenelerPage() {
                   // Dosya durumu: dosyaAdi var ama dosyaUrl yoksa "yüklenemedi"
                   const hasFileError = m.dosyaAdi && !m.dosyaUrl;
                   return (
-                    <tr key={m.id}>
+                    <tr key={m.id} style={{ background: selectedIds.has(m.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                      <td className="text-center">
+                        <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleOne(m.id)} className="cursor-pointer" />
+                      </td>
                       <td>
                         <div>
                           <p className="font-semibold text-sm truncate max-w-[150px]" style={{ color: 'var(--text-primary)' }}>{personel?.adSoyad || '—'}</p>
@@ -620,6 +681,33 @@ export default function MuayenelerPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Modal */}
+      <Modal
+        isOpen={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        title="Toplu Silme"
+        size="sm"
+        icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
+              <i className="ri-delete-bin-line" /> {selectedIds.size} Kaydı Sil
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
+            <strong>{selectedIds.size}</strong> sağlık kaydı silinecek.
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
+        </div>
+      </Modal>
 
       {/* Modal */}
       <Modal

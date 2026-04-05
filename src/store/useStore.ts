@@ -268,7 +268,9 @@ export function useStore(
       'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar', 'is_izinleri',
     ] as const;
 
-    const results = await Promise.all(
+    // FIX 7: Use Promise.allSettled instead of Promise.all
+    // This ensures partial failures don't wipe all data — each table loads independently
+    const results = await Promise.allSettled(
       TABLES.map(table =>
         supabase
           .from(table)
@@ -278,42 +280,51 @@ export function useStore(
       ),
     );
 
+    // Helper: extract rows from settled result — returns empty array on failure
+    const getRows = <T>(settled: PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>): T[] => {
+      if (settled.status === 'rejected') {
+        console.error('[ISG] Table load rejected:', settled.reason);
+        return [];
+      }
+      const res = settled.value;
+      if (res.error) {
+        console.error('[ISG] Load error:', res.error);
+        return [];
+      }
+      return (res.data ?? []).map(row => row.data as T);
+    };
+
     const [
       firmaRes, personelRes, evrakRes, egitimRes,
       muayeneRes, uygRes, ekipmanRes, gorevRes, tutanakRes, isIzRes,
     ] = results;
-
-    const getRows = <T>(res: typeof firmaRes): T[] => {
-      if (res.error) { console.error('[ISG] Load error:', res.error); return []; }
-      return (res.data ?? []).map(row => row.data as T);
-    };
 
     const KAN: Record<string, string> = {
       'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-',
       'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-',
     };
 
-    setFirmalar(getRows<Firma>(firmaRes));
-    setPersoneller(getRows<Personel>(personelRes).map(p => ({
+    setFirmalar(getRows<Firma>(firmaRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
+    setPersoneller(getRows<Personel>(personelRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>).map(p => ({
       ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
     })));
-    setEvraklar(getRows<Evrak>(evrakRes).map(e => ({
+    setEvraklar(getRows<Evrak>(evrakRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>).map(e => ({
       ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
     })));
-    setEgitimler(getRows<Egitim>(egitimRes));
-    setMuayeneler(getRows<Muayene>(muayeneRes));
-    setUygunsuzluklar(getRows<Uygunsuzluk>(uygRes).map(u => {
+    setEgitimler(getRows<Egitim>(egitimRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
+    setMuayeneler(getRows<Muayene>(muayeneRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
+    setUygunsuzluklar(getRows<Uygunsuzluk>(uygRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>).map(u => {
       let durum = u.durum as string;
       if (durum === 'Kapatıldı') durum = 'Kapandı';
       if (durum === 'İncelemede') durum = 'Açık';
       return { ...u, durum: durum as UygunsuzlukStatus };
     }));
-    setEkipmanlar(getRows<Ekipman>(ekipmanRes));
-    setGorevler(getRows<Gorev>(gorevRes));
-    setTutanaklar(getRows<Tutanak>(tutanakRes));
-    setIsIzinleri(getRows<IsIzni>(isIzRes));
+    setEkipmanlar(getRows<Ekipman>(ekipmanRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
+    setGorevler(getRows<Gorev>(gorevRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
+    setTutanaklar(getRows<Tutanak>(tutanakRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
+    setIsIzinleri(getRows<IsIzni>(isIzRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
 
-    console.log(`[ISG] Data loaded ✓ firms=${firmaRes.data?.length ?? 0} personnel=${personelRes.data?.length ?? 0}`);
+    console.log(`[ISG] Data loaded ✓ firms=${firmaRes.status === 'fulfilled' ? (firmaRes.value.data?.length ?? 0) : 'ERR'} personnel=${personelRes.status === 'fulfilled' ? (personelRes.value.data?.length ?? 0) : 'ERR'}`);
   }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, setTutanaklar, setIsIzinleri]);
 
   // ── Public refresh function — called by UI refresh buttons ──
@@ -524,32 +535,61 @@ export function useStore(
     updatedItems.forEach(({ table, item }) => saveToDb(table, item));
   }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, saveToDb]);
 
-  const permanentDeleteFirma = useCallback((id: string) => {
+  const permanentDeleteFirma = useCallback(async (id: string) => {
+    // Snapshot all affected state for rollback
+    let snapshotFirmalar: Firma[] = [];
+    let snapshotPersoneller: Personel[] = [];
+    let snapshotEvraklar: Evrak[] = [];
+    let snapshotEgitimler: Egitim[] = [];
+    let snapshotMuayeneler: Muayene[] = [];
+    let snapshotUyg: Uygunsuzluk[] = [];
+    let snapshotEkipmanlar: Ekipman[] = [];
+    let snapshotGorevler: Gorev[] = [];
+
     let personelIds: string[] = [];
     let evrakIds: string[] = [];
     let egitimIds: string[] = [];
+    let muayeneIds: string[] = [];
     let uygIds: string[] = [];
     let ekipmanIds: string[] = [];
     let gorevIds: string[] = [];
 
-    setPersoneller(prev => { personelIds = prev.filter(p => p.firmaId === id).map(p => p.id); return prev.filter(p => p.firmaId !== id); });
-    setEvraklar(prev => { evrakIds = prev.filter(e => e.firmaId === id).map(e => e.id); return prev.filter(e => e.firmaId !== id); });
-    setEgitimler(prev => { egitimIds = prev.filter(e => e.firmaId === id).map(e => e.id); return prev.filter(e => e.firmaId !== id); });
-    setMuayeneler(prev => prev.filter(m => m.firmaId !== id));
-    setUygunsuzluklar(prev => { uygIds = prev.filter(u => u.firmaId === id).map(u => u.id); return prev.filter(u => u.firmaId !== id); });
-    setEkipmanlar(prev => { ekipmanIds = prev.filter(e => e.firmaId === id).map(e => e.id); return prev.filter(e => e.firmaId !== id); });
-    setGorevler(prev => { gorevIds = prev.filter(g => g.firmaId === id).map(g => g.id); return prev.filter(g => g.firmaId !== id); });
-    setFirmalar(prev => prev.filter(f => f.id !== id));
+    // Optimistic UI update — collect snapshots and IDs simultaneously
+    await Promise.all([
+      new Promise<void>(resolve => { _setFirmalar(prev => { snapshotFirmalar = prev; resolve(); return prev.filter(f => f.id !== id); }); }),
+      new Promise<void>(resolve => { _setPersoneller(prev => { snapshotPersoneller = prev; personelIds = prev.filter(p => p.firmaId === id).map(p => p.id); resolve(); return prev.filter(p => p.firmaId !== id); }); }),
+      new Promise<void>(resolve => { _setEvraklar(prev => { snapshotEvraklar = prev; evrakIds = prev.filter(e => e.firmaId === id).map(e => e.id); resolve(); return prev.filter(e => e.firmaId !== id); }); }),
+      new Promise<void>(resolve => { _setEgitimler(prev => { snapshotEgitimler = prev; egitimIds = prev.filter(e => e.firmaId === id).map(e => e.id); resolve(); return prev.filter(e => e.firmaId !== id); }); }),
+      new Promise<void>(resolve => { _setMuayeneler(prev => { snapshotMuayeneler = prev; muayeneIds = prev.filter(m => m.firmaId === id).map(m => m.id); resolve(); return prev.filter(m => m.firmaId !== id); }); }),
+      new Promise<void>(resolve => { _setUygunsuzluklar(prev => { snapshotUyg = prev; uygIds = prev.filter(u => u.firmaId === id).map(u => u.id); resolve(); return prev.filter(u => u.firmaId !== id); }); }),
+      new Promise<void>(resolve => { _setEkipmanlar(prev => { snapshotEkipmanlar = prev; ekipmanIds = prev.filter(e => e.firmaId === id).map(e => e.id); resolve(); return prev.filter(e => e.firmaId !== id); }); }),
+      new Promise<void>(resolve => { _setGorevler(prev => { snapshotGorevler = prev; gorevIds = prev.filter(g => g.firmaId === id).map(g => g.id); resolve(); return prev.filter(g => g.firmaId !== id); }); }),
+    ]);
 
-    deleteFromDb('firmalar', id);
-    deleteManyFromDb('personeller', personelIds);
-    deleteManyFromDb('evraklar', evrakIds);
-    deleteManyFromDb('egitimler', egitimIds);
-    deleteManyFromDb('muayeneler', []);
-    deleteManyFromDb('uygunsuzluklar', uygIds);
-    deleteManyFromDb('ekipmanlar', ekipmanIds);
-    deleteManyFromDb('gorevler', gorevIds);
-  }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, deleteFromDb, deleteManyFromDb]);
+    try {
+      await Promise.all([
+        dbDelete('firmalar', id),
+        dbDeleteMany('personeller', personelIds),
+        dbDeleteMany('evraklar', evrakIds),
+        dbDeleteMany('egitimler', egitimIds),
+        dbDeleteMany('muayeneler', muayeneIds),
+        dbDeleteMany('uygunsuzluklar', uygIds),
+        dbDeleteMany('ekipmanlar', ekipmanIds),
+        dbDeleteMany('gorevler', gorevIds),
+      ]);
+    } catch (err) {
+      console.error('[ISG] permanentDeleteFirma FAILED, rolling back:', err);
+      _setFirmalar(snapshotFirmalar);
+      _setPersoneller(snapshotPersoneller);
+      _setEvraklar(snapshotEvraklar);
+      _setEgitimler(snapshotEgitimler);
+      _setMuayeneler(snapshotMuayeneler);
+      _setUygunsuzluklar(snapshotUyg);
+      _setEkipmanlar(snapshotEkipmanlar);
+      _setGorevler(snapshotGorevler);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (firma): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, []);
 
   // ──────── PERSONEL ────────
   const addPersonel = useCallback((personel: Omit<Personel, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
@@ -592,10 +632,21 @@ export function useStore(
     if (updated) saveToDb('personeller', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setPersoneller, saveToDb]);
 
-  const permanentDeletePersonel = useCallback((id: string) => {
-    setPersoneller(prev => prev.filter(p => p.id !== id));
-    deleteFromDb('personeller', id);
-  }, [setPersoneller, deleteFromDb]);
+  const personellerRef = useRef<Personel[]>([]);
+  useEffect(() => { personellerRef.current = personeller; }, [personeller]);
+
+  const permanentDeletePersonel = useCallback(async (id: string) => {
+    const snapshot = personellerRef.current;
+    _setPersoneller(prev => prev.filter(p => p.id !== id));
+    try {
+      await dbDelete('personeller', id);
+    } catch (err) {
+      console.error('[ISG] permanentDeletePersonel FAILED, rolling back:', err);
+      _setPersoneller(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (personeller): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
 
   // ──────── EVRAK ────────
   const addEvrak = useCallback((evrak: Omit<Evrak, 'id' | 'olusturmaTarihi'>) => {
@@ -644,10 +695,21 @@ export function useStore(
     if (updated) saveToDb('evraklar', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setEvraklar, saveToDb]);
 
-  const permanentDeleteEvrak = useCallback((id: string) => {
-    setEvraklar(prev => prev.filter(e => e.id !== id));
-    deleteFromDb('evraklar', id);
-  }, [setEvraklar, deleteFromDb]);
+  const evraklarRef = useRef<Evrak[]>([]);
+  useEffect(() => { evraklarRef.current = evraklar; }, [evraklar]);
+
+  const permanentDeleteEvrak = useCallback(async (id: string) => {
+    const snapshot = evraklarRef.current;
+    _setEvraklar(prev => prev.filter(e => e.id !== id));
+    try {
+      await dbDelete('evraklar', id);
+    } catch (err) {
+      console.error('[ISG] permanentDeleteEvrak FAILED, rolling back:', err);
+      _setEvraklar(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (evraklar): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
 
   // ──────── EĞİTİM ────────
   const addEgitim = useCallback((egitim: Omit<Egitim, 'id' | 'olusturmaTarihi'>) => {
@@ -692,10 +754,21 @@ export function useStore(
     if (updated) saveToDb('egitimler', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setEgitimler, saveToDb]);
 
-  const permanentDeleteEgitim = useCallback((id: string) => {
-    setEgitimler(prev => prev.filter(e => e.id !== id));
-    deleteFromDb('egitimler', id);
-  }, [setEgitimler, deleteFromDb]);
+  const egitimlerRef = useRef<Egitim[]>([]);
+  useEffect(() => { egitimlerRef.current = egitimler; }, [egitimler]);
+
+  const permanentDeleteEgitim = useCallback(async (id: string) => {
+    const snapshot = egitimlerRef.current;
+    _setEgitimler(prev => prev.filter(e => e.id !== id));
+    try {
+      await dbDelete('egitimler', id);
+    } catch (err) {
+      console.error('[ISG] permanentDeleteEgitim FAILED, rolling back:', err);
+      _setEgitimler(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (egitimler): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
 
   // ──────── MUAYENE ────────
   const addMuayene = useCallback((muayene: Omit<Muayene, 'id' | 'olusturmaTarihi'>) => {
@@ -736,10 +809,21 @@ export function useStore(
     if (updated) saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setMuayeneler, saveToDb]);
 
-  const permanentDeleteMuayene = useCallback((id: string) => {
-    setMuayeneler(prev => prev.filter(m => m.id !== id));
-    deleteFromDb('muayeneler', id);
-  }, [setMuayeneler, deleteFromDb]);
+  const muayenelerRef = useRef<Muayene[]>([]);
+  useEffect(() => { muayenelerRef.current = muayeneler; }, [muayeneler]);
+
+  const permanentDeleteMuayene = useCallback(async (id: string) => {
+    const snapshot = muayenelerRef.current;
+    _setMuayeneler(prev => prev.filter(m => m.id !== id));
+    try {
+      await dbDelete('muayeneler', id);
+    } catch (err) {
+      console.error('[ISG] permanentDeleteMuayene FAILED, rolling back:', err);
+      _setMuayeneler(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (muayeneler): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
 
   // ──────── UYGUNSUZLUK ────────
   const addUygunsuzluk = useCallback(async (u: Omit<Uygunsuzluk, 'id' | 'olusturmaTarihi'>) => {
@@ -823,12 +907,26 @@ export function useStore(
     return newE;
   }, [setEkipmanlar, saveToDb]);
 
-  const updateEkipman = useCallback((id: string, updates: Partial<Ekipman>) => {
+  // Fields that denetci role is allowed to update (FIX 1: field-level restriction)
+  const DENETCI_ALLOWED_EKIPMAN_FIELDS = new Set([
+    'sonKontrolTarihi', 'sonrakiKontrolTarihi', 'durum', 'kontrolGecmisi', 'notlar',
+  ]);
+
+  const updateEkipman = useCallback((id: string, updates: Partial<Ekipman>, callerRole?: string) => {
     const { dosyaVeri: _ignored, ...rest } = updates as Partial<Ekipman> & { dosyaVeri?: string };
+
+    // FIX 1: If caller is denetci, only allow whitelisted fields
+    let safeRest = rest;
+    if (callerRole === 'denetci') {
+      safeRest = Object.fromEntries(
+        Object.entries(rest).filter(([key]) => DENETCI_ALLOWED_EKIPMAN_FIELDS.has(key))
+      ) as Partial<Ekipman>;
+    }
+
     let updated: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
-      updated = { ...e, ...rest };
+      updated = { ...e, ...safeRest };
       return updated;
     }));
     if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
@@ -855,10 +953,37 @@ export function useStore(
     if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setEkipmanlar, saveToDb]);
 
-  const permanentDeleteEkipman = useCallback((id: string) => {
-    setEkipmanlar(prev => prev.filter(e => e.id !== id));
-    deleteFromDb('ekipmanlar', id);
-  }, [setEkipmanlar, deleteFromDb]);
+  const ekipmanlarRef = useRef<Ekipman[]>([]);
+  useEffect(() => { ekipmanlarRef.current = ekipmanlar; }, [ekipmanlar]);
+
+  const permanentDeleteEkipman = useCallback(async (id: string) => {
+    const snapshot = ekipmanlarRef.current;
+    _setEkipmanlar(prev => prev.filter(e => e.id !== id));
+    try {
+      await dbDelete('ekipmanlar', id);
+      console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
+    } catch (err) {
+      console.error('[ISG] permanentDeleteEkipman FAILED, rolling back:', err);
+      _setEkipmanlar(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
+
+  const permanentDeleteEkipmanMany = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const snapshot = ekipmanlarRef.current;
+    _setEkipmanlar(prev => prev.filter(e => !ids.includes(e.id)));
+    try {
+      await dbDeleteMany('ekipmanlar', ids);
+      console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
+    } catch (err) {
+      console.error('[ISG] permanentDeleteEkipmanMany FAILED, rolling back:', err);
+      _setEkipmanlar(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
 
   // ──────── GÖREV ────────
   const addGorev = useCallback((g: Omit<Gorev, 'id' | 'olusturmaTarihi'>) => {
@@ -890,7 +1015,21 @@ export function useStore(
     const id = genId();
     const { dosyaVeri: _ignored, ...rest } = t as Tutanak & { dosyaVeri?: string };
     const rpcNo = await generateRecordNoFromDB('tutanak');
-    const tutanakNo = rpcNo ?? generateTutanakNo(tutRef.current);
+    // Fallback: fetch fresh count from DB to avoid stale-ref race condition
+    let tutanakNo: string;
+    if (rpcNo) {
+      tutanakNo = rpcNo;
+    } else {
+      // Fresh fetch from DB to avoid stale tutRef race condition
+      const orgId = orgIdRef.current;
+      if (orgId) {
+        const { data } = await supabase.from('tutanaklar').select('data').eq('organization_id', orgId);
+        const freshList = (data ?? []).map(r => r.data as { tutanakNo: string });
+        tutanakNo = generateTutanakNo(freshList);
+      } else {
+        tutanakNo = generateTutanakNo(tutRef.current);
+      }
+    }
     const newT: Tutanak = { ...rest, id, tutanakNo, olusturmaTarihi: now, guncellemeTarihi: now };
     setTutanaklar(prev => [newT, ...prev]);
     saveToDb('tutanaklar', newT as unknown as { id: string } & Record<string, unknown>);
@@ -930,10 +1069,21 @@ export function useStore(
     if (updated) saveToDb('tutanaklar', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setTutanaklar, saveToDb]);
 
-  const permanentDeleteTutanak = useCallback((id: string) => {
-    setTutanaklar(prev => prev.filter(t => t.id !== id));
-    deleteFromDb('tutanaklar', id);
-  }, [setTutanaklar, deleteFromDb]);
+  const tutanaklarRef2 = useRef<Tutanak[]>([]);
+  useEffect(() => { tutanaklarRef2.current = tutanaklar; }, [tutanaklar]);
+
+  const permanentDeleteTutanak = useCallback(async (id: string) => {
+    const snapshot = tutanaklarRef2.current;
+    _setTutanaklar(prev => prev.filter(t => t.id !== id));
+    try {
+      await dbDelete('tutanaklar', id);
+    } catch (err) {
+      console.error('[ISG] permanentDeleteTutanak FAILED, rolling back:', err);
+      _setTutanaklar(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (tutanaklar): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
 
   // ──────── İŞ İZNİ ────────
   const addIsIzni = useCallback(async (iz: Omit<IsIzni, 'id' | 'izinNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
@@ -980,11 +1130,22 @@ export function useStore(
     if (updated) saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setIsIzinleri, saveToDb]);
 
-  const permanentDeleteIsIzni = useCallback((id: string) => {
-    setIsIzinleri(prev => prev.filter(iz => iz.id !== id));
-    deleteFromDb('is_izinleri', id);
-    logFnRef.current?.('is_izni_perm_deleted', 'İş İzinleri', id, undefined, 'İş izni kalıcı silindi.');
-  }, [setIsIzinleri, deleteFromDb]);
+  const isIzinleriRef2 = useRef<IsIzni[]>([]);
+  useEffect(() => { isIzinleriRef2.current = isIzinleri; }, [isIzinleri]);
+
+  const permanentDeleteIsIzni = useCallback(async (id: string) => {
+    const snapshot = isIzinleriRef2.current;
+    _setIsIzinleri(prev => prev.filter(iz => iz.id !== id));
+    try {
+      await dbDelete('is_izinleri', id);
+      logFnRef.current?.('is_izni_perm_deleted', 'İş İzinleri', id, undefined, 'İş izni kalıcı silindi.');
+    } catch (err) {
+      console.error('[ISG] permanentDeleteIsIzni FAILED, rolling back:', err);
+      _setIsIzinleri(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (is_izinleri): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
 
   // ──────── LOGO — Supabase Storage ────────
   /**
@@ -1048,7 +1209,7 @@ export function useStore(
     addEgitim, updateEgitim, deleteEgitim, restoreEgitim, permanentDeleteEgitim,
     addMuayene, updateMuayene, deleteMuayene, restoreMuayene, permanentDeleteMuayene,
     addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, getUygunsuzlukPhoto, setUygunsuzlukPhoto,
-    addEkipman, updateEkipman, deleteEkipman, restoreEkipman, permanentDeleteEkipman,
+    addEkipman, updateEkipman, deleteEkipman, restoreEkipman, permanentDeleteEkipman, permanentDeleteEkipmanMany,
     addGorev, updateGorev, deleteGorev,
     addTutanak, updateTutanak, deleteTutanak, restoreTutanak, permanentDeleteTutanak,
     addIsIzni, updateIsIzni, deleteIsIzni, restoreIsIzni, permanentDeleteIsIzni,

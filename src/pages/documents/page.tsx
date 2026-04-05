@@ -52,6 +52,10 @@ export default function EvraklarPage() {
   const [refreshing, setRefreshing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Toplu silme state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
   // PersonelDetayModal'dan "Evrak Ekle" butonuyla gelindiğinde pre-fill
   useEffect(() => {
     const state = location.state as { personelId?: string; firmaId?: string; autoOpen?: boolean } | null;
@@ -78,6 +82,30 @@ export default function EvraklarPage() {
     }
   }, [quickCreate, setQuickCreate]);
 
+  // Bildirimden gelen kayıt açma
+  useEffect(() => {
+    const handleOpenRecord = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { module: string; recordId: string };
+      if (detail.module !== 'evraklar') return;
+      const evrak = evraklar.find(ev => ev.id === detail.recordId);
+      if (evrak) openEdit(evrak);
+    };
+    window.addEventListener('isg_open_record', handleOpenRecord);
+    // Sayfa yüklenince localStorage'dan da kontrol et
+    try {
+      const saved = localStorage.getItem('isg_open_record');
+      if (saved) {
+        const { module, recordId, ts } = JSON.parse(saved);
+        if (module === 'evraklar' && recordId && Date.now() - ts < 5000) {
+          const evrak = evraklar.find(ev => ev.id === recordId);
+          if (evrak) { openEdit(evrak); localStorage.removeItem('isg_open_record'); }
+        }
+      }
+    } catch { /* ignore */ }
+    return () => window.removeEventListener('isg_open_record', handleOpenRecord);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evraklar]);
+
   const filtPersonel = useMemo(() => {
     if (!form.firmaId) return [];
     return personeller.filter(p => p.firmaId === form.firmaId && !p.silinmis);
@@ -102,6 +130,21 @@ export default function EvraklarPage() {
       const tb = b.olusturmaTarihi ?? '';
       return tb.localeCompare(ta);
     }), [evraklarWithDurum, search, firmaFilter, statusFilter, turFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every(e => selected.has(e.id));
+  const toggleAll = () => allSelected ? setSelected(new Set()) : setSelected(new Set(filtered.map(e => e.id)));
+  const toggleOne = (id: string) => setSelected(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const handleBulkDelete = () => {
+    selected.forEach(id => deleteEvrak(id));
+    addToast(`${selected.size} evrak silindi.`, 'info');
+    setSelected(new Set());
+    setBulkDeleteConfirm(false);
+  };
 
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
   const getPersonelAd = (id?: string) => id ? (personeller.find(p => p.id === id)?.adSoyad || '—') : 'Firma Evrakı';
@@ -303,6 +346,23 @@ export default function EvraklarPage() {
         </div>
       </div>
 
+      {/* Toplu seçim aksiyonları */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <span className="text-sm font-semibold" style={{ color: '#F87171' }}>{selected.size} evrak seçildi</span>
+          <button
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
+            <i className="ri-delete-bin-line" /> Seçilenleri Sil
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+            Seçimi Kaldır
+          </button>
+        </div>
+      )}
+
       {/* ── Table ── */}
       {filtered.length === 0 ? (
         <div className="rounded-xl p-14 flex flex-col items-center text-center isg-card">
@@ -319,6 +379,9 @@ export default function EvraklarPage() {
             <table className="w-full table-premium">
               <thead>
                 <tr>
+                  <th className="w-10 text-center">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                  </th>
                   <th className="text-left">Evrak Adı / Tür</th>
                   <th className="text-left hidden md:table-cell">Firma</th>
                   <th className="text-left hidden lg:table-cell">Personel</th>
@@ -329,7 +392,10 @@ export default function EvraklarPage() {
               </thead>
               <tbody>
                 {filtered.map(ev => (
-                  <tr key={ev.id}>
+                  <tr key={ev.id} style={{ background: selected.has(ev.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                    <td className="text-center">
+                      <input type="checkbox" checked={selected.has(ev.id)} onChange={() => toggleOne(ev.id)} className="cursor-pointer" />
+                    </td>
                     <td>
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
@@ -531,6 +597,29 @@ export default function EvraklarPage() {
           <p className="text-xs" style={{ color: '#94A3B8' }}>Evrak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
+
+      {/* Toplu Silme Onay Modal */}
+      <Modal open={bulkDeleteConfirm} onClose={() => setBulkDeleteConfirm(false)} title="Toplu Silme Onayı" size="sm" icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary">İptal</button>
+            <button onClick={handleBulkDelete} className="btn-danger">
+              <i className="ri-delete-bin-line" /> {selected.size} Evrakı Sil
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
+            <strong>{selected.size}</strong> evrak çöp kutusuna taşınacak.
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Çöp kutusundan geri yükleyebilirsiniz.</p>
+        </div>
+      </Modal>
+
       {/* Bulk Upload Modal */}
       <BulkEvrakUpload open={bulkOpen} onClose={() => setBulkOpen(false)} />
     </div>

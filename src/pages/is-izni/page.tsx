@@ -77,6 +77,12 @@ export default function IsIzniPage() {
   const [pendingBelge, setPendingBelge] = useState<File | null>(null);
   const evrakFileRef = useRef<HTMLInputElement>(null);
   const formFileRef = useRef<HTMLInputElement>(null);
+  // FIX 4: useRef lock to prevent double-click duplicate submissions
+  const submittingRef = useRef<boolean>(false);
+
+  // Toplu silme state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   const aktivFirmalar = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
 
@@ -109,6 +115,21 @@ export default function IsIzniPage() {
       })
       .sort((a, b) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? ''));
   }, [isIzinleri, firmalar, search, tipFilter, durumFilter, firmaFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every(iz => selected.has(iz.id));
+  const toggleAll = () => allSelected ? setSelected(new Set()) : setSelected(new Set(filtered.map(iz => iz.id)));
+  const toggleOne = (id: string) => setSelected(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const handleBulkDelete = () => {
+    selected.forEach(id => deleteIsIzni(id));
+    addToast(`${selected.size} iş izni silindi.`, 'info');
+    setSelected(new Set());
+    setBulkDeleteConfirm(false);
+  };
 
   const stats = useMemo(() => ({
     total: isIzinleri.length,
@@ -153,35 +174,60 @@ export default function IsIzniPage() {
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  // FIX 4: Async handleSave with proper await for record creation
+  const handleSave = async () => {
     if (!form.aciklama.trim()) { addToast('Açıklama zorunludur.', 'error'); return; }
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.baslamaTarihi) { addToast('Başlama tarihi zorunludur.', 'error'); return; }
+    // FIX 4: Immediate ref lock — prevents double-click before state update
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     const { selectedCalisanIds: _ids, ...saveData } = form;
     const orgId = org?.id ?? 'unknown';
 
-    if (editId) {
-      updateIsIzni(editId, saveData);
-      if (pendingBelge) {
-        uploadFileToStorage(pendingBelge, orgId, 'is-izni', editId).then(url => {
-          if (url) updateIsIzni(editId, { belgeDosyaUrl: url });
-        });
+    try {
+      if (editId) {
+        updateIsIzni(editId, saveData);
+        if (pendingBelge) {
+          try {
+            const url = await uploadFileToStorage(pendingBelge, orgId, 'is-izni', editId);
+            if (url) updateIsIzni(editId, { belgeDosyaUrl: url });
+          } catch (err) {
+            addToast('Belge yüklenirken hata oluştu.', 'error');
+          }
+        }
+        addToast('İş izni güncellendi.', 'success');
+        setShowModal(false);
+        setPendingBelge(null);
+      } else {
+        // FIX 4: Await the record creation to get the actual ID
+        const newIz = await addIsIzni(saveData);
+        if (!newIz?.id) {
+          addToast('İş izni oluşturulurken hata oluştu.', 'error');
+          return;
+        }
+        
+        // FIX 4: Only upload AFTER we have the confirmed record ID
+        if (pendingBelge) {
+          try {
+            const url = await uploadFileToStorage(pendingBelge, orgId, 'is-izni', newIz.id);
+            if (url) {
+              updateIsIzni(newIz.id, { belgeDosyaUrl: url });
+            } else {
+              addToast('Belge yüklenemedi.', 'error');
+            }
+          } catch (err) {
+            addToast('Belge yüklenirken hata oluştu.', 'error');
+          }
+        }
+        setPendingBelge(null);
+        setShowModal(false);
+        setSavedIsIzni(newIz);
+        setShowBelgeModal(true);
       }
-      addToast('İş izni güncellendi.', 'success');
-      setShowModal(false);
-      setPendingBelge(null);
-    } else {
-      const newIz = addIsIzni(saveData);
-      if (pendingBelge && newIz?.id) {
-        uploadFileToStorage(pendingBelge, orgId, 'is-izni', newIz.id).then(url => {
-          if (url) updateIsIzni(newIz.id, { belgeDosyaUrl: url });
-        });
-      }
-      setPendingBelge(null);
-      setShowModal(false);
-      setSavedIsIzni(newIz);
-      setShowBelgeModal(true);
+    } finally {
+      submittingRef.current = false;
     }
   };
 
@@ -362,6 +408,23 @@ export default function IsIzniPage() {
         )}
       </div>
 
+      {/* Toplu seçim aksiyonları */}
+      {selected.size > 0 && canDelete && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <span className="text-sm font-semibold" style={{ color: '#F87171' }}>{selected.size} iş izni seçildi</span>
+          <button
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
+            <i className="ri-delete-bin-line" /> Seçilenleri Sil
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+            Seçimi Kaldır
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="isg-card rounded-xl py-20 text-center">
@@ -378,6 +441,11 @@ export default function IsIzniPage() {
             <table className="table-premium w-full">
               <thead>
                 <tr>
+                  {canDelete && (
+                    <th className="w-10 text-center">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                    </th>
+                  )}
                   <th className="text-left">İzin No</th>
                   <th className="text-left">Tip</th>
                   <th className="text-left hidden md:table-cell">Firma / Bölüm</th>
@@ -393,7 +461,12 @@ export default function IsIzniPage() {
                   const tip = TIP_CONFIG[iz.tip] || { color: '#64748B', bg: 'rgba(100,116,139,0.12)', icon: 'ri-question-line' };
                   const dur = DURUM_CONFIG[iz.durum] || { color: '#64748B', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.25)', icon: 'ri-question-line' };
                   return (
-                    <tr key={iz.id}>
+                    <tr key={iz.id} style={{ background: selected.has(iz.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                      {canDelete && (
+                        <td className="text-center">
+                          <input type="checkbox" checked={selected.has(iz.id)} onChange={() => toggleOne(iz.id)} className="cursor-pointer" />
+                        </td>
+                      )}
                       <td><span className="text-sm font-mono font-semibold" style={{ color: '#60A5FA' }}>{iz.izinNo}</span></td>
                       <td>
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: tip.bg, color: tip.color }}>
@@ -954,6 +1027,33 @@ export default function IsIzniPage() {
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Bu iş iznini silmek istediğinizden emin misiniz?</p>
           <p className="text-xs" style={{ color: '#94A3B8' }}>İş izni çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
+        </div>
+      </Modal>
+
+      {/* Toplu Silme Onay Modal */}
+      <Modal
+        open={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        title="Toplu Silme Onayı"
+        size="sm"
+        icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
+              <i className="ri-delete-bin-line" /> {selected.size} İş İznini Sil
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
+            <strong>{selected.size}</strong> iş izni çöp kutusuna taşınacak.
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Çöp kutusundan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
 

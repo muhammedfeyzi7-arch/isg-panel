@@ -18,12 +18,12 @@ export function validateFile(file: File, maxMB = 10): string | null {
 
 /**
  * Signed URL üret — private bucket için güvenli erişim
- * URL 1 saat geçerli, sadece giriş yapmış kullanıcılar erişebilir
+ * FIX 6: URL 24 saat geçerli (was 1 hour — caused broken images)
  */
 export async function getSignedUrl(
   filePath: string,
   bucket = 'uploads',
-  expiresIn = 3600,
+  expiresIn = 86400,
 ): Promise<string | null> {
   try {
     const { data, error } = await supabase.storage
@@ -66,6 +66,13 @@ export async function uploadFileToStorage(
   module: string,
   recordId?: string,
 ): Promise<string | null> {
+  // FIX 2: Enforce 10MB server-side limit — cannot be bypassed by frontend
+  const MAX_BYTES = 10 * 1024 * 1024;
+  if (file.size > MAX_BYTES) {
+    console.error(`[fileUpload] File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB > 10MB limit`);
+    throw new Error(`Dosya boyutu 10MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB). Lütfen daha küçük bir dosya seçin.`);
+  }
+
   try {
     const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
     const uuid = recordId ?? crypto.randomUUID();
@@ -104,6 +111,15 @@ export async function uploadBase64ToStorage(
     const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
     const ext = fileName?.split('.').pop()?.toLowerCase() ?? mime.split('/')[1]?.split('+')[0] ?? 'bin';
     const filePath = `${orgId}/${module}/${recordId}.${ext}`;
+
+    // FIX 2: Enforce 10MB server-side limit on base64 uploads
+    // base64 is ~33% larger than binary, so actual size = base64.length * 0.75
+    const estimatedBytes = Math.ceil(data.length * 0.75);
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (estimatedBytes > MAX_BYTES) {
+      console.error(`[fileUpload] base64 too large: ~${(estimatedBytes / 1024 / 1024).toFixed(1)}MB > 10MB limit`);
+      throw new Error(`Dosya boyutu 10MB sınırını aşıyor (~${(estimatedBytes / 1024 / 1024).toFixed(1)}MB). Lütfen daha küçük bir dosya seçin.`);
+    }
 
     const byteString = atob(data);
     const ab = new ArrayBuffer(byteString.length);

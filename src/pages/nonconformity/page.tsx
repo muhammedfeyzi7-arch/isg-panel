@@ -48,6 +48,7 @@ export default function UygunsuzluklarPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (quickCreate === 'uygunsuzluklar') {
@@ -108,6 +109,13 @@ export default function UygunsuzluklarPage() {
     if (kapatmaRecord?.id === deleteId) setKapatmaRecord(null);
     addToast('Uygunsuzluk silindi.', 'success');
     setDeleteId(null);
+  };
+
+  const handleBulkDelete = () => {
+    Array.from(selected).forEach(id => deleteUygunsuzluk(id));
+    addToast(`${selected.size} kayıt silindi.`, 'success');
+    setSelected(new Set());
+    setBulkDeleteConfirm(false);
   };
 
   const resetFilters = () => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); setDateFrom(''); setDateTo(''); };
@@ -277,6 +285,15 @@ export default function UygunsuzluklarPage() {
               <button onClick={() => setShowReport(true)} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap" style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8' }}>
                 <i className="ri-file-chart-line mr-1" />Seçilenlerden Rapor
               </button>
+              {canDelete && (
+                <button
+                  onClick={() => setBulkDeleteConfirm(true)}
+                  className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+                  style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                >
+                  <i className="ri-delete-bin-line mr-1" />Seçilenleri Sil
+                </button>
+              )}
               <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
                 Seçimi Kaldır
               </button>
@@ -419,6 +436,32 @@ export default function UygunsuzluklarPage() {
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Bu uygunsuzluk kaydını silmek istediğinizden emin misiniz?</p>
           <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz. Tüm fotoğraflar da silinecektir.</p>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        title="Toplu Silme"
+        size="sm"
+        icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
+              <i className="ri-delete-bin-line" /> {selected.size} Kaydı Sil
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+            <strong>{selected.size}</strong> saha denetim kaydı silinecek.
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
         </div>
       </Modal>
     </div>

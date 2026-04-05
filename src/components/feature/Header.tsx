@@ -44,7 +44,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
     activeModule, setActiveModule, sidebarCollapsed, setSidebarCollapsed,
     currentUser, setQuickCreate, theme, toggleTheme,
     bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
-    firmalar, personeller, evraklar, tutanaklar,
+    firmalar, personeller, evraklar, tutanaklar, egitimler, muayeneler, ekipmanlar,
     refreshData, dataLoading,
   } = useApp();
 
@@ -154,6 +154,29 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const dropdownItemHover = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)';
 
   const displayBildirimler = bildirimler.slice(0, 10);
+
+  // Bildirime tıklayınca ilgili modüle git
+  const handleBildirimClick = (b: typeof bildirimler[0]) => {
+    bildirimOku(b.id);
+    setNotifOpen(false);
+    const targetModule = b.module || 'dashboard';
+    setActiveModule(targetModule);
+    // recordId varsa ilgili modülün açması için sinyal gönder
+    if (b.recordId) {
+      try {
+        localStorage.setItem('isg_open_record', JSON.stringify({
+          module: targetModule,
+          recordId: b.recordId,
+          tip: b.tip,
+          ts: Date.now(),
+        }));
+        // Custom event ile aynı anda açık olan sayfayı tetikle
+        window.dispatchEvent(new CustomEvent('isg_open_record', {
+          detail: { module: targetModule, recordId: b.recordId, tip: b.tip },
+        }));
+      } catch { /* ignore */ }
+    }
+  };
 
   const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; badge: string; badgeBg: string }> = {
     evrak_surecek:           { icon: 'ri-file-warning-line',      color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', badge: 'Evrak',          badgeBg: 'rgba(148,163,184,0.12)' },
@@ -436,7 +459,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                           }}
                           onMouseEnter={e => { e.currentTarget.style.background = dropdownItemHover; }}
                           onMouseLeave={e => { e.currentTarget.style.background = !b.okundu ? (isDark ? 'rgba(59,130,246,0.03)' : 'rgba(59,130,246,0.02)') : 'transparent'; }}
-                          onClick={() => bildirimOku(b.id)}
+                          onClick={() => handleBildirimClick(b)}
                         >
                           <div className="flex items-start gap-3">
                             <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 mt-0.5" style={{ background: cfg.bg }}>
@@ -452,6 +475,12 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                                 )}
                               </div>
                               <p className="text-[11px] leading-relaxed" style={{ color: '#64748B' }}>{b.detay}</p>
+                              {b.module && (
+                                <p className="text-[10px] mt-1 flex items-center gap-1 font-semibold" style={{ color: '#3B82F6' }}>
+                                  <i className="ri-arrow-right-circle-line text-[10px]" />
+                                  {b.module === 'evraklar' ? 'Evrak Takibi' : b.module === 'ekipmanlar' ? 'Ekipmanlar' : b.module === 'egitimler' ? 'Eğitimler' : b.module === 'muayeneler' ? 'Sağlık' : 'Panele Git'} sayfasına git
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>

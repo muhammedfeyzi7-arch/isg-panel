@@ -25,6 +25,8 @@ export interface Bildirim {
   tarih: string;
   okundu: boolean;
   kalanGun: number;
+  module: string;
+  recordId?: string;
 }
 
 export type Theme = 'dark' | 'light';
@@ -323,6 +325,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           tarih: e.gecerlilikTarihi!,
           okundu: okunanlar.has(`evrak_surecek_${e.id}`),
           kalanGun,
+          module: 'evraklar',
+          recordId: e.id,
         });
       } else if (d < today) {
         result.push({
@@ -333,6 +337,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           tarih: e.gecerlilikTarihi!,
           okundu: okunanlar.has(`evrak_dolmus_${e.id}`),
           kalanGun,
+          module: 'evraklar',
+          recordId: e.id,
         });
       }
     });
@@ -352,6 +358,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           tarih: new Date().toISOString().split('T')[0],
           okundu: okunanlar.has(`ekipman_uygunsuz_${ek.id}`),
           kalanGun: -999, // kritik flag
+          module: 'ekipmanlar',
+          recordId: ek.id,
         });
         return; // tarih bazlı kontrol yapma
       }
@@ -369,6 +377,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tarih: ek.sonrakiKontrolTarihi,
         okundu: okunanlar.has(`ekipman_${ek.id}`),
         kalanGun,
+        module: 'ekipmanlar',
+        recordId: ek.id,
       });
     });
 
@@ -398,6 +408,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tarih: tarihStr,
         okundu: okunanlar.has(`egitim_${eg.id}`),
         kalanGun,
+        module: 'egitimler',
+        recordId: eg.id,
       });
     });
 
@@ -419,6 +431,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tarih: tarihStr!,
         okundu: okunanlar.has(`saglik_${m.id}`),
         kalanGun,
+        module: 'muayeneler',
+        recordId: m.id,
       });
     });
 
@@ -440,6 +454,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           tarih: f.sonrakiKontrolTarihi,
           okundu: okunanlar.has(`kontrol_formu_gecikti_${f.id}`),
           kalanGun,
+          module: 'dashboard',
         });
       } else if (kalanGun <= 30) {
         result.push({
@@ -450,6 +465,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           tarih: f.sonrakiKontrolTarihi,
           okundu: okunanlar.has(`kontrol_formu_yaklasan_${f.id}`),
           kalanGun,
+          module: 'dashboard',
         });
       }
     });
@@ -463,22 +479,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [bildirimler],
   );
 
+  // FIX: Cap localStorage bildirim IDs at 500 to prevent QuotaExceededError
+  // After 1 year of use, unlimited IDs would hit the 5MB localStorage limit
+  const MAX_OKUNAN_IDS = 500;
+  const persistOkunanlar = useCallback((ids: Set<string>) => {
+    try {
+      // Keep only the most recent MAX_OKUNAN_IDS entries
+      const arr = [...ids].slice(-MAX_OKUNAN_IDS);
+      localStorage.setItem('isg_okunan_bildirimler', JSON.stringify(arr));
+    } catch { /* ignore QuotaExceededError */ }
+  }, []);
+
   const bildirimOku = useCallback((id: string) => {
     setOkunanlar(prev => {
       const next = new Set([...prev, id]);
-      try { localStorage.setItem('isg_okunan_bildirimler', JSON.stringify([...next])); } catch { /* ignore */ }
+      persistOkunanlar(next);
       return next;
     });
-  }, []);
+  }, [persistOkunanlar]);
 
   const tumunuOku = useCallback(() => {
     const ids = bildirimler.map(b => b.id);
     setOkunanlar(prev => {
       const next = new Set([...prev, ...ids]);
-      try { localStorage.setItem('isg_okunan_bildirimler', JSON.stringify([...next])); } catch { /* ignore */ }
+      persistOkunanlar(next);
       return next;
     });
-  }, [bildirimler]);
+  }, [bildirimler, persistOkunanlar]);
 
   const clearMustChangePassword = useCallback(async () => {
     await clearMustChangePw();

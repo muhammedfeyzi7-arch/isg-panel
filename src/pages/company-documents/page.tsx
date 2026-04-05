@@ -30,6 +30,8 @@ export default function FirmaEvraklariPage() {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -190,6 +192,22 @@ export default function FirmaEvraklariPage() {
     addToast(`${toDownload.length} dosya indirildi.`, 'success');
   };
 
+  // Toplu silme
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    let successCount = 0;
+    let errorCount = 0;
+    for (const id of Array.from(selectedIds)) {
+      const { error } = await deleteDocument(id);
+      if (error) { errorCount++; } else { successCount++; }
+    }
+    setBulkDeleting(false);
+    setBulkDeleteConfirm(false);
+    setSelectedIds(new Set());
+    if (successCount > 0) addToast(`${successCount} evrak silindi.`, 'success');
+    if (errorCount > 0) addToast(`${errorCount} evrak silinemedi.`, 'error');
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -283,6 +301,13 @@ export default function FirmaEvraklariPage() {
             {bulkDownloading ? 'İndiriliyor...' : 'Seçilenleri İndir'}
           </button>
           <button
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
+            <i className="ri-delete-bin-line" /> Seçilenleri Sil
+          </button>
+          <button
             onClick={() => setSelectedIds(new Set())}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
             style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}
@@ -362,6 +387,33 @@ export default function FirmaEvraklariPage() {
             <strong>"{deleteDoc?.title}"</strong> evrakını silmek istediğinizden emin misiniz?
           </p>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Bu işlem geri alınamaz.</p>
+        </div>
+      </Modal>
+
+      {/* Toplu Silme Onayı */}
+      <Modal
+        isOpen={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        title="Toplu Silme"
+        size="sm"
+        icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleBulkDelete} disabled={bulkDeleting} className="btn-danger whitespace-nowrap disabled:opacity-50">
+              {bulkDeleting ? <><i className="ri-loader-4-line animate-spin" /> Siliniyor...</> : <><i className="ri-delete-bin-line" /> {selectedIds.size} Evrakı Sil</>}
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+            <strong>{selectedIds.size}</strong> evrak kalıcı olarak silinecek.
+          </p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Bu işlem <strong className="text-red-400">geri alınamaz</strong>.</p>
         </div>
       </Modal>
     </div>

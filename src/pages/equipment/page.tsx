@@ -366,6 +366,11 @@ export default function EkipmanlarPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Toplu silme state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
   const handleRefresh = async () => {
     if (refreshing || dataLoading) return;
     setRefreshing(true);
@@ -381,6 +386,29 @@ export default function EkipmanlarPage() {
       setQuickCreate(null);
     }
   }, [quickCreate, setQuickCreate]);
+
+  // Bildirimden gelen kayıt açma
+  useEffect(() => {
+    const handleOpenRecord = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { module: string; recordId: string };
+      if (detail.module !== 'ekipmanlar') return;
+      const ekipman = ekipmanlar.find(ek => ek.id === detail.recordId);
+      if (ekipman) { setEditId(ekipman.id); setForm(ekipman as typeof defaultForm); setShowModal(true); }
+    };
+    window.addEventListener('isg_open_record', handleOpenRecord);
+    try {
+      const saved = localStorage.getItem('isg_open_record');
+      if (saved) {
+        const { module, recordId, ts } = JSON.parse(saved);
+        if (module === 'ekipmanlar' && recordId && Date.now() - ts < 5000) {
+          const ekipman = ekipmanlar.find(ek => ek.id === recordId);
+          if (ekipman) { setEditId(ekipman.id); setForm(ekipman as typeof defaultForm); setShowModal(true); localStorage.removeItem('isg_open_record'); }
+        }
+      }
+    } catch { /* ignore */ }
+    return () => window.removeEventListener('isg_open_record', handleOpenRecord);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ekipmanlar]);
 
   const filtered = useMemo(() => {
     return ekipmanlar
@@ -403,6 +431,21 @@ export default function EkipmanlarPage() {
         return tb.localeCompare(ta);
       });
   }, [ekipmanlar, firmalar, search, firmaFilter, statusFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every(e => selected.has(e.id));
+  const toggleAll = () => allSelected ? setSelected(new Set()) : setSelected(new Set(filtered.map(e => e.id)));
+  const toggleOne = (id: string) => setSelected(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const handleBulkDelete = () => {
+    selected.forEach(id => deleteEkipman(id));
+    addToast(`${selected.size} ekipman silindi.`, 'info');
+    setSelected(new Set());
+    setBulkDeleteConfirm(false);
+  };
 
   const aktifEkipmanlar = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
   const stats = useMemo(() => {
@@ -860,6 +903,23 @@ export default function EkipmanlarPage() {
         )}
       </div>
 
+      {/* Toplu seçim aksiyonları */}
+      {selected.size > 0 && canDelete && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <span className="text-sm font-semibold" style={{ color: '#F87171' }}>{selected.size} ekipman seçildi</span>
+          <button
+            onClick={() => setBulkDeleteConfirm(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
+            <i className="ri-delete-bin-line" /> Seçilenleri Sil
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+            Seçimi Kaldır
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="isg-card rounded-xl overflow-hidden">
         {filtered.length === 0 ? (
@@ -878,6 +938,11 @@ export default function EkipmanlarPage() {
             <table className="table-premium w-full">
               <thead>
                 <tr>
+                  {canDelete && (
+                    <th className="w-10 text-center">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                    </th>
+                  )}
                   <th>Ekipman Adı</th>
                   <th>Tür</th>
                   <th>Firma</th>
@@ -899,7 +964,12 @@ export default function EkipmanlarPage() {
                   // Dosya durumu: dosyaAdi var ama dosyaUrl yoksa "yüklenemedi"
                   const hasFileError = ekipman.dosyaAdi && !ekipman.dosyaUrl;
                   return (
-                    <tr key={ekipman.id}>
+                    <tr key={ekipman.id} style={{ background: selected.has(ekipman.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                      {canDelete && (
+                        <td className="text-center">
+                          <input type="checkbox" checked={selected.has(ekipman.id)} onChange={() => toggleOne(ekipman.id)} className="cursor-pointer" />
+                        </td>
+                      )}
                       <td>
                         <div>
                           <p className="font-semibold text-slate-200 text-sm">{ekipman.ad}</p>
@@ -1234,6 +1304,33 @@ export default function EkipmanlarPage() {
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu ekipmanı silmek istediğinizden emin misiniz?</p>
           <p className="text-xs" style={{ color: '#94A3B8' }}>Ekipman çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
+        </div>
+      </Modal>
+
+      {/* Toplu Silme Onay Modal */}
+      <Modal
+        isOpen={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        title="Toplu Silme Onayı"
+        size="sm"
+        icon="ri-delete-bin-2-line"
+        footer={
+          <>
+            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
+              <i className="ri-delete-bin-line" /> {selected.size} Ekipmanı Sil
+            </button>
+          </>
+        }
+      >
+        <div className="py-2">
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
+          </div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
+            <strong>{selected.size}</strong> ekipman çöp kutusuna taşınacak.
+          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Çöp kutusundan geri yükleyebilirsiniz.</p>
         </div>
       </Modal>
 
