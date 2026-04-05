@@ -8,6 +8,14 @@ import Modal from '../../components/base/Modal';
 import ImageUpload from '../nonconformity/components/ImageUpload';
 import type { Ekipman, EkipmanStatus, EkipmanSahaFoto, UygunsuzlukSeverity } from '../../types';
 
+// ── Kontrol Geçmişi tipi ──
+interface KontrolKayit {
+  tarih: string;
+  yapanKisi: string;
+  durum: EkipmanStatus;
+  notlar?: string;
+}
+
 const STATUS_CONFIG: Record<EkipmanStatus, {
   label: string; color: string; bg: string; border: string; icon: string;
   gradient: string; glowColor: string; heroGradient: string;
@@ -53,7 +61,7 @@ function getDaysUntil(dateStr: string): number {
 function KontrolModal({
   open, onClose, ekipmanAd, ekipmanId, onSaved,
 }: { open: boolean; onClose: () => void; ekipmanAd: string; ekipmanId: string; onSaved: () => void }) {
-  const { updateEkipman, addToast, currentUser } = useApp();
+  const { updateEkipman, ekipmanlar, addToast, currentUser } = useApp();
   const [durum, setDurum] = useState<EkipmanStatus>('Uygun');
   const [notlar, setNotlar] = useState('');
   const [sonrakiTarih, setSonrakiTarih] = useState('');
@@ -63,14 +71,28 @@ function KontrolModal({
     setSaving(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
+      const yapanKisi = currentUser.ad || 'Kullanıcı';
       const notlarVal = notlar.trim()
-        ? `[${today} - ${currentUser.ad || 'Kullanıcı'}] ${notlar.trim()}`
+        ? `[${today} - ${yapanKisi}] ${notlar.trim()}`
         : '';
+
+      // Mevcut kontrol geçmişini al ve yeni kaydı başa ekle
+      const mevcutEkipman = ekipmanlar.find(e => e.id === ekipmanId);
+      const mevcutGecmis: KontrolKayit[] = (mevcutEkipman as unknown as { kontrolGecmisi?: KontrolKayit[] })?.kontrolGecmisi ?? [];
+      const yeniKayit: KontrolKayit = {
+        tarih: new Date().toISOString(),
+        yapanKisi,
+        durum,
+        notlar: notlar.trim() || undefined,
+      };
+      const yeniGecmis = [yeniKayit, ...mevcutGecmis].slice(0, 50); // max 50 kayıt tut
+
       updateEkipman(ekipmanId, {
         durum,
         sonKontrolTarihi: today,
         ...(sonrakiTarih ? { sonrakiKontrolTarihi: sonrakiTarih } : {}),
         notlar: notlarVal,
+        ...(({ kontrolGecmisi: yeniGecmis }) as unknown as Partial<Ekipman>),
       });
       addToast('Kontrol kaydedildi.', 'success');
       onClose();
@@ -128,6 +150,148 @@ function KontrolModal({
           <label className="form-label">Notlar</label>
           <textarea value={notlar} onChange={e => setNotlar(e.target.value)} rows={3} maxLength={500} placeholder="Kontrol notları..." className="isg-input" />
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Kontrol Geçmişi Modal ──
+function KontrolGecmisiModal({
+  open, onClose, ekipmanId, ekipmanAd,
+}: { open: boolean; onClose: () => void; ekipmanId: string; ekipmanAd: string }) {
+  const [gecmis, setGecmis] = useState<KontrolKayit[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !ekipmanId) return;
+    setLoading(true);
+    supabase
+      .from('ekipmanlar')
+      .select('data')
+      .eq('id', ekipmanId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.data) {
+          const kayitlar: KontrolKayit[] = (data.data as unknown as { kontrolGecmisi?: KontrolKayit[] }).kontrolGecmisi ?? [];
+          setGecmis(kayitlar.slice(0, 10));
+        } else {
+          setGecmis([]);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [open, ekipmanId]);
+
+  const durumRenk: Record<EkipmanStatus, { color: string; bg: string; border: string; icon: string }> = {
+    'Uygun':       { color: '#34D399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.25)',  icon: 'ri-checkbox-circle-fill' },
+    'Uygun Değil': { color: '#F87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.25)', icon: 'ri-close-circle-fill' },
+    'Bakımda':     { color: '#FBBF24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.25)',  icon: 'ri-tools-fill' },
+    'Hurda':       { color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.25)', icon: 'ri-delete-bin-fill' },
+  };
+
+  return (
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      title="Kontrol Geçmişi"
+      size="sm"
+      icon="ri-history-line"
+      footer={
+        <button onClick={onClose} className="btn-secondary whitespace-nowrap w-full">Kapat</button>
+      }
+    >
+      <div>
+        {/* Ekipman adı */}
+        <div
+          className="px-3 py-2 rounded-xl mb-4"
+          style={{ background: 'rgba(51,65,85,0.3)', border: '1px solid rgba(51,65,85,0.4)' }}
+        >
+          <p className="text-xs" style={{ color: '#64748B' }}>Ekipman</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{ekipmanAd}</p>
+        </div>
+
+        {/* İçerik */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <div
+              className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor: 'rgba(52,211,153,0.3)', borderTopColor: '#34D399' }}
+            />
+            <p className="text-xs" style={{ color: '#475569' }}>Yükleniyor...</p>
+          </div>
+        ) : gecmis.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <div
+              className="w-12 h-12 flex items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(51,65,85,0.3)', border: '1px solid rgba(51,65,85,0.4)' }}
+            >
+              <i className="ri-history-line text-xl" style={{ color: '#475569' }} />
+            </div>
+            <p className="text-sm font-semibold" style={{ color: '#64748B' }}>Henüz kontrol yapılmamış</p>
+            <p className="text-xs text-center" style={{ color: '#334155' }}>
+              Bu ekipman için kayıtlı kontrol geçmişi bulunmuyor.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {gecmis.map((kayit, idx) => {
+              const dr = durumRenk[kayit.durum] ?? durumRenk['Uygun'];
+              const tarihObj = new Date(kayit.tarih);
+              const tarihStr = tarihObj.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+              const saatStr = tarihObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+              return (
+                <div
+                  key={idx}
+                  className="flex items-start gap-3 px-3 py-3 rounded-xl"
+                  style={{ background: 'rgba(15,23,42,0.5)', border: '1px solid rgba(51,65,85,0.3)' }}
+                >
+                  {/* Durum ikonu */}
+                  <div
+                    className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 mt-0.5"
+                    style={{ background: dr.bg, border: `1px solid ${dr.border}` }}
+                  >
+                    <i className={`${dr.icon} text-sm`} style={{ color: dr.color }} />
+                  </div>
+
+                  {/* Bilgiler */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-lg whitespace-nowrap"
+                        style={{ background: dr.bg, color: dr.color, border: `1px solid ${dr.border}` }}
+                      >
+                        {kayit.durum}
+                      </span>
+                      {idx === 0 && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-lg font-semibold whitespace-nowrap"
+                          style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }}
+                        >
+                          Son Kontrol
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <i className="ri-user-line text-xs" style={{ color: '#475569' }} />
+                      <p className="text-sm font-semibold truncate" style={{ color: '#CBD5E1' }}>{kayit.yapanKisi}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <i className="ri-calendar-line text-xs" style={{ color: '#475569' }} />
+                      <p className="text-xs" style={{ color: '#64748B' }}>{tarihStr} — {saatStr}</p>
+                    </div>
+                    {kayit.notlar && (
+                      <p
+                        className="text-xs mt-1.5 px-2 py-1.5 rounded-lg leading-relaxed"
+                        style={{ background: 'rgba(51,65,85,0.3)', color: '#94A3B8' }}
+                      >
+                        {kayit.notlar}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -422,6 +586,7 @@ export default function QrDetailPage() {
   const [showKontrol, setShowKontrol] = useState(false);
   const [showUygunsuzluk, setShowUygunsuzluk] = useState(false);
   const [showFoto, setShowFoto] = useState(false);
+  const [showGecmis, setShowGecmis] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const fetchedRef = useRef(false);
 
@@ -833,6 +998,37 @@ export default function QrDetailPage() {
                 <i className="ri-arrow-right-s-line text-lg" style={{ color: '#FBBF24' }} />
               </div>
             </button>
+
+            {/* Kontrol Geçmişi */}
+            <button
+              onClick={() => setShowGecmis(true)}
+              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl cursor-pointer transition-all active:scale-[0.98] text-left"
+              style={{
+                background: 'linear-gradient(135deg, rgba(148,163,184,0.08) 0%, rgba(100,116,139,0.03) 100%)',
+                border: '1px solid rgba(148,163,184,0.15)',
+              }}
+            >
+              <div
+                className="w-14 h-14 flex items-center justify-center rounded-2xl flex-shrink-0"
+                style={{
+                  background: 'rgba(148,163,184,0.12)',
+                  border: '1px solid rgba(148,163,184,0.2)',
+                  boxShadow: '0 4px 20px rgba(148,163,184,0.08)',
+                }}
+              >
+                <i className="ri-history-line text-2xl" style={{ color: '#94A3B8' }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-bold mb-0.5" style={{ color: '#94A3B8' }}>Kontrol Geçmişi</p>
+                <p className="text-xs leading-relaxed" style={{ color: '#475569' }}>Yapılan kontrolleri görüntüle</p>
+              </div>
+              <div
+                className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(148,163,184,0.08)' }}
+              >
+                <i className="ri-arrow-right-s-line text-lg" style={{ color: '#94A3B8' }} />
+              </div>
+            </button>
           </div>
         </div>
 
@@ -1073,6 +1269,13 @@ export default function QrDetailPage() {
         ekipmanAd={localEkipman.ad}
         ekipmanId={localEkipman.id}
         onUploaded={handleAfterSave}
+      />
+
+      <KontrolGecmisiModal
+        open={showGecmis}
+        onClose={() => setShowGecmis(false)}
+        ekipmanId={localEkipman.id}
+        ekipmanAd={localEkipman.ad}
       />
 
       {lightboxUrl && (
