@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
   const user = { id: userId, email: userEmail, user_metadata: userMetadata };
 
   try {
+    // Check for existing membership - but ALWAYS ensure role is admin for org creator
     const { data: existingMembership } = await supabase
       .from('user_organizations')
       .select('organization_id, role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
@@ -86,9 +87,29 @@ Deno.serve(async (req) => {
 
     if (existingMembership?.organizations) {
       const org = existingMembership.organizations as { id: string; name: string; invite_code: string };
+      
+      // IMPORTANT: If this user created the org, ensure they are admin
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('created_by')
+        .eq('id', org.id)
+        .maybeSingle();
+      
+      const isCreator = orgData?.created_by === user.id;
+      const shouldBeAdmin = isCreator || existingMembership.role === 'admin';
+      
+      // If creator but not admin, fix the role
+      if (isCreator && existingMembership.role !== 'admin') {
+        await supabase
+          .from('user_organizations')
+          .update({ role: 'admin' })
+          .eq('user_id', user.id)
+          .eq('organization_id', org.id);
+      }
+      
       return new Response(JSON.stringify({
         organization: org,
-        role: existingMembership.role ?? 'admin',
+        role: shouldBeAdmin ? 'admin' : (existingMembership.role ?? 'member'),
         is_active: existingMembership.is_active,
         must_change_password: existingMembership.must_change_password,
         display_name: existingMembership.display_name,
