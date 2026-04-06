@@ -71,14 +71,15 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = false }: SidebarProps) {
-  const { activeModule, setActiveModule, sidebarCollapsed, currentUser, firmalar, personeller, evraklar, org } = useApp();
+  const { activeModule, setActiveModule, sidebarCollapsed, currentUser, firmalar, personeller, evraklar, org, orgLoading } = useApp();
   const { logout } = useAuth();
   const [supportOpen, setSupportOpen] = useState(false);
 
-  const { orgLoading } = useApp();
   const userRole = org?.role ?? 'member';
-  // orgLoading sırasında tüm modüllere izin ver — yanlış kısıtlama olmasın
-  const allowedModules = orgLoading ? getAllowedModules('admin') : getAllowedModules(userRole);
+  // org yüklenene kadar (loading veya null) tüm modüllere izin ver — yanlış kısıtlama olmasın
+  const allowedModules = (orgLoading || !org) ? getAllowedModules('admin') : getAllowedModules(userRole);
+  
+  console.log('[Sidebar] orgLoading:', orgLoading, 'org?.role:', org?.role, 'userRole:', userRole, 'allowedModules count:', allowedModules.length);
   const roleInfo = ROLE_LABELS[userRole] ?? ROLE_LABELS.member;
 
   useEffect(() => {

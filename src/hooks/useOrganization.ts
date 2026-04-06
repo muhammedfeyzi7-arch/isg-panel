@@ -27,10 +27,12 @@ export function useOrganization(user: User | null) {
 
   const loadOrg = useCallback(async () => {
     if (!user) {
+      console.log('[ISG] loadOrg: no user');
       setOrg(null);
       setLoading(false);
       return;
     }
+    console.log('[ISG] loadOrg starting for user:', user.id);
     setLoading(true);
     setLoadError(null);
 
@@ -40,6 +42,65 @@ export function useOrganization(user: User | null) {
       setOrg(null);
       setLoading(false);
     }, 15000);
+
+    // Helper: create org directly via Supabase client (fallback when edge function fails)
+    const createOrgDirectly = async (): Promise<boolean> => {
+      try {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        const emailPrefix = user.email?.split('@')[0] ?? 'kullanici';
+        const orgName = emailPrefix.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim() || 'ISG Firması';
+
+        const { data: newOrg, error: orgError } = await supabase
+          .from('organizations')
+          .insert({ name: orgName, invite_code: inviteCode, created_by: user.id })
+          .select()
+          .maybeSingle();
+
+        if (orgError || !newOrg) {
+          console.error('[ISG] createOrgDirectly: org insert failed:', orgError?.message);
+          return false;
+        }
+
+        const { error: memberError } = await supabase
+          .from('user_organizations')
+          .insert({
+            user_id: user.id,
+            organization_id: newOrg.id,
+            role: 'admin',
+            display_name: emailPrefix,
+            email: user.email ?? '',
+            is_active: true,
+            must_change_password: false,
+          });
+
+        if (memberError) {
+          console.error('[ISG] createOrgDirectly: member insert failed:', memberError.message);
+          return false;
+        }
+
+        await supabase.from('app_data').upsert(
+          { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
+          { onConflict: 'organization_id' },
+        );
+
+        console.log('[ISG] createOrgDirectly: org created successfully with admin role');
+        setOrg({
+          id: newOrg.id,
+          name: newOrg.name,
+          invite_code: newOrg.invite_code,
+          role: 'admin',
+          isActive: true,
+          mustChangePassword: false,
+          displayName: emailPrefix,
+          email: user.email ?? undefined,
+        });
+        return true;
+      } catch (e) {
+        console.error('[ISG] createOrgDirectly exception:', e);
+        return false;
+      }
+    };
 
     // Helper: load/create via edge function (uses service role key — bypasses RLS, auto-creates org if needed)
     const loadViaEdgeFunction = async (): Promise<boolean> => {
@@ -73,6 +134,7 @@ export function useOrganization(user: User | null) {
           if (resData.created) {
             console.log('[ISG] New org auto-created by edge function:', resData.organization.id);
           }
+          console.log('[ISG] Edge function returned role:', resData.role, 'setting org with role:', resData.role ?? 'admin');
           setOrg({
             id: resData.organization.id,
             name: resData.organization.name,
@@ -83,6 +145,7 @@ export function useOrganization(user: User | null) {
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
           });
+          console.log('[ISG] Org set successfully');
           return true;
         }
         return false;
@@ -121,6 +184,7 @@ export function useOrganization(user: User | null) {
 
       if (data && data.organizations) {
         const o = data.organizations as { id: string; name: string; invite_code: string };
+        console.log('[ISG] loadOrg: found existing org with role:', data.role);
         setOrg({
           id: o.id,
           name: o.name,
@@ -137,8 +201,13 @@ export function useOrganization(user: User | null) {
         console.log('[ISG] loadOrg: no org found for user, calling edge function to auto-create');
         const ok = await loadViaEdgeFunction();
         if (!ok) {
-          // Edge function failed — set null so onboarding page shows
-          setOrg(null);
+          // Edge function failed — fallback: create org directly via Supabase client
+          console.log('[ISG] loadOrg: edge function failed, trying direct org creation fallback');
+          const fallbackOk = await createOrgDirectly();
+          if (!fallbackOk) {
+            console.log('[ISG] loadOrg: all methods failed, setting org to null');
+            setOrg(null);
+          }
         }
       }
     } catch (err) {

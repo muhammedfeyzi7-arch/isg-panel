@@ -1,21 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { jwtVerify } from 'https://esm.sh/jose@5';
 
-// CORS — sadece bilinen origin'lere izin ver
-const ALLOWED_ORIGINS = [
-  'https://readdy.ai',
-  'https://app.readdy.ai',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
+// CORS — tüm origin'lere izin ver (preview URL'leri için)
 function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowed = origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))
-    ? origin
-    : ALLOWED_ORIGINS[0];
   return {
-    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Origin': origin ?? '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',
   };
 }
@@ -147,11 +138,6 @@ Deno.serve(async (req) => {
     }
 
     // ── No active org found — create one automatically ──
-    // This handles:
-    //   1. Brand new users (first login)
-    //   2. Users manually created via Supabase dashboard
-    //   3. Users whose org membership was deleted
-
     console.log(`[setup-org] No org found for user ${userId} — creating new org automatically`);
 
     // Org name: prefer display name, fallback to email prefix
