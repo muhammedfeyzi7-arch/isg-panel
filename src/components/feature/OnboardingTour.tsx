@@ -179,12 +179,10 @@ export default function OnboardingTour() {
 
   // Turu göster: Supabase'den kontrol et, localStorage fallback
   useEffect(() => {
-    // org.id VE user.id ikisi de hazır olmalı — erken çalışmayı engelle
-    // NOT: org.id bekliyoruz çünkü rol bilgisi org'dan geliyor
-    if (!user?.id) return;
+    // BUG FIX #2: org.id VE user.id ikisi de hazır olmalı — erken çalışmayı engelle
+    if (!org?.id || !user?.id) return;
 
-    // Aynı kullanıcı için tekrar çalışmasın, ama farklı kullanıcı için çalışsın
-    // NOT: org.id'yi beklememek için sadece user.id ile track ediyoruz
+    // BUG FIX #1: Aynı kullanıcı için tekrar çalışmasın, ama farklı kullanıcı için çalışsın
     if (checkedUserIdRef.current === user.id) return;
     checkedUserIdRef.current = user.id;
 

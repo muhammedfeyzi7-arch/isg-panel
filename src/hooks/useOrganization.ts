@@ -55,18 +55,14 @@ export function useOrganization(user: User | null) {
           },
         });
         if (!res.ok) return false;
-        let resData: {
+        const resData = await res.json() as {
           organization?: { id: string; name: string; invite_code: string };
           role?: string;
           is_active?: boolean;
           must_change_password?: boolean;
           display_name?: string;
           email?: string;
-        } = {};
-        try {
-          const text = await res.text();
-          if (text) resData = JSON.parse(text);
-        } catch { return false; }
+        };
         if (resData?.organization) {
           setOrg({
             id: resData.organization.id,
@@ -181,24 +177,33 @@ export function useOrganization(user: User | null) {
   const createOrg = async (name: string, userId: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Kullanıcı bulunamadı.' };
     try {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      const inviteCode = generateInviteCode();
+      const { data: newOrg, error: orgError } = await supabase
+        .from('organizations')
+        .insert({ name, invite_code: inviteCode, created_by: user.id })
+        .select()
+        .maybeSingle();
 
-      // SECURITY DEFINER RPC — RLS'yi bypass eder, admin olarak org oluşturur
-      const { data, error } = await supabase.rpc('create_organization_for_user', {
-        p_user_id: user.id,
-        p_org_name: name.trim(),
-        p_invite_code: inviteCode,
-      });
+      if (orgError || !newOrg) return { error: orgError?.message ?? 'Organizasyon oluşturulamadı.' };
 
-      if (error) return { error: error.message };
-      if (!data) return { error: 'Organizasyon oluşturulamadı.' };
+      const { error: memberError } = await supabase
+        .from('user_organizations')
+        .insert({
+          user_id: user.id,
+          organization_id: newOrg.id,
+          role: 'admin',
+          email: user.email ?? '',
+          is_active: true,
+          must_change_password: false,
+        });
 
-      const result = data as { organization_id: string; role: string };
-      if (result.organization_id) {
-        await migrateLegacyData(userId, result.organization_id);
-      }
+      if (memberError) return { error: memberError.message };
 
+      await supabase.from('app_data').upsert(
+        { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
+        { onConflict: 'organization_id' },
+      );
+      await migrateLegacyData(userId, newOrg.id);
       await loadOrg();
       return { error: null };
     } catch (e) {

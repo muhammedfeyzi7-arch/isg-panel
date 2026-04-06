@@ -1,6 +1,4 @@
 import { useApp } from '../../store/AppContext';
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
 import Layout from '../../components/feature/Layout';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import OnboardingTour from '../../components/feature/OnboardingTour';
@@ -21,28 +19,7 @@ import IsIzniPage from '../is-izni/page';
 import FirmaEvraklariPage from '../company-documents/page';
 
 function AppContent() {
-  const { activeModule, orgError, org, orgLoading, mustChangePassword } = useApp();
-  const navigate = useNavigate();
-
-  // Org yüklenip null gelirse → onboarding'e yönlendir (sadece bir kez)
-  useEffect(() => {
-    if (!orgLoading && !org && !orgError) {
-      navigate('/onboarding', { replace: true });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgLoading, org]);
-
-  // Yükleniyor veya org yok → boş ekran göster (navigate effect çalışacak)
-  if (orgLoading || (!org && !orgError)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm" style={{ color: '#64748B' }}>Yükleniyor...</p>
-        </div>
-      </div>
-    );
-  }
+  const { activeModule, orgError, org, mustChangePassword } = useApp();
 
   if (mustChangePassword) {
     return <ForcePasswordChange />;
