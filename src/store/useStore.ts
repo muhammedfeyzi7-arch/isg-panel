@@ -120,6 +120,11 @@ async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
   console.log(`[ISG] DELETE_MANY OK ${table} (${ids.length} rows) ✓`);
 }
 
+// ── Fields that denetci role is allowed to update (module-level constant — not recreated on each render)
+const DENETCI_ALLOWED_EKIPMAN_FIELDS = new Set([
+  'sonKontrolTarihi', 'sonrakiKontrolTarihi', 'durum', 'kontrolGecmisi', 'notlar',
+]);
+
 // ──────── Main hook ────────
 export function useStore(
   organizationId: string | null,
@@ -932,15 +937,10 @@ export function useStore(
     return newE;
   }, [setEkipmanlar, saveToDb]);
 
-  // Fields that denetci role is allowed to update (FIX 1: field-level restriction)
-  const DENETCI_ALLOWED_EKIPMAN_FIELDS = new Set([
-    'sonKontrolTarihi', 'sonrakiKontrolTarihi', 'durum', 'kontrolGecmisi', 'notlar',
-  ]);
-
   const updateEkipman = useCallback((id: string, updates: Partial<Ekipman>, callerRole?: string) => {
     const { dosyaVeri: _ignored, ...rest } = updates as Partial<Ekipman> & { dosyaVeri?: string };
 
-    // FIX 1: If caller is denetci, only allow whitelisted fields
+    // If caller is denetci, only allow whitelisted fields (uses module-level constant)
     let safeRest = rest;
     if (callerRole === 'denetci') {
       safeRest = Object.fromEntries(
@@ -1029,10 +1029,18 @@ export function useStore(
     if (updated) saveToDb('gorevler', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setGorevler, saveToDb]);
 
+  // BUG FIX: deleteGorev should soft-delete (silinmis: true), not hard-delete
+  // Hard delete was causing görevler to not appear in trash/restore flow
   const deleteGorev = useCallback((id: string) => {
-    setGorevler(prev => prev.filter(g => g.id !== id));
-    deleteFromDb('gorevler', id);
-  }, [setGorevler, deleteFromDb]);
+    let updated: Gorev | null = null;
+    setGorevler(prev => prev.map(g => {
+      if (g.id !== id) return g;
+      updated = { ...g, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      return updated;
+    }));
+    if (updated) saveToDb('gorevler', updated as unknown as { id: string } & Record<string, unknown>);
+    logFnRef.current?.('gorev_deleted', 'Görevler', id, undefined, 'Görev silindi.');
+  }, [setGorevler, saveToDb]);
 
   // ──────── TUTANAK ────────
   const addTutanak = useCallback(async (t: Omit<Tutanak, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
@@ -1233,11 +1241,6 @@ export function useStore(
   }, [updatePersonel]);
 
   const getPersonelFoto = useCallback((personelId: string): string | null => {
-    const p = _setPersoneller.length !== undefined
-      ? undefined
-      : undefined;
-    void p;
-    // fotoUrl doğrudan personel state'inden okunur
     const found = personeller.find(x => x.id === personelId);
     return found?.fotoUrl ?? null;
   }, [personeller]);

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 interface TourStep {
   title: string;
@@ -163,6 +164,9 @@ export default function OnboardingTour() {
   const [targetEl, setTargetEl] = useState<HTMLElement | null>(null);
   const [, forceRender] = useState(0);
 
+  // BUG FIX #1: checkedRef user bazlı tutulmalı — farklı kullanıcı girişinde sıfırlansın
+  const checkedUserIdRef = useRef<string | null>(null);
+
   const setStepIndex = useCallback((i: number) => {
     stepIndexRef.current = i;
     setStepIndexState(i);
@@ -173,20 +177,61 @@ export default function OnboardingTour() {
   const currentStep = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
 
-  // Turu göster: her kullanıcı için ayrı ayrı, sadece ilk kez
+  // Turu göster: Supabase'den kontrol et, localStorage fallback
   useEffect(() => {
+    // BUG FIX #2: org.id VE user.id ikisi de hazır olmalı — erken çalışmayı engelle
     if (!org?.id || !user?.id) return;
-    // user_id bazlı key — aynı orgdaki farklı kullanıcılar ayrı ayrı görür
-    const key = `${TOUR_STORAGE_KEY}_${user.id}`;
+
+    // BUG FIX #1: Aynı kullanıcı için tekrar çalışmasın, ama farklı kullanıcı için çalışsın
+    if (checkedUserIdRef.current === user.id) return;
+    checkedUserIdRef.current = user.id;
+
+    const localKey = `${TOUR_STORAGE_KEY}_${user.id}`;
+    let cancelled = false;
+    let showTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Önce localStorage'a bak (hızlı kontrol — aynı cihazda cache)
     try {
-      const done = localStorage.getItem(key);
-      if (!done) {
-        const t = setTimeout(() => setVisible(true), 800);
-        return () => clearTimeout(t);
-      }
-    } catch {
-      // localStorage erişim hatası — turu gösterme
-    }
+      const localDone = localStorage.getItem(localKey);
+      if (localDone === '1') return; // Bu cihazda zaten tamamlanmış
+    } catch { /* ignore */ }
+
+    // Supabase'den kontrol et (cihazlar arası kalıcı durum)
+    supabase
+      .from('profiles')
+      .select('tour_completed')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+
+        if (error) {
+          // Supabase hatası — localStorage'da da yoksa göster
+          showTimer = setTimeout(() => { if (!cancelled) setVisible(true); }, 800);
+          return;
+        }
+
+        if (data?.tour_completed === true) {
+          // Supabase'de tamamlanmış — localStorage cache'e yaz
+          try { localStorage.setItem(localKey, '1'); } catch { /* ignore */ }
+          return;
+        }
+
+        // Tamamlanmamış (data null veya tour_completed false) — turu göster
+        showTimer = setTimeout(() => { if (!cancelled) setVisible(true); }, 800);
+      })
+      .catch(() => {
+        // Network hatası — localStorage'da da yoksa göster
+        if (!cancelled) {
+          showTimer = setTimeout(() => { if (!cancelled) setVisible(true); }, 800);
+        }
+      });
+
+    // BUG FIX #3: Cleanup düzgün çalışsın — Promise içinde değil dışında
+    return () => {
+      cancelled = true;
+      if (showTimer) clearTimeout(showTimer);
+    };
   }, [org?.id, user?.id]);
 
   // Hedef elementi bul — modül değişiminden bağımsız
@@ -206,14 +251,26 @@ export default function OnboardingTour() {
     return () => clearTimeout(t);
   }, [visible, stepIndex, currentStep?.targetId]);
 
-  const completeTour = useCallback(() => {
+  const completeTour = useCallback(async () => {
     if (!user?.id) return;
+
+    // Önce UI'ı kapat — kullanıcı beklemeden devam etsin
+    setVisible(false);
+
+    // localStorage'a hemen yaz (anlık etki, aynı cihaz)
     try {
       localStorage.setItem(`${TOUR_STORAGE_KEY}_${user.id}`, '1');
-    } catch {
-      // localStorage erişim hatası — sessizce geç
-    }
-    setVisible(false);
+    } catch { /* ignore */ }
+
+    // BUG FIX #4: update yerine upsert — profiles satırı yoksa da çalışsın
+    try {
+      await supabase
+        .from('profiles')
+        .upsert(
+          { user_id: user.id, tour_completed: true },
+          { onConflict: 'user_id', ignoreDuplicates: false }
+        );
+    } catch { /* ignore — localStorage zaten yazıldı */ }
   }, [user?.id]);
 
   const handleNext = useCallback(() => {
