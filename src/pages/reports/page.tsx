@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import Badge, { getFirmaStatusColor, getTehlikeColor } from '../../components/base/Badge';
+import { urlToBase64 } from '@/utils/fileUpload';
 import type ExcelJS from 'exceljs';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -250,17 +251,177 @@ export default function RaporlarPage() {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'genel' | 'evrak' | 'uygunsuzluk' | 'egitim'>('genel');
+  const [selectedFirmaId, setSelectedFirmaId] = useState<string>('all');
+  const [firmaDropdownOpen, setFirmaDropdownOpen] = useState(false);
+  const firmaDropdownRef = useRef<HTMLDivElement>(null);
   const months = useMemo(() => last12Months(), []);
 
+  // Tarih aralığı filtresi
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [datePreset, setDatePreset] = useState<string>('all');
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
+  const dateDropdownRef = useRef<HTMLDivElement>(null);
+
+  const DATE_PRESETS = [
+    { id: 'all', label: 'Tüm Zamanlar' },
+    { id: 'this_month', label: 'Bu Ay' },
+    { id: 'last_month', label: 'Geçen Ay' },
+    { id: 'last_3', label: 'Son 3 Ay' },
+    { id: 'last_6', label: 'Son 6 Ay' },
+    { id: 'this_year', label: 'Bu Yıl' },
+    { id: 'custom', label: 'Özel Aralık' },
+  ];
+
+  // Preset seçilince tarih aralığını hesapla
+  const applyPreset = (preset: string) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    setDatePreset(preset);
+    if (preset === 'all') { setDateFrom(''); setDateTo(''); }
+    else if (preset === 'this_month') {
+      setDateFrom(fmt(new Date(now.getFullYear(), now.getMonth(), 1)));
+      setDateTo(fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0)));
+    } else if (preset === 'last_month') {
+      setDateFrom(fmt(new Date(now.getFullYear(), now.getMonth() - 1, 1)));
+      setDateTo(fmt(new Date(now.getFullYear(), now.getMonth(), 0)));
+    } else if (preset === 'last_3') {
+      setDateFrom(fmt(new Date(now.getFullYear(), now.getMonth() - 2, 1)));
+      setDateTo(fmt(now));
+    } else if (preset === 'last_6') {
+      setDateFrom(fmt(new Date(now.getFullYear(), now.getMonth() - 5, 1)));
+      setDateTo(fmt(now));
+    } else if (preset === 'this_year') {
+      setDateFrom(fmt(new Date(now.getFullYear(), 0, 1)));
+      setDateTo(fmt(new Date(now.getFullYear(), 11, 31)));
+    }
+    if (preset !== 'custom') setDateDropdownOpen(false);
+  };
+
+  const isDateActive = datePreset !== 'all' || (dateFrom !== '' || dateTo !== '');
+  const activeDateLabel = useMemo(() => {
+    if (datePreset !== 'all' && datePreset !== 'custom') return DATE_PRESETS.find(p => p.id === datePreset)?.label ?? '';
+    if (dateFrom && dateTo) return `${new Date(dateFrom).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} – ${new Date(dateTo).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    if (dateFrom) return `${new Date(dateFrom).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })} sonrası`;
+    if (dateTo) return `${new Date(dateTo).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })} öncesi`;
+    return 'Tarih Filtresi';
+  }, [datePreset, dateFrom, dateTo]);
+
+  // Tarih aralığı kontrol fonksiyonu
+  const isInDateRange = (dateStr: string | null | undefined): boolean => {
+    if (!dateFrom && !dateTo) return true;
+    if (!dateStr) return false;
+    const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+    if (dateFrom) { const f = new Date(dateFrom); f.setHours(0, 0, 0, 0); if (d < f) return false; }
+    if (dateTo) { const t = new Date(dateTo); t.setHours(23, 59, 59, 999); if (d > t) return false; }
+    return true;
+  };
+
+  // Dropdown dışına tıklayınca kapat
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (firmaDropdownRef.current && !firmaDropdownRef.current.contains(e.target as Node)) {
+        setFirmaDropdownOpen(false);
+      }
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target as Node)) {
+        setDateDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Tüm aktif firmalar (filtre için)
   const aktifFirmalar = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
-  const aktifPersoneller = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);
-  const aktifEvraklar = useMemo(() => evraklar.filter(e => !e.silinmis), [evraklar]);
-  const aktifEgitimler = useMemo(() => egitimler.filter(e => !e.silinmis), [egitimler]);
-  const aktifMuayeneler = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
-  const aktifUygunsuzluklar = useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
-  const aktifEkipmanlar = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
-  const aktifGorevler = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);
-  const aktifTutanaklar = useMemo(() => tutanaklar.filter(t => !(t as unknown as { silinmis?: boolean }).silinmis), [tutanaklar]);
+
+  // Seçili firma
+  const secilenFirma = useMemo(
+    () => selectedFirmaId === 'all' ? null : aktifFirmalar.find(f => f.id === selectedFirmaId) ?? null,
+    [selectedFirmaId, aktifFirmalar],
+  );
+
+  // Filtrelenmiş veriler — firma + tarih aralığı filtresi
+  const filtrePersoneller = useMemo(
+    () => personeller.filter(p =>
+      !p.silinmis &&
+      (selectedFirmaId === 'all' || p.firmaId === selectedFirmaId) &&
+      isInDateRange(p.olusturmaTarihi)
+    ),
+    [personeller, selectedFirmaId, dateFrom, dateTo],
+  );
+  const filtreEvraklar = useMemo(
+    () => evraklar.filter(e =>
+      !e.silinmis &&
+      (selectedFirmaId === 'all' || e.firmaId === selectedFirmaId) &&
+      isInDateRange(e.olusturmaTarihi)
+    ),
+    [evraklar, selectedFirmaId, dateFrom, dateTo],
+  );
+  const filtreEgitimler = useMemo(
+    () => egitimler.filter(e =>
+      !e.silinmis &&
+      (selectedFirmaId === 'all' || e.firmaId === selectedFirmaId) &&
+      isInDateRange(e.olusturmaTarihi)
+    ),
+    [egitimler, selectedFirmaId, dateFrom, dateTo],
+  );
+  const filtreMuayeneler = useMemo(
+    () => muayeneler.filter(m =>
+      !m.silinmis &&
+      (selectedFirmaId === 'all' || filtrePersoneller.some(p => p.id === m.personelId)) &&
+      isInDateRange(m.muayeneTarihi)
+    ),
+    [muayeneler, selectedFirmaId, filtrePersoneller, dateFrom, dateTo],
+  );
+  const filtreUygunsuzluklar = useMemo(
+    () => uygunsuzluklar.filter(u =>
+      !u.silinmis &&
+      (selectedFirmaId === 'all' || u.firmaId === selectedFirmaId) &&
+      isInDateRange(u.olusturmaTarihi)
+    ),
+    [uygunsuzluklar, selectedFirmaId, dateFrom, dateTo],
+  );
+  const filtreEkipmanlar = useMemo(
+    () => ekipmanlar.filter(e =>
+      !e.silinmis &&
+      (selectedFirmaId === 'all' || e.firmaId === selectedFirmaId) &&
+      isInDateRange(e.olusturmaTarihi)
+    ),
+    [ekipmanlar, selectedFirmaId, dateFrom, dateTo],
+  );
+  const filtreGorevler = useMemo(
+    () => gorevler.filter(g =>
+      !g.silinmis &&
+      (selectedFirmaId === 'all' || (g as unknown as { firmaId?: string }).firmaId === selectedFirmaId) &&
+      isInDateRange((g as unknown as { olusturmaTarihi?: string }).olusturmaTarihi)
+    ),
+    [gorevler, selectedFirmaId, dateFrom, dateTo],
+  );
+  const filtreTutanaklar = useMemo(
+    () => tutanaklar.filter(t =>
+      !(t as unknown as { silinmis?: boolean }).silinmis &&
+      (selectedFirmaId === 'all' || (t as unknown as { firmaId?: string }).firmaId === selectedFirmaId) &&
+      isInDateRange((t as unknown as { olusturmaTarihi?: string }).olusturmaTarihi)
+    ),
+    [tutanaklar, selectedFirmaId, dateFrom, dateTo],
+  );
+
+  // Alias'lar — eski kod uyumluluğu için
+  const aktifPersoneller = filtrePersoneller;
+  const aktifEvraklar = filtreEvraklar;
+  const aktifEgitimler = filtreEgitimler;
+  const aktifMuayeneler = filtreMuayeneler;
+  const aktifUygunsuzluklar = filtreUygunsuzluklar;
+  const aktifEkipmanlar = filtreEkipmanlar;
+  const aktifGorevler = filtreGorevler;
+  const aktifTutanaklar = filtreTutanaklar;
+
+  // Gösterilen firma listesi (genel bakış tablosunda)
+  const goruntulenenFirmalar = useMemo(
+    () => selectedFirmaId === 'all' ? aktifFirmalar : aktifFirmalar.filter(f => f.id === selectedFirmaId),
+    [selectedFirmaId, aktifFirmalar],
+  );
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const in30 = new Date(today.getTime() + 30 * 86400000);
@@ -365,6 +526,21 @@ export default function RaporlarPage() {
         const now = new Date();
         const tarih = now.toLocaleDateString('tr-TR');
         const tarihDosya = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+        const firmaAdi = secilenFirma ? secilenFirma.ad : 'TÜM FİRMALAR';
+        const firmaAdiDosya = secilenFirma ? secilenFirma.ad.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s]/g, '').trim().replace(/\s+/g, '-').toUpperCase() : 'GENEL';
+        const tarihAralikLabel = isDateActive ? activeDateLabel : 'Tüm Zamanlar';
+        const tarihAralikDosya = isDateActive
+          ? (dateFrom && dateTo ? `${dateFrom.replace(/-/g, '')}-${dateTo.replace(/-/g, '')}` : dateFrom ? `${dateFrom.replace(/-/g, '')}-SONRASI` : `${dateTo.replace(/-/g, '')}-ONCESI`)
+          : '';
+
+        // Excel'de kullanılacak filtrelenmiş veriler
+        const exFirmalar = selectedFirmaId === 'all' ? aktifFirmalar : aktifFirmalar.filter(f => f.id === selectedFirmaId);
+        const exPersoneller = aktifPersoneller;
+        const exEvraklar = aktifEvraklar;
+        const exEgitimler = aktifEgitimler;
+        const exMuayeneler = aktifMuayeneler;
+        const exUygunsuzluklar = aktifUygunsuzluklar;
+        const exEkipmanlar = aktifEkipmanlar;
 
         const wb = new ExcelJS.Workbook();
         wb.creator = 'ISG Denetim Sistemi';
@@ -418,7 +594,7 @@ export default function RaporlarPage() {
           c2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A0F1E' } };
           c2.alignment = { horizontal: 'left', vertical: 'middle' };
           const c3 = ws.getCell(3, 1);
-          c3.value = subtitle;
+          c3.value = `${subtitle}  |  Dönem: ${tarihAralikLabel}`;
           c3.font = { italic: true, size: 10, color: { argb: 'FF94A3B8' }, name: 'Calibri' };
           c3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
           c3.alignment = { horizontal: 'left', vertical: 'middle' };
@@ -504,15 +680,15 @@ export default function RaporlarPage() {
         // ── SAYFA 1: ÖZET ──
         const ozetWs = wb.addWorksheet('Genel Özet');
         ozetWs.columns = [{ width: 30 }, { width: 16 }, { width: 30 }, { width: 16 }];
-        applyHeaderRows(ozetWs, 'GENEL ÖZET RAPORU', `Rapor Tarihi: ${tarih}  |  Oluşturan: Sistem`, 4);
+        applyHeaderRows(ozetWs, `GENEL ÖZET RAPORU — ${firmaAdi}`, `Rapor Tarihi: ${tarih}  |  Firma: ${firmaAdi}`, 4);
         applyHeaderCols(ozetWs, ['Kategori', 'Toplam', 'Alt Kategori', 'Değer']);
         const ozetRows = [
-          ['Toplam Firma', aktifFirmalar.length, 'Aktif Firma', aktifFirmalar.filter(f => f.durum === 'Aktif').length],
-          ['Toplam Personel', aktifPersoneller.length, 'Aktif Personel', aktifPersoneller.filter(p => p.durum === 'Aktif').length],
-          ['Toplam Evrak', aktifEvraklar.length, 'Sorunlu Evrak', evrakStats.eksik + evrakStats.sureDolmus],
-          ['Toplam Eğitim', aktifEgitimler.length, 'Tamamlanan', aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length],
-          ['Toplam Muayene', aktifMuayeneler.length, 'Çalışabilir', aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length],
-          ['Toplam Ekipman', aktifEkipmanlar.length, 'Uygun Değil', aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length],
+          ['Toplam Firma', exFirmalar.length, 'Aktif Firma', exFirmalar.filter(f => f.durum === 'Aktif').length],
+          ['Toplam Personel', exPersoneller.length, 'Aktif Personel', exPersoneller.filter(p => p.durum === 'Aktif').length],
+          ['Toplam Evrak', exEvraklar.length, 'Sorunlu Evrak', evrakStats.eksik + evrakStats.sureDolmus],
+          ['Toplam Eğitim', exEgitimler.length, 'Tamamlanan', exEgitimler.filter(e => e.durum === 'Tamamlandı').length],
+          ['Toplam Muayene', exMuayeneler.length, 'Çalışabilir', exMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length],
+          ['Toplam Ekipman', exEkipmanlar.length, 'Uygun Değil', exEkipmanlar.filter(e => e.durum === 'Uygun Değil').length],
           ['Açık Uygunsuzluk', uygunsuzlukStats.acik, 'Kapatılan', uygunsuzlukStats.kapandi],
           ['Sistem Sağlık Skoru', `${healthScore}/100`, 'Durum', healthLabel],
         ];
@@ -537,21 +713,21 @@ export default function RaporlarPage() {
         ozetWs.views = [{ state: 'frozen', ySplit: 4 }];
 
         // ── SAYFA 2: FİRMALAR ──
-        buildSheet('Firmalar', 'FİRMALAR LİSTESİ', `Toplam ${aktifFirmalar.length} firma  |  Rapor: ${tarih}`,
+        buildSheet('Firmalar', 'FİRMALAR LİSTESİ', `Toplam ${exFirmalar.length} firma  |  ${firmaAdi}  |  Rapor: ${tarih}`,
           ['#', 'Firma Adı', 'Yetkili Kişi', 'Telefon', 'E-posta', 'Tehlike Sınıfı', 'Durum', 'Personel', 'Evrak', 'Açık Uyg.', 'Sözleşme Baş.', 'Sözleşme Bit.'],
-          aktifFirmalar.map((f, i) => {
-            const pS = aktifPersoneller.filter(p => p.firmaId === f.id).length;
-            const eS = aktifEvraklar.filter(e => e.firmaId === f.id).length;
-            const uS = aktifUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
+          exFirmalar.map((f, i) => {
+            const pS = exPersoneller.filter(p => p.firmaId === f.id).length;
+            const eS = exEvraklar.filter(e => e.firmaId === f.id).length;
+            const uS = exUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
             return [i+1, f.ad, f.yetkiliKisi||'—', f.telefon||'—', f.email||'—', f.tehlikeSinifi, f.durum, pS, eS, uS, fmtDate(f.sozlesmeBas), fmtDate(f.sozlesmeBit)];
           }),
           [4, 28, 22, 16, 28, 16, 12, 10, 10, 12, 14, 14],
         );
 
         // ── SAYFA 3: PERSONELLER ──
-        buildSheet('Personeller', 'PERSONELLER LİSTESİ', `Toplam ${aktifPersoneller.length} personel  |  Rapor: ${tarih}`,
+        buildSheet('Personeller', 'PERSONELLER LİSTESİ', `Toplam ${exPersoneller.length} personel  |  ${firmaAdi}  |  Rapor: ${tarih}`,
           ['#', 'Ad Soyad', 'TC Kimlik', 'Telefon', 'E-posta', 'Firma', 'Görev', 'Departman', 'Durum', 'Kan Grubu', 'Doğum Tarihi', 'İşe Giriş'],
-          aktifPersoneller.map((p, i) => {
+          exPersoneller.map((p, i) => {
             const firma = aktifFirmalar.find(f => f.id === p.firmaId);
             return [i+1, p.adSoyad, p.tc||'—', p.telefon||'—', p.email||'—', firma?.ad||'—', p.gorev||'—', p.departman||'—', p.durum, p.kanGrubu||'—', fmtDate(p.dogumTarihi), fmtDate(p.iseGirisTarihi)];
           }),
@@ -559,11 +735,11 @@ export default function RaporlarPage() {
         );
 
         // ── SAYFA 4: EVRAKLAR ──
-        buildSheet('Evraklar', 'EVRAKLAR LİSTESİ', `Toplam ${aktifEvraklar.length} evrak  |  Sorunlu: ${evrakStats.eksik + evrakStats.sureDolmus}  |  Rapor: ${tarih}`,
+        buildSheet('Evraklar', 'EVRAKLAR LİSTESİ', `Toplam ${exEvraklar.length} evrak  |  Sorunlu: ${evrakStats.eksik + evrakStats.sureDolmus}  |  ${firmaAdi}  |  Rapor: ${tarih}`,
           ['#', 'Evrak Adı', 'Tür', 'Firma', 'Personel', 'Durum', 'Geçerlilik Tarihi', 'Kalan Süre'],
-          aktifEvraklar.map((e, i) => {
+          exEvraklar.map((e, i) => {
             const firma = aktifFirmalar.find(f => f.id === e.firmaId);
-            const personel = aktifPersoneller.find(p => p.id === e.personelId);
+            const personel = exPersoneller.find(p => p.id === e.personelId);
             const t2 = new Date(); t2.setHours(0,0,0,0);
             const kg = e.gecerlilikTarihi ? Math.ceil((new Date(e.gecerlilikTarihi).getTime() - t2.getTime()) / 86400000) : null;
             return [i+1, e.ad, e.tur||'—', firma?.ad||'—', personel?.adSoyad||'—', e.durum, fmtDate(e.gecerlilikTarihi), kg !== null ? (kg < 0 ? `${Math.abs(kg)}g önce doldu` : `${kg}g kaldı`) : '—'];
@@ -572,9 +748,9 @@ export default function RaporlarPage() {
         );
 
         // ── SAYFA 5: EĞİTİMLER ──
-        buildSheet('Eğitimler', 'EĞİTİMLER LİSTESİ', `Toplam ${aktifEgitimler.length} eğitim  |  Rapor: ${tarih}`,
+        buildSheet('Eğitimler', 'EĞİTİMLER LİSTESİ', `Toplam ${exEgitimler.length} eğitim  |  ${firmaAdi}  |  Rapor: ${tarih}`,
           ['#', 'Eğitim Adı', 'Tür', 'Firma', 'Eğitimci', 'Durum', 'Tarih', 'Süre', 'Katılımcı'],
-          aktifEgitimler.map((e, i) => {
+          exEgitimler.map((e, i) => {
             const firma = aktifFirmalar.find(f => f.id === e.firmaId);
             return [i+1, e.ad, e.tur||'—', firma?.ad||'—', e.egitimci||'—', e.durum, fmtDate(e.tarih), e.sure ? `${e.sure} dk` : '—', e.katilimciSayisi ?? '—'];
           }),
@@ -582,10 +758,10 @@ export default function RaporlarPage() {
         );
 
         // ── SAYFA 6: MUAYENELER ──
-        buildSheet('Muayeneler', 'MUAYENELER LİSTESİ', `Toplam ${aktifMuayeneler.length} muayene  |  Rapor: ${tarih}`,
+        buildSheet('Muayeneler', 'MUAYENELER LİSTESİ', `Toplam ${exMuayeneler.length} muayene  |  ${firmaAdi}  |  Rapor: ${tarih}`,
           ['#', 'Personel', 'Firma', 'Muayene Türü', 'Sonuç', 'Muayene Tarihi', 'Sonraki Tarih', 'Hekim'],
-          aktifMuayeneler.map((m, i) => {
-            const personel = aktifPersoneller.find(p => p.id === m.personelId);
+          exMuayeneler.map((m, i) => {
+            const personel = exPersoneller.find(p => p.id === m.personelId);
             const firma = aktifFirmalar.find(f => f.id === (personel?.firmaId ?? ''));
             return [i+1, personel?.adSoyad||'—', firma?.ad||'—', m.muayeneTuru||'—', m.sonuc||'—', fmtDate(m.muayeneTarihi), fmtDate(m.sonrakiTarih), m.hekim||'—'];
           }),
@@ -593,26 +769,12 @@ export default function RaporlarPage() {
         );
 
         // ── SAYFA 7: UYGUNSUZLUKLAR — fotoğraf embed ──
-        const resolvePhotoToBase64 = async (url: string | undefined | null): Promise<string | null> => {
-          if (!url) return null;
-          try {
-            const resp = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'no-store' });
-            if (!resp.ok) return null;
-            const blob = await resp.blob();
-            return new Promise(resolve => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.onerror = () => resolve(null);
-              reader.readAsDataURL(blob);
-            });
-          } catch { return null; }
-        };
-
+        // urlToBase64: filePath ise signed URL üretir, http URL ise direkt fetch eder
         const photoResults = await Promise.all(
-          aktifUygunsuzluklar.map(async u => ({
+          exUygunsuzluklar.map(async u => ({
             id: u.id,
-            acilis: await resolvePhotoToBase64(u.acilisFotoUrl),
-            kapanis: await resolvePhotoToBase64(u.kapatmaFotoUrl),
+            acilis: u.acilisFotoMevcut ? await urlToBase64(u.acilisFotoUrl ?? '') : null,
+            kapanis: u.kapatmaFotoMevcut ? await urlToBase64(u.kapatmaFotoUrl ?? '') : null,
           }))
         );
         const photoMap2 = new Map(photoResults.map(r => [r.id, { acilis: r.acilis, kapanis: r.kapanis }]));
@@ -620,11 +782,11 @@ export default function RaporlarPage() {
         const wsUyg = wb.addWorksheet('Uygunsuzluklar');
         const uygCols = ['#', 'DÖF No', 'Başlık', 'Firma', 'Durum', 'Seviye', 'Açılış Tarihi', 'Kapanış Tarihi', 'Sorumlu', 'Açılış Fotosu', 'Kapanış Fotosu'];
         wsUyg.columns = [5, 14, 36, 26, 13, 14, 16, 16, 22, 28, 28].map(w => ({ width: w }));
-        applyHeaderRows(wsUyg, 'UYGUNSUZLUKLAR LİSTESİ', `Açık: ${uygunsuzlukStats.acik}  |  Kapandı: ${uygunsuzlukStats.kapandi}  |  Kritik: ${uygunsuzlukStats.kritik}  |  Rapor: ${tarih}`, uygCols.length);
+        applyHeaderRows(wsUyg, 'UYGUNSUZLUKLAR LİSTESİ', `Açık: ${uygunsuzlukStats.acik}  |  Kapandı: ${uygunsuzlukStats.kapandi}  |  Kritik: ${uygunsuzlukStats.kritik}  |  ${firmaAdi}  |  Rapor: ${tarih}`, uygCols.length);
         applyHeaderCols(wsUyg, uygCols, true);
 
-        for (let i = 0; i < aktifUygunsuzluklar.length; i++) {
-          const u = aktifUygunsuzluklar[i];
+        for (let i = 0; i < exUygunsuzluklar.length; i++) {
+          const u = exUygunsuzluklar[i];
           const firma = aktifFirmalar.find(f => f.id === u.firmaId);
           const rowBg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
           const exRow = wsUyg.getRow(5 + i);
@@ -670,9 +832,9 @@ export default function RaporlarPage() {
         wsUyg.views = [{ state: 'frozen', ySplit: 4 }];
 
         // ── SAYFA 8: EKİPMANLAR ──
-        buildSheet('Ekipmanlar', 'EKİPMANLAR LİSTESİ', `Toplam ${aktifEkipmanlar.length} ekipman  |  Uygun Değil: ${aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length}  |  Rapor: ${tarih}`,
+        buildSheet('Ekipmanlar', 'EKİPMANLAR LİSTESİ', `Toplam ${exEkipmanlar.length} ekipman  |  Uygun Değil: ${exEkipmanlar.filter(e => e.durum === 'Uygun Değil').length}  |  ${firmaAdi}  |  Rapor: ${tarih}`,
           ['#', 'Ekipman Adı', 'Tür', 'Marka', 'Model', 'Firma', 'Durum', 'Sonraki Kontrol', 'Kalan Süre'],
-          aktifEkipmanlar.map((e, i) => {
+          exEkipmanlar.map((e, i) => {
             const firma = aktifFirmalar.find(f => f.id === e.firmaId);
             const t2 = new Date(); t2.setHours(0,0,0,0);
             const kg = e.sonrakiKontrolTarihi ? Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - t2.getTime()) / 86400000) : null;
@@ -682,17 +844,17 @@ export default function RaporlarPage() {
         );
 
         // ── SAYFA 9: FİRMA BAZLI ÖZET ──
-        buildSheet('Firma Özeti', 'FİRMA BAZLI ÖZET', `${aktifFirmalar.length} firma için konsolide özet  |  Rapor: ${tarih}`,
+        buildSheet('Firma Özeti', 'FİRMA BAZLI ÖZET', `${exFirmalar.length} firma için konsolide özet  |  ${firmaAdi}  |  Rapor: ${tarih}`,
           ['#', 'Firma Adı', 'Tehlike Sınıfı', 'Durum', 'Personel', 'Aktif P.', 'Evrak', 'Sorunlu E.', 'Eğitim', 'Muayene', 'Açık Uyg.', 'Ekipman'],
-          aktifFirmalar.map((f, i) => {
-            const pS = aktifPersoneller.filter(p => p.firmaId === f.id).length;
-            const aP = aktifPersoneller.filter(p => p.firmaId === f.id && p.durum === 'Aktif').length;
-            const eS = aktifEvraklar.filter(e => e.firmaId === f.id).length;
-            const xE = aktifEvraklar.filter(e => e.firmaId === f.id && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
-            const egS = aktifEgitimler.filter(e => e.firmaId === f.id).length;
-            const muS = aktifMuayeneler.filter(m => aktifPersoneller.find(p => p.id === m.personelId)?.firmaId === f.id).length;
-            const uS = aktifUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
-            const ekS = aktifEkipmanlar.filter(e => e.firmaId === f.id).length;
+          exFirmalar.map((f, i) => {
+            const pS = exPersoneller.filter(p => p.firmaId === f.id).length;
+            const aP = exPersoneller.filter(p => p.firmaId === f.id && p.durum === 'Aktif').length;
+            const eS = exEvraklar.filter(e => e.firmaId === f.id).length;
+            const xE = exEvraklar.filter(e => e.firmaId === f.id && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
+            const egS = exEgitimler.filter(e => e.firmaId === f.id).length;
+            const muS = exMuayeneler.filter(m => exPersoneller.find(p => p.id === m.personelId)?.firmaId === f.id).length;
+            const uS = exUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
+            const ekS = exEkipmanlar.filter(e => e.firmaId === f.id).length;
             return [i+1, f.ad, f.tehlikeSinifi, f.durum, pS, aP, eS, xE, egS, muS, uS, ekS];
           }),
           [4, 28, 16, 12, 10, 10, 10, 12, 10, 10, 12, 10],
@@ -704,7 +866,8 @@ export default function RaporlarPage() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${tarihDosya}-GENEL-RAPOR.xlsx`;
+        const donemSuffix = tarihAralikDosya ? `-${tarihAralikDosya}` : '';
+        link.download = `${tarihDosya}-${firmaAdiDosya}${donemSuffix}-RAPOR.xlsx`;
         document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
       } finally {
         setExporting(false);
@@ -734,15 +897,205 @@ export default function RaporlarPage() {
             Raporlar &amp; Analiz
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Sistemdeki tüm verilerin özet analizi ve grafikleri
+            {secilenFirma ? (
+              <span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{secilenFirma.ad}</span>
+                {' '}firmasına ait veriler gösteriliyor
+              </span>
+            ) : 'Sistemdeki tüm verilerin özet analizi ve grafikleri'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Tarih */}
           <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)', color: 'var(--text-muted)' }}>
             <i className="ri-calendar-line text-xs" />
             {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
+
+          {/* Tarih Aralığı Filtresi */}
+          <div className="relative" ref={dateDropdownRef}>
+            <button
+              onClick={() => setDateDropdownOpen(v => !v)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all"
+              style={{
+                background: isDateActive ? 'rgba(16,185,129,0.1)' : 'var(--bg-card)',
+                border: isDateActive ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-main)',
+                color: isDateActive ? '#10B981' : 'var(--text-secondary)',
+                minWidth: 150,
+              }}
+            >
+              <i className="ri-calendar-line text-xs" />
+              <span className="flex-1 text-left truncate" style={{ maxWidth: 140 }}>
+                {isDateActive ? activeDateLabel : 'Tarih Filtresi'}
+              </span>
+              {dateDropdownOpen ? <i className="ri-arrow-up-s-line text-xs" /> : <i className="ri-arrow-down-s-line text-xs" />}
+            </button>
+
+            {dateDropdownOpen && (
+              <div
+                className="absolute right-0 mt-1.5 rounded-xl overflow-hidden z-50"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-main)',
+                  minWidth: 260,
+                  top: '100%',
+                }}
+              >
+                {/* Preset seçenekleri */}
+                <div className="p-2 space-y-0.5">
+                  {DATE_PRESETS.filter(p => p.id !== 'custom').map(preset => (
+                    <button
+                      key={preset.id}
+                      onClick={() => applyPreset(preset.id)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-medium transition-colors cursor-pointer"
+                      style={{
+                        background: datePreset === preset.id ? 'rgba(16,185,129,0.08)' : 'transparent',
+                        color: datePreset === preset.id ? '#10B981' : 'var(--text-secondary)',
+                      }}
+                    >
+                      <i className={`ri-${preset.id === 'all' ? 'time-line' : preset.id === 'this_month' ? 'calendar-2-line' : preset.id === 'last_month' ? 'arrow-left-s-line' : 'history-line'} text-[10px]`} />
+                      {preset.label}
+                      {datePreset === preset.id && <i className="ri-check-line text-[10px] ml-auto" style={{ color: '#10B981' }} />}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Özel aralık */}
+                <div className="px-3 pb-3 pt-1" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                  <p className="text-[10px] font-semibold mb-2 mt-2" style={{ color: 'var(--text-muted)' }}>ÖZEL ARALIK</p>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>Başlangıç</label>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={e => { setDateFrom(e.target.value); setDatePreset('custom'); }}
+                        className="w-full px-2.5 py-1.5 rounded-lg text-xs"
+                        style={{
+                          background: 'var(--bg-item)',
+                          border: '1px solid var(--border-main)',
+                          color: 'var(--text-primary)',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] mb-1 block" style={{ color: 'var(--text-muted)' }}>Bitiş</label>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={e => { setDateTo(e.target.value); setDatePreset('custom'); }}
+                        className="w-full px-2.5 py-1.5 rounded-lg text-xs"
+                        style={{
+                          background: 'var(--bg-item)',
+                          border: '1px solid var(--border-main)',
+                          color: 'var(--text-primary)',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => { setDateDropdownOpen(false); }}
+                        className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
+                        style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+                      >
+                        Uygula
+                      </button>
+                      <button
+                        onClick={() => { applyPreset('all'); }}
+                        className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
+                        style={{ background: 'var(--bg-item)', color: 'var(--text-muted)', border: '1px solid var(--border-main)' }}
+                      >
+                        Temizle
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Firma Filtresi */}
+          <div className="relative" ref={firmaDropdownRef}>
+            <button
+              onClick={() => setFirmaDropdownOpen(v => !v)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all"
+              style={{
+                background: secilenFirma ? 'rgba(99,102,241,0.1)' : 'var(--bg-card)',
+                border: secilenFirma ? '1px solid rgba(99,102,241,0.3)' : '1px solid var(--border-main)',
+                color: secilenFirma ? '#818CF8' : 'var(--text-secondary)',
+                minWidth: 160,
+              }}
+            >
+              <i className="ri-building-2-line text-xs" />
+              <span className="flex-1 text-left truncate" style={{ maxWidth: 140 }}>
+                {secilenFirma ? secilenFirma.ad : 'Tüm Firmalar'}
+              </span>
+              {firmaDropdownOpen ? <i className="ri-arrow-up-s-line text-xs" /> : <i className="ri-arrow-down-s-line text-xs" />}
+            </button>
+
+            {firmaDropdownOpen && (
+              <div
+                className="absolute right-0 mt-1.5 rounded-xl overflow-hidden z-50"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-main)',
+                  minWidth: 220,
+                  maxHeight: 320,
+                  overflowY: 'auto',
+                  top: '100%',
+                }}
+              >
+                {/* Tüm Firmalar seçeneği */}
+                <button
+                  onClick={() => { setSelectedFirmaId('all'); setFirmaDropdownOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-xs font-medium transition-colors cursor-pointer"
+                  style={{
+                    background: selectedFirmaId === 'all' ? 'rgba(99,102,241,0.08)' : 'transparent',
+                    color: selectedFirmaId === 'all' ? '#818CF8' : 'var(--text-secondary)',
+                    borderBottom: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
+                    style={{ background: selectedFirmaId === 'all' ? 'rgba(99,102,241,0.15)' : 'var(--bg-item)' }}>
+                    <i className="ri-apps-line text-[10px]" style={{ color: selectedFirmaId === 'all' ? '#818CF8' : 'var(--text-muted)' }} />
+                  </div>
+                  <span className="font-semibold">Tüm Firmalar</span>
+                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}>
+                    {aktifFirmalar.length}
+                  </span>
+                </button>
+
+                {/* Firma listesi */}
+                {aktifFirmalar.map(firma => (
+                  <button
+                    key={firma.id}
+                    onClick={() => { setSelectedFirmaId(firma.id); setFirmaDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-xs font-medium transition-colors cursor-pointer"
+                    style={{
+                      background: selectedFirmaId === firma.id ? 'rgba(99,102,241,0.08)' : 'transparent',
+                      color: selectedFirmaId === firma.id ? '#818CF8' : 'var(--text-secondary)',
+                      borderBottom: '1px solid var(--border-subtle)',
+                    }}
+                  >
+                    <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0 text-[9px] font-bold text-white"
+                      style={{ background: selectedFirmaId === firma.id ? '#818CF8' : 'linear-gradient(135deg, #475569, #334155)' }}>
+                      {firma.ad.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="truncate flex-1">{firma.ad}</span>
+                    {selectedFirmaId === firma.id && (
+                      <i className="ri-check-line text-[10px] flex-shrink-0" style={{ color: '#818CF8' }} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Excel İndir */}
           <button
             onClick={handleExcelExport}
             disabled={exporting}
@@ -751,11 +1104,71 @@ export default function RaporlarPage() {
           >
             {exporting
               ? <><i className="ri-loader-4-line animate-spin text-sm" /> Hazırlanıyor...</>
-              : <><i className="ri-file-excel-2-line text-sm" /> Excel Raporu İndir</>
+              : <><i className="ri-file-excel-2-line text-sm" /> {secilenFirma ? `${secilenFirma.ad} Raporu` : 'Excel Raporu'} İndir</>
             }
           </button>
         </div>
       </div>
+
+      {/* Tarih filtresi aktifse bilgi bandı */}
+      {isDateActive && (
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}
+        >
+          <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+            style={{ background: 'rgba(16,185,129,0.12)' }}>
+            <i className="ri-calendar-line text-xs" style={{ color: '#10B981' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-[12px] font-semibold" style={{ color: '#10B981' }}>Tarih Filtresi Aktif: </span>
+            <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+              <strong>{activeDateLabel}</strong> dönemine ait veriler gösteriliyor.
+            </span>
+          </div>
+          <button
+            onClick={() => applyPreset('all')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap cursor-pointer transition-all"
+            style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+          >
+            <i className="ri-close-line text-xs" />
+            Filtreyi Kaldır
+          </button>
+        </div>
+      )}
+
+      {/* Firma filtresi aktifse bilgi bandı */}
+      {secilenFirma && (
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}
+        >
+          <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+            style={{ background: 'rgba(99,102,241,0.12)' }}>
+            <i className="ri-filter-3-line text-xs" style={{ color: '#818CF8' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-[12px] font-semibold" style={{ color: '#818CF8' }}>Firma Filtresi Aktif: </span>
+            <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+              Sadece <strong>{secilenFirma.ad}</strong> firmasına ait veriler gösteriliyor.
+              {secilenFirma.tehlikeSinifi && (
+                <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
+                  {secilenFirma.tehlikeSinifi}
+                </span>
+              )}
+            </span>
+          </div>
+          <button
+            onClick={() => setSelectedFirmaId('all')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap cursor-pointer transition-all"
+            style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}
+          >
+            <i className="ri-close-line text-xs" />
+            Filtreyi Kaldır
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -948,10 +1361,10 @@ export default function RaporlarPage() {
               </div>
               <h3 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Firma Özet Listesi</h3>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
-                {aktifFirmalar.length}
+                {goruntulenenFirmalar.length}
               </span>
             </div>
-            {aktifFirmalar.length === 0 ? (
+            {goruntulenenFirmalar.length === 0 ? (
               <div className="py-12 text-center">
                 <i className="ri-building-2-line text-3xl" style={{ color: 'var(--text-faint)' }} />
                 <p className="text-[12px] mt-2" style={{ color: 'var(--text-muted)' }}>Henüz firma kaydı yok</p>
@@ -970,7 +1383,7 @@ export default function RaporlarPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {aktifFirmalar.map(firma => {
+                    {goruntulenenFirmalar.map(firma => {
                       const firmaPersonel = aktifPersoneller.filter(p => p.firmaId === firma.id).length;
                       const firmaEvrak = aktifEvraklar.filter(e => e.firmaId === firma.id).length;
                       const firmaUyg = aktifUygunsuzluklar.filter(u => u.firmaId === firma.id && u.durum === 'Açık').length;

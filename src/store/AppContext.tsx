@@ -308,13 +308,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // ── Evraklar ──
     store.evraklar.forEach(e => {
       if (e.silinmis) return;
-      // Geçerlilik tarihi yoksa veya geçersizse → uyarı üretme
-      const d = parseDate(e.gecerlilikTarihi);
-      if (!d) return;
-      const kalanGun = getDaysRemaining(e.gecerlilikTarihi)!;
       const personel = e.personelId ? store.personeller.find(p => p.id === e.personelId) : null;
       const firma = store.firmalar.find(f => f.id === e.firmaId);
       const detayBase = `${personel ? personel.adSoyad + ' — ' : ''}${firma?.ad || ''}`;
+
+      // Durum bazlı kontrol — tarih olmasa bile durum "Süre Dolmuş" veya "Eksik" ise bildirim üret
+      if (e.durum === 'Süre Dolmuş') {
+        const d = parseDate(e.gecerlilikTarihi);
+        const tarihBilgi = d ? `${d.toLocaleDateString('tr-TR')} tarihinde doldu` : 'Süresi dolmuş';
+        result.push({
+          id: `evrak_dolmus_${e.id}`,
+          tip: 'evrak_dolmus',
+          mesaj: `${e.ad} evrakının süresi dolmuş`,
+          detay: `${detayBase}${detayBase ? ' — ' : ''}${tarihBilgi}`,
+          tarih: e.gecerlilikTarihi || new Date().toISOString().split('T')[0],
+          okundu: okunanlar.has(`evrak_dolmus_${e.id}`),
+          kalanGun: -1,
+          module: 'evraklar',
+          recordId: e.id,
+        });
+        return;
+      }
+
+      if (e.durum === 'Eksik') {
+        result.push({
+          id: `evrak_eksik_${e.id}`,
+          tip: 'evrak_dolmus',
+          mesaj: `${e.ad} evrakı eksik`,
+          detay: `${detayBase}${detayBase ? ' — ' : ''}Evrak henüz yüklenmemiş`,
+          tarih: new Date().toISOString().split('T')[0],
+          okundu: okunanlar.has(`evrak_eksik_${e.id}`),
+          kalanGun: -1,
+          module: 'evraklar',
+          recordId: e.id,
+        });
+        return;
+      }
+
+      // Tarih bazlı kontrol — geçerlilik tarihi varsa
+      const d = parseDate(e.gecerlilikTarihi);
+      if (!d) return;
+      const kalanGun = getDaysRemaining(e.gecerlilikTarihi)!;
 
       if (d >= today && d <= in60) {
         result.push({
@@ -346,10 +380,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // ── Ekipman kontrolleri ──
     store.ekipmanlar.forEach(ek => {
       if (ek.silinmis) return;
+      const firma = store.firmalar.find(f => f.id === ek.firmaId);
 
-      // ⚠️ UYGUN DEĞİL override: tarih hesaplama yapma, anında kritik bildirim üret
+      // ⚠️ UYGUN DEĞİL: anında kritik bildirim
       if (ek.durum === 'Uygun Değil') {
-        const firma = store.firmalar.find(f => f.id === ek.firmaId);
         result.push({
           id: `ekipman_uygunsuz_${ek.id}`,
           tip: 'ekipman_kontrol',
@@ -357,18 +391,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
           detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman uygunsuz olarak işaretlendi`,
           tarih: new Date().toISOString().split('T')[0],
           okundu: okunanlar.has(`ekipman_uygunsuz_${ek.id}`),
-          kalanGun: -999, // kritik flag
+          kalanGun: -999,
           module: 'ekipmanlar',
           recordId: ek.id,
         });
-        return; // tarih bazlı kontrol yapma
+        return;
       }
 
+      // ⚠️ BAKIMDA: bildirim üret
+      if (ek.durum === 'Bakımda') {
+        result.push({
+          id: `ekipman_bakimda_${ek.id}`,
+          tip: 'ekipman_kontrol',
+          mesaj: `${ek.ad} bakımda`,
+          detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman bakım sürecinde`,
+          tarih: new Date().toISOString().split('T')[0],
+          okundu: okunanlar.has(`ekipman_bakimda_${ek.id}`),
+          kalanGun: -1,
+          module: 'ekipmanlar',
+          recordId: ek.id,
+        });
+        return;
+      }
+
+      // Tarih bazlı kontrol — sonraki kontrol tarihi varsa
       const d = parseDate(ek.sonrakiKontrolTarihi);
-      if (!d) return; // Kontrol tarihi yoksa → uyarı üretme
+      if (!d) return;
       const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi)!;
-      if (kalanGun < 0 || kalanGun > 60) return;
-      const firma = store.firmalar.find(f => f.id === ek.firmaId);
+
+      // Tarihi geçmiş ekipman — bildirim üret
+      if (kalanGun < 0) {
+        result.push({
+          id: `ekipman_gecikti_${ek.id}`,
+          tip: 'ekipman_kontrol',
+          mesaj: `${ek.ad} kontrolü gecikti`,
+          detay: `${firma?.ad ? firma.ad + ' — ' : ''}${Math.abs(kalanGun)} gün gecikti`,
+          tarih: ek.sonrakiKontrolTarihi,
+          okundu: okunanlar.has(`ekipman_gecikti_${ek.id}`),
+          kalanGun,
+          module: 'ekipmanlar',
+          recordId: ek.id,
+        });
+        return;
+      }
+
+      if (kalanGun > 60) return;
       result.push({
         id: `ekipman_${ek.id}`,
         tip: 'ekipman_kontrol',
