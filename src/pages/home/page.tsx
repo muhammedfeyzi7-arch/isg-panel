@@ -1,6 +1,7 @@
 import { useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
+import OnboardingTour from '../../components/feature/OnboardingTour';
 import ToastContainer from '../../components/base/ToastContainer';
 import DashboardPage from '../dashboard/page';
 import FirmalarPage from '../companies/page';
@@ -64,6 +65,7 @@ function AppContent() {
   return (
     <Layout>
       <ToastContainer />
+      <OnboardingTour />
       {renderPage()}
     </Layout>
   );

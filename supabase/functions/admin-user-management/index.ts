@@ -18,6 +18,12 @@ function normalizeRole(role: string): string {
   return 'member';
 }
 
+function getRoleLabel(role: string): string {
+  if (role === 'admin') return 'Admin Kullanıcı';
+  if (role === 'denetci') return 'Saha Personeli';
+  return 'Evrak/Dökümantasyon Denetçi';
+}
+
 // Decode JWT payload without verification
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -34,12 +40,8 @@ Deno.serve(async (req) => {
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
 
-  // Handle preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
-      status: 200,
-      headers: corsHeaders 
-    });
+    return new Response('ok', { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -47,7 +49,6 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('[FATAL] Missing env vars');
       return new Response(JSON.stringify({ error: 'Sunucu yapılandırma hatası.' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -63,7 +64,7 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '').trim();
-    
+
     if (!token || token === 'undefined' || token === 'null' || token === '') {
       return new Response(JSON.stringify({ error: 'Geçersiz token. Lütfen tekrar giriş yapın.' }), {
         status: 401,
@@ -71,7 +72,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check token expiry
     const payload = decodeJwtPayload(token);
     if (payload) {
       const exp = payload.exp as number | undefined;
@@ -88,18 +88,16 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Verify token
     const { data: { user: callerUser }, error: authError } = await adminClient.auth.getUser(token);
 
     if (authError || !callerUser) {
-      console.error('[AUTH] Token verification failed:', authError?.message);
       return new Response(JSON.stringify({ error: 'Geçersiz oturum. Lütfen tekrar giriş yapın.' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return await handleRequest(req, callerUser.id, callerUser.email ?? '', adminClient, corsHeaders, normalizeRole);
+    return await handleRequest(req, callerUser.id, callerUser.email ?? '', adminClient, corsHeaders, normalizeRole, getRoleLabel);
   } catch (err) {
     console.error('[FATAL] Unhandled error:', err);
     return new Response(JSON.stringify({ error: 'Sunucu hatası oluştu. Lütfen tekrar deneyin.' }), {
@@ -116,6 +114,7 @@ async function handleRequest(
   adminClient: ReturnType<typeof createClient>,
   corsHeaders: Record<string, string>,
   normalizeRole: (role: string) => string,
+  getRoleLabel: (role: string) => string,
 ): Promise<Response> {
   let body: Record<string, unknown> = {};
   try {
@@ -127,7 +126,6 @@ async function handleRequest(
   const action = body.action as string;
   const requestedOrgId = body.organization_id as string | undefined;
 
-  // Get caller membership
   let membershipQuery = adminClient
     .from('user_organizations')
     .select('role, organization_id, display_name, email, is_active')
@@ -141,7 +139,6 @@ async function handleRequest(
   const { data: memberships, error: membershipError } = await membershipQuery;
 
   if (membershipError || !memberships || memberships.length === 0) {
-    console.error('[MEMBERSHIP] Error:', membershipError?.message, 'userId:', userId, 'orgId:', requestedOrgId);
     return new Response(JSON.stringify({ error: 'Organizasyon üyeliği bulunamadı.' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -186,7 +183,7 @@ async function handleRequest(
     }
   }
 
-  // ── LIST MEMBERS ──────────────────────────────────────────────
+  // ── LIST MEMBERS ──
   if (action === 'list') {
     const { data: members, error: listError } = await adminClient
       .from('user_organizations')
@@ -220,7 +217,7 @@ async function handleRequest(
     });
   }
 
-  // ── CREATE USER ───────────────────────────────────────────────
+  // ── CREATE USER ──
   if (action === 'create') {
     const { email: newEmail, password, display_name, role } = body as {
       email: string;
@@ -245,7 +242,6 @@ async function handleRequest(
 
     const normalizedEmail = newEmail.toLowerCase().trim();
 
-    // Check if user already exists in this org
     const { data: existingMember } = await adminClient
       .from('user_organizations')
       .select('id')
@@ -260,26 +256,24 @@ async function handleRequest(
       );
     }
 
-    // Check auth users
     let newUserId: string;
-    
+
     const { data: existingUsers, error: listError } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-    
+
     if (listError) {
       console.error('[CREATE] listUsers error:', listError.message);
     }
-    
+
     const existingAuthUser = existingUsers?.users?.find((u) => u.email === normalizedEmail);
 
     if (existingAuthUser) {
       newUserId = existingAuthUser.id;
-      console.log('[CREATE] Existing auth user found:', newUserId);
     } else {
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email: normalizedEmail,
         password,
         email_confirm: true,
-        user_metadata: { 
+        user_metadata: {
           full_name: display_name,
           admin_created: true,
           organization_id: orgId,
@@ -287,7 +281,6 @@ async function handleRequest(
       });
 
       if (createError) {
-        console.error('[CREATE] Auth creation error:', createError.message);
         let errorMsg = 'Kullanıcı oluşturulamadı.';
         if (createError.message.includes('already registered') || createError.message.includes('already exists')) {
           errorMsg = 'Bu e-posta adresi zaten kayıtlı.';
@@ -303,19 +296,17 @@ async function handleRequest(
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      
+
       if (!newUser?.user) {
         return new Response(JSON.stringify({ error: 'Kullanıcı oluşturulamadı: Servis yanıt vermedi.' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      
+
       newUserId = newUser.user.id;
-      console.log('[CREATE] New auth user created:', newUserId);
     }
 
-    // Add to organization
     const { error: memberError } = await adminClient
       .from('user_organizations')
       .insert({
@@ -329,16 +320,13 @@ async function handleRequest(
       });
 
     if (memberError) {
-      console.error('[CREATE] DB insert error:', memberError.message, memberError.code);
-      
       if (memberError.code === '23505') {
         return new Response(JSON.stringify({ error: 'Bu kullanıcı zaten organizasyonda kayıtlı.' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Kullanıcı organizasyona eklenemedi: ' + memberError.message,
       }), {
         status: 400,
@@ -346,7 +334,6 @@ async function handleRequest(
       });
     }
 
-    // Upsert profile (non-blocking)
     try {
       await adminClient
         .from('profiles')
@@ -358,7 +345,7 @@ async function handleRequest(
       console.warn('[CREATE] Profile upsert skipped:', profileErr);
     }
 
-    const roleLabel = role === 'admin' ? 'Admin' : role === 'denetci' ? 'Denetçi' : 'Kullanıcı';
+    const roleLabel = getRoleLabel(normalizeRole(role));
     await logActivity(
       'user_created',
       'Kullanıcı Yönetimi',
@@ -367,17 +354,17 @@ async function handleRequest(
       `${display_name} (${normalizedEmail}) kullanıcısı ${roleLabel} rolüyle oluşturuldu.`,
     );
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       user_id: newUserId,
-      message: 'Kullanıcı başarıyla oluşturuldu'
+      message: 'Kullanıcı başarıyla oluşturuldu',
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  // ── UPDATE MEMBER ─────────────────────────────────────────────
+  // ── UPDATE MEMBER ──
   if (action === 'update') {
     const { target_user_id, is_active, role, display_name } = body as {
       target_user_id: string;
@@ -443,7 +430,7 @@ async function handleRequest(
       );
     }
     if (role !== undefined) {
-      const roleLabel = role === 'admin' ? 'Admin' : role === 'denetci' ? 'Denetçi' : 'Kullanıcı';
+      const roleLabel = getRoleLabel(normalizeRole(role));
       await logActivity(
         'user_role_changed',
         'Kullanıcı Yönetimi',
@@ -459,7 +446,7 @@ async function handleRequest(
     });
   }
 
-  // ── RESET PASSWORD ────────────────────────────────────────────
+  // ── RESET PASSWORD ──
   if (action === 'reset_password') {
     const { target_user_id, new_password } = body as {
       target_user_id: string;
@@ -526,7 +513,7 @@ async function handleRequest(
     });
   }
 
-  // ── DELETE MEMBER ─────────────────────────────────────────────
+  // ── DELETE MEMBER ──
   if (action === 'delete') {
     const { target_user_id } = body as { target_user_id: string };
 

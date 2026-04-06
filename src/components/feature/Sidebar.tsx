@@ -222,6 +222,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                 return (
                   <li key={item.id}>
                     <button
+                      id={`sidebar-${item.id}`}
                       onClick={() => { setActiveModule(item.id); onMobileClose?.(); }}
                       title={collapsed ? item.label : ''}
                       className="w-full flex items-center gap-2.5 text-left cursor-pointer relative"
