@@ -120,11 +120,6 @@ async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
   console.log(`[ISG] DELETE_MANY OK ${table} (${ids.length} rows) ✓`);
 }
 
-// ── Fields that denetci role is allowed to update (module-level constant — not recreated on each render)
-const DENETCI_ALLOWED_EKIPMAN_FIELDS = new Set([
-  'sonKontrolTarihi', 'sonrakiKontrolTarihi', 'durum', 'kontrolGecmisi', 'notlar',
-]);
-
 // ──────── Main hook ────────
 export function useStore(
   organizationId: string | null,
@@ -614,75 +609,6 @@ export function useStore(
     return newPersonel;
   }, [setPersoneller, saveToDb]);
 
-  /**
-   * Toplu personel ekleme — Excel import için optimize edilmiş.
-   * Tüm kayıtları tek seferde Supabase'e batch upsert eder.
-   * Tek tek saveToDb çağrısı yerine bu kullanılmalı.
-   */
-  const addPersonelBatch = useCallback(async (
-    personelList: Omit<Personel, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>[],
-  ): Promise<Personel[]> => {
-    if (personelList.length === 0) return [];
-    const now = new Date().toISOString();
-    const newPersoneller: Personel[] = personelList.map(p => ({
-      ...p, id: genId(), olusturmaTarihi: now, guncellemeTarihi: now,
-    }));
-
-    // Optimistic UI update — hepsini bir anda ekle
-    setPersoneller(prev => [...newPersoneller, ...prev]);
-
-    const orgId = orgIdRef.current;
-    const uid = userIdRef.current;
-
-    if (!orgId || !uid) {
-      // Org hazır değil — pending queue'ya ekle (tek tek)
-      newPersoneller.forEach(p => {
-        pendingSavesRef.current.push({ table: 'personeller', item: p as unknown as { id: string } & Record<string, unknown> });
-      });
-      console.warn(`[ISG] addPersonelBatch QUEUED ${newPersoneller.length} items (org not ready)`);
-      return newPersoneller;
-    }
-
-    // Batch upsert — 50'lik chunk'lara böl (Supabase limit)
-    const CHUNK_SIZE = 50;
-    const chunks: Personel[][] = [];
-    for (let i = 0; i < newPersoneller.length; i += CHUNK_SIZE) {
-      chunks.push(newPersoneller.slice(i, i + CHUNK_SIZE));
-    }
-
-    const failedItems: Personel[] = [];
-
-    for (const chunk of chunks) {
-      const payload = chunk.map(p => ({
-        id: p.id,
-        user_id: uid,
-        organization_id: orgId,
-        data: p,
-        updated_at: now,
-        deleted_at: null,
-      }));
-
-      const { data, error } = await supabase.from('personeller').upsert(payload).select('id');
-      if (error) {
-        console.error(`[ISG] addPersonelBatch chunk FAILED:`, error);
-        failedItems.push(...chunk);
-        onSaveErrorRef.current?.(`Toplu kayıt hatası: ${error.message}`);
-      } else {
-        console.log(`[ISG] addPersonelBatch chunk OK: ${data?.length ?? 0} rows`);
-      }
-    }
-
-    // Başarısız olanları pending queue'ya ekle (retry için)
-    if (failedItems.length > 0) {
-      failedItems.forEach(p => {
-        pendingSavesRef.current.push({ table: 'personeller', item: p as unknown as { id: string } & Record<string, unknown> });
-      });
-      console.warn(`[ISG] addPersonelBatch: ${failedItems.length} items queued for retry`);
-    }
-
-    return newPersoneller;
-  }, [setPersoneller]);
-
   const updatePersonel = useCallback((id: string, updates: Partial<Personel>) => {
     let updated: Personel | null = null;
     setPersoneller(prev => prev.map(p => {
@@ -1006,10 +932,15 @@ export function useStore(
     return newE;
   }, [setEkipmanlar, saveToDb]);
 
+  // Fields that denetci role is allowed to update (FIX 1: field-level restriction)
+  const DENETCI_ALLOWED_EKIPMAN_FIELDS = new Set([
+    'sonKontrolTarihi', 'sonrakiKontrolTarihi', 'durum', 'kontrolGecmisi', 'notlar',
+  ]);
+
   const updateEkipman = useCallback((id: string, updates: Partial<Ekipman>, callerRole?: string) => {
     const { dosyaVeri: _ignored, ...rest } = updates as Partial<Ekipman> & { dosyaVeri?: string };
 
-    // If caller is denetci, only allow whitelisted fields (uses module-level constant)
+    // FIX 1: If caller is denetci, only allow whitelisted fields
     let safeRest = rest;
     if (callerRole === 'denetci') {
       safeRest = Object.fromEntries(
@@ -1098,18 +1029,10 @@ export function useStore(
     if (updated) saveToDb('gorevler', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setGorevler, saveToDb]);
 
-  // BUG FIX: deleteGorev should soft-delete (silinmis: true), not hard-delete
-  // Hard delete was causing görevler to not appear in trash/restore flow
   const deleteGorev = useCallback((id: string) => {
-    let updated: Gorev | null = null;
-    setGorevler(prev => prev.map(g => {
-      if (g.id !== id) return g;
-      updated = { ...g, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
-      return updated;
-    }));
-    if (updated) saveToDb('gorevler', updated as unknown as { id: string } & Record<string, unknown>);
-    logFnRef.current?.('gorev_deleted', 'Görevler', id, undefined, 'Görev silindi.');
-  }, [setGorevler, saveToDb]);
+    setGorevler(prev => prev.filter(g => g.id !== id));
+    deleteFromDb('gorevler', id);
+  }, [setGorevler, deleteFromDb]);
 
   // ──────── TUTANAK ────────
   const addTutanak = useCallback(async (t: Omit<Tutanak, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>) => {
@@ -1310,6 +1233,11 @@ export function useStore(
   }, [updatePersonel]);
 
   const getPersonelFoto = useCallback((personelId: string): string | null => {
+    const p = _setPersoneller.length !== undefined
+      ? undefined
+      : undefined;
+    void p;
+    // fotoUrl doğrudan personel state'inden okunur
     const found = personeller.find(x => x.id === personelId);
     return found?.fotoUrl ?? null;
   }, [personeller]);
@@ -1326,7 +1254,7 @@ export function useStore(
     isSaving: false,
     refreshAllData,
     addFirma, updateFirma, deleteFirma, restoreFirma, permanentDeleteFirma,
-    addPersonel, addPersonelBatch, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
+    addPersonel, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
     addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak,
     addEgitim, updateEgitim, deleteEgitim, restoreEgitim, permanentDeleteEgitim,
     addMuayene, updateMuayene, deleteMuayene, restoreMuayene, permanentDeleteMuayene,

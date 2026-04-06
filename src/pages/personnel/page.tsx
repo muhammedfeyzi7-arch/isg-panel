@@ -94,7 +94,7 @@ interface ImportResult {
 }
 
 export default function PersonellerPage() {
-  const { personeller, firmalar, addPersonel, addPersonelBatch, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto, refreshData, dataLoading } = useApp();
+  const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto, refreshData, dataLoading } = useApp();
   const { canCreate, canEdit, canDelete, isReadOnly, canViewSensitiveData } = usePermissions();
 
   const [search, setSearch] = useState('');
@@ -438,9 +438,6 @@ export default function PersonellerPage() {
       const existingTCs = new Set(personeller.filter(p => !p.silinmis && p.tc).map(p => p.tc.replace(/\D/g, '')));
       const result: ImportResult = { successCount: 0, duplicateCount: 0, errorCount: 0, rows: [] };
 
-      // Batch için toplanacak personel listesi
-      const batchPersoneller: Omit<import('../../types').Personel, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>[] = [];
-
       // dataRows: global utility'den gelen temiz satırlar (boş + not satırları filtrelenmiş)
       dataRows.forEach((row, idx) => {
         const rowNum = idx + 2; // header = satır 1, data = satır 2+
@@ -491,8 +488,7 @@ export default function PersonellerPage() {
         const durum: PersonelStatus = (durumMap[normalize(get('Durum'))] as PersonelStatus) ?? 'Aktif';
         const kanGrubu = kanMap[normalize(get('Kan Grubu'))] ?? '';
 
-        // Batch listesine ekle — tek tek saveToDb yerine toplu gönderilecek
-        batchPersoneller.push({
+        addPersonel({
           adSoyad: adSoyad.trim(), tc, telefon: get('Telefon'), email: get('E-posta'),
           dogumTarihi: parseTrDate(get('Doğum Tarihi')), iseGirisTarihi: parseTrDate(get('İşe Giriş Tarihi')),
           gorev: get('Görev'), departman: get('Departman'), firmaId: firmaId!,
@@ -503,11 +499,6 @@ export default function PersonellerPage() {
         result.successCount++;
         result.rows.push({ row: rowNum, adSoyad, status: 'success', message: `Başarıyla eklendi${durum !== 'Aktif' ? ` (Durum: ${durum})` : ''}` });
       });
-
-      // Tüm geçerli personelleri tek seferde batch upsert ile kaydet
-      if (batchPersoneller.length > 0) {
-        await addPersonelBatch(batchPersoneller);
-      }
 
       setImportResult(result);
       if (result.successCount > 0) addToast(`${result.successCount} personel başarıyla içe aktarıldı.`, 'success');

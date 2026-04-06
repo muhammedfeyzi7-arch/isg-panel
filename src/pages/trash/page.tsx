@@ -14,8 +14,8 @@ export default function CopKutusuPage() {
     restoreEvrak, permanentDeleteEvrak,
     restoreEgitim, permanentDeleteEgitim,
     restoreMuayene, permanentDeleteMuayene,
-    restoreEkipman, permanentDeleteEkipmanMany,
-    permanentDeleteUygunsuzluk,
+    restoreEkipman, permanentDeleteEkipman, permanentDeleteEkipmanMany,
+    deleteUygunsuzluk, permanentDeleteUygunsuzluk,
     restoreTutanak, permanentDeleteTutanak,
     restoreIsIzni, permanentDeleteIsIzni,
     addToast,
@@ -23,30 +23,33 @@ export default function CopKutusuPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>('firmalar');
   const [permDeleteItem, setPermDeleteItem] = useState<{ id: string; tip: Tab; ad: string } | null>(null);
+
+  // Toplu seçim
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPermDeleteConfirm, setBulkPermDeleteConfirm] = useState(false);
   const [bulkRestoreConfirm, setBulkRestoreConfirm] = useState(false);
 
-  const deletedFirmalar       = useMemo(() => firmalar.filter(f => f.silinmis), [firmalar]);
-  const deletedPersoneller    = useMemo(() => personeller.filter(p => p.silinmis), [personeller]);
-  const deletedEvraklar       = useMemo(() => evraklar.filter(e => e.silinmis), [evraklar]);
-  const deletedEgitimler      = useMemo(() => egitimler.filter(e => e.silinmis), [egitimler]);
-  const deletedMuayeneler     = useMemo(() => muayeneler.filter(m => m.silinmis), [muayeneler]);
-  const deletedEkipmanlar     = useMemo(() => ekipmanlar.filter(e => e.silinmis || e.cascadeSilindi), [ekipmanlar]);
-  const deletedUygunsuzluklar = useMemo(() => uygunsuzluklar.filter(u => u.silinmis || u.cascadeSilindi), [uygunsuzluklar]);
-  const deletedTutanaklar     = useMemo(() => tutanaklar.filter(t => (t as unknown as { silinmis?: boolean }).silinmis), [tutanaklar]);
-  const deletedIsIzinleri     = useMemo(() => isIzinleri.filter(iz => (iz as unknown as { silinmis?: boolean }).silinmis), [isIzinleri]);
+  const deletedFirmalar    = useMemo(() => firmalar.filter(f => f.silinmis), [firmalar]);
+  const deletedPersoneller = useMemo(() => personeller.filter(p => p.silinmis), [personeller]);
+  const deletedEvraklar    = useMemo(() => evraklar.filter(e => e.silinmis), [evraklar]);
+  const deletedEgitimler   = useMemo(() => egitimler.filter(e => e.silinmis), [egitimler]);
+  const deletedMuayeneler  = useMemo(() => muayeneler.filter(m => m.silinmis), [muayeneler]);
+  const deletedEkipmanlar      = useMemo(() => ekipmanlar.filter(e => e.silinmis || e.cascadeSilindi), [ekipmanlar]);
+  const deletedUygunsuzluklar  = useMemo(() => uygunsuzluklar.filter(u => u.silinmis || u.cascadeSilindi), [uygunsuzluklar]);
+  const deletedTutanaklar  = useMemo(() => tutanaklar.filter(t => (t as unknown as { silinmis?: boolean }).silinmis), [tutanaklar]);
+  const deletedIsIzinleri  = useMemo(() => isIzinleri.filter(iz => (iz as unknown as { silinmis?: boolean }).silinmis), [isIzinleri]);
 
+  // Aktif tab'daki silinen kayıtlar
   const activeItems = useMemo(() => {
-    if (activeTab === 'firmalar')       return deletedFirmalar;
-    if (activeTab === 'personeller')    return deletedPersoneller;
-    if (activeTab === 'evraklar')       return deletedEvraklar;
-    if (activeTab === 'egitimler')      return deletedEgitimler;
-    if (activeTab === 'muayeneler')     return deletedMuayeneler;
-    if (activeTab === 'ekipmanlar')     return deletedEkipmanlar;
+    if (activeTab === 'firmalar') return deletedFirmalar;
+    if (activeTab === 'personeller') return deletedPersoneller;
+    if (activeTab === 'evraklar') return deletedEvraklar;
+    if (activeTab === 'egitimler') return deletedEgitimler;
+    if (activeTab === 'muayeneler') return deletedMuayeneler;
+    if (activeTab === 'ekipmanlar') return deletedEkipmanlar;
     if (activeTab === 'uygunsuzluklar') return deletedUygunsuzluklar;
-    if (activeTab === 'tutanaklar')     return deletedTutanaklar;
-    if (activeTab === 'is_izinleri')    return deletedIsIzinleri;
+    if (activeTab === 'tutanaklar') return deletedTutanaklar;
+    if (activeTab === 'is_izinleri') return deletedIsIzinleri;
     return [];
   }, [activeTab, deletedFirmalar, deletedPersoneller, deletedEvraklar, deletedEgitimler, deletedMuayeneler, deletedEkipmanlar, deletedUygunsuzluklar, deletedTutanaklar, deletedIsIzinleri]);
 
@@ -58,6 +61,7 @@ export default function CopKutusuPage() {
     return n;
   });
 
+  // Tab değişince seçimi temizle
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
     setSelected(new Set());
@@ -72,7 +76,9 @@ export default function CopKutusuPage() {
   const firmaCascadeSayilari = useMemo(() => {
     const result: Record<string, { personel: number; evrak: number }> = {};
     for (const f of deletedFirmalar) {
-      const cascadePersonelIds = personeller.filter(p => p.cascadeFirmaId === f.id && p.cascadeSilindi).map(p => p.id);
+      const cascadePersonelIds = personeller
+        .filter(p => p.cascadeFirmaId === f.id && p.cascadeSilindi)
+        .map(p => p.id);
       const cascadeEvrakSayisi = evraklar.filter(e => e.cascadeFirmaId === f.id && e.cascadeSilindi).length;
       result[f.id] = { personel: cascadePersonelIds.length, evrak: cascadeEvrakSayisi };
     }
@@ -98,13 +104,13 @@ export default function CopKutusuPage() {
         : '';
       addToast(`Firma geri yüklendi.${ekBilgi}`, 'success');
     }
-    if (tip === 'personeller') { restorePersonel(id);  addToast('Personel geri yüklendi.', 'success'); }
-    if (tip === 'evraklar')    { restoreEvrak(id);     addToast('Evrak geri yüklendi.', 'success'); }
-    if (tip === 'egitimler')   { restoreEgitim(id);    addToast('Eğitim geri yüklendi.', 'success'); }
-    if (tip === 'muayeneler')  { restoreMuayene(id);   addToast('Sağlık evrakı geri yüklendi.', 'success'); }
-    if (tip === 'ekipmanlar')  { restoreEkipman(id);   addToast('Ekipman geri yüklendi.', 'success'); }
-    if (tip === 'tutanaklar')  { restoreTutanak(id);   addToast('Tutanak geri yüklendi.', 'success'); }
-    if (tip === 'is_izinleri') { restoreIsIzni(id);    addToast('İş izni geri yüklendi.', 'success'); }
+    if (tip === 'personeller')    { restorePersonel(id);  addToast('Personel geri yüklendi.', 'success'); }
+    if (tip === 'evraklar')       { restoreEvrak(id);     addToast('Evrak geri yüklendi.', 'success'); }
+    if (tip === 'egitimler')      { restoreEgitim(id);    addToast('Eğitim geri yüklendi.', 'success'); }
+    if (tip === 'muayeneler')     { restoreMuayene(id);   addToast('Sağlık evrakı geri yüklendi.', 'success'); }
+    if (tip === 'ekipmanlar')     { restoreEkipman(id);   addToast('Ekipman geri yüklendi.', 'success'); }
+    if (tip === 'tutanaklar')     { restoreTutanak(id);   addToast('Tutanak geri yüklendi.', 'success'); }
+    if (tip === 'is_izinleri')    { restoreIsIzni(id);    addToast('İş izni geri yüklendi.', 'success'); }
   };
 
   const handlePermanentDelete = async () => {
@@ -112,6 +118,7 @@ export default function CopKutusuPage() {
     const { id, tip } = permDeleteItem;
     setPermDeleteItem(null);
     setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
+
     try {
       if (tip === 'firmalar')       await permanentDeleteFirma(id);
       if (tip === 'personeller')    await permanentDeletePersonel(id);
@@ -128,6 +135,7 @@ export default function CopKutusuPage() {
     }
   };
 
+  // Toplu geri yükleme
   const handleBulkRestore = () => {
     selected.forEach(id => handleRestore(id, activeTab));
     addToast(`${selected.size} kayıt geri yüklendi.`, 'success');
@@ -135,11 +143,13 @@ export default function CopKutusuPage() {
     setBulkRestoreConfirm(false);
   };
 
+  // Toplu kalıcı silme
   const handleBulkPermDelete = async () => {
     const ids = Array.from(selected);
     const count = ids.length;
     setSelected(new Set());
     setBulkPermDeleteConfirm(false);
+
     try {
       if (activeTab === 'ekipmanlar') {
         await permanentDeleteEkipmanMany(ids);
@@ -164,16 +174,16 @@ export default function CopKutusuPage() {
 
   const canRestore = (tip: Tab) => ['firmalar', 'personeller', 'evraklar', 'egitimler', 'muayeneler', 'ekipmanlar', 'tutanaklar', 'is_izinleri'].includes(tip);
 
-  const tabs: { id: Tab; label: string; icon: string; count: number }[] = [
-    { id: 'firmalar',       label: 'Firmalar',      icon: 'ri-building-2-line',    count: deletedFirmalar.length },
-    { id: 'personeller',    label: 'Personeller',   icon: 'ri-team-line',           count: deletedPersoneller.length },
-    { id: 'evraklar',       label: 'Evraklar',      icon: 'ri-file-list-3-line',    count: deletedEvraklar.length },
-    { id: 'egitimler',      label: 'Eğitimler',     icon: 'ri-graduation-cap-line', count: deletedEgitimler.length },
-    { id: 'muayeneler',     label: 'Sağlık',        icon: 'ri-heart-pulse-line',    count: deletedMuayeneler.length },
-    { id: 'ekipmanlar',     label: 'Ekipmanlar',    icon: 'ri-tools-line',          count: deletedEkipmanlar.length },
-    { id: 'uygunsuzluklar', label: 'Saha Denetim', icon: 'ri-map-pin-user-line',   count: deletedUygunsuzluklar.length },
-    { id: 'tutanaklar',     label: 'Tutanaklar',    icon: 'ri-article-line',        count: deletedTutanaklar.length },
-    { id: 'is_izinleri',    label: 'İş İzinleri',  icon: 'ri-shield-check-line',   count: deletedIsIzinleri.length },
+  const tabs: { id: Tab; label: string; icon: string; count: number; color: string }[] = [
+    { id: 'firmalar',       label: 'Firmalar',       icon: 'ri-building-2-line',      count: deletedFirmalar.length,       color: '#3B82F6' },
+    { id: 'personeller',    label: 'Personeller',    icon: 'ri-team-line',             count: deletedPersoneller.length,    color: '#10B981' },
+    { id: 'evraklar',       label: 'Evraklar',       icon: 'ri-file-list-3-line',      count: deletedEvraklar.length,       color: '#F59E0B' },
+    { id: 'egitimler',      label: 'Eğitimler',      icon: 'ri-graduation-cap-line',   count: deletedEgitimler.length,      color: '#60A5FA' },
+    { id: 'muayeneler',     label: 'Sağlık',         icon: 'ri-heart-pulse-line',      count: deletedMuayeneler.length,     color: '#F43F5E' },
+    { id: 'ekipmanlar',     label: 'Ekipmanlar',     icon: 'ri-tools-line',            count: deletedEkipmanlar.length,     color: '#FB923C' },
+    { id: 'uygunsuzluklar', label: 'Saha Denetim',  icon: 'ri-map-pin-user-line',     count: deletedUygunsuzluklar.length, color: '#F97316' },
+    { id: 'tutanaklar',     label: 'Tutanaklar',     icon: 'ri-article-line',          count: deletedTutanaklar.length,     color: '#14B8A6' },
+    { id: 'is_izinleri',    label: 'İş İzinleri',   icon: 'ri-shield-check-line',     count: deletedIsIzinleri.length,     color: '#8B5CF6' },
   ];
 
   const fmt = (d?: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
@@ -188,6 +198,7 @@ export default function CopKutusuPage() {
     'Onay Bekliyor': '#FBBF24', 'Onaylandı': '#34D399', 'Reddedildi': '#F87171',
   };
 
+  // Satır render yardımcısı — checkbox + butonlar
   const renderRowActions = (id: string, tip: Tab, ad: string, restoreLabel?: string) => (
     <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
       <input type="checkbox" checked={selected.has(id)} onChange={() => toggleOne(id)} className="cursor-pointer" />
@@ -244,11 +255,14 @@ export default function CopKutusuPage() {
       <div className="overflow-x-auto">
         <div className="flex gap-1 p-1 rounded-xl isg-card min-w-max sm:min-w-0 sm:flex-wrap">
           {tabs.map(tab => (
-            <button key={tab.id} onClick={() => handleTabChange(tab.id)}
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
               className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap"
               style={activeTab === tab.id
                 ? { background: 'linear-gradient(135deg, #3B82F6, #6366F1)', color: 'white', boxShadow: '0 4px 15px rgba(99,102,241,0.3)' }
-                : { color: 'var(--text-muted)' }}>
+                : { color: 'var(--text-muted)' }}
+            >
               <i className={tab.icon} />
               <span className="hidden xs:inline sm:inline">{tab.label}</span>
               {tab.count > 0 && (
@@ -266,24 +280,25 @@ export default function CopKutusuPage() {
 
       {/* Toplu seçim aksiyonları */}
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl flex-wrap"
-          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl flex-wrap" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
           <span className="text-sm font-semibold" style={{ color: '#818CF8' }}>{selected.size} kayıt seçildi</span>
           {canRestore(activeTab) && (
-            <button onClick={() => setBulkRestoreConfirm(true)}
+            <button
+              onClick={() => setBulkRestoreConfirm(true)}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
-              style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}>
+              style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}
+            >
               <i className="ri-arrow-go-back-line" /> Seçilenleri Geri Yükle
             </button>
           )}
-          <button onClick={() => setBulkPermDeleteConfirm(true)}
+          <button
+            onClick={() => setBulkPermDeleteConfirm(true)}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
-            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
             <i className="ri-delete-bin-line" /> Seçilenleri Kalıcı Sil
           </button>
-          <button onClick={() => setSelected(new Set())}
-            className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto"
-            style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+          <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
             Seçimi Kaldır
           </button>
         </div>
@@ -291,9 +306,10 @@ export default function CopKutusuPage() {
 
       {/* Content */}
       <div className="rounded-2xl isg-card overflow-hidden">
+
+        {/* Tümünü seç başlık satırı */}
         {activeItems.length > 0 && (
-          <div className="flex items-center gap-3 px-5 py-2.5 border-b"
-            style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-item)' }}>
+          <div className="flex items-center gap-3 px-5 py-2.5 border-b" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-item)' }}>
             <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
             <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
               {allSelected ? 'Tümünün seçimini kaldır' : 'Tümünü seç'} ({activeItems.length} kayıt)
@@ -301,328 +317,338 @@ export default function CopKutusuPage() {
           </div>
         )}
 
-        {/* Firmalar */}
+        {/* Firmalar Tab */}
         {activeTab === 'firmalar' && (
-          deletedFirmalar.length === 0 ? <TrashEmpty type="firma" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedFirmalar.map(f => {
-              const cascade = firmaCascadeSayilari[f.id] ?? { personel: 0, evrak: 0 };
-              const hasCascade = cascade.personel > 0 || cascade.evrak > 0;
-              return (
-                <div key={f.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(f.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-xs font-bold text-white"
-                    style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
-                    {f.ad.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{f.ad}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {f.yetkiliKisi || '—'} · Silinme: {fmt(f.silinmeTarihi)}
-                      </p>
-                      {hasCascade && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1"
-                          style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
-                          <i className="ri-links-line" />
-                          {cascade.personel > 0 && `${cascade.personel} personel`}
-                          {cascade.personel > 0 && cascade.evrak > 0 && ', '}
-                          {cascade.evrak > 0 && `${cascade.evrak} evrak`}
-                        </span>
-                      )}
+          deletedFirmalar.length === 0
+            ? <TrashEmpty type="firma" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedFirmalar.map(f => {
+                const cascade = firmaCascadeSayilari[f.id] ?? { personel: 0, evrak: 0 };
+                const hasCascade = cascade.personel > 0 || cascade.evrak > 0;
+                return (
+                  <div key={f.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(f.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-xs font-bold text-white"
+                      style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
+                      {f.ad.charAt(0)}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{f.ad}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {f.yetkiliKisi || '—'} · Silinme: {fmt(f.silinmeTarihi)}
+                        </p>
+                        {hasCascade && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1"
+                            style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+                            <i className="ri-links-line" />
+                            {cascade.personel > 0 && `${cascade.personel} personel`}
+                            {cascade.personel > 0 && cascade.evrak > 0 && ', '}
+                            {cascade.evrak > 0 && `${cascade.evrak} evrak`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Badge label={f.durum} color={getFirmaStatusColor(f.durum)} />
+                    {renderRowActions(f.id, 'firmalar', f.ad, hasCascade ? 'Tümünü Geri Yükle' : 'Geri Yükle')}
                   </div>
-                  <Badge label={f.durum} color={getFirmaStatusColor(f.durum)} />
-                  {renderRowActions(f.id, 'firmalar', f.ad, hasCascade ? 'Tümünü Geri Yükle' : 'Geri Yükle')}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
 
-        {/* Personeller */}
+        {/* Personeller Tab */}
         {activeTab === 'personeller' && (
-          deletedPersoneller.length === 0 ? <TrashEmpty type="personel" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedPersoneller.map(p => {
-              const ilgiFirma = p.cascadeSilindi && p.cascadeFirmaId ? firmalar.find(f => f.id === p.cascadeFirmaId) : null;
-              return (
-                <div key={p.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(p.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-xs font-bold text-white"
-                    style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                    {p.adSoyad.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{p.adSoyad}</p>
-                      {ilgiFirma && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0"
-                          style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
-                          <i className="ri-building-2-line" />{ilgiFirma.ad} ile silindi
-                        </span>
-                      )}
+          deletedPersoneller.length === 0
+            ? <TrashEmpty type="personel" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedPersoneller.map(p => {
+                const ilgiFirma = p.cascadeSilindi && p.cascadeFirmaId
+                  ? firmalar.find(f => f.id === p.cascadeFirmaId)
+                  : null;
+                return (
+                  <div key={p.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(p.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-xs font-bold text-white"
+                      style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                      {p.adSoyad.charAt(0)}
                     </div>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {p.gorev || '—'} · Silinme: {fmt(p.silinmeTarihi)}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{p.adSoyad}</p>
+                        {ilgiFirma && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0"
+                            style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
+                            <i className="ri-building-2-line" />{ilgiFirma.ad} ile silindi
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {p.gorev || '—'} · Silinme: {fmt(p.silinmeTarihi)}
+                      </p>
+                    </div>
+                    <Badge label={p.durum} color={getPersonelStatusColor(p.durum)} />
+                    {renderRowActions(p.id, 'personeller', p.adSoyad)}
                   </div>
-                  <Badge label={p.durum} color={getPersonelStatusColor(p.durum)} />
-                  {renderRowActions(p.id, 'personeller', p.adSoyad)}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
 
-        {/* Evraklar */}
+        {/* Evraklar Tab */}
         {activeTab === 'evraklar' && (
-          deletedEvraklar.length === 0 ? <TrashEmpty type="evrak" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedEvraklar.map(e => {
-              const cascadeFirma = e.cascadeSilindi && e.cascadeFirmaId ? firmalar.find(f => f.id === e.cascadeFirmaId) : null;
-              return (
-                <div key={e.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(e.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                    <i className="ri-file-text-line text-sm" style={{ color: '#60A5FA' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{e.ad}</p>
-                      {cascadeFirma && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0"
-                          style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
-                          <i className="ri-building-2-line" />{cascadeFirma.ad} ile silindi
-                        </span>
-                      )}
+          deletedEvraklar.length === 0
+            ? <TrashEmpty type="evrak" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedEvraklar.map(e => {
+                const cascadeFirma = e.cascadeSilindi && e.cascadeFirmaId
+                  ? firmalar.find(f => f.id === e.cascadeFirmaId)
+                  : null;
+                return (
+                  <div key={e.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(e.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                      <i className="ri-file-text-line text-sm" style={{ color: '#60A5FA' }} />
                     </div>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{e.tur} · Silinme: {fmt(e.silinmeTarihi)}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{e.ad}</p>
+                        {cascadeFirma && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0"
+                            style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
+                            <i className="ri-building-2-line" />{cascadeFirma.ad} ile silindi
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {e.tur} · Silinme: {fmt(e.silinmeTarihi)}
+                      </p>
+                    </div>
+                    <Badge label={e.durum} color={getEvrakStatusColor(e.durum)} />
+                    {renderRowActions(e.id, 'evraklar', e.ad)}
                   </div>
-                  <Badge label={e.durum} color={getEvrakStatusColor(e.durum)} />
-                  {renderRowActions(e.id, 'evraklar', e.ad)}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
 
-        {/* Eğitimler */}
+        {/* Eğitimler Tab */}
         {activeTab === 'egitimler' && (
-          deletedEgitimler.length === 0 ? <TrashEmpty type="egitim" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedEgitimler.map(eg => {
-              const firma = firmalar.find(f => f.id === eg.firmaId);
-              return (
-                <div key={eg.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(eg.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)' }}>
-                    <i className="ri-graduation-cap-line text-sm" style={{ color: '#60A5FA' }} />
+          deletedEgitimler.length === 0
+            ? <TrashEmpty type="egitim" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedEgitimler.map(eg => {
+                const firma = firmalar.find(f => f.id === eg.firmaId);
+                return (
+                  <div key={eg.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(eg.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                      <i className="ri-graduation-cap-line text-sm" style={{ color: '#60A5FA' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{eg.ad}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {firma?.ad || '—'} · {eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'} · Silinme: {fmt(eg.silinmeTarihi)}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: 'rgba(96,165,250,0.12)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.2)' }}>
+                      {eg.durum}
+                    </span>
+                    {renderRowActions(eg.id, 'egitimler', eg.ad)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{eg.ad}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {firma?.ad || '—'} · {eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'} · Silinme: {fmt(eg.silinmeTarihi)}
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ background: 'rgba(96,165,250,0.12)', color: '#60A5FA', border: '1px solid rgba(96,165,250,0.2)' }}>
-                    {eg.durum}
-                  </span>
-                  {renderRowActions(eg.id, 'egitimler', eg.ad)}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
 
-        {/* Muayeneler */}
+        {/* Muayeneler Tab */}
         {activeTab === 'muayeneler' && (
-          deletedMuayeneler.length === 0 ? <TrashEmpty type="muayene" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedMuayeneler.map(m => {
-              const personel = personeller.find(p => p.id === m.personelId);
-              const firma = firmalar.find(f => f.id === m.firmaId);
-              const RESULT_COLOR: Record<string, string> = { 'Çalışabilir': '#34D399', 'Kısıtlı Çalışabilir': '#FBBF24', 'Çalışamaz': '#F87171' };
-              const rc = RESULT_COLOR[m.sonuc] ?? '#94A3B8';
-              return (
-                <div key={m.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(m.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.2)' }}>
-                    <i className="ri-heart-pulse-line text-sm" style={{ color: '#F43F5E' }} />
+          deletedMuayeneler.length === 0
+            ? <TrashEmpty type="muayene" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedMuayeneler.map(m => {
+                const personel = personeller.find(p => p.id === m.personelId);
+                const firma = firmalar.find(f => f.id === m.firmaId);
+                const RESULT_COLOR: Record<string, string> = {
+                  'Çalışabilir': '#34D399', 'Kısıtlı Çalışabilir': '#FBBF24', 'Çalışamaz': '#F87171',
+                };
+                const rc = RESULT_COLOR[m.sonuc] ?? '#94A3B8';
+                return (
+                  <div key={m.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(m.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.2)' }}>
+                      <i className="ri-heart-pulse-line text-sm" style={{ color: '#F43F5E' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{personel?.adSoyad || '—'}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {firma?.ad || '—'} · {m.muayeneTarihi ? new Date(m.muayeneTarihi).toLocaleDateString('tr-TR') : '—'} · Silinme: {fmt(m.silinmeTarihi)}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: `${rc}18`, color: rc, border: `1px solid ${rc}30` }}>
+                      {m.sonuc}
+                    </span>
+                    {renderRowActions(m.id, 'muayeneler', personel?.adSoyad || 'Muayene')}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{personel?.adSoyad || '—'}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {firma?.ad || '—'} · {m.muayeneTarihi ? new Date(m.muayeneTarihi).toLocaleDateString('tr-TR') : '—'} · Silinme: {fmt(m.silinmeTarihi)}
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ background: `${rc}18`, color: rc, border: `1px solid ${rc}30` }}>
-                    {m.sonuc}
-                  </span>
-                  {renderRowActions(m.id, 'muayeneler', personel?.adSoyad || 'Muayene')}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
 
-        {/* Ekipmanlar */}
+        {/* Ekipmanlar Tab */}
         {activeTab === 'ekipmanlar' && (
-          deletedEkipmanlar.length === 0 ? <TrashEmpty type="ekipman" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedEkipmanlar.map(ek => {
-              const firma = firmalar.find(f => f.id === ek.firmaId);
-              const sc = EKIPMAN_STATUS_COLOR[ek.durum] ?? '#94A3B8';
-              return (
-                <div key={ek.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(ek.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.2)' }}>
-                    <i className="ri-tools-line text-sm" style={{ color: '#FB923C' }} />
+          deletedEkipmanlar.length === 0
+            ? <TrashEmpty type="ekipman" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedEkipmanlar.map(ek => {
+                const firma = firmalar.find(f => f.id === ek.firmaId);
+                const sc = EKIPMAN_STATUS_COLOR[ek.durum] ?? '#94A3B8';
+                return (
+                  <div key={ek.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(ek.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.2)' }}>
+                      <i className="ri-tools-line text-sm" style={{ color: '#FB923C' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {ek.tur} · {firma?.ad || '—'} · {ek.bulunduguAlan || '—'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
+                      {ek.durum}
+                    </span>
+                    {renderRowActions(ek.id, 'ekipmanlar', ek.ad)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {ek.tur} · {firma?.ad || '—'} · {ek.bulunduguAlan || '—'}
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
-                    {ek.durum}
-                  </span>
-                  {renderRowActions(ek.id, 'ekipmanlar', ek.ad)}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
 
-        {/* Uygunsuzluklar */}
+        {/* Uygunsuzluklar Tab */}
         {activeTab === 'uygunsuzluklar' && (
-          deletedUygunsuzluklar.length === 0 ? <TrashEmpty type="uygunsuzluk" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedUygunsuzluklar.map(u => {
-              const firma = firmalar.find(f => f.id === u.firmaId);
-              const sc = SEVERITY_COLOR[u.severity] ?? '#94A3B8';
-              return (
-                <div key={u.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(u.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.2)' }}>
-                    <i className="ri-map-pin-user-line text-sm" style={{ color: '#F97316' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{u.baslik}</p>
-                      {u.acilisNo && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-                          style={{ background: 'rgba(249,115,22,0.1)', color: '#F97316' }}>
-                          {u.acilisNo}
-                        </span>
-                      )}
+          deletedUygunsuzluklar.length === 0
+            ? <TrashEmpty type="uygunsuzluk" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedUygunsuzluklar.map(u => {
+                const firma = firmalar.find(f => f.id === u.firmaId);
+                const sc = SEVERITY_COLOR[u.severity] ?? '#94A3B8';
+                return (
+                  <div key={u.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(u.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                      <i className="ri-map-pin-user-line text-sm" style={{ color: '#F97316' }} />
                     </div>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {firma?.ad || '—'} · {u.tarih ? new Date(u.tarih).toLocaleDateString('tr-TR') : '—'}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{u.baslik}</p>
+                        {u.acilisNo && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                            style={{ background: 'rgba(249,115,22,0.1)', color: '#F97316' }}>
+                            {u.acilisNo}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {firma?.ad || '—'} · {u.tarih ? new Date(u.tarih).toLocaleDateString('tr-TR') : '—'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
+                      {u.severity}
+                    </span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleOne(u.id)} className="cursor-pointer" />
+                      <button onClick={() => setPermDeleteItem({ id: u.id, tip: 'uygunsuzluklar', ad: u.baslik })}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                        style={{ color: '#EF4444' }} title="Kalıcı Sil"
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                        <i className="ri-delete-bin-line text-sm" />
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
-                    {u.severity}
-                  </span>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleOne(u.id)} className="cursor-pointer" />
-                    <button onClick={() => setPermDeleteItem({ id: u.id, tip: 'uygunsuzluklar', ad: u.baslik })}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                      style={{ color: '#EF4444' }} title="Kalıcı Sil"
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                      <i className="ri-delete-bin-line text-sm" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
 
-        {/* Tutanaklar */}
+        {/* Tutanaklar Tab */}
         {activeTab === 'tutanaklar' && (
-          deletedTutanaklar.length === 0 ? <TrashEmpty type="tutanak" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedTutanaklar.map(t => {
-              const firma = firmalar.find(f => f.id === t.firmaId);
-              const STATUS_COLOR: Record<string, string> = { 'Taslak': '#94A3B8', 'Tamamlandı': '#34D399', 'Onaylandı': '#60A5FA', 'İptal': '#F87171' };
-              const sc = STATUS_COLOR[t.durum] ?? '#94A3B8';
-              return (
-                <div key={t.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(t.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(20,184,166,0.12)', border: '1px solid rgba(20,184,166,0.2)' }}>
-                    <i className="ri-article-line text-sm" style={{ color: '#14B8A6' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{t.baslik}</p>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-                        style={{ background: 'rgba(20,184,166,0.1)', color: '#14B8A6' }}>
-                        {t.tutanakNo}
-                      </span>
+          deletedTutanaklar.length === 0
+            ? <TrashEmpty type="tutanak" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedTutanaklar.map(t => {
+                const firma = firmalar.find(f => f.id === t.firmaId);
+                const STATUS_COLOR: Record<string, string> = {
+                  'Taslak': '#94A3B8', 'Tamamlandı': '#34D399', 'Onaylandı': '#60A5FA', 'İptal': '#F87171',
+                };
+                const sc = STATUS_COLOR[t.durum] ?? '#94A3B8';
+                return (
+                  <div key={t.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(t.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(20,184,166,0.12)', border: '1px solid rgba(20,184,166,0.2)' }}>
+                      <i className="ri-article-line text-sm" style={{ color: '#14B8A6' }} />
                     </div>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {firma?.ad || '—'} · {t.tarih ? new Date(t.tarih).toLocaleDateString('tr-TR') : '—'}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{t.baslik}</p>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{ background: 'rgba(20,184,166,0.1)', color: '#14B8A6' }}>
+                          {t.tutanakNo}
+                        </span>
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {firma?.ad || '—'} · {t.tarih ? new Date(t.tarih).toLocaleDateString('tr-TR') : '—'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
+                      {t.durum}
+                    </span>
+                    {renderRowActions(t.id, 'tutanaklar', t.baslik)}
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
-                    {t.durum}
-                  </span>
-                  {renderRowActions(t.id, 'tutanaklar', t.baslik)}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
 
-        {/* İş İzinleri */}
+        {/* İş İzinleri Tab */}
         {activeTab === 'is_izinleri' && (
-          deletedIsIzinleri.length === 0 ? <TrashEmpty type="is_izni" /> :
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {deletedIsIzinleri.map(iz => {
-              const firma = firmalar.find(f => f.id === iz.firmaId);
-              const sc = IZIN_STATUS_COLOR[iz.durum] ?? '#94A3B8';
-              return (
-                <div key={iz.id} className="flex items-center gap-4 px-5 py-4"
-                  style={{ background: selected.has(iz.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    <i className="ri-shield-check-line text-sm" style={{ color: '#8B5CF6' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{iz.tip}</p>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-                        style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}>
-                        {iz.izinNo}
-                      </span>
+          deletedIsIzinleri.length === 0
+            ? <TrashEmpty type="is_izni" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedIsIzinleri.map(iz => {
+                const firma = firmalar.find(f => f.id === iz.firmaId);
+                const sc = IZIN_STATUS_COLOR[iz.durum] ?? '#94A3B8';
+                return (
+                  <div key={iz.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(iz.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                      <i className="ri-shield-check-line text-sm" style={{ color: '#8B5CF6' }} />
                     </div>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {firma?.ad || '—'} · {iz.bolum || '—'} · {iz.baslamaTarihi ? new Date(iz.baslamaTarihi).toLocaleDateString('tr-TR') : '—'}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{iz.tip}</p>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}>
+                          {iz.izinNo}
+                        </span>
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {firma?.ad || '—'} · {iz.bolum || '—'} · {iz.baslamaTarihi ? new Date(iz.baslamaTarihi).toLocaleDateString('tr-TR') : '—'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
+                      {iz.durum}
+                    </span>
+                    {renderRowActions(iz.id, 'is_izinleri', `${iz.izinNo} - ${iz.tip}`)}
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
-                    {iz.durum}
-                  </span>
-                  {renderRowActions(iz.id, 'is_izinleri', `${iz.izinNo} - ${iz.tip}`)}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         )}
       </div>
 
@@ -652,8 +678,7 @@ export default function CopKutusuPage() {
             </div>
           </div>
           {permDeleteItem?.tip === 'firmalar' && permDeleteCascade && (permDeleteCascade.personelSayisi > 0 || permDeleteCascade.evrakSayisi > 0) && (
-            <div className="rounded-xl p-3.5 space-y-2.5"
-              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <div className="rounded-xl p-3.5 space-y-2.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
               <div className="flex items-center gap-2">
                 <i className="ri-links-line text-sm flex-shrink-0" style={{ color: '#F87171' }} />
                 <p className="text-xs font-semibold" style={{ color: '#F87171' }}>Birlikte kalıcı olarak silinecek:</p>
@@ -692,8 +717,7 @@ export default function CopKutusuPage() {
           </>
         }>
         <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4"
-            style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
             <i className="ri-arrow-go-back-line text-xl" style={{ color: '#10B981' }} />
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
@@ -714,16 +738,13 @@ export default function CopKutusuPage() {
           </>
         }>
         <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4"
-            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
           </div>
           <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
             <strong>{selected.size}</strong> kayıt kalıcı olarak silinecek.
           </p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>
-            Bu işlem <strong className="text-red-400">geri alınamaz</strong>. Kayıtlar sistemden tamamen kaldırılacak.
-          </p>
+          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem <strong className="text-red-400">geri alınamaz</strong>. Kayıtlar sistemden tamamen kaldırılacak.</p>
         </div>
       </Modal>
     </div>
@@ -732,15 +753,15 @@ export default function CopKutusuPage() {
 
 function TrashEmpty({ type }: { type: string }) {
   const labels: Record<string, string> = {
-    firma:       'Çöp kutusunda firma yok',
-    personel:    'Çöp kutusunda personel yok',
-    evrak:       'Çöp kutusunda evrak yok',
-    egitim:      'Çöp kutusunda eğitim kaydı yok',
-    muayene:     'Çöp kutusunda sağlık kaydı yok',
-    ekipman:     'Çöp kutusunda ekipman kaydı yok',
-    uygunsuzluk: 'Çöp kutusunda saha denetim kaydı yok',
-    tutanak:     'Çöp kutusunda tutanak yok',
-    is_izni:     'Çöp kutusunda iş izni yok',
+    firma:          'Çöp kutusunda firma yok',
+    personel:       'Çöp kutusunda personel yok',
+    evrak:          'Çöp kutusunda evrak yok',
+    egitim:         'Çöp kutusunda eğitim kaydı yok',
+    muayene:        'Çöp kutusunda sağlık kaydı yok',
+    ekipman:        'Çöp kutusunda ekipman kaydı yok',
+    uygunsuzluk:    'Çöp kutusunda saha denetim kaydı yok',
+    tutanak:        'Çöp kutusunda tutanak yok',
+    is_izni:        'Çöp kutusunda iş izni yok',
   };
   return (
     <div className="flex flex-col items-center py-16 gap-3">

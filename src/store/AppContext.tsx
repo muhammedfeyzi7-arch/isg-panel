@@ -231,24 +231,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!org?.id) return;
     let cancelled = false;
-    // kontrol_formlari tablosu: veriler data JSONB kolonunda saklanıyor
-    // id ve organization_id doğrudan kolon, geri kalanlar data içinde
     supabase
       .from('kontrol_formlari')
-      .select('id, data')
+      .select('id, ad, kategori, sonraki_kontrol_tarihi, firma_id')
       .eq('organization_id', org.id)
       .then(({ data }) => {
         if (cancelled || !data) return;
-        setKontrolFormlar(data.map(r => {
-          const d = (r.data as Record<string, unknown>) ?? {};
-          return {
-            id: r.id as string,
-            ad: (d.ad as string) ?? '',
-            kategori: (d.kategori as string) ?? '',
-            sonrakiKontrolTarihi: (d.sonrakiKontrolTarihi as string) ?? undefined,
-            firmaId: (d.firmaId as string) ?? undefined,
-          };
-        }));
+        setKontrolFormlar(data.map(r => ({
+          id: r.id,
+          ad: r.ad,
+          kategori: r.kategori ?? '',
+          sonrakiKontrolTarihi: r.sonraki_kontrol_tarihi ?? undefined,
+          firmaId: r.firma_id ?? undefined,
+        })));
       });
     return () => { cancelled = true; };
   }, [org?.id]);
