@@ -1,10 +1,10 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../../store/AppContext';
 import MonthlyStats from './components/MonthlyStats';
 import StatCard from './components/StatCard';
 import CompanyDocumentsWidget from './components/CompanyDocumentsWidget';
 import AkilliOzet from './components/AkilliOzet';
-import { supabase } from '../../lib/supabase';
+import IsIzniUyariWidget from './components/IsIzniUyariWidget';
 
 import {
   PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
@@ -23,31 +23,10 @@ export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
     uygunsuzluklar, bildirimler, ekipmanlar, gorevler, isIzinleri,
-    setActiveModule, org,
+    setActiveModule,
   } = useApp();
 
-  // Kontrol Formları — data JSONB kolonundan oku
-  const [acikKontrolFormu, setAcikKontrolFormu] = useState(0);
-  const [kontrolFormYuklendi, setKontrolFormYuklendi] = useState(false);
-  useEffect(() => {
-    if (!org?.id) return;
-    const today = new Date().toISOString().split('T')[0];
-    supabase
-      .from('kontrol_formlari')
-      .select('id, data')
-      .eq('organization_id', org.id)
-      .then(({ data }) => {
-        if (!data) { setKontrolFormYuklendi(true); return; }
-        // data JSONB içindeki sonrakiKontrolTarihi alanını oku
-        const count = data.filter(r => {
-          const form = r.data as Record<string, unknown> | null;
-          const tarih = form?.sonrakiKontrolTarihi as string | undefined;
-          return tarih && tarih <= today;
-        }).length;
-        setAcikKontrolFormu(count);
-        setKontrolFormYuklendi(true);
-      });
-  }, [org?.id]);
+
 
   const aktifFirmalar      = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
   const aktifPersoneller   = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);
@@ -303,12 +282,7 @@ export default function DashboardPage() {
                 <i className="ri-task-line text-[11px]" />{gorevStats.gecikmiş} gecikmiş görev
               </div>
             )}
-            {acikKontrolFormu > 0 && kontrolFormYuklendi && (
-              <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
-                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
-                <i className="ri-folder-shield-2-line text-[11px]" />{acikKontrolFormu} kontrol formu
-              </div>
-            )}
+
             {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
               <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
                 style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
@@ -417,7 +391,7 @@ export default function DashboardPage() {
 
       {/* ── Akıllı Özet + Bu Ay Özeti ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        <AkilliOzet acikKontrolFormu={acikKontrolFormu} kontrolFormYuklendi={kontrolFormYuklendi} />
+        <AkilliOzet />
         <div className="lg:col-span-2">
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
@@ -739,6 +713,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── İş İzni Uyarı Widget ── */}
+      <IsIzniUyariWidget />
 
       {/* ── Firma Evrakları Widget ── */}
       <CompanyDocumentsWidget />

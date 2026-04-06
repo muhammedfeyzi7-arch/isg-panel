@@ -51,7 +51,7 @@ function AppContent() {
       case 'muayeneler': return <MuayenelerPage />;
       case 'uygunsuzluklar': return <UygunsuzluklarPage />;
       case 'ekipmanlar': return <EkipmanlarPage />;
-      case 'kontrol-formlari': return <DashboardPage />;
+
       case 'tutanaklar': return <TutanaklarPage />;
       case 'is-izinleri': return <IsIzniPage />;
       case 'firma-evraklari': return <FirmaEvraklariPage />;

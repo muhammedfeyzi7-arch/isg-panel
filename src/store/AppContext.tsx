@@ -6,20 +6,11 @@ import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
 import { useOrganization } from '../hooks/useOrganization';
 import { logActivity } from '../utils/activityLog';
-import { supabase } from '../lib/supabase';
 import type { Toast } from '../types';
-
-interface KontrolFormuBildirim {
-  id: string;
-  ad: string;
-  kategori: string;
-  sonrakiKontrolTarihi?: string;
-  firmaId?: string;
-}
 
 export interface Bildirim {
   id: string;
-  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek' | 'kontrol_formu_yaklasan' | 'kontrol_formu_gecikti';
+  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek';
   mesaj: string;
   detay: string;
   tarih: string;
@@ -101,25 +92,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     joinOrg,
     regenerateInviteCode,
     refetch: refetchOrg,
-    autoCreateOrg,
     clearMustChangePassword: clearMustChangePw,
   } = useOrganization(user);
-
-  // Auto-create org when user has no org
-  // IMPORTANT: autoCreateOrgRef prevents the effect from re-firing every time
-  // autoCreateOrg gets a new reference (which would reset the 500ms timer indefinitely).
-  const autoCreateAttemptedRef = useRef<string | null>(null);
-  const autoCreateOrgRef = useRef(autoCreateOrg);
-  useEffect(() => { autoCreateOrgRef.current = autoCreateOrg; }, [autoCreateOrg]);
-
-  useEffect(() => {
-    if (!user || orgLoading || rawOrg) return;
-    if (autoCreateAttemptedRef.current === user.id) return;
-    autoCreateAttemptedRef.current = user.id;
-    const t = setTimeout(() => { autoCreateOrgRef.current(); }, 500);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, orgLoading, rawOrg]);
+  // Auto-create org is now handled inside useOrganization.loadOrg() via the edge function.
+  // No separate autoCreateOrg effect needed here.
 
   const org = useMemo<OrgInfo | null>(() => {
     if (!rawOrg) return null;
@@ -225,28 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return new Set<string>();
     }
   });
-  const [kontrolFormlar, setKontrolFormlar] = useState<KontrolFormuBildirim[]>([]);
 
-  // Kontrol formlarını Supabase'den çek (bildirim için)
-  useEffect(() => {
-    if (!org?.id) return;
-    let cancelled = false;
-    supabase
-      .from('kontrol_formlari')
-      .select('id, ad, kategori, sonraki_kontrol_tarihi, firma_id')
-      .eq('organization_id', org.id)
-      .then(({ data }) => {
-        if (cancelled || !data) return;
-        setKontrolFormlar(data.map(r => ({
-          id: r.id,
-          ad: r.ad,
-          kategori: r.kategori ?? '',
-          sonrakiKontrolTarihi: r.sonraki_kontrol_tarihi ?? undefined,
-          firmaId: r.firma_id ?? undefined,
-        })));
-      });
-    return () => { cancelled = true; };
-  }, [org?.id]);
 
   // Sync user info into store's currentUser (including full_name from user_metadata)
   useEffect(() => {
@@ -503,43 +458,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    // ── Kontrol Formları (Supabase) ──
-    kontrolFormlar.forEach(f => {
-      if (!f.sonrakiKontrolTarihi) return;
-      const d = parseDate(f.sonrakiKontrolTarihi);
-      if (!d) return;
-      const kalanGun = getDaysRemaining(f.sonrakiKontrolTarihi)!;
-      const firma = store.firmalar.find(x => x.id === f.firmaId);
-      const detay = `${f.kategori}${firma ? ' — ' + firma.ad : ''}`;
-
-      if (kalanGun < 0) {
-        result.push({
-          id: `kontrol_formu_gecikti_${f.id}`,
-          tip: 'kontrol_formu_gecikti',
-          mesaj: `${f.ad} kontrolü gecikti`,
-          detay: `${detay} — ${Math.abs(kalanGun)} gün gecikti`,
-          tarih: f.sonrakiKontrolTarihi,
-          okundu: okunanlar.has(`kontrol_formu_gecikti_${f.id}`),
-          kalanGun,
-          module: 'dashboard',
-        });
-      } else if (kalanGun <= 30) {
-        result.push({
-          id: `kontrol_formu_yaklasan_${f.id}`,
-          tip: 'kontrol_formu_yaklasan',
-          mesaj: `${f.ad} kontrol tarihi yaklaşıyor`,
-          detay: `${detay} — ${kalanGun === 0 ? 'Bugün son gün!' : `${kalanGun} gün kaldı`}`,
-          tarih: f.sonrakiKontrolTarihi,
-          okundu: okunanlar.has(`kontrol_formu_yaklasan_${f.id}`),
-          kalanGun,
-          module: 'dashboard',
-        });
-      }
-    });
-
     return result.sort((a, b) => a.kalanGun - b.kalanGun);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar, kontrolFormlar]);
+  }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar]);
 
   const okunmamisBildirimSayisi = useMemo(
     () => bildirimler.filter(b => !b.okundu).length,

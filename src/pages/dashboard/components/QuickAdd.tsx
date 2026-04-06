@@ -83,16 +83,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     gradientTo: '#EA580C',
     module: 'ekipmanlar',
   },
-  {
-    id: 'kontrolform',
-    label: 'Kontrol Form',
-    icon: 'ri-folder-shield-2-line',
-    description: 'Kontrol formu yükle',
-    accentColor: '#C084FC',
-    gradientFrom: '#C084FC',
-    gradientTo: '#A855F7',
-    module: 'kontrol-formlari',
-  },
+
 ];
 
 export default function QuickAdd() {

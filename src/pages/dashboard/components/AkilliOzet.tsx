@@ -24,12 +24,7 @@ function parseValidDate(dateStr: string | null | undefined): Date | null {
   return d;
 }
 
-interface AkilliOzetProps {
-  acikKontrolFormu: number;
-  kontrolFormYuklendi: boolean;
-}
-
-export default function AkilliOzet({ acikKontrolFormu, kontrolFormYuklendi }: AkilliOzetProps) {
+export default function AkilliOzet() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
     uygunsuzluklar, ekipmanlar, gorevler, isIzinleri,
@@ -143,17 +138,6 @@ export default function AkilliOzet({ acikKontrolFormu, kontrolFormYuklendi }: Ak
         detail: `${acikUygunsuzluk.length} kayıt kapatılmayı bekliyor`,
         color: '#F87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
         priority: 80, level: 'warning', module: 'uygunsuzluklar', count: acikUygunsuzluk.length,
-      });
-    }
-
-    if (acikKontrolFormu > 0 && kontrolFormYuklendi) {
-      list.push({
-        id: 'kontrol-formu',
-        icon: 'ri-folder-shield-2-line',
-        title: `${acikKontrolFormu} Kontrol Formu Tarihi Geçti`,
-        detail: 'Kontrol formları güncellenmeli',
-        color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',
-        priority: 75, level: 'warning', count: acikKontrolFormu,
       });
     }
 
@@ -271,7 +255,6 @@ export default function AkilliOzet({ acikKontrolFormu, kontrolFormYuklendi }: Ak
   }, [
     aktifEkipmanlar, aktifEvraklar, aktifMuayeneler, aktifGorevler,
     aktifUygunsuzluklar, aktifIsIzinleri, aktifPersoneller, aktifEgitimler,
-    acikKontrolFormu, kontrolFormYuklendi,
   ]);
 
   // Sağlık skoru hesapla

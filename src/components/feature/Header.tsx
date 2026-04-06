@@ -13,8 +13,7 @@ const moduleTitles: Record<string, { label: string; icon: string }> = {
   tutanaklar:     { label: 'Tutanaklar',          icon: 'ri-article-line' },
   uygunsuzluklar: { label: 'Saha Denetim',       icon: 'ri-map-pin-user-line' },
   ekipmanlar:     { label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },
-  gorevler:           { label: 'Kontrol Formları',   icon: 'ri-folder-shield-2-line' },
-  'kontrol-formlari': { label: 'Kontrol Formları',   icon: 'ri-folder-shield-2-line' },
+  gorevler:           { label: 'Görevler',            icon: 'ri-task-line' },
   raporlar:       { label: 'Raporlar & Analiz',  icon: 'ri-bar-chart-2-line' },
   ayarlar:        { label: 'Ayarlar',             icon: 'ri-settings-4-line' },
 };
@@ -28,7 +27,7 @@ const quickCards = [
   { id: 'tutanak',     label: 'Tutanak Ekle',      desc: 'Tutanak oluştur',             icon: 'ri-article-line',        accent: '#14B8A6', primary: false, module: 'tutanaklar' },
   { id: 'sahadenetim', label: 'Saha Denetim',      desc: 'Denetim kaydı aç',            icon: 'ri-map-pin-user-line',   accent: '#FB923C', primary: false, module: 'uygunsuzluklar' },
   { id: 'ekipman',     label: 'Ekipman Kontrolü', desc: 'Kontrol kaydı oluştur',       icon: 'ri-tools-line',          accent: '#34D399', primary: false, module: 'ekipmanlar' },
-  { id: 'kontrolform', label: 'Kontrol Formları',  desc: 'Kontrol formu oluştur',       icon: 'ri-folder-shield-2-line', accent: '#C084FC', primary: false, module: 'kontrol-formlari' },
+
   { id: 'isizni',      label: 'İş İzinleri',       desc: 'İş izni kaydı aç',            icon: 'ri-file-shield-2-line',  accent: '#38BDF8', primary: false, module: 'is-izinleri' },
 ];
 
@@ -188,8 +187,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
     ekipman_kontrol:         { icon: 'ri-tools-line',              color: '#FB923C', bg: 'rgba(251,146,60,0.12)',  badge: 'Ekipman',        badgeBg: 'rgba(251,146,60,0.12)' },
     egitim_surecek:          { icon: 'ri-graduation-cap-line',     color: '#60A5FA', bg: 'rgba(96,165,250,0.12)',  badge: 'Eğitim',         badgeBg: 'rgba(96,165,250,0.12)' },
     saglik_surecek:          { icon: 'ri-heart-pulse-line',        color: '#34D399', bg: 'rgba(52,211,153,0.12)',  badge: 'Sağlık',         badgeBg: 'rgba(52,211,153,0.12)' },
-    kontrol_formu_yaklasan:  { icon: 'ri-folder-shield-2-line',   color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', badge: 'Kontrol Formu',  badgeBg: 'rgba(167,139,250,0.12)' },
-    kontrol_formu_gecikti:   { icon: 'ri-alarm-warning-line',      color: '#F87171', bg: 'rgba(248,113,113,0.12)', badge: 'Kontrol Formu',  badgeBg: 'rgba(248,113,113,0.12)' },
+
   };
 
   const hour      = new Date().getHours();
@@ -436,7 +434,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                 <>
                   {/* Summary chips */}
                   <div className="px-4 py-2.5 flex flex-wrap gap-1.5" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
-                    {(['evrak_surecek','evrak_dolmus','ekipman_kontrol','egitim_surecek','saglik_surecek','kontrol_formu_yaklasan','kontrol_formu_gecikti'] as const).map(tip => {
+                    {(['evrak_surecek','evrak_dolmus','ekipman_kontrol','egitim_surecek','saglik_surecek'] as const).map(tip => {
                       const count = bildirimler.filter(b => b.tip === tip).length;
                       if (count === 0) return null;
                       const cfg = TYPE_CONFIG[tip];

@@ -72,9 +72,41 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const user = { id: userId, email: userEmail, user_metadata: userMetadata };
+
+  // ── Fetch full auth user to get latest metadata (handles manually created users) ──
+  let resolvedEmail = userEmail ?? '';
+  let resolvedDisplayName = (userMetadata?.full_name as string | undefined) ?? '';
 
   try {
+    const { data: authUserData } = await supabase.auth.admin.getUserById(userId);
+    if (authUserData?.user) {
+      resolvedEmail = authUserData.user.email ?? resolvedEmail;
+      const meta = authUserData.user.user_metadata ?? {};
+      if (!resolvedDisplayName && meta.full_name) {
+        resolvedDisplayName = String(meta.full_name);
+      }
+      if (!resolvedDisplayName && meta.name) {
+        resolvedDisplayName = String(meta.name);
+      }
+    }
+  } catch (e) {
+    console.warn('[setup-org] Could not fetch full auth user:', e);
+  }
+
+  // Derive a display name from email if still empty
+  if (!resolvedDisplayName && resolvedEmail) {
+    resolvedDisplayName = resolvedEmail
+      .split('@')[0]
+      .replace(/[._-]/g, ' ')
+      .replace(/\b\w/g, (c: string) => c.toUpperCase())
+      .trim() || 'Kullanıcı';
+  }
+  if (!resolvedDisplayName) resolvedDisplayName = 'Kullanıcı';
+
+  const user = { id: userId, email: resolvedEmail, display_name: resolvedDisplayName };
+
+  try {
+    // ── Check for existing active membership ──
     const { data: existingMembership } = await supabase
       .from('user_organizations')
       .select('organization_id, role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
@@ -86,36 +118,55 @@ Deno.serve(async (req) => {
 
     if (existingMembership?.organizations) {
       const org = existingMembership.organizations as { id: string; name: string; invite_code: string };
+
+      // Back-fill display_name / email if they were empty (handles legacy records)
+      const needsUpdate =
+        (!existingMembership.display_name && user.display_name) ||
+        (!existingMembership.email && user.email);
+
+      if (needsUpdate) {
+        await supabase
+          .from('user_organizations')
+          .update({
+            ...((!existingMembership.display_name && user.display_name) ? { display_name: user.display_name } : {}),
+            ...((!existingMembership.email && user.email) ? { email: user.email } : {}),
+          })
+          .eq('user_id', user.id)
+          .eq('organization_id', org.id);
+      }
+
       return new Response(JSON.stringify({
         organization: org,
         role: existingMembership.role ?? 'admin',
         is_active: existingMembership.is_active,
         must_change_password: existingMembership.must_change_password,
-        display_name: existingMembership.display_name,
+        display_name: existingMembership.display_name || user.display_name,
+        email: existingMembership.email || user.email,
         created: false,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // No active org — check org limit before creating
-    const { count: orgCount } = await supabase
-      .from('organizations')
-      .select('id', { count: 'exact', head: true })
-      .eq('created_by', user.id);
+    // ── No active org found — create one automatically ──
+    // This handles:
+    //   1. Brand new users (first login)
+    //   2. Users manually created via Supabase dashboard
+    //   3. Users whose org membership was deleted
 
-    if ((orgCount ?? 0) >= 3) {
-      return new Response(JSON.stringify({ error: 'Maksimum 3 organizasyon oluşturabilirsiniz.' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    console.log(`[setup-org] No org found for user ${userId} — creating new org automatically`);
 
-    // Create new org
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    const orgName = user.user_metadata?.full_name
-      ? String(user.user_metadata.full_name)
+    // Org name: prefer display name, fallback to email prefix
+    const orgName = user.display_name !== 'Kullanıcı'
+      ? user.display_name
       : user.email
-        ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'ISG Firması'
+        ? user.email.split('@')[0].replace(/[^a-zA-Z0-9\s]/g, ' ').trim() || 'ISG Firması'
         : 'ISG Firması';
+
+    // Generate unique invite code
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const inviteCode = Array.from(
+      { length: 6 },
+      () => chars[Math.floor(Math.random() * chars.length)]
+    ).join('');
 
     const { data: newOrg, error: orgError } = await supabase
       .from('organizations')
@@ -124,41 +175,94 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (orgError || !newOrg) {
+      console.error('[setup-org] Org creation failed:', orgError?.message);
       return new Response(JSON.stringify({ error: orgError?.message || 'Org creation failed' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    // Insert user_organizations record with admin role
     const { error: memberError } = await supabase
       .from('user_organizations')
       .insert({
         user_id: user.id,
         organization_id: newOrg.id,
         role: 'admin',
-        email: user.email ?? '',
+        display_name: user.display_name,
+        email: user.email,
         is_active: true,
         must_change_password: false,
       });
 
     if (memberError) {
+      // Handle race condition: another request may have already inserted
+      if (memberError.code === '23505') {
+        console.warn('[setup-org] Duplicate insert detected, fetching existing record');
+        const { data: retryMembership } = await supabase
+          .from('user_organizations')
+          .select('organization_id, role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (retryMembership?.organizations) {
+          const org = retryMembership.organizations as { id: string; name: string; invite_code: string };
+          return new Response(JSON.stringify({
+            organization: org,
+            role: retryMembership.role ?? 'admin',
+            is_active: retryMembership.is_active,
+            must_change_password: retryMembership.must_change_password,
+            display_name: retryMembership.display_name || user.display_name,
+            email: retryMembership.email || user.email,
+            created: false,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+
+      console.error('[setup-org] Member insert failed:', memberError.message);
       return new Response(JSON.stringify({ error: memberError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    // Initialize empty app_data for the new org
     await supabase
       .from('app_data')
-      .upsert({ organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() }, { onConflict: 'organization_id' });
+      .upsert(
+        { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
+        { onConflict: 'organization_id' }
+      );
+
+    // Log the auto-creation event
+    await supabase.from('activity_logs').insert({
+      organization_id: newOrg.id,
+      user_id: user.id,
+      user_email: user.email,
+      user_name: user.display_name,
+      user_role: 'admin',
+      action_type: 'org_auto_created',
+      module: 'Sistem',
+      record_id: newOrg.id,
+      record_name: orgName,
+      description: `Organizasyon otomatik oluşturuldu: ${orgName}`,
+    }).catch(() => { /* silent */ });
+
+    console.log(`[setup-org] New org created: ${newOrg.id} for user ${userId}`);
 
     return new Response(JSON.stringify({
       organization: newOrg,
       role: 'admin',
       is_active: true,
       must_change_password: false,
+      display_name: user.display_name,
+      email: user.email,
       created: true,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err) {
+    console.error('[setup-org] Unhandled error:', err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
