@@ -99,13 +99,13 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
 
   // ── Design tokens ──
   const sidebarBg = dark
-    ? 'linear-gradient(180deg, #080D1A 0%, #0A1020 50%, #080D1A 100%)'
+    ? 'var(--bg-sidebar)'
     : '#FFFFFF';
   const sidebarBorder = dark
-    ? '1px solid rgba(255,255,255,0.045)'
+    ? '1px solid var(--border-subtle)'
     : '1px solid rgba(15,23,42,0.08)';
   const logoBorderBottom = dark
-    ? '1px solid rgba(255,255,255,0.055)'
+    ? '1px solid var(--border-main)'
     : '1px solid rgba(15,23,42,0.07)';
   const groupLabelColor = dark ? 'rgba(255,255,255,0.32)' : '#94A3B8';
   const groupDividerBg  = dark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)';

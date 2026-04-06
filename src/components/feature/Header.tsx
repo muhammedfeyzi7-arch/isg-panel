@@ -143,17 +143,17 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const showSearchDropdown = searchFocus && (searchResults.length > 0 || search.trim().length > 0);
 
   // ── Theme tokens ──
-  const headerBg     = isDark ? 'rgba(7,11,20,0.95)'     : 'rgba(255,255,255,0.97)';
-  const headerBorder = isDark ? 'rgba(255,255,255,0.048)' : 'rgba(15,23,42,0.075)';
+  const headerBg     = isDark ? 'var(--bg-header)'        : 'rgba(255,255,255,0.97)';
+  const headerBorder = isDark ? 'var(--border-subtle)'    : 'rgba(15,23,42,0.075)';
   const textMuted    = isDark ? '#64748B'                 : '#64748B';
-  const inputBg      = isDark ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.04)';
-  const inputBorder  = isDark ? 'rgba(255,255,255,0.12)'  : 'rgba(15,23,42,0.09)';
-  const iconBtnBg    = isDark ? 'rgba(255,255,255,0.042)' : 'rgba(15,23,42,0.038)';
-  const iconBtnBorder= isDark ? 'rgba(255,255,255,0.07)'  : 'rgba(15,23,42,0.09)';
+  const inputBg      = isDark ? 'var(--bg-input)'         : 'rgba(15,23,42,0.04)';
+  const inputBorder  = isDark ? 'var(--border-input)'     : 'rgba(15,23,42,0.09)';
+  const iconBtnBg    = isDark ? 'var(--bg-item)'          : 'rgba(15,23,42,0.038)';
+  const iconBtnBorder= isDark ? 'var(--border-main)'      : 'rgba(15,23,42,0.09)';
   const nameColor    = isDark ? '#EDF2F7'                 : '#0F172A';
-  const dropdownBg   = isDark ? 'rgba(8,12,22,0.99)'     : 'rgba(255,255,255,0.99)';
-  const dropdownBorder = isDark ? 'rgba(255,255,255,0.075)' : 'rgba(15,23,42,0.09)';
-  const dropdownItemHover = isDark ? 'rgba(255,255,255,0.045)' : 'rgba(15,23,42,0.038)';
+  const dropdownBg   = isDark ? 'var(--bg-card-solid)'   : 'rgba(255,255,255,0.99)';
+  const dropdownBorder = isDark ? 'var(--border-main)'   : 'rgba(15,23,42,0.09)';
+  const dropdownItemHover = isDark ? 'var(--bg-hover)'   : 'rgba(15,23,42,0.038)';
 
   const displayBildirimler = bildirimler.slice(0, 10);
 
@@ -622,7 +622,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           <div
             className="w-full max-w-[620px] animate-slide-up overflow-hidden"
             style={{
-              background: isDark ? '#0A0F1E' : '#FFFFFF',
+              background: isDark ? 'var(--bg-card-solid)' : '#FFFFFF',
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)'}`,
               borderRadius: '24px',
               boxShadow: isDark

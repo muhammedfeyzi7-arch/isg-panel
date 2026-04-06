@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
-import type { Personel } from '../../types';
+import type { Personel, PersonelStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getPersonelStatusColor } from '../../components/base/Badge';
 import XLSXStyle from 'xlsx-js-style';
@@ -20,7 +20,7 @@ const EXCEL_COLUMNS = [
 
 const emptyPersonel: Omit<Personel, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'> = {
   adSoyad: '', tc: '', telefon: '', email: '', dogumTarihi: '', gorev: '',
-  departman: '', iseGirisTarihi: '', firmaId: '', durum: 'Aktif',
+  departman: '', iseGirisTarihi: '', firmaId: '', durum: 'Aktif' as PersonelStatus,
   kanGrubu: '', acilKisi: '', acilTelefon: '', adres: '',
 };
 
@@ -129,8 +129,7 @@ export default function PersonellerPage() {
     const wb = XLSXStyle.utils.book_new();
     const tarih = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
     const aktifSayisi = aktif.filter(p => p.durum === 'Aktif').length;
-    const pasifSayisi = aktif.filter(p => p.durum === 'Pasif').length;
-    const ayrildiSayisi = aktif.filter(p => p.durum === 'Ayrıldı').length;
+    const ayrildiSayisi = aktif.filter(p => p.durum === 'Ayrıldı' || p.durum === ('Pasif' as string)).length;
 
     // ── Stil tanımları ──
     const HEADER_BG = '1E293B'; const HEADER_FG = 'FFFFFF'; const TITLE_BG = '0F172A';
@@ -159,8 +158,8 @@ export default function PersonellerPage() {
       const firma = firmalar.find(f => f.id === p.firmaId);
       return [i + 1, p.adSoyad, p.tc || '-', p.telefon || '-', p.email || '-', fmtDate(p.dogumTarihi), fmtDate(p.iseGirisTarihi), p.gorev || '-', p.departman || '-', firma?.ad || '-', p.durum, p.kanGrubu || '-', p.acilKisi || '-', p.acilTelefon || '-', p.adres || '-'];
     });
-    const summaryRow = ['Toplam', 'Aktif', 'Pasif', 'Ayrıldı', '', '', '', '', '', '', '', '', '', '', ''];
-    const summaryVal = [aktif.length, aktifSayisi, pasifSayisi, ayrildiSayisi, '', '', '', '', '', '', '', '', '', '', ''];
+    const summaryRow = ['Toplam', 'Aktif', 'Ayrıldı', '', '', '', '', '', '', '', '', '', '', '', ''];
+    const summaryVal = [aktif.length, aktifSayisi, ayrildiSayisi, '', '', '', '', '', '', '', '', '', '', '', ''];
     const ws1Rows = [
       [`ISG PERSONEL LİSTESİ RAPORU — ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`, ...Array(COLS1.length - 1).fill('')],
       summaryRow,
@@ -201,20 +200,20 @@ export default function PersonellerPage() {
     // ── Sayfa 2: Firma Bazlı Özet ──
     const firmaOzet = firmalar.filter(f => !f.silinmis).map(f => {
       const fps = aktif.filter(p => p.firmaId === f.id);
-      return [f.ad, fps.length, fps.filter(p => p.durum === 'Aktif').length, fps.filter(p => p.durum === 'Pasif').length, fps.filter(p => p.durum === 'Ayrıldı').length];
+      return [f.ad, fps.length, fps.filter(p => p.durum === 'Aktif').length, fps.filter(p => p.durum === 'Ayrıldı' || p.durum === ('Pasif' as string)).length];
     }).filter(r => (r[1] as number) > 0).sort((a, b) => (b[1] as number) - (a[1] as number));
-    const COLS2 = ['Firma Adı', 'Toplam', 'Aktif', 'Pasif', 'Ayrıldı'];
+    const COLS2 = ['Firma Adı', 'Toplam', 'Aktif', 'Ayrıldı'];
     const ws2Rows = [
-      ['FİRMA BAZLI PERSONEL ÖZETİ', '', '', '', ''],
+      ['FİRMA BAZLI PERSONEL ÖZETİ', '', '', ''],
       COLS2,
       ...firmaOzet,
-      ['TOPLAM', aktif.length, aktifSayisi, pasifSayisi, ayrildiSayisi],
-      ['', '', '', '', ''],
-      ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR'), '', '', ''],
+      ['TOPLAM', aktif.length, aktifSayisi, ayrildiSayisi],
+      ['', '', '', ''],
+      ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR'), '', ''],
     ];
     const ws2 = XLSXStyle.utils.aoa_to_sheet(ws2Rows);
     if (!ws2['!merges']) ws2['!merges'] = [];
-    ws2['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+    ws2['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } });
     ws2Rows.forEach((row, ri) => {
       (row as (string | number)[]).forEach((val, ci) => {
         const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
@@ -232,7 +231,7 @@ export default function PersonellerPage() {
         (ws2[addr] as XLSXStyle.CellObject).s = s;
       });
     });
-    ws2['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+    ws2['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
     if (!ws2['!rows']) ws2['!rows'] = [];
     (ws2['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
     (ws2['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
@@ -431,7 +430,7 @@ export default function PersonellerPage() {
         return { id: null, hint: `Sistemdeki firmalar: ${firmaListesi}` };
       };
 
-      const durumMap: Record<string, 'Aktif' | 'Pasif' | 'Ayrıldı'> = { aktif: 'Aktif', active: 'Aktif', pasif: 'Pasif', inactive: 'Pasif', ayrildi: 'Ayrıldı', ayrilmis: 'Ayrıldı', left: 'Ayrıldı' };
+      const durumMap: Record<string, PersonelStatus> = { aktif: 'Aktif', active: 'Aktif', pasif: 'Ayrıldı', inactive: 'Ayrıldı', ayrildi: 'Ayrıldı', ayrilmis: 'Ayrıldı', left: 'Ayrıldı' };
       const kanMap: Record<string, string> = {};
       KAN_GRUPLARI.forEach(k => { kanMap[normalize(k)] = k; });
       Object.assign(kanMap, { 'a rh+': 'A+', 'a rh-': 'A-', 'b rh+': 'B+', 'b rh-': 'B-', 'ab rh+': 'AB+', 'ab rh-': 'AB-', '0 rh+': '0+', '0 rh-': '0-' });
@@ -486,7 +485,7 @@ export default function PersonellerPage() {
           return;
         }
 
-        const durum: 'Aktif' | 'Pasif' | 'Ayrıldı' = durumMap[normalize(get('Durum'))] ?? 'Aktif';
+        const durum: PersonelStatus = (durumMap[normalize(get('Durum'))] as PersonelStatus) ?? 'Aktif';
         const kanGrubu = kanMap[normalize(get('Kan Grubu'))] ?? '';
 
         addPersonel({
@@ -658,7 +657,6 @@ export default function PersonellerPage() {
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '130px' }}>
           <option value="">Tüm Durumlar</option>
           <option value="Aktif">Aktif</option>
-          <option value="Pasif">Pasif</option>
           <option value="Ayrıldı">Ayrıldı</option>
         </select>
         {(search || firmaFilter || statusFilter) && (
@@ -865,7 +863,7 @@ export default function PersonellerPage() {
                   </p>
                 )}
               </div>
-              <FS label="Çalışma Durumu" value={f('durum')} onChange={v => set('durum', v)} options={['Aktif', 'Pasif', 'Ayrıldı']} />
+              <FS label="Çalışma Durumu" value={f('durum')} onChange={v => set('durum', v as PersonelStatus)} options={['Aktif', 'Ayrıldı']} />
               <FF label="Görev / Unvan" value={f('gorev')} onChange={v => set('gorev', v)} placeholder="Operatör, Mühendis..." />
               <FF label="Departman" value={f('departman')} onChange={v => set('departman', v)} placeholder="Üretim, Kalite..." />
               <FF label="İşe Giriş Tarihi" value={f('iseGirisTarihi')} onChange={v => set('iseGirisTarihi', v)} type="date" />

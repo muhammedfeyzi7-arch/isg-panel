@@ -448,16 +448,28 @@ export default function EkipmanlarPage() {
   };
 
   const aktifEkipmanlar = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
+
+  // Bir ekipmanın gerçek efektif durumunu hesapla:
+  // Eğer kontrol tarihi geçmişse ve durum Uygun ise → otomatik Uygun Değil
+  const getEffectiveDurum = (ekipman: Ekipman): EkipmanStatus => {
+    if (ekipman.durum !== 'Uygun') return ekipman.durum;
+    if (!ekipman.sonrakiKontrolTarihi) return ekipman.durum;
+    const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
+    if (days < 0) return 'Uygun Değil';
+    return ekipman.durum;
+  };
+
   const stats = useMemo(() => {
     const total = aktifEkipmanlar.length;
-    const uygun = aktifEkipmanlar.filter(e => e.durum === 'Uygun').length;
-    const uygunDegil = aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length;
+    const uygun = aktifEkipmanlar.filter(e => getEffectiveDurum(e) === 'Uygun').length;
+    const uygunDegil = aktifEkipmanlar.filter(e => getEffectiveDurum(e) === 'Uygun Değil').length;
     const yaklasan = aktifEkipmanlar.filter(e => {
-      if (e.durum === 'Uygun Değil') return false; // kritik — tarih hesabı yapılmaz
+      if (getEffectiveDurum(e) === 'Uygun Değil') return false;
       const days = getDaysUntil(e.sonrakiKontrolTarihi);
       return days >= 0 && days <= 30;
     }).length;
     return { total, uygun, uygunDegil, yaklasan };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktifEkipmanlar]);
 
   const openAdd = () => {
@@ -957,7 +969,8 @@ export default function EkipmanlarPage() {
               <tbody>
                 {filtered.map(ekipman => {
                   const firma = firmalar.find(f => f.id === ekipman.firmaId);
-                  const sc = STATUS_CONFIG[ekipman.durum];
+                  const effectiveDurum = getEffectiveDurum(ekipman);
+                  const sc = STATUS_CONFIG[effectiveDurum];
                   const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
                   const isUrgent = days >= 0 && days <= 30;
                   const isOverdue = days < 0;
@@ -994,13 +1007,20 @@ export default function EkipmanlarPage() {
                         </span>
                       </td>
                       <td>
-                        {ekipman.durum === 'Uygun Değil' ? (
+                        {effectiveDurum === 'Uygun Değil' ? (
                           /* Uygun Değil: tarih hesaplama yapma, kritik uyarı göster */
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse whitespace-nowrap"
-                              style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}>
-                              <i className="ri-error-warning-fill mr-1" />KRİTİK
-                            </span>
+                            <div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse whitespace-nowrap"
+                                style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}>
+                                <i className="ri-error-warning-fill mr-1" />KRİTİK
+                              </span>
+                              {isOverdue && ekipman.sonrakiKontrolTarihi && (
+                                <p className="text-[10px] text-red-500 mt-0.5">
+                                  {new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')} — {Math.abs(days)} gün gecikmiş
+                                </p>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <div>

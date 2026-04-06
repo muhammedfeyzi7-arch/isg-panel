@@ -38,7 +38,8 @@ export function getEvrakStatusColor(s: string): BadgeProps['color'] {
 
 export function getPersonelStatusColor(s: string): BadgeProps['color'] {
   if (s === 'Aktif') return 'green';
-  if (s === 'Pasif') return 'gray';
+  if (s === 'Ayrıldı') return 'red';
+  // Eski 'Pasif' kayıtlar için fallback — 'Ayrıldı' gibi göster
   return 'red';
 }
 

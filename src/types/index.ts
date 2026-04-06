@@ -1,6 +1,6 @@
 export type TehlikeSinifi = 'Az Tehlikeli' | 'Tehlikeli' | 'Çok Tehlikeli';
 export type FirmaStatus = 'Aktif' | 'Pasif' | 'Askıda';
-export type PersonelStatus = 'Aktif' | 'Pasif' | 'Ayrıldı';
+export type PersonelStatus = 'Aktif' | 'Ayrıldı';
 export type EvrakStatus = 'Yüklü' | 'Eksik' | 'Süre Yaklaşıyor' | 'Süre Dolmuş';
 export type UygunsuzlukSeverity = 'Düşük' | 'Orta' | 'Yüksek' | 'Kritik';
 export type UygunsuzlukStatus = 'Açık' | 'Kapandı';

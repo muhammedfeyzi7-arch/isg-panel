@@ -21,11 +21,13 @@ function parseValidDate(dateStr: string | null | undefined): Date | null {
 export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
-    uygunsuzluklar, bildirimler, ekipmanlar, setActiveModule, org,
+    uygunsuzluklar, bildirimler, ekipmanlar, gorevler, isIzinleri,
+    setActiveModule, org,
   } = useApp();
 
-  // Kontrol Formları sayısını Supabase'den çek
+  // Kontrol Formları — data JSONB kolonundan oku
   const [acikKontrolFormu, setAcikKontrolFormu] = useState(0);
+  const [kontrolFormYuklendi, setKontrolFormYuklendi] = useState(false);
   useEffect(() => {
     if (!org?.id) return;
     const today = new Date().toISOString().split('T')[0];
@@ -34,13 +36,15 @@ export default function DashboardPage() {
       .select('id, data')
       .eq('organization_id', org.id)
       .then(({ data }) => {
-        if (!data) return;
-        // Tarihi geçmiş veya yaklaşan kontrol formları
+        if (!data) { setKontrolFormYuklendi(true); return; }
+        // data JSONB içindeki sonrakiKontrolTarihi alanını oku
         const count = data.filter(r => {
-          const form = r.data as { sonrakiKontrolTarihi?: string };
-          return form?.sonrakiKontrolTarihi && form.sonrakiKontrolTarihi <= today;
+          const form = r.data as Record<string, unknown> | null;
+          const tarih = form?.sonrakiKontrolTarihi as string | undefined;
+          return tarih && tarih <= today;
         }).length;
         setAcikKontrolFormu(count);
+        setKontrolFormYuklendi(true);
       });
   }, [org?.id]);
 
@@ -51,8 +55,28 @@ export default function DashboardPage() {
   const aktifMuayeneler    = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
   const aktifUygunsuzluklar= useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
   const aktifEkipmanlar    = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
+  const aktifGorevler      = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);
+  const aktifIsIzinleri    = useMemo(() => isIzinleri.filter(iz => !iz.silinmis), [isIzinleri]);
 
+  // Görev istatistikleri
+  const gorevStats = useMemo(() => {
+    const now = new Date();
+    const acik = aktifGorevler.filter(g => g.durum !== 'Tamamlandı').length;
+    const tamamlanan = aktifGorevler.filter(g => g.durum === 'Tamamlandı').length;
+    const gecikmiş = aktifGorevler.filter(g => {
+      if (g.durum === 'Tamamlandı') return false;
+      if (!g.bitisTarihi) return false;
+      return new Date(g.bitisTarihi) < now;
+    }).length;
+    return { acik, tamamlanan, gecikmiş };
+  }, [aktifGorevler]);
 
+  // İş izni istatistikleri
+  const isIzniStats = useMemo(() => {
+    const aktif = aktifIsIzinleri.filter(iz => iz.durum === 'Onaylandı' || iz.durum === 'Aktif').length;
+    const bekleyen = aktifIsIzinleri.filter(iz => iz.durum === 'Beklemede' || iz.durum === 'İncelemede').length;
+    return { toplam: aktifIsIzinleri.length, aktif, bekleyen };
+  }, [aktifIsIzinleri]);
 
   // ── ISG Risk hesaplamaları ──
   const riskStats = useMemo(() => {
@@ -165,9 +189,10 @@ export default function DashboardPage() {
       ...aktifFirmalar.map(f => ({ tip: 'Firma', ad: f.ad, tarih: f.olusturmaTarihi, icon: 'ri-building-2-line', color: '#3B82F6', badge: 'eklendi', badgeColor: '#10B981', badgeBg: 'rgba(16,185,129,0.12)' })),
       ...aktifPersoneller.map(p => ({ tip: 'Personel', ad: p.adSoyad, tarih: p.olusturmaTarihi, icon: 'ri-user-line', color: '#10B981', badge: 'eklendi', badgeColor: '#10B981', badgeBg: 'rgba(16,185,129,0.12)' })),
       ...aktifEgitimler.map(e => ({ tip: 'Eğitim', ad: e.ad, tarih: e.olusturmaTarihi, icon: 'ri-graduation-cap-line', color: '#F59E0B', badge: 'planlandı', badgeColor: '#F59E0B', badgeBg: 'rgba(245,158,11,0.12)' })),
+      ...aktifGorevler.slice(0, 5).map(g => ({ tip: 'Görev', ad: g.baslik || 'Görev', tarih: g.olusturmaTarihi, icon: 'ri-task-line', color: '#6366F1', badge: g.durum === 'Tamamlandı' ? 'tamamlandı' : 'açık', badgeColor: g.durum === 'Tamamlandı' ? '#10B981' : '#F59E0B', badgeBg: g.durum === 'Tamamlandı' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)' })),
     ];
     return all.sort((a, b) => new Date(b.tarih).getTime() - new Date(a.tarih).getTime()).slice(0, 8);
-  }, [aktifFirmalar, aktifPersoneller, aktifEgitimler]);
+  }, [aktifFirmalar, aktifPersoneller, aktifEgitimler, aktifGorevler]);
 
   const yaklaşanEvraklar = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -205,12 +230,9 @@ export default function DashboardPage() {
   const insights = useMemo(() => {
     const list: { icon: string; text: string; color: string; bg: string; priority: number; subItems?: { icon: string; text: string; count: number; color: string }[] }[] = [];
     
-    // Kritik - Uygun Değil Ekipman (EN YÜKSEK ÖNCELİK)
     if (riskStats.uygunDegil > 0) {
       list.push({ icon: 'ri-error-warning-fill', text: `${riskStats.uygunDegil} ekipman KRİTİK: Uygun Değil`, color: '#EF4444', bg: 'rgba(239,68,68,0.12)', priority: 100 });
     }
-    
-    // Gecikmiş işlemler (YÜKSEK ÖNCELİK)
     if (riskStats.gecikmisBelge > 0) {
       list.push({ icon: 'ri-file-damage-line', text: `${riskStats.gecikmisBelge} evrak süresi dolmuş`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', priority: 90 });
     }
@@ -220,58 +242,37 @@ export default function DashboardPage() {
     if (riskStats.gecikmisMuayene > 0) {
       list.push({ icon: 'ri-heart-pulse-line', text: `${riskStats.gecikmisMuayene} muayene tarihi geçti`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', priority: 90 });
     }
-    
-    // Açık uygunsuzluklar
+    if (gorevStats.gecikmiş > 0) {
+      list.push({ icon: 'ri-task-line', text: `${gorevStats.gecikmiş} görev gecikmiş`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 85 });
+    }
     if (stats.acikU > 0) {
       list.push({ icon: 'ri-alert-line', text: `${stats.acikU} açık uygunsuzluk kapatılmayı bekliyor`, color: '#F87171', bg: 'rgba(239,68,68,0.1)', priority: 80 });
     }
-    
-    // Gecikmiş kontrol formları
-    if (acikKontrolFormu > 0) {
+    if (acikKontrolFormu > 0 && kontrolFormYuklendi) {
       list.push({ icon: 'ri-folder-shield-2-line', text: `${acikKontrolFormu} kontrol formu tarihi geçti`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 70 });
     }
-    
-    // 7 gün içinde sona erenler - DETAYLI GÖSTERİM
+    if (isIzniStats.bekleyen > 0) {
+      list.push({ icon: 'ri-shield-check-line', text: `${isIzniStats.bekleyen} iş izni onay bekliyor`, color: '#6366F1', bg: 'rgba(99,102,241,0.1)', priority: 65 });
+    }
     if (riskStats.toplam7 > 0) {
       const subItems7: { icon: string; text: string; count: number; color: string }[] = [];
       if (riskStats.yaklasan7Belge > 0)   subItems7.push({ icon: 'ri-file-warning-line', text: 'Evrak', count: riskStats.yaklasan7Belge, color: '#94A3B8' });
       if (riskStats.yaklasan7Ekipman > 0) subItems7.push({ icon: 'ri-tools-line', text: 'Ekipman', count: riskStats.yaklasan7Ekipman, color: '#FB923C' });
       if (riskStats.yaklasan7Muayene > 0) subItems7.push({ icon: 'ri-heart-pulse-line', text: 'Muayene', count: riskStats.yaklasan7Muayene, color: '#34D399' });
-      
-      list.push({ 
-        icon: 'ri-alarm-warning-line',  
-        text: `${riskStats.toplam7} işlem 7 gün içinde sona eriyor`,       
-        color: '#F59E0B', 
-        bg: 'rgba(245,158,11,0.1)', 
-        priority: 60,
-        subItems: subItems7
-      });
+      list.push({ icon: 'ri-alarm-warning-line', text: `${riskStats.toplam7} işlem 7 gün içinde sona eriyor`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 60, subItems: subItems7 });
     }
-    
-    // 30 gün içinde sona erenler - DETAYLI GÖSTERİM
     if (riskStats.toplam30 > 0) {
       const subItems30: { icon: string; text: string; count: number; color: string }[] = [];
       if (riskStats.yaklasan30Belge > 0)   subItems30.push({ icon: 'ri-file-warning-line', text: 'Evrak', count: riskStats.yaklasan30Belge, color: '#94A3B8' });
       if (riskStats.yaklasan30Ekipman > 0) subItems30.push({ icon: 'ri-tools-line', text: 'Ekipman', count: riskStats.yaklasan30Ekipman, color: '#FB923C' });
       if (riskStats.yaklasan30Muayene > 0) subItems30.push({ icon: 'ri-heart-pulse-line', text: 'Muayene', count: riskStats.yaklasan30Muayene, color: '#34D399' });
-      
-      list.push({ 
-        icon: 'ri-timer-line',          
-        text: `${riskStats.toplam30} işlem 30 gün içinde sona eriyor`,     
-        color: '#FBBF24', 
-        bg: 'rgba(251,191,36,0.1)', 
-        priority: 50,
-        subItems: subItems30
-      });
+      list.push({ icon: 'ri-timer-line', text: `${riskStats.toplam30} işlem 30 gün içinde sona eriyor`, color: '#FBBF24', bg: 'rgba(251,191,36,0.1)', priority: 50, subItems: subItems30 });
     }
-    
-    // Sadece gerçekten hiçbir sorun yoksa yeşil mesaj göster
     if (list.length === 0) {
       list.push({ icon: 'ri-checkbox-circle-line', text: 'Tüm sistemler normal çalışıyor', color: '#34D399', bg: 'rgba(16,185,129,0.1)', priority: 0 });
     }
-    
     return list.sort((a, b) => b.priority - a.priority).slice(0, 5);
-  }, [riskStats, stats, acikKontrolFormu]);
+  }, [riskStats, stats, acikKontrolFormu, kontrolFormYuklendi, gorevStats, isIzniStats]);
 
   const isEmpty = aktifFirmalar.length === 0 && aktifPersoneller.length === 0;
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
@@ -283,12 +284,41 @@ export default function DashboardPage() {
     { label: 'Açık Uygunsuzluk',      value: stats.acikU,             icon: 'ri-alert-line',       sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, trend: null,                trendLabel: null,                                gradient: stats.acikU > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)', border: stats.acikU > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.15)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #6EE7B7, #34D399)', accentColor: stats.acikU > 0 ? '#EF4444' : '#10B981' },
   ];
 
+  // Görev + İş İzni ek stat kartları
+  const extraStatCards = [
+    {
+      label: 'Açık Görevler',
+      value: gorevStats.acik,
+      icon: 'ri-task-line',
+      sub: `${gorevStats.gecikmiş} gecikmiş · ${gorevStats.tamamlanan} tamamlandı`,
+      trend: null,
+      trendLabel: null,
+      gradient: gorevStats.gecikmiş > 0 ? 'linear-gradient(145deg, rgba(245,158,11,0.1) 0%, rgba(217,119,6,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)',
+      border: gorevStats.gecikmiş > 0 ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.15)',
+      iconBg: gorevStats.gecikmiş > 0 ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'linear-gradient(135deg, #10B981, #059669)',
+      valueColor: gorevStats.gecikmiş > 0 ? 'linear-gradient(135deg, #FCD34D, #FBBF24)' : 'linear-gradient(135deg, #6EE7B7, #34D399)',
+      accentColor: gorevStats.gecikmiş > 0 ? '#F59E0B' : '#10B981',
+    },
+    {
+      label: 'İş İzinleri',
+      value: isIzniStats.toplam,
+      icon: 'ri-shield-check-line',
+      sub: `${isIzniStats.aktif} aktif · ${isIzniStats.bekleyen} beklemede`,
+      trend: null,
+      trendLabel: null,
+      gradient: isIzniStats.bekleyen > 0 ? 'linear-gradient(145deg, rgba(99,102,241,0.1) 0%, rgba(79,70,229,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)',
+      border: isIzniStats.bekleyen > 0 ? 'rgba(99,102,241,0.2)' : 'rgba(16,185,129,0.15)',
+      iconBg: 'linear-gradient(135deg, #6366F1, #4F46E5)',
+      valueColor: 'linear-gradient(135deg, #A5B4FC, #818CF8)',
+      accentColor: '#6366F1',
+    },
+  ];
+
   return (
     <div className="space-y-6">
 
       {/* ── Premium Page Header ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        {/* Top gradient bar */}
         <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #6366F1, #10B981, #F59E0B, #EF4444)' }} />
         <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -305,13 +335,19 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
               style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}>
               <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#10B981' }} />
               Sistem Aktif
             </div>
-            {acikKontrolFormu > 0 && (
+            {gorevStats.gecikmiş > 0 && (
+              <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
+                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
+                <i className="ri-task-line text-[11px]" />{gorevStats.gecikmiş} gecikmiş görev
+              </div>
+            )}
+            {acikKontrolFormu > 0 && kontrolFormYuklendi && (
               <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
                 style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
                 <i className="ri-folder-shield-2-line text-[11px]" />{acikKontrolFormu} kontrol formu
@@ -381,9 +417,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-
-
-      {/* ── Stat Cards ── */}
+      {/* ── Ana Stat Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card, idx) => (
           <StatCard
@@ -400,6 +434,27 @@ export default function DashboardPage() {
             valueColor={card.valueColor}
             accentColor={card.accentColor}
             delay={idx * 120}
+          />
+        ))}
+      </div>
+
+      {/* ── Görev + İş İzni Stat Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {extraStatCards.map((card, idx) => (
+          <StatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            icon={card.icon}
+            sub={card.sub}
+            trend={card.trend}
+            trendLabel={card.trendLabel}
+            gradient={card.gradient}
+            border={card.border}
+            iconBg={card.iconBg}
+            valueColor={card.valueColor}
+            accentColor={card.accentColor}
+            delay={idx * 120 + 480}
           />
         ))}
       </div>
@@ -435,21 +490,12 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-[11.5px] leading-relaxed font-medium" style={{ color: 'var(--text-secondary)' }}>{insight.text}</p>
                   </div>
-                  
-                  {/* Alt detaylar - Evrak/Ekipman/Muayene ayrımı */}
                   {insight.subItems && insight.subItems.length > 0 && (
                     <div className="px-3 pb-2.5">
                       <div className="flex flex-wrap gap-1.5">
                         {insight.subItems.map((sub, idx) => (
-                          <div 
-                            key={idx}
-                            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium"
-                            style={{ 
-                              background: `${sub.color}15`, 
-                              border: `1px solid ${sub.color}25`,
-                              color: sub.color 
-                            }}
-                          >
+                          <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium"
+                            style={{ background: `${sub.color}15`, border: `1px solid ${sub.color}25`, color: sub.color }}>
                             <i className={`${sub.icon} text-[9px]`} />
                             <span>{sub.count} {sub.text}</span>
                           </div>
@@ -516,7 +562,7 @@ export default function DashboardPage() {
                         <i className="ri-tools-line text-[10px]" style={{ color: '#F87171' }} />
                         <span className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</span>
                         {firma && <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{firma.ad}</span>}
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap flex items-center gap-1"
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap"
                           style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>KRİTİK</span>
                       </div>
                     );
@@ -532,11 +578,12 @@ export default function DashboardPage() {
               <p className="text-[10.5px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
                 <i className="ri-error-warning-line mr-1.5" style={{ color: '#EF4444' }} />Geciken İşlemler
               </p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 {[
                   { label: 'Evrak', value: riskStats.gecikmisBelge,   icon: 'ri-file-damage-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
                   { label: 'Ekipman', value: riskStats.gecikmisEkipman, icon: 'ri-tools-line',        color: '#FB923C', bg: 'rgba(251,146,60,0.1)',   border: 'rgba(251,146,60,0.2)' },
                   { label: 'Muayene', value: riskStats.gecikmisMuayene, icon: 'ri-heart-pulse-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
+                  { label: 'Görev', value: gorevStats.gecikmiş,         icon: 'ri-task-line',         color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.2)' },
                 ].map(item => (
                   <div key={item.label} className="rounded-xl p-3.5 text-center"
                     style={{ background: item.value > 0 ? item.bg : 'var(--bg-item)', border: `1px solid ${item.value > 0 ? item.border : 'var(--bg-item-border)'}` }}>
@@ -659,6 +706,12 @@ export default function DashboardPage() {
                     <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
                       <i className="ri-circle-fill text-[6px] mr-1.5" style={{ color: '#F87171' }} />
                       {riskStats.gecikmisMuayene} muayene tarihi geçti
+                    </p>
+                  )}
+                  {gorevStats.gecikmiş > 0 && (
+                    <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                      <i className="ri-circle-fill text-[6px] mr-1.5" style={{ color: '#FBBF24' }} />
+                      {gorevStats.gecikmiş} görev gecikmiş
                     </p>
                   )}
                 </div>
@@ -785,7 +838,7 @@ export default function DashboardPage() {
         {[
           { label: 'Aktif Firmalar',        value: aktifFirmalar.filter(f => f.durum === 'Aktif').length,         total: aktifFirmalar.length,    color: '#3B82F6', icon: 'ri-building-2-line',     accent: 'linear-gradient(135deg, #3B82F6, #6366F1)' },
           { label: 'Aktif Personeller',     value: aktifPersoneller.filter(p => p.durum === 'Aktif').length,      total: aktifPersoneller.length, color: '#10B981', icon: 'ri-team-line',           accent: 'linear-gradient(135deg, #10B981, #059669)' },
-          { label: 'Tamamlanan Eğitimler',  value: aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length,   total: aktifEgitimler.length,   color: '#F59E0B', icon: 'ri-graduation-cap-line', accent: 'linear-gradient(135deg, #F59E0B, #D97706)' },
+          { label: 'Tamamlanan Görevler',   value: gorevStats.tamamlanan,                                          total: aktifGorevler.length,    color: '#6366F1', icon: 'ri-task-line',           accent: 'linear-gradient(135deg, #6366F1, #4F46E5)' },
           { label: 'Çalışabilir Muayene',   value: aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length, total: aktifMuayeneler.length,  color: '#34D399', icon: 'ri-heart-pulse-line',    accent: 'linear-gradient(135deg, #34D399, #10B981)' },
         ].map(item => {
           const pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;
