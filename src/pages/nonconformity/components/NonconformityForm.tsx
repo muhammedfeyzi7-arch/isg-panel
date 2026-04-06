@@ -36,8 +36,33 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
   const { firmalar, personeller, addUygunsuzluk, updateUygunsuzluk, setUygunsuzlukPhoto, getUygunsuzlukPhoto, addToast, logAction } = useApp();
   const [form, setForm] = useState<FormState>(defaultForm);
   const [saving, setSaving] = useState(false);
+  const [aiOnlemLoading, setAiOnlemLoading] = useState(false);
   // FIX 4: useRef lock to prevent double-click duplicate submissions
   const submittingRef = useRef(false);
+
+  const handleAiOnlemOner = async () => {
+    if (!form.aciklama.trim()) { addToast('Önce uygunsuzluk açıklamasını girin.', 'error'); return; }
+    setAiOnlemLoading(true);
+    try {
+      const firmaAdi = firmalar.find(f => f.id === form.firmaId)?.ad || '';
+      const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/openai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'uygunsuzluk',
+          data: { baslik: form.baslik, aciklama: form.aciklama, severity: form.severity, firmaAdi },
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Hata');
+      setForm(prev => ({ ...prev, onlem: json.data.onlem || prev.onlem }));
+      addToast('AI önlem önerisi oluşturuldu!', 'success');
+    } catch {
+      addToast('AI yanıt veremedi, lütfen tekrar deneyin.', 'error');
+    } finally {
+      setAiOnlemLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -211,8 +236,28 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
           </div>
 
           <div className="sm:col-span-2">
-            <label className="form-label">Alınması Gereken Önlem</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="form-label mb-0">Alınması Gereken Önlem</label>
+              <button
+                type="button"
+                onClick={handleAiOnlemOner}
+                disabled={aiOnlemLoading || !form.aciklama.trim()}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))', color: '#A5B4FC', border: '1px solid rgba(99,102,241,0.25)' }}
+                title={!form.aciklama.trim() ? 'Önce açıklama girin' : 'AI ile önlem öner'}
+              >
+                {aiOnlemLoading
+                  ? <><i className="ri-loader-4-line animate-spin text-xs" /> Öneriliyor...</>
+                  : <><i className="ri-sparkling-line text-xs" /> AI Öneri Al</>
+                }
+              </button>
+            </div>
             <textarea value={form.onlem} onChange={e => set('onlem', e.target.value)} placeholder="Uygunsuzluğun giderilmesi için alınması gereken önlemler..." rows={3} maxLength={500} className="isg-input" />
+            {!form.aciklama.trim() && (
+              <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>
+                <i className="ri-information-line mr-1" />AI önerisi için önce açıklama alanını doldurun
+              </p>
+            )}
           </div>
 
           <div className="sm:col-span-2">

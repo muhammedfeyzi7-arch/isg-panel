@@ -676,6 +676,43 @@ export default function TutanaklarPage() {
   // FIX 4: useRef lock to prevent double-click duplicate submissions
   const submittingRef = useRef<boolean>(false);
 
+  // AI Tutanak Oluşturma
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiKisaAciklama, setAiKisaAciklama] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleAiOlustur = async () => {
+    if (!aiKisaAciklama.trim()) { addToast('Lütfen kısa bir açıklama girin.', 'error'); return; }
+    setAiLoading(true);
+    try {
+      const firmaAdi = aktivFirmalar.find(f => f.id === form.firmaId)?.ad || '';
+      const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/openai-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'tutanak',
+          data: { kisaAciklama: aiKisaAciklama, firmaAdi, tarih: form.tarih },
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Hata');
+      const { baslik, aciklama, notlar } = json.data;
+      setForm(prev => ({
+        ...prev,
+        baslik: baslik || prev.baslik,
+        aciklama: aciklama || prev.aciklama,
+        notlar: notlar || prev.notlar,
+      }));
+      setAiModalOpen(false);
+      setAiKisaAciklama('');
+      addToast('Tutanak AI tarafından oluşturuldu!', 'success');
+    } catch (e) {
+      addToast('AI yanıt veremedi, lütfen tekrar deneyin.', 'error');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleFileChange = (file?: File) => {
     if (!file) return;
     setPendingFile(file);
@@ -1113,6 +1150,15 @@ export default function TutanaklarPage() {
         footer={
           <>
             <button onClick={closeModal} className="btn-secondary whitespace-nowrap">İptal</button>
+            {!editId && (
+              <button
+                onClick={() => setAiModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer whitespace-nowrap transition-all"
+                style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))', color: '#A5B4FC', border: '1px solid rgba(99,102,241,0.3)' }}
+              >
+                <i className="ri-sparkling-line" /> AI ile Oluştur
+              </button>
+            )}
             <button onClick={handleSave} className="btn-primary whitespace-nowrap">
               <i className={editId ? 'ri-save-line' : 'ri-add-line'} />
               {editId ? 'Güncelle' : 'Oluştur'}
@@ -1286,6 +1332,64 @@ export default function TutanaklarPage() {
               </div>
             </div>
           </div>
+        </div>
+      </Modal>
+
+      {/* ── AI Tutanak Oluşturma Modal ── */}
+      <Modal
+        open={aiModalOpen}
+        onClose={() => { setAiModalOpen(false); setAiKisaAciklama(''); }}
+        title="AI ile Tutanak Oluştur"
+        size="sm"
+        icon="ri-sparkling-line"
+        footer={
+          <>
+            <button onClick={() => { setAiModalOpen(false); setAiKisaAciklama(''); }} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button
+              onClick={handleAiOlustur}
+              disabled={aiLoading || !aiKisaAciklama.trim()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer whitespace-nowrap transition-all disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: '#fff' }}
+            >
+              {aiLoading
+                ? <><i className="ri-loader-4-line animate-spin" /> Oluşturuluyor...</>
+                : <><i className="ri-sparkling-line" /> Tutanak Oluştur</>
+              }
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
+            style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.06))', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <i className="ri-sparkling-line mt-0.5 flex-shrink-0" style={{ color: '#A5B4FC' }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: '#A5B4FC' }}>Nasıl çalışır?</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Kısa bir açıklama gir, AI otomatik olarak tutanak başlığı, detaylı açıklama ve notları oluştursun. İstersen sonradan düzenleyebilirsin.
+              </p>
+            </div>
+          </div>
+          <div>
+            <label className="form-label">Kısa Açıklama *</label>
+            <textarea
+              value={aiKisaAciklama}
+              onChange={e => setAiKisaAciklama(e.target.value)}
+              placeholder="Örn: Depo alanında yangın tüplerinin süresi dolmuş, çalışanlar kişisel koruyucu ekipman kullanmıyor..."
+              rows={4}
+              maxLength={300}
+              className="isg-input resize-none"
+              autoFocus
+            />
+            <p className="text-xs mt-1 text-right" style={{ color: 'var(--text-faint)' }}>{aiKisaAciklama.length}/300</p>
+          </div>
+          {form.firmaId && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+              style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+              <i className="ri-building-2-line" style={{ color: '#34D399' }} />
+              <span style={{ color: 'var(--text-muted)' }}>Firma: <strong style={{ color: '#34D399' }}>{aktivFirmalar.find(f => f.id === form.firmaId)?.ad}</strong></span>
+            </div>
+          )}
         </div>
       </Modal>
 

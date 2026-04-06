@@ -38,11 +38,11 @@ const ADMIN_STEPS: TourStep[] = [
     iconBg: 'rgba(16,185,129,0.15)',
     gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
     targetId: 'sidebar-dashboard',
-    tip: 'Yapay zeka destekli özet ile günlük durumunuzu hızlıca görün',
+    tip: 'Otomatik risk analizi ile günlük durumunuzu hızlıca görün',
     features: [
       { icon: 'ri-bar-chart-2-line', text: 'Anlık istatistikler' },
       { icon: 'ri-notification-3-line', text: 'Akıllı bildirimler' },
-      { icon: 'ri-robot-line', text: 'AI destekli özet' },
+      { icon: 'ri-bar-chart-box-line', text: 'Otomatik risk analizi' },
     ],
   },
   {
