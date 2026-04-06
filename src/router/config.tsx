@@ -1,10 +1,10 @@
 import type { RouteObject } from "react-router-dom";
-import { Navigate } from "react-router-dom";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import LoginPage from "../pages/login/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
+import OnboardingPage from "../pages/onboarding/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
 import QrDetailPage from "../pages/equipment/QrDetailPage";
 
@@ -23,7 +23,11 @@ const routes: RouteObject[] = [
   },
   {
     path: "/onboarding",
-    element: <Navigate to="/" replace />,
+    element: (
+      <ProtectedRoute>
+        <OnboardingPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/",

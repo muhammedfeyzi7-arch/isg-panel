@@ -24,15 +24,16 @@ function AppContent() {
   const { activeModule, orgError, org, orgLoading, mustChangePassword } = useApp();
   const navigate = useNavigate();
 
-  // Org yüklenip null gelirse → onboarding'e yönlendir
+  // Org yüklenip null gelirse → onboarding'e yönlendir (sadece bir kez)
   useEffect(() => {
     if (!orgLoading && !org && !orgError) {
       navigate('/onboarding', { replace: true });
     }
-  }, [orgLoading, org, orgError, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgLoading, org]);
 
-  // Yükleniyor
-  if (orgLoading) {
+  // Yükleniyor veya org yok → boş ekran göster (navigate effect çalışacak)
+  if (orgLoading || (!org && !orgError)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
         <div className="flex flex-col items-center gap-3">
