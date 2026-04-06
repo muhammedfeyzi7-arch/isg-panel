@@ -181,34 +181,22 @@ export function useOrganization(user: User | null) {
   const createOrg = async (name: string, userId: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Kullanıcı bulunamadı.' };
     try {
-      // Use setup-organization edge function with org name — bypasses RLS via service role
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return { error: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 
-      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-      const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ org_name: name }),
+      // SECURITY DEFINER RPC — RLS'yi bypass eder, admin olarak org oluşturur
+      const { data, error } = await supabase.rpc('create_organization_for_user', {
+        p_user_id: user.id,
+        p_org_name: name.trim(),
+        p_invite_code: inviteCode,
       });
 
-      let data: { error?: string; organization?: { id: string } } = {};
-      try {
-        const text = await res.text();
-        if (text) data = JSON.parse(text);
-      } catch {
-        return { error: 'Sunucu yanıtı okunamadı. Lütfen tekrar deneyin.' };
-      }
+      if (error) return { error: error.message };
+      if (!data) return { error: 'Organizasyon oluşturulamadı.' };
 
-      if (!res.ok || data.error) {
-        return { error: data.error ?? 'Organizasyon oluşturulamadı.' };
-      }
-
-      if (data.organization?.id) {
-        await migrateLegacyData(userId, data.organization.id);
+      const result = data as { organization_id: string; role: string };
+      if (result.organization_id) {
+        await migrateLegacyData(userId, result.organization_id);
       }
 
       await loadOrg();
