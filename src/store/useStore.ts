@@ -614,6 +614,75 @@ export function useStore(
     return newPersonel;
   }, [setPersoneller, saveToDb]);
 
+  /**
+   * Toplu personel ekleme — Excel import için optimize edilmiş.
+   * Tüm kayıtları tek seferde Supabase'e batch upsert eder.
+   * Tek tek saveToDb çağrısı yerine bu kullanılmalı.
+   */
+  const addPersonelBatch = useCallback(async (
+    personelList: Omit<Personel, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'>[],
+  ): Promise<Personel[]> => {
+    if (personelList.length === 0) return [];
+    const now = new Date().toISOString();
+    const newPersoneller: Personel[] = personelList.map(p => ({
+      ...p, id: genId(), olusturmaTarihi: now, guncellemeTarihi: now,
+    }));
+
+    // Optimistic UI update — hepsini bir anda ekle
+    setPersoneller(prev => [...newPersoneller, ...prev]);
+
+    const orgId = orgIdRef.current;
+    const uid = userIdRef.current;
+
+    if (!orgId || !uid) {
+      // Org hazır değil — pending queue'ya ekle (tek tek)
+      newPersoneller.forEach(p => {
+        pendingSavesRef.current.push({ table: 'personeller', item: p as unknown as { id: string } & Record<string, unknown> });
+      });
+      console.warn(`[ISG] addPersonelBatch QUEUED ${newPersoneller.length} items (org not ready)`);
+      return newPersoneller;
+    }
+
+    // Batch upsert — 50'lik chunk'lara böl (Supabase limit)
+    const CHUNK_SIZE = 50;
+    const chunks: Personel[][] = [];
+    for (let i = 0; i < newPersoneller.length; i += CHUNK_SIZE) {
+      chunks.push(newPersoneller.slice(i, i + CHUNK_SIZE));
+    }
+
+    const failedItems: Personel[] = [];
+
+    for (const chunk of chunks) {
+      const payload = chunk.map(p => ({
+        id: p.id,
+        user_id: uid,
+        organization_id: orgId,
+        data: p,
+        updated_at: now,
+        deleted_at: null,
+      }));
+
+      const { data, error } = await supabase.from('personeller').upsert(payload).select('id');
+      if (error) {
+        console.error(`[ISG] addPersonelBatch chunk FAILED:`, error);
+        failedItems.push(...chunk);
+        onSaveErrorRef.current?.(`Toplu kayıt hatası: ${error.message}`);
+      } else {
+        console.log(`[ISG] addPersonelBatch chunk OK: ${data?.length ?? 0} rows`);
+      }
+    }
+
+    // Başarısız olanları pending queue'ya ekle (retry için)
+    if (failedItems.length > 0) {
+      failedItems.forEach(p => {
+        pendingSavesRef.current.push({ table: 'personeller', item: p as unknown as { id: string } & Record<string, unknown> });
+      });
+      console.warn(`[ISG] addPersonelBatch: ${failedItems.length} items queued for retry`);
+    }
+
+    return newPersoneller;
+  }, [setPersoneller]);
+
   const updatePersonel = useCallback((id: string, updates: Partial<Personel>) => {
     let updated: Personel | null = null;
     setPersoneller(prev => prev.map(p => {
@@ -1257,7 +1326,7 @@ export function useStore(
     isSaving: false,
     refreshAllData,
     addFirma, updateFirma, deleteFirma, restoreFirma, permanentDeleteFirma,
-    addPersonel, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
+    addPersonel, addPersonelBatch, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
     addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak,
     addEgitim, updateEgitim, deleteEgitim, restoreEgitim, permanentDeleteEgitim,
     addMuayene, updateMuayene, deleteMuayene, restoreMuayene, permanentDeleteMuayene,
