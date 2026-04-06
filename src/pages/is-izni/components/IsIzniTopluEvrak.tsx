@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Modal from '@/components/base/Modal';
-import type { IsIzni } from '@/types';
+import type { IsIzni, Firma } from '@/types';
 import { uploadFileToStorage } from '@/utils/fileUpload';
 
 interface UploadFile {
@@ -17,6 +17,7 @@ interface Props {
   onClose: () => void;
   isIzni: IsIzni | null;
   isIzinleri?: IsIzni[];
+  firmalar?: Firma[];
   orgId: string;
   onEvrakEklendi: (izId: string, evraklar: IsIzni['evraklar']) => void;
 }
@@ -63,21 +64,28 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [], orgId, onEvrakEklendi }: Props) {
+export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [], firmalar = [], orgId, onEvrakEklendi }: Props) {
+  const [seciliFirmaId, setSeciliFirmaId] = useState<string>(isIzni?.firmaId ?? '');
   const [seciliIzniId, setSeciliIzniId] = useState<string>(isIzni?.id ?? '');
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(false);
-  const [evrakTur, setEvrakTur] = useState('Belge');
+  const [evrakTur, setEvrakTur] = useState('Sıcak Çalışma');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
+      setSeciliFirmaId(isIzni?.firmaId ?? '');
       setSeciliIzniId(isIzni?.id ?? '');
       setFiles([]);
-      setEvrakTur('Belge');
+      setEvrakTur('Sıcak Çalışma');
     }
   }, [open, isIzni]);
+
+  // Seçili firmaya ait iş izinleri
+  const firmaIsIzinleri = seciliFirmaId
+    ? isIzinleri.filter(i => i.firmaId === seciliFirmaId)
+    : isIzinleri;
 
   const seciliIzni = isIzni ?? isIzinleri.find(i => i.id === seciliIzniId) ?? null;
 
@@ -179,22 +187,39 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
     >
       <div className="space-y-4">
 
-        {/* İş İzni Seçimi — sadece header butonundan açıldığında göster */}
+        {/* Firma + İş İzni Seçimi — sadece header butonundan açıldığında göster */}
         {showIzniSecim && (
-          <div>
-            <label className="form-label">İş İzni Seçin *</label>
-            <select
-              value={seciliIzniId}
-              onChange={e => setSeciliIzniId(e.target.value)}
-              className="isg-input w-full"
-            >
-              <option value="">— İş izni seçin —</option>
-              {isIzinleri.map(iz => (
-                <option key={iz.id} value={iz.id}>
-                  {iz.izinNo} — {iz.tip} {iz.sorumlu ? `(${iz.sorumlu})` : ''}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-3">
+            <div>
+              <label className="form-label">Firma Seçin *</label>
+              <select
+                value={seciliFirmaId}
+                onChange={e => { setSeciliFirmaId(e.target.value); setSeciliIzniId(''); }}
+                className="isg-input w-full"
+              >
+                <option value="">— Firma seçin —</option>
+                {firmalar.map(f => (
+                  <option key={f.id} value={f.id}>{f.ad}</option>
+                ))}
+              </select>
+            </div>
+            {seciliFirmaId && (
+              <div>
+                <label className="form-label">İş İzni Seçin *</label>
+                <select
+                  value={seciliIzniId}
+                  onChange={e => setSeciliIzniId(e.target.value)}
+                  className="isg-input w-full"
+                >
+                  <option value="">— İş izni seçin —</option>
+                  {firmaIsIzinleri.map(iz => (
+                    <option key={iz.id} value={iz.id}>
+                      {iz.izinNo} — {iz.tip} {iz.sorumlu ? `(${iz.sorumlu})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
 
@@ -206,15 +231,12 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
             onChange={e => setEvrakTur(e.target.value)}
             className="isg-input w-full"
           >
-            <option value="Belge">Belge</option>
-            <option value="Risk Analizi">Risk Analizi</option>
-            <option value="Çalışma Talimatı">Çalışma Talimatı</option>
-            <option value="Eğitim Belgesi">Eğitim Belgesi</option>
-            <option value="Yöntem Belgesi">Yöntem Belgesi</option>
-            <option value="Onay Belgesi">Onay Belgesi</option>
-            <option value="Fotoğraf">Fotoğraf</option>
-            <option value="Rapor">Rapor</option>
-            <option value="Diğer">Diğer</option>
+            <option value="Sıcak Çalışma">Sıcak Çalışma</option>
+            <option value="Yüksekte Çalışma">Yüksekte Çalışma</option>
+            <option value="Kapalı Alan">Kapalı Alan</option>
+            <option value="Elektrikli Çalışma">Elektrikli Çalışma</option>
+            <option value="Kazı">Kazı</option>
+            <option value="Genel">Genel</option>
           </select>
         </div>
 

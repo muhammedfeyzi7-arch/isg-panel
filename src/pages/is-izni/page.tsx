@@ -836,7 +836,8 @@ export default function IsIzniPage() {
         open={showTopluEvrak}
         onClose={() => { setShowTopluEvrak(false); setTopluEvrakIzni(null); }}
         isIzni={topluEvrakIzni}
-        isIzinleri={topluEvrakIzni ? [] : filtered}
+        isIzinleri={topluEvrakIzni ? [] : aktifIsIzinleri}
+        firmalar={topluEvrakIzni ? [] : aktivFirmalar}
         orgId={org?.id ?? 'unknown'}
         onEvrakEklendi={(izId, evraklar) => {
           updateIsIzni(izId, { evraklar });
