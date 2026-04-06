@@ -3,7 +3,7 @@ import Modal from '../../../components/base/Modal';
 import { useApp } from '../../../store/AppContext';
 import type { Uygunsuzluk } from '../../../types';
 import { STATUS_CONFIG, SEV_CONFIG } from '../utils/statusHelper';
-import { printDofRaporu, exportDofToExcel } from '../utils/dofPdfGenerator';
+import { exportDofToExcel } from '../utils/dofPdfGenerator';
 
 interface Props {
   isOpen: boolean;
@@ -17,7 +17,6 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
   const [firmaFilter, setFirmaFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const aktif = useMemo(() => uygunsuzluklar.filter(u => !u.silinmis && !u.cascadeSilindi), [uygunsuzluklar]);
@@ -47,16 +46,6 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
     return filtered.filter(u => selected.has(u.id));
   }, [filtered, selected]);
 
-  const handleGenerate = async () => {
-    if (selectedRecords.length === 0) return;
-    setGenerating(true);
-    try {
-      await printDofRaporu(selectedRecords, firmalar, personeller, getUygunsuzlukPhoto);
-    } finally {
-      setTimeout(() => setGenerating(false), 1500);
-    }
-  };
-
   const handleExcelExport = async () => {
     if (selectedRecords.length === 0) return;
     setExporting(true);
@@ -85,20 +74,11 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
             <button
               onClick={handleExcelExport}
               disabled={selectedRecords.length === 0 || exporting}
-              className="whitespace-nowrap px-4 py-2 rounded-lg font-semibold text-sm transition-all cursor-pointer disabled:opacity-50"
+              className="whitespace-nowrap px-5 py-2 rounded-lg font-semibold text-sm transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
               style={{ background: '#16A34A', color: '#fff' }}
             >
-              <i className="ri-file-excel-2-line mr-1.5" />
-              {exporting ? 'İndiriliyor...' : 'Excel İndir'}
-            </button>
-            <button
-              onClick={handleGenerate}
-              disabled={selectedRecords.length === 0 || generating}
-              className="whitespace-nowrap px-5 py-2 rounded-lg font-semibold text-sm transition-all cursor-pointer disabled:opacity-50"
-              style={{ background: '#EF4444', color: '#fff' }}
-            >
-              <i className="ri-download-line mr-1.5" />
-              {generating ? 'Oluşturuluyor...' : 'PDF Oluştur ve İndir'}
+              <i className="ri-file-excel-2-line text-sm" />
+              {exporting ? 'İndiriliyor...' : 'Excel Raporu İndir'}
             </button>
           </div>
         </>
@@ -213,11 +193,11 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
         </div>
 
         {selectedRecords.length > 0 && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
-            <i className="ri-information-line text-sm" style={{ color: '#818CF8' }} />
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(16,163,74,0.06)', border: '1px solid rgba(16,163,74,0.2)' }}>
+            <i className="ri-information-line text-sm" style={{ color: '#16A34A' }} />
             <span className="text-xs" style={{ color: '#94A3B8' }}>
-              <strong style={{ color: '#818CF8' }}>{selectedRecords.length}</strong> kayıt rapora eklenecek.
-              Açılış/kapatma fotoğrafları varsa PDF&apos;e dahil edilir.
+              <strong style={{ color: '#16A34A' }}>{selectedRecords.length}</strong> kayıt Excel raporuna eklenecek.
+              Açılış ve kapanış fotoğrafları varsa Excel&apos;e gömülü olarak dahil edilir.
             </span>
           </div>
         )}
