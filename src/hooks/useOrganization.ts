@@ -55,14 +55,18 @@ export function useOrganization(user: User | null) {
           },
         });
         if (!res.ok) return false;
-        const resData = await res.json() as {
+        let resData: {
           organization?: { id: string; name: string; invite_code: string };
           role?: string;
           is_active?: boolean;
           must_change_password?: boolean;
           display_name?: string;
           email?: string;
-        };
+        } = {};
+        try {
+          const text = await res.text();
+          if (text) resData = JSON.parse(text);
+        } catch { return false; }
         if (resData?.organization) {
           setOrg({
             id: resData.organization.id,
@@ -191,7 +195,13 @@ export function useOrganization(user: User | null) {
         body: JSON.stringify({ org_name: name }),
       });
 
-      const data = await res.json() as { error?: string; organization?: { id: string } };
+      let data: { error?: string; organization?: { id: string } } = {};
+      try {
+        const text = await res.text();
+        if (text) data = JSON.parse(text);
+      } catch {
+        return { error: 'Sunucu yanıtı okunamadı. Lütfen tekrar deneyin.' };
+      }
 
       if (!res.ok || data.error) {
         return { error: data.error ?? 'Organizasyon oluşturulamadı.' };
