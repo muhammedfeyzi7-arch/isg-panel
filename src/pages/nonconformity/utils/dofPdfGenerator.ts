@@ -372,6 +372,7 @@ export async function exportDofToExcel(
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
   });
 
+  // Sütun sıralaması: No, DÖF No, Tarih, Firma, Personel, Başlık, Açılış Foto, Açıklama, Önlemler, Sorumlu, Hedef Tarih, Kapanma Tarihi, Kapanış Foto, Önem, Durum
   ws.columns = [
     { header: 'No', key: 'no', width: 6 },
     { header: 'DÖF No', key: 'dofNo', width: 16 },
@@ -379,15 +380,15 @@ export async function exportDofToExcel(
     { header: 'Firma', key: 'firma', width: 28 },
     { header: 'Personel', key: 'personel', width: 22 },
     { header: 'Başlık', key: 'baslik', width: 32 },
+    { header: 'Açılış Fotoğrafı', key: 'acilisFoto', width: 22 },
     { header: 'Uygunsuzluk Açıklaması', key: 'aciklama', width: 42 },
     { header: 'Alınması Gereken Önlemler', key: 'onlem', width: 42 },
     { header: 'Sorumlu', key: 'sorumlu', width: 20 },
     { header: 'Hedef Tarih', key: 'hedefTarih', width: 14 },
     { header: 'Kapanma Tarihi', key: 'kapatmaTarihi', width: 16 },
+    { header: 'Kapanış Fotoğrafı', key: 'kapatmaFoto', width: 22 },
     { header: 'Önem', key: 'severity', width: 12 },
     { header: 'Durum', key: 'durum', width: 14 },
-    { header: 'Açılış Fotoğrafı', key: 'acilisFoto', width: 22 },
-    { header: 'Kapanış Fotoğrafı', key: 'kapatmaFoto', width: 22 },
   ];
 
   const headerRow = ws.getRow(1);
@@ -408,6 +409,7 @@ export async function exportDofToExcel(
     const isEven = i % 2 === 0;
     const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
 
+    // Sütun sırası: no, dofNo, tarih, firma, personel, baslik, acilisFoto(7), aciklama, onlem, sorumlu, hedefTarih, kapatmaTarihi, kapatmaFoto(13), severity, durum
     const rowData = {
       no: i + 1,
       dofNo: r.acilisNo ?? `DÖF-${i + 1}`,
@@ -415,15 +417,15 @@ export async function exportDofToExcel(
       firma: firma?.ad ?? '—',
       personel: personel?.adSoyad ?? '—',
       baslik: r.baslik ?? '',
+      acilisFoto: '',
       aciklama: r.aciklama ?? '',
       onlem: r.onlem ?? '',
       sorumlu: r.sorumlu ?? '',
       hedefTarih: r.hedefTarih ? new Date(r.hedefTarih).toLocaleDateString('tr-TR') : '',
       kapatmaTarihi: r.kapatmaTarihi ? new Date(r.kapatmaTarihi).toLocaleDateString('tr-TR') : '',
+      kapatmaFoto: '',
       severity: r.severity,
       durum: r.durum,
-      acilisFoto: '',
-      kapatmaFoto: '',
     };
 
     const dataRow = ws.addRow(rowData);
@@ -436,12 +438,14 @@ export async function exportDofToExcel(
         bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
         right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
       };
-      if (colNumber === 13) {
+      // Durum sütunu (15)
+      if (colNumber === 15) {
         const val = cell.value as string;
         if (val === 'Açık') cell.font = { bold: true, color: { argb: 'FFDC2626' }, size: 11 };
         else if (val === 'Kapandı') cell.font = { bold: true, color: { argb: 'FF16A34A' }, size: 11 };
       }
-      if (colNumber === 12) {
+      // Önem sütunu (14)
+      if (colNumber === 14) {
         const val = cell.value as string;
         const sevColors: Record<string, string> = {
           'Kritik': 'FFDC2626', 'Yüksek': 'FFD97706', 'Orta': 'FFCA8A04', 'Düşük': 'FF16A34A',
@@ -470,19 +474,21 @@ export async function exportDofToExcel(
       } catch { /* fotoğraf eklenemezse sessizce geç */ }
     };
 
+    // Açılış Fotoğrafı (sütun 7)
     if (acilisB64) {
-      await addPhoto(acilisB64, 14);
+      await addPhoto(acilisB64, 7);
     } else {
-      const cell = dataRow.getCell(14);
+      const cell = dataRow.getCell(7);
       cell.value = r.acilisFotoMevcut ? 'Fotoğraf yüklenemedi' : '—';
       cell.font = { color: { argb: r.acilisFotoMevcut ? 'FFCA8A04' : 'FF9CA3AF' }, size: 10 };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
     }
 
+    // Kapanış Fotoğrafı (sütun 13)
     if (kapatmaB64) {
-      await addPhoto(kapatmaB64, 15);
+      await addPhoto(kapatmaB64, 13);
     } else {
-      const cell = dataRow.getCell(15);
+      const cell = dataRow.getCell(13);
       cell.value = r.kapatmaFotoMevcut ? 'Fotoğraf yüklenemedi' : '—';
       cell.font = { color: { argb: r.kapatmaFotoMevcut ? 'FFCA8A04' : 'FF9CA3AF' }, size: 10 };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
