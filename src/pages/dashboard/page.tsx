@@ -3,6 +3,7 @@ import { useApp } from '../../store/AppContext';
 import MonthlyStats from './components/MonthlyStats';
 import StatCard from './components/StatCard';
 import CompanyDocumentsWidget from './components/CompanyDocumentsWidget';
+import AkilliOzet from './components/AkilliOzet';
 import { supabase } from '../../lib/supabase';
 
 import {
@@ -227,52 +228,7 @@ export default function DashboardPage() {
       .slice(0, 5),
   [aktifUygunsuzluklar]);
 
-  const insights = useMemo(() => {
-    const list: { icon: string; text: string; color: string; bg: string; priority: number; subItems?: { icon: string; text: string; count: number; color: string }[] }[] = [];
-    
-    if (riskStats.uygunDegil > 0) {
-      list.push({ icon: 'ri-error-warning-fill', text: `${riskStats.uygunDegil} ekipman KRİTİK: Uygun Değil`, color: '#EF4444', bg: 'rgba(239,68,68,0.12)', priority: 100 });
-    }
-    if (riskStats.gecikmisBelge > 0) {
-      list.push({ icon: 'ri-file-damage-line', text: `${riskStats.gecikmisBelge} evrak süresi dolmuş`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', priority: 90 });
-    }
-    if (riskStats.gecikmisEkipman > 0) {
-      list.push({ icon: 'ri-tools-line', text: `${riskStats.gecikmisEkipman} ekipman kontrolü gecikti`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', priority: 90 });
-    }
-    if (riskStats.gecikmisMuayene > 0) {
-      list.push({ icon: 'ri-heart-pulse-line', text: `${riskStats.gecikmisMuayene} muayene tarihi geçti`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', priority: 90 });
-    }
-    if (gorevStats.gecikmiş > 0) {
-      list.push({ icon: 'ri-task-line', text: `${gorevStats.gecikmiş} görev gecikmiş`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 85 });
-    }
-    if (stats.acikU > 0) {
-      list.push({ icon: 'ri-alert-line', text: `${stats.acikU} açık uygunsuzluk kapatılmayı bekliyor`, color: '#F87171', bg: 'rgba(239,68,68,0.1)', priority: 80 });
-    }
-    if (acikKontrolFormu > 0 && kontrolFormYuklendi) {
-      list.push({ icon: 'ri-folder-shield-2-line', text: `${acikKontrolFormu} kontrol formu tarihi geçti`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 70 });
-    }
-    if (isIzniStats.bekleyen > 0) {
-      list.push({ icon: 'ri-shield-check-line', text: `${isIzniStats.bekleyen} iş izni onay bekliyor`, color: '#6366F1', bg: 'rgba(99,102,241,0.1)', priority: 65 });
-    }
-    if (riskStats.toplam7 > 0) {
-      const subItems7: { icon: string; text: string; count: number; color: string }[] = [];
-      if (riskStats.yaklasan7Belge > 0)   subItems7.push({ icon: 'ri-file-warning-line', text: 'Evrak', count: riskStats.yaklasan7Belge, color: '#94A3B8' });
-      if (riskStats.yaklasan7Ekipman > 0) subItems7.push({ icon: 'ri-tools-line', text: 'Ekipman', count: riskStats.yaklasan7Ekipman, color: '#FB923C' });
-      if (riskStats.yaklasan7Muayene > 0) subItems7.push({ icon: 'ri-heart-pulse-line', text: 'Muayene', count: riskStats.yaklasan7Muayene, color: '#34D399' });
-      list.push({ icon: 'ri-alarm-warning-line', text: `${riskStats.toplam7} işlem 7 gün içinde sona eriyor`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 60, subItems: subItems7 });
-    }
-    if (riskStats.toplam30 > 0) {
-      const subItems30: { icon: string; text: string; count: number; color: string }[] = [];
-      if (riskStats.yaklasan30Belge > 0)   subItems30.push({ icon: 'ri-file-warning-line', text: 'Evrak', count: riskStats.yaklasan30Belge, color: '#94A3B8' });
-      if (riskStats.yaklasan30Ekipman > 0) subItems30.push({ icon: 'ri-tools-line', text: 'Ekipman', count: riskStats.yaklasan30Ekipman, color: '#FB923C' });
-      if (riskStats.yaklasan30Muayene > 0) subItems30.push({ icon: 'ri-heart-pulse-line', text: 'Muayene', count: riskStats.yaklasan30Muayene, color: '#34D399' });
-      list.push({ icon: 'ri-timer-line', text: `${riskStats.toplam30} işlem 30 gün içinde sona eriyor`, color: '#FBBF24', bg: 'rgba(251,191,36,0.1)', priority: 50, subItems: subItems30 });
-    }
-    if (list.length === 0) {
-      list.push({ icon: 'ri-checkbox-circle-line', text: 'Tüm sistemler normal çalışıyor', color: '#34D399', bg: 'rgba(16,185,129,0.1)', priority: 0 });
-    }
-    return list.sort((a, b) => b.priority - a.priority).slice(0, 5);
-  }, [riskStats, stats, acikKontrolFormu, kontrolFormYuklendi, gorevStats, isIzniStats]);
+
 
   const isEmpty = aktifFirmalar.length === 0 && aktifPersoneller.length === 0;
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
@@ -418,7 +374,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Ana Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -439,7 +395,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Görev + İş İzni Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {extraStatCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -460,54 +416,8 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Akıllı Özet + Bu Ay Özeti ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="rounded-2xl overflow-hidden isg-card">
-          <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #6366F1, #8B5CF6)' }} />
-          <div className="p-5">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
-                <i className="ri-brain-line text-white text-sm" />
-              </div>
-              <h2 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Akıllı Özet</h2>
-              <span className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-full"
-                style={insights.filter(i => i.priority >= 2).length > 0 
-                  ? { background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }
-                  : { background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.2)' }
-                }
-              >
-                {insights.filter(i => i.priority >= 2).length > 0 ? `${insights.filter(i => i.priority >= 2).length} uyarı` : 'Temiz'}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {insights.map((insight, i) => (
-                <div key={i} className="rounded-xl overflow-hidden"
-                  style={{ background: insight.bg, border: `1px solid ${insight.color}20` }}>
-                  <div className="flex items-start gap-2.5 px-3 py-2.5">
-                    <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0 mt-0.5"
-                      style={{ background: `${insight.color}18` }}>
-                      <i className={`${insight.icon} text-[11px]`} style={{ color: insight.color }} />
-                    </div>
-                    <p className="text-[11.5px] leading-relaxed font-medium" style={{ color: 'var(--text-secondary)' }}>{insight.text}</p>
-                  </div>
-                  {insight.subItems && insight.subItems.length > 0 && (
-                    <div className="px-3 pb-2.5">
-                      <div className="flex flex-wrap gap-1.5">
-                        {insight.subItems.map((sub, idx) => (
-                          <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium"
-                            style={{ background: `${sub.color}15`, border: `1px solid ${sub.color}25`, color: sub.color }}>
-                            <i className={`${sub.icon} text-[9px]`} />
-                            <span>{sub.count} {sub.text}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <AkilliOzet acikKontrolFormu={acikKontrolFormu} kontrolFormYuklendi={kontrolFormYuklendi} />
         <div className="lg:col-span-2">
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"

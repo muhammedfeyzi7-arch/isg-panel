@@ -469,7 +469,42 @@ export default function EgitimlerPage() {
               </button>
             </div>
           )}
-          <div className="overflow-x-auto">
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {filtered.map(eg => {
+              const stc = STATUS_CFG[eg.durum as EgitimStatus] || STATUS_CFG['Planlandı'];
+              return (
+                <div key={eg.id} className="p-4" style={{ background: selectedIds.has(eg.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                  <div className="flex items-start gap-3">
+                    <input type="checkbox" checked={selectedIds.has(eg.id)} onChange={() => toggleOne(eg.id)} className="cursor-pointer mt-1 flex-shrink-0" />
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: stc.bg, border: `1px solid ${stc.border}` }}>
+                      <i className="ri-graduation-cap-line text-sm" style={{ color: stc.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{eg.ad}</p>
+                        <Badge label={stc.label} color={getStatusColor(eg.durum)} />
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{getFirmaAd(eg.firmaId)}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        {eg.tarih && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{new Date(eg.tarih).toLocaleDateString('tr-TR')}</span>}
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>{eg.katilimciIds.length} kişi</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 justify-end mt-2">
+                    <ABtn icon="ri-eye-line" color="#60A5FA" onClick={() => setDetailId(eg.id)} title="Detay" />
+                    {eg.belgeDosyaUrl && <ABtn icon="ri-external-link-line" color="#34D399" onClick={() => handleBelgeGoruntule(eg)} title="Görüntüle" />}
+                    <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(eg)} title="Düzenle" />
+                    <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Masaüstü tablo görünümü */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full table-premium">
               <thead>
                 <tr>
@@ -487,7 +522,6 @@ export default function EgitimlerPage() {
               <tbody>
                 {filtered.map(eg => {
                   const stc = STATUS_CFG[eg.durum as EgitimStatus] || STATUS_CFG['Planlandı'];
-                  // Belge sadece URL varsa "Mevcut" göster
                   const hasBelge = !!eg.belgeDosyaUrl;
                   const hasFileError = eg.belgeDosyaAdi && !eg.belgeDosyaUrl;
                   const isLoadingBelge = belgeLoading === eg.id;
@@ -518,19 +552,11 @@ export default function EgitimlerPage() {
                       <td className="hidden sm:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'}</span></td>
                       <td className="hidden lg:table-cell">
                         {hasFileError ? (
-                          <button
-                            onClick={() => openEdit(eg)}
-                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg cursor-pointer whitespace-nowrap transition-all"
-                            style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
-                            title="Dosya yüklenmemiş — düzenleyerek ekleyin"
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.2)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.1)'; }}
-                          >
+                          <button onClick={() => openEdit(eg)} className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg cursor-pointer whitespace-nowrap transition-all" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
                             <i className="ri-upload-2-line" />Belge Ekle
                           </button>
                         ) : hasBelge ? (
-                          <button onClick={() => handleBelgeIndir(eg)} disabled={isLoadingBelge} className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-all whitespace-nowrap disabled:opacity-50" style={{ color: '#34D399' }}
-                            onMouseEnter={e => { e.currentTarget.style.opacity = '0.7'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
+                          <button onClick={() => handleBelgeIndir(eg)} disabled={isLoadingBelge} className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-all whitespace-nowrap disabled:opacity-50" style={{ color: '#34D399' }}>
                             {isLoadingBelge ? <i className="ri-loader-4-line animate-spin text-sm" /> : <i className="ri-file-check-line text-sm" />}
                             <span className="max-w-[80px] truncate">{eg.belgeDosyaAdi || 'Mevcut'}</span>
                           </button>

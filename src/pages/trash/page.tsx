@@ -200,16 +200,16 @@ export default function CopKutusuPage() {
 
   // Satır render yardımcısı — checkbox + butonlar
   const renderRowActions = (id: string, tip: Tab, ad: string, restoreLabel?: string) => (
-    <div className="flex items-center gap-2 flex-shrink-0">
+    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
       <input type="checkbox" checked={selected.has(id)} onChange={() => toggleOne(id)} className="cursor-pointer" />
       {canRestore(tip) && (
         <button onClick={() => handleRestore(id, tip)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
           style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.25)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; }}>
           <i className="ri-arrow-go-back-line" />
-          {restoreLabel || 'Geri Yükle'}
+          <span className="hidden sm:inline">{restoreLabel || 'Geri Yükle'}</span>
         </button>
       )}
       <button onClick={() => setPermDeleteItem({ id, tip, ad })}
@@ -252,28 +252,30 @@ export default function CopKutusuPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-1 p-1 rounded-xl isg-card">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap"
-            style={activeTab === tab.id
-              ? { background: 'linear-gradient(135deg, #3B82F6, #6366F1)', color: 'white', boxShadow: '0 4px 15px rgba(99,102,241,0.3)' }
-              : { color: 'var(--text-muted)' }}
-          >
-            <i className={tab.icon} />
-            <span className="hidden sm:inline">{tab.label}</span>
-            {tab.count > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                style={activeTab === tab.id
-                  ? { background: 'rgba(255,255,255,0.25)', color: 'white' }
-                  : { background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="overflow-x-auto">
+        <div className="flex gap-1 p-1 rounded-xl isg-card min-w-max sm:min-w-0 sm:flex-wrap">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap"
+              style={activeTab === tab.id
+                ? { background: 'linear-gradient(135deg, #3B82F6, #6366F1)', color: 'white', boxShadow: '0 4px 15px rgba(99,102,241,0.3)' }
+                : { color: 'var(--text-muted)' }}
+            >
+              <i className={tab.icon} />
+              <span className="hidden xs:inline sm:inline">{tab.label}</span>
+              {tab.count > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                  style={activeTab === tab.id
+                    ? { background: 'rgba(255,255,255,0.25)', color: 'white' }
+                    : { background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Toplu seçim aksiyonları */}

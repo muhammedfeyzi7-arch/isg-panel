@@ -477,22 +477,61 @@ export default function MuayenelerPage() {
             <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Sağlık Evrakı Ekle</button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-3 px-4 py-2.5 flex-wrap" style={{ background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid rgba(99,102,241,0.2)' }}>
-                <span className="text-sm font-semibold" style={{ color: '#818CF8' }}>{selectedIds.size} kayıt seçildi</span>
-                <button
-                  onClick={() => setBulkDeleteConfirm(true)}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
-                  style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
-                >
-                  <i className="ri-delete-bin-line" /> Seçilenleri Sil
-                </button>
-                <button onClick={() => setSelectedIds(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
-                  Seçimi Kaldır
-                </button>
-              </div>
-            )}
+          <>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2.5 flex-wrap" style={{ background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid rgba(99,102,241,0.2)' }}>
+              <span className="text-sm font-semibold" style={{ color: '#818CF8' }}>{selectedIds.size} kayıt seçildi</span>
+              <button onClick={() => setBulkDeleteConfirm(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap" style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <i className="ri-delete-bin-line" /> Seçilenleri Sil
+              </button>
+              <button onClick={() => setSelectedIds(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>Seçimi Kaldır</button>
+            </div>
+          )}
+
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {filtered.map(m => {
+              const personel = personeller.find(p => p.id === m.personelId);
+              const firma = firmalar.find(f => f.id === m.firmaId);
+              const rc = RESULT_CONFIG[m.sonuc];
+              const days = getDaysUntil(m.sonrakiTarih);
+              const isOverdue = days < 0;
+              const isUrgent = days >= 0 && days <= 30;
+              return (
+                <div key={m.id} className="p-4" style={{ background: selectedIds.has(m.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                  <div className="flex items-start gap-3">
+                    <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleOne(m.id)} className="cursor-pointer mt-1 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{personel?.adSoyad || '—'}</p>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0" style={{ background: rc.bg, color: rc.color }}>
+                          <i className={rc.icon} />{rc.label}
+                        </span>
+                      </div>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{personel?.gorev || ''} {firma ? `· ${firma.ad}` : ''}</p>
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        {m.muayeneTarihi && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>Muayene: {new Date(m.muayeneTarihi).toLocaleDateString('tr-TR')}</span>}
+                        {m.sonrakiTarih && (
+                          <span className={`text-xs font-medium ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : ''}`} style={!isOverdue && !isUrgent ? { color: 'var(--text-faint)' } : {}}>
+                            Sonraki: {new Date(m.sonrakiTarih).toLocaleDateString('tr-TR')}
+                            {isOverdue && ' ⚠'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 justify-end mt-2">
+                    {m.dosyaUrl && <button onClick={() => handleViewFile(m)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} title="Görüntüle"><i className="ri-eye-line text-sm" /></button>}
+                    <button onClick={() => openEdit(m)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>
+                    <button onClick={() => setDeleteId(m.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Masaüstü tablo görünümü */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="table-premium w-full">
               <thead>
                 <tr>
@@ -614,6 +653,7 @@ export default function MuayenelerPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

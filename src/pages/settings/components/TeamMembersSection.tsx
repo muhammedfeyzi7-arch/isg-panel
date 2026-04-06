@@ -32,9 +32,9 @@ interface FetchOptions {
 const emptyForm: AddUserForm = { display_name: '', email: '', password: '', role: 'member' };
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; gradient: string }> = {
-  admin: { label: 'Admin', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', gradient: 'linear-gradient(135deg, #F59E0B, #EA580C)' },
-  denetci: { label: 'Denetçi', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', gradient: 'linear-gradient(135deg, #06B6D4, #0891B2)' },
-  member: { label: 'Kullanıcı', color: '#818CF8', bg: 'rgba(99,102,241,0.1)', gradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)' },
+  admin: { label: 'Admin Kullanıcı', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', gradient: 'linear-gradient(135deg, #F59E0B, #EA580C)' },
+  denetci: { label: 'Saha Personeli', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', gradient: 'linear-gradient(135deg, #06B6D4, #0891B2)' },
+  member: { label: 'Evrak/Dökümantasyon Denetçi', color: '#818CF8', bg: 'rgba(99,102,241,0.1)', gradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)' },
 };
 
 export default function TeamMembersSection() {
@@ -512,9 +512,9 @@ export default function TeamMembersSection() {
                           outline: 'none',
                         }}
                       >
-                        <option value="admin">Admin</option>
-                        <option value="denetci">Denetçi</option>
-                        <option value="member">Kullanıcı</option>
+                        <option value="admin">Admin Kullanıcı</option>
+                        <option value="denetci">Saha Personeli</option>
+                        <option value="member">Evrak/Dökümantasyon Denetçi</option>
                       </select>
 
                       <button
@@ -580,9 +580,9 @@ export default function TeamMembersSection() {
         >
           <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#64748B' }} />
           <p className="text-xs leading-relaxed" style={{ color: subColor }}>
-            <strong style={{ color: nameColor }}>Admin:</strong> Tam yetki &bull;&nbsp;
-            <strong style={{ color: '#06B6D4' }}>Denetçi:</strong> Saha denetim, tutanaklar ve raporlar &bull;&nbsp;
-            <strong style={{ color: '#818CF8' }}>Kullanıcı:</strong> Tüm modüller (ayarlar hariç)
+            <strong style={{ color: nameColor }}>Admin Kullanıcı:</strong> Tam yetki &bull;&nbsp;
+            <strong style={{ color: '#06B6D4' }}>Saha Personeli:</strong> Saha denetim, tutanaklar ve raporlar &bull;&nbsp;
+            <strong style={{ color: '#818CF8' }}>Evrak/Dökümantasyon Denetçi:</strong> Tüm modüller (ayarlar hariç)
           </p>
         </div>
       </div>
@@ -673,9 +673,9 @@ export default function TeamMembersSection() {
                   onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
                   style={{ ...inputStyle, cursor: 'pointer' }}
                 >
-                  <option value="member">Kullanıcı</option>
-                  <option value="denetci">Denetçi</option>
-                  <option value="admin">Admin</option>
+                  <option value="member">Evrak/Dökümantasyon Denetçi</option>
+                  <option value="denetci">Saha Personeli</option>
+                  <option value="admin">Admin Kullanıcı</option>
                 </select>
               </div>
             </div>

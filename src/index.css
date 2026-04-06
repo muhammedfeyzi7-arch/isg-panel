@@ -345,6 +345,7 @@ select option {
 }
 @media (max-width: 640px) {
   .form-grid-2 { grid-template-columns: 1fr; }
+  .form-grid-2 > .col-span-2 { grid-column: span 1; }
 }
 
 /* ══════════════════════════════════════════════════════════

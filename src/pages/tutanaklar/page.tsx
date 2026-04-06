@@ -933,7 +933,7 @@ export default function TutanaklarPage() {
         </div>
       )}
 
-      {/* Table */}
+      {/* Table / Cards */}
       {filtered.length === 0 ? (
         <div className="isg-card rounded-xl py-20 text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
@@ -946,7 +946,62 @@ export default function TutanaklarPage() {
         </div>
       ) : (
         <div className="isg-card rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {filtered.map(t => {
+              const firma = firmalar.find(f => f.id === t.firmaId);
+              const stc = STS_CONFIG[t.durum];
+              return (
+                <div key={t.id} className="p-4" style={{ background: selected.has(t.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                  <div className="flex items-start gap-3">
+                    {canDelete && (
+                      <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleOne(t.id)} className="cursor-pointer mt-1 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-mono text-xs font-bold" style={{ color: '#60A5FA' }}>{t.tutanakNo}</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap" style={{ background: stc.bg, color: stc.color }}>
+                          <i className={stc.icon} />{t.durum}
+                        </span>
+                      </div>
+                      <p className="font-semibold text-sm mb-0.5" style={{ color: 'var(--text-primary)' }}>{t.baslik}</p>
+                      {t.aciklama && (
+                        <p className="text-xs mb-1 line-clamp-1" style={{ color: 'var(--text-muted)' }}>{t.aciklama}</p>
+                      )}
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {firma && <span><i className="ri-building-2-line mr-1" />{firma.ad}</span>}
+                        {t.tarih && <span><i className="ri-calendar-line mr-1" />{new Date(t.tarih).toLocaleDateString('tr-TR')}</span>}
+                        {t.olusturanKisi && <span><i className="ri-user-line mr-1" />{t.olusturanKisi}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3 justify-end flex-wrap">
+                    {t.dosyaAdi && (
+                      <button onClick={() => handleFileDownload(t)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}>
+                        <i className="ri-attachment-2" />Dosya
+                      </button>
+                    )}
+                    <button onClick={() => setViewId(t.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>
+                      <i className="ri-eye-line" />Görüntüle
+                    </button>
+                    {canEdit && (
+                      <button onClick={() => openEdit(t)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
+                        <i className="ri-edit-line text-sm" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => setDeleteId(t.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                        <i className="ri-delete-bin-line text-sm" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Masaüstü tablo görünümü */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="table-premium w-full">
               <thead>
                 <tr>

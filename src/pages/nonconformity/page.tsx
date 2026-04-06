@@ -300,7 +300,7 @@ export default function UygunsuzluklarPage() {
             </div>
           )}
 
-          {/* Table */}
+          {/* Table / Cards */}
           <div className="isg-card rounded-xl overflow-hidden">
             {filtered.length === 0 ? (
               <div className="py-20 text-center">
@@ -317,94 +317,148 @@ export default function UygunsuzluklarPage() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="table-premium w-full">
-                  <thead>
-                    <tr>
-                      <th className="w-10 text-center">
-                        <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                      </th>
-                      <th className="text-left">DÖF No / Başlık</th>
-                      <th className="text-left hidden md:table-cell">Firma</th>
-                      <th className="text-left hidden lg:table-cell">Personel</th>
-                      <th className="text-left hidden sm:table-cell">Tarih</th>
-                      <th className="text-left">Önem</th>
-                      <th className="text-left">Durum</th>
-                      <th className="text-center hidden lg:table-cell">Foto</th>
-                      <th className="text-right">İşlemler</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map(u => {
-                      const firma = firmalar.find(f => f.id === u.firmaId);
-                      const personel = personeller.find(p => p.id === u.personelId);
-                      const sc = STATUS_CONFIG[u.durum];
-                      const sev = SEV_CONFIG[u.severity];
-                      const isChecked = selected.has(u.id);
-                      return (
-                        <tr key={u.id} style={{ background: isChecked ? 'rgba(99,102,241,0.04)' : undefined }}>
-                          <td className="text-center">
-                            <input type="checkbox" checked={isChecked} onChange={() => toggleOne(u.id)} className="cursor-pointer" />
-                          </td>
-                          <td>
-                            <p className="font-mono text-xs font-bold mb-0.5" style={{ color: '#6366F1' }}>{u.acilisNo ?? '—'}</p>
-                            <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.baslik}</p>
-                          </td>
-                          <td className="hidden md:table-cell">
-                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{firma?.ad ?? '—'}</span>
-                          </td>
-                          <td className="hidden lg:table-cell">
-                            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{personel?.adSoyad ?? '—'}</span>
-                          </td>
-                          <td className="hidden sm:table-cell">
-                            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{u.tarih ? new Date(u.tarih).toLocaleDateString('tr-TR') : '—'}</span>
-                          </td>
-                          <td>
-                            <span className="inline-block px-2 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: sev.bg, color: sev.color }}>{u.severity}</span>
-                          </td>
-                          <td>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
-                              <i className={sc.icon + ' text-xs'} />{u.durum}
-                            </span>
-                          </td>
-                          <td className="hidden lg:table-cell text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <span title="Açılış fotoğrafı" className={`w-6 h-6 flex items-center justify-center rounded-md text-xs ${u.acilisFotoMevcut ? 'opacity-100' : 'opacity-25'}`} style={{ background: u.acilisFotoMevcut ? 'rgba(249,115,22,0.15)' : 'rgba(71,85,105,0.1)', color: u.acilisFotoMevcut ? '#F97316' : '#64748B' }}>
-                                <i className="ri-camera-line" />
-                              </span>
-                              <span title="Kapatma fotoğrafı" className={`w-6 h-6 flex items-center justify-center rounded-md text-xs ${u.kapatmaFotoMevcut ? 'opacity-100' : 'opacity-25'}`} style={{ background: u.kapatmaFotoMevcut ? 'rgba(34,197,94,0.15)' : 'rgba(71,85,105,0.1)', color: u.kapatmaFotoMevcut ? '#22C55E' : '#64748B' }}>
-                                <i className="ri-camera-line" />
+              <>
+                {/* Mobil kart görünümü */}
+                <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                  {filtered.map(u => {
+                    const firma = firmalar.find(f => f.id === u.firmaId);
+                    const sc = STATUS_CONFIG[u.durum];
+                    const sev = SEV_CONFIG[u.severity];
+                    const isChecked = selected.has(u.id);
+                    return (
+                      <div key={u.id} className="p-4" style={{ background: isChecked ? 'rgba(99,102,241,0.04)' : undefined }}>
+                        <div className="flex items-start gap-3">
+                          <input type="checkbox" checked={isChecked} onChange={() => toggleOne(u.id)} className="cursor-pointer mt-1 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-mono text-xs font-bold" style={{ color: '#6366F1' }}>{u.acilisNo ?? '—'}</span>
+                              <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap" style={{ background: sev.bg, color: sev.color }}>{u.severity}</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold whitespace-nowrap" style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
+                                <i className={sc.icon + ' text-xs'} />{u.durum}
                               </span>
                             </div>
-                          </td>
-                          <td>
-                            <div className="flex items-center gap-1 justify-end">
-                              <button onClick={() => setDetailRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }} title="Detay">
-                                <i className="ri-eye-line text-xs" />
-                              </button>
-                              {u.durum !== 'Kapandı' && canCloseNonconformity && (
-                                <button onClick={() => setKapatmaRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }} title="Kapatma Yap">
-                                  <i className="ri-checkbox-circle-line text-xs" />
-                                </button>
-                              )}
-                              {canEdit && (
-                                <button onClick={() => openEdit(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Düzenle">
-                                  <i className="ri-edit-line text-xs" />
-                                </button>
-                              )}
-                              {canDelete && (
-                                <button onClick={() => setDeleteId(u.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil">
-                                  <i className="ri-delete-bin-line text-xs" />
-                                </button>
-                              )}
+                            <p className="font-semibold text-sm mb-1" style={{ color: 'var(--text-primary)' }}>{u.baslik}</p>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {firma && <span><i className="ri-building-2-line mr-1" />{firma.ad}</span>}
+                              {u.tarih && <span><i className="ri-calendar-line mr-1" />{new Date(u.tarih).toLocaleDateString('tr-TR')}</span>}
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-3 justify-end">
+                          <button onClick={() => setDetailRecord(u)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+                            <i className="ri-eye-line" />Detay
+                          </button>
+                          {u.durum !== 'Kapandı' && canCloseNonconformity && (
+                            <button onClick={() => setKapatmaRecord(u)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}>
+                              <i className="ri-checkbox-circle-line" />Kapat
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button onClick={() => openEdit(u)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
+                              <i className="ri-edit-line text-sm" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => setDeleteId(u.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                              <i className="ri-delete-bin-line text-sm" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Masaüstü tablo görünümü */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="table-premium w-full">
+                    <thead>
+                      <tr>
+                        <th className="w-10 text-center">
+                          <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                        </th>
+                        <th className="text-left">DÖF No / Başlık</th>
+                        <th className="text-left hidden md:table-cell">Firma</th>
+                        <th className="text-left hidden lg:table-cell">Personel</th>
+                        <th className="text-left hidden sm:table-cell">Tarih</th>
+                        <th className="text-left">Önem</th>
+                        <th className="text-left">Durum</th>
+                        <th className="text-center hidden lg:table-cell">Foto</th>
+                        <th className="text-right">İşlemler</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map(u => {
+                        const firma = firmalar.find(f => f.id === u.firmaId);
+                        const personel = personeller.find(p => p.id === u.personelId);
+                        const sc = STATUS_CONFIG[u.durum];
+                        const sev = SEV_CONFIG[u.severity];
+                        const isChecked = selected.has(u.id);
+                        return (
+                          <tr key={u.id} style={{ background: isChecked ? 'rgba(99,102,241,0.04)' : undefined }}>
+                            <td className="text-center">
+                              <input type="checkbox" checked={isChecked} onChange={() => toggleOne(u.id)} className="cursor-pointer" />
+                            </td>
+                            <td>
+                              <p className="font-mono text-xs font-bold mb-0.5" style={{ color: '#6366F1' }}>{u.acilisNo ?? '—'}</p>
+                              <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.baslik}</p>
+                            </td>
+                            <td className="hidden md:table-cell">
+                              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{firma?.ad ?? '—'}</span>
+                            </td>
+                            <td className="hidden lg:table-cell">
+                              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{personel?.adSoyad ?? '—'}</span>
+                            </td>
+                            <td className="hidden sm:table-cell">
+                              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{u.tarih ? new Date(u.tarih).toLocaleDateString('tr-TR') : '—'}</span>
+                            </td>
+                            <td>
+                              <span className="inline-block px-2 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: sev.bg, color: sev.color }}>{u.severity}</span>
+                            </td>
+                            <td>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
+                                <i className={sc.icon + ' text-xs'} />{u.durum}
+                              </span>
+                            </td>
+                            <td className="hidden lg:table-cell text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span title="Açılış fotoğrafı" className={`w-6 h-6 flex items-center justify-center rounded-md text-xs ${u.acilisFotoMevcut ? 'opacity-100' : 'opacity-25'}`} style={{ background: u.acilisFotoMevcut ? 'rgba(249,115,22,0.15)' : 'rgba(71,85,105,0.1)', color: u.acilisFotoMevcut ? '#F97316' : '#64748B' }}>
+                                  <i className="ri-camera-line" />
+                                </span>
+                                <span title="Kapatma fotoğrafı" className={`w-6 h-6 flex items-center justify-center rounded-md text-xs ${u.kapatmaFotoMevcut ? 'opacity-100' : 'opacity-25'}`} style={{ background: u.kapatmaFotoMevcut ? 'rgba(34,197,94,0.15)' : 'rgba(71,85,105,0.1)', color: u.kapatmaFotoMevcut ? '#22C55E' : '#64748B' }}>
+                                  <i className="ri-camera-line" />
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="flex items-center gap-1 justify-end">
+                                <button onClick={() => setDetailRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }} title="Detay">
+                                  <i className="ri-eye-line text-xs" />
+                                </button>
+                                {u.durum !== 'Kapandı' && canCloseNonconformity && (
+                                  <button onClick={() => setKapatmaRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }} title="Kapatma Yap">
+                                    <i className="ri-checkbox-circle-line text-xs" />
+                                  </button>
+                                )}
+                                {canEdit && (
+                                  <button onClick={() => openEdit(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Düzenle">
+                                    <i className="ri-edit-line text-xs" />
+                                  </button>
+                                )}
+                                {canDelete && (
+                                  <button onClick={() => setDeleteId(u.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil">
+                                    <i className="ri-delete-bin-line text-xs" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </>

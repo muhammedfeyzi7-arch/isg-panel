@@ -301,87 +301,134 @@ export default function FirmalarPage() {
           actionLabel="Yeni Firma Ekle"
         />
       ) : (
-        <div className="rounded-xl overflow-hidden isg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full table-premium">
-              <thead>
-                <tr>
-                  {canDelete && (
-                    <th className="w-10 text-center">
-                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                    </th>
-                  )}
-                  <th className="text-left">Firma Adı</th>
-                  <th className="text-left hidden md:table-cell">Yetkili Kişi</th>
-                  <th className="text-left hidden lg:table-cell">İletişim</th>
-                  <th className="text-left hidden md:table-cell">Tehlike Sınıfı</th>
-                  <th className="text-left">Durum</th>
-                  <th className="text-left hidden lg:table-cell">Sözleşme Bitiş</th>
-                  <th className="w-20 text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((firma) => (
-                  <tr key={firma.id} style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+        <>
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden space-y-3">
+            {filtered.map((firma) => {
+              const logoUrl = (firma as Firma & { logoUrl?: string }).logoUrl;
+              return (
+                <div key={firma.id} className="isg-card rounded-xl p-4" style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                  <div className="flex items-start gap-3">
                     {canDelete && (
-                      <td className="text-center">
-                        <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer" />
-                      </td>
+                      <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer mt-1 flex-shrink-0" />
                     )}
-                    <td>
-                      <button onClick={() => setDetailId(firma.id)} className="group cursor-pointer text-left">
-                        <div className="flex items-center gap-2.5">
-                          {(() => {
-                            const logoUrl = (firma as Firma & { logoUrl?: string }).logoUrl;
-                            return logoUrl ? (
-                              <div className="w-8 h-8 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                <img src={logoUrl} alt={firma.ad} className="w-full h-full object-contain p-0.5" />
-                              </div>
-                            ) : (
-                              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-[11px] font-bold text-white"
-                                style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
-                                {firma.ad.charAt(0).toUpperCase()}
-                              </div>
-                            );
-                          })()}
-                          <div>
-                            <p className="text-[12.5px] font-semibold group-hover:text-blue-400 transition-colors" style={{ color: 'var(--text-primary)' }}>{firma.ad}</p>
-                            {firma.sgkSicil && <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>SGK: {firma.sgkSicil}</p>}
-                          </div>
+                    <button onClick={() => setDetailId(firma.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer">
+                      {logoUrl ? (
+                        <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <img src={logoUrl} alt={firma.ad} className="w-full h-full object-contain p-0.5" />
                         </div>
-                      </button>
-                    </td>
-                    <td className="hidden md:table-cell">
-                      <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{firma.yetkiliKisi || '—'}</p>
-                    </td>
-                    <td className="hidden lg:table-cell">
-                      <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{firma.telefon || '—'}</p>
-                      <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{firma.email || ''}</p>
-                    </td>
-                    <td className="hidden md:table-cell">
-                      <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
-                    </td>
-                    <td>
-                      <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
-                    </td>
-                    <td className="hidden lg:table-cell">
-                      <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        {firma.sozlesmeBit ? new Date(firma.sozlesmeBit).toLocaleDateString('tr-TR') : '—'}
-                      </p>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-1 justify-end">
-                        <ActionBtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(firma.id)} title="Detay" />
-                        {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
-                        {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
+                      ) : (
+                        <div className="w-10 h-10 flex items-center justify-center rounded-lg flex-shrink-0 text-sm font-bold text-white"
+                          style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
+                          {firma.ad.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{firma.ad}</p>
+                        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{firma.yetkiliKisi || '—'}</p>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </button>
+                    <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
+                      {firma.telefon && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{firma.telefon}</span>}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <ActionBtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(firma.id)} title="Detay" />
+                      {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
+                      {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+
+          {/* Masaüstü tablo görünümü */}
+          <div className="hidden md:block rounded-xl overflow-hidden isg-card">
+            <div className="overflow-x-auto">
+              <table className="w-full table-premium">
+                <thead>
+                  <tr>
+                    {canDelete && (
+                      <th className="w-10 text-center">
+                        <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                      </th>
+                    )}
+                    <th className="text-left">Firma Adı</th>
+                    <th className="text-left hidden md:table-cell">Yetkili Kişi</th>
+                    <th className="text-left hidden lg:table-cell">İletişim</th>
+                    <th className="text-left hidden md:table-cell">Tehlike Sınıfı</th>
+                    <th className="text-left">Durum</th>
+                    <th className="text-left hidden lg:table-cell">Sözleşme Bitiş</th>
+                    <th className="w-20 text-right">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((firma) => (
+                    <tr key={firma.id} style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                      {canDelete && (
+                        <td className="text-center">
+                          <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer" />
+                        </td>
+                      )}
+                      <td>
+                        <button onClick={() => setDetailId(firma.id)} className="group cursor-pointer text-left">
+                          <div className="flex items-center gap-2.5">
+                            {(() => {
+                              const logoUrl = (firma as Firma & { logoUrl?: string }).logoUrl;
+                              return logoUrl ? (
+                                <div className="w-8 h-8 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                  <img src={logoUrl} alt={firma.ad} className="w-full h-full object-contain p-0.5" />
+                                </div>
+                              ) : (
+                                <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-[11px] font-bold text-white"
+                                  style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
+                                  {firma.ad.charAt(0).toUpperCase()}
+                                </div>
+                              );
+                            })()}
+                            <div>
+                              <p className="text-[12.5px] font-semibold group-hover:text-blue-400 transition-colors" style={{ color: 'var(--text-primary)' }}>{firma.ad}</p>
+                              {firma.sgkSicil && <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>SGK: {firma.sgkSicil}</p>}
+                            </div>
+                          </div>
+                        </button>
+                      </td>
+                      <td className="hidden md:table-cell">
+                        <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{firma.yetkiliKisi || '—'}</p>
+                      </td>
+                      <td className="hidden lg:table-cell">
+                        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{firma.telefon || '—'}</p>
+                        <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{firma.email || ''}</p>
+                      </td>
+                      <td className="hidden md:table-cell">
+                        <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
+                      </td>
+                      <td>
+                        <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
+                      </td>
+                      <td className="hidden lg:table-cell">
+                        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          {firma.sozlesmeBit ? new Date(firma.sozlesmeBit).toLocaleDateString('tr-TR') : '—'}
+                        </p>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1 justify-end">
+                          <ActionBtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(firma.id)} title="Detay" />
+                          {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
+                          {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Add/Edit Modal */}

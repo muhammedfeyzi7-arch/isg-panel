@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import { useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
+import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import ToastContainer from '../../components/base/ToastContainer';
 import DashboardPage from '../dashboard/page';
 import FirmalarPage from '../companies/page';
@@ -11,7 +11,6 @@ import RaporlarPage from '../reports/page';
 import EkipmanlarPage from '../equipment/page';
 import MuayenelerPage from '../health/page';
 import UygunsuzluklarPage from '../nonconformity/page';
-import GorevlerPage from '../tasks/page';
 import TutanaklarPage from '../tutanaklar/page';
 import CopKutusuPage from '../trash/page';
 import SettingsPage from '../settings/page';
@@ -19,7 +18,11 @@ import IsIzniPage from '../is-izni/page';
 import FirmaEvraklariPage from '../company-documents/page';
 
 function AppContent() {
-  const { activeModule, dataLoading, orgLoading, orgError, org } = useApp();
+  const { activeModule, dataLoading, orgLoading, orgError, org, mustChangePassword } = useApp();
+
+  if (mustChangePassword) {
+    return <ForcePasswordChange />;
+  }
 
   if (orgError && !org) {
     return (
@@ -47,8 +50,7 @@ function AppContent() {
       case 'muayeneler': return <MuayenelerPage />;
       case 'uygunsuzluklar': return <UygunsuzluklarPage />;
       case 'ekipmanlar': return <EkipmanlarPage />;
-      case 'gorevler':
-      case 'kontrol-formlari': return <GorevlerPage />;
+      case 'kontrol-formlari': return <DashboardPage />;
       case 'tutanaklar': return <TutanaklarPage />;
       case 'is-izinleri': return <IsIzniPage />;
       case 'firma-evraklari': return <FirmaEvraklariPage />;

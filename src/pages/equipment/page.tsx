@@ -946,8 +946,57 @@ export default function EkipmanlarPage() {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {filtered.map(ekipman => {
+              const firma = firmalar.find(f => f.id === ekipman.firmaId);
+              const effectiveDurum = getEffectiveDurum(ekipman);
+              const sc = STATUS_CONFIG[effectiveDurum];
+              const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
+              const isUrgent = days >= 0 && days <= 30;
+              const isOverdue = days < 0;
+              return (
+                <div key={ekipman.id} className="p-4" style={{ background: selected.has(ekipman.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                  <div className="flex items-start gap-3">
+                    {canDelete && (
+                      <input type="checkbox" checked={selected.has(ekipman.id)} onChange={() => toggleOne(ekipman.id)} className="cursor-pointer mt-1 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</p>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>
+                          <i className={sc.icon} />{sc.label}
+                        </span>
+                      </div>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{ekipman.tur || '—'} {firma ? `· ${firma.ad}` : ''}</p>
+                      {ekipman.marka && <p className="text-xs mt-0.5" style={{ color: 'var(--text-faint)' }}>{ekipman.marka} {ekipman.model}</p>}
+                      {ekipman.sonrakiKontrolTarihi && (
+                        <p className={`text-xs mt-1 font-medium ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : ''}`} style={!isOverdue && !isUrgent ? { color: 'var(--text-muted)' } : {}}>
+                          Kontrol: {new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')}
+                          {isOverdue && ' — Gecikmiş!'}
+                          {isUrgent && !isOverdue && ` — ${days} gün kaldı`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 justify-end mt-2">
+                    {ekipman.dosyaUrl && (
+                      <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} title="İndir"><i className="ri-download-2-line text-sm" /></button>
+                    )}
+                    <button onClick={() => setQrEkipman(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(168,85,247,0.1)', color: '#A855F7' }} title="QR"><i className="ri-qr-code-line text-sm" /></button>
+                    {canEdit && <button onClick={() => openEdit(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>}
+                    {canDelete && <button onClick={() => setDeleteId(ekipman.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Masaüstü tablo görünümü */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="table-premium w-full">
+
               <thead>
                 <tr>
                   {canDelete && (
@@ -1089,6 +1138,7 @@ export default function EkipmanlarPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

@@ -374,83 +374,104 @@ export default function EvraklarPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl overflow-hidden isg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full table-premium">
-              <thead>
-                <tr>
-                  <th className="w-10 text-center">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                  </th>
-                  <th className="text-left">Evrak Adı / Tür</th>
-                  <th className="text-left hidden md:table-cell">Firma</th>
-                  <th className="text-left hidden lg:table-cell">Personel</th>
-                  <th className="text-left">Durum</th>
-                  <th className="text-left hidden lg:table-cell">Geçerlilik</th>
-                  <th className="w-20 text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(ev => (
-                  <tr key={ev.id} style={{ background: selected.has(ev.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
-                    <td className="text-center">
-                      <input type="checkbox" checked={selected.has(ev.id)} onChange={() => toggleOne(ev.id)} className="cursor-pointer" />
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-                          style={{ background: ev.dosyaUrl ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${ev.dosyaUrl ? 'rgba(59,130,246,0.15)' : 'rgba(245,158,11,0.2)'}` }}>
-                          <i className={ev.dosyaUrl ? 'ri-file-text-line text-xs' : 'ri-file-warning-line text-xs'}
-                            style={{ color: ev.dosyaUrl ? '#60A5FA' : '#F59E0B' }} />
-                        </div>
-                        <div>
-                          <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
-                            {!ev.dosyaUrl && ev.dosyaAdi && (
-                              <button
-                                onClick={() => openEdit(ev)}
-                                className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md cursor-pointer transition-all whitespace-nowrap"
-                                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
-                                title="Dosya yüklenmemiş — düzenleyerek ekleyin"
-                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.22)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.12)'; }}
-                              >
-                                <i className="ri-upload-2-line mr-0.5" />Belge Ekle
-                              </button>
-                            )}
-                            {ev.dosyaUrl && (
-                              <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md"
-                                style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.15)' }}>
-                                <i className="ri-cloud-line mr-0.5" />Bulutta
-                              </span>
-                            )}
+        <>
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden space-y-3">
+            {filtered.map(ev => (
+              <div key={ev.id} className="isg-card rounded-xl p-4" style={{ background: selected.has(ev.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                <div className="flex items-start gap-3">
+                  <input type="checkbox" checked={selected.has(ev.id)} onChange={() => toggleOne(ev.id)} className="cursor-pointer mt-1 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
+                      <Badge label={ev.durum} color={getEvrakStatusColor(ev.durum)} />
+                    </div>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{ev.tur} · {getFirmaAd(ev.firmaId)}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-faint)' }}>{getPersonelAd(ev.personelId)}</p>
+                    {ev.gecerlilikTarihi && (
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                        Geçerlilik: {new Date(ev.gecerlilikTarihi).toLocaleDateString('tr-TR')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 justify-end mt-2 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                  <ABtn icon="ri-eye-line" color={ev.dosyaUrl ? '#60A5FA' : '#475569'} onClick={() => handlePreview(ev)} title="Görüntüle" />
+                  <ABtn icon="ri-download-line" color={ev.dosyaUrl ? '#10B981' : '#475569'} onClick={() => handleDownload(ev)} title="İndir" />
+                  <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(ev)} title="Düzenle" />
+                  <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Masaüstü tablo görünümü */}
+          <div className="hidden md:block rounded-xl overflow-hidden isg-card">
+            <div className="overflow-x-auto">
+              <table className="w-full table-premium">
+                <thead>
+                  <tr>
+                    <th className="w-10 text-center">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                    </th>
+                    <th className="text-left">Evrak Adı / Tür</th>
+                    <th className="text-left hidden md:table-cell">Firma</th>
+                    <th className="text-left hidden lg:table-cell">Personel</th>
+                    <th className="text-left">Durum</th>
+                    <th className="text-left hidden lg:table-cell">Geçerlilik</th>
+                    <th className="w-20 text-right">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(ev => (
+                    <tr key={ev.id} style={{ background: selected.has(ev.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                      <td className="text-center">
+                        <input type="checkbox" checked={selected.has(ev.id)} onChange={() => toggleOne(ev.id)} className="cursor-pointer" />
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                            style={{ background: ev.dosyaUrl ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${ev.dosyaUrl ? 'rgba(59,130,246,0.15)' : 'rgba(245,158,11,0.2)'}` }}>
+                            <i className={ev.dosyaUrl ? 'ri-file-text-line text-xs' : 'ri-file-warning-line text-xs'}
+                              style={{ color: ev.dosyaUrl ? '#60A5FA' : '#F59E0B' }} />
+                          </div>
+                          <div>
+                            <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
+                              {ev.dosyaUrl && (
+                                <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md"
+                                  style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                  <i className="ri-cloud-line mr-0.5" />Bulutta
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell"><p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(ev.firmaId)}</p></td>
-                    <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{getPersonelAd(ev.personelId)}</p></td>
-                    <td><Badge label={ev.durum} color={getEvrakStatusColor(ev.durum)} /></td>
-                    <td className="hidden lg:table-cell">
-                      <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                        {ev.gecerlilikTarihi ? new Date(ev.gecerlilikTarihi).toLocaleDateString('tr-TR') : '—'}
-                      </p>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-1 justify-end">
-                        <ABtn icon="ri-eye-line" color={ev.dosyaAdi || ev.dosyaUrl ? '#60A5FA' : '#475569'} onClick={() => handlePreview(ev)} title="Görüntüle" />
-                        <ABtn icon="ri-download-line" color={ev.dosyaAdi || ev.dosyaUrl ? '#10B981' : '#475569'} onClick={() => handleDownload(ev)} title="Dosyayı İndir" />
-                        <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(ev)} title="Düzenle" />
-                        <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="hidden md:table-cell"><p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(ev.firmaId)}</p></td>
+                      <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{getPersonelAd(ev.personelId)}</p></td>
+                      <td><Badge label={ev.durum} color={getEvrakStatusColor(ev.durum)} /></td>
+                      <td className="hidden lg:table-cell">
+                        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          {ev.gecerlilikTarihi ? new Date(ev.gecerlilikTarihi).toLocaleDateString('tr-TR') : '—'}
+                        </p>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1 justify-end">
+                          <ABtn icon="ri-eye-line" color={ev.dosyaAdi || ev.dosyaUrl ? '#60A5FA' : '#475569'} onClick={() => handlePreview(ev)} title="Görüntüle" />
+                          <ABtn icon="ri-download-line" color={ev.dosyaAdi || ev.dosyaUrl ? '#10B981' : '#475569'} onClick={() => handleDownload(ev)} title="Dosyayı İndir" />
+                          <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(ev)} title="Düzenle" />
+                          <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Form Modal */}

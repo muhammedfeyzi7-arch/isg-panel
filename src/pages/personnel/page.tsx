@@ -554,11 +554,17 @@ export default function PersonellerPage() {
     try {
       if (editingId) {
         updatePersonel(editingId, form);
-        if (pendingFotoFile) setPersonelFoto(editingId, pendingFotoFile);
+        if (pendingFotoFile) {
+          addToast('Fotoğraf yükleniyor...', 'info');
+          await setPersonelFoto(editingId, pendingFotoFile);
+        }
         addToast('Personel güncellendi.', 'success');
       } else {
         const newP = addPersonel(form);
-        if (pendingFotoFile) setPersonelFoto(newP.id, pendingFotoFile);
+        if (pendingFotoFile) {
+          addToast('Fotoğraf yükleniyor...', 'info');
+          await setPersonelFoto(newP.id, pendingFotoFile);
+        }
         addToast('Personel eklendi.', 'success');
       }
       setFormOpen(false);
@@ -609,29 +615,29 @@ export default function PersonellerPage() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Personeller</h1>
+          <h1 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Personeller</h1>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{personeller.filter(p => !p.silinmis).length} personel kayıtlı</span>
+            <span className="text-[11px] sm:text-[12px]" style={{ color: 'var(--text-muted)' }}>{personeller.filter(p => !p.silinmis).length} personel kayıtlı</span>
             <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,182,212,0.1)', color: '#06B6D4' }}>{aktifCount} aktif</span>
+            <span className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,182,212,0.1)', color: '#06B6D4' }}>{aktifCount} aktif</span>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
-            <i className={`ri-refresh-line text-xs ${refreshing ? 'animate-spin' : ''}`} />{refreshing ? 'Yenileniyor...' : 'Yenile'}
+          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px' }}>
+            <i className={`ri-refresh-line text-xs ${refreshing ? 'animate-spin' : ''}`} /><span className="hidden sm:inline ml-1">{refreshing ? 'Yenileniyor...' : 'Yenile'}</span>
           </button>
-          <button onClick={handleDownloadTemplate} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
+          <button onClick={handleDownloadTemplate} className="btn-secondary whitespace-nowrap hidden sm:flex" style={{ fontSize: '12px', padding: '6px 12px' }}>
             <i className="ri-download-2-line text-xs" />Şablon İndir
           </button>
-          <button onClick={() => fileInputRef.current?.click()} disabled={importLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
-            {importLoading ? <><i className="ri-loader-4-line animate-spin text-xs" />Yükleniyor...</> : <><i className="ri-upload-2-line text-xs" />Excel İçe Aktar</>}
+          <button onClick={() => fileInputRef.current?.click()} disabled={importLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px' }}>
+            {importLoading ? <><i className="ri-loader-4-line animate-spin text-xs" /><span className="hidden sm:inline ml-1">Yükleniyor...</span></> : <><i className="ri-upload-2-line text-xs" /><span className="hidden sm:inline ml-1">Excel İçe Aktar</span></>}
           </button>
-          <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
-            <i className="ri-file-excel-2-line text-xs" />Excel İndir
+          <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px' }}>
+            <i className="ri-file-excel-2-line text-xs" /><span className="hidden sm:inline ml-1">Excel İndir</span>
           </button>
           {canCreate && (
-            <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12.5px', padding: '7px 14px' }}>
-              <i className="ri-user-add-line text-sm" />Yeni Personel Ekle
+            <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
+              <i className="ri-user-add-line text-sm" /><span className="hidden sm:inline ml-1">Yeni Personel</span>
             </button>
           )}
         </div>
@@ -645,26 +651,47 @@ export default function PersonellerPage() {
       )}
 
       {/* ── Filters ── */}
-      <div className="flex flex-wrap gap-2.5 px-4 py-3 rounded-xl isg-card">
-        <div className="relative flex-1 min-w-[180px]">
+      <div className="flex flex-col sm:flex-row gap-2.5 px-4 py-3 rounded-xl isg-card">
+        <div className="relative flex-1 min-w-0">
           <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: 'var(--text-muted)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ad, TC kimlik veya görev ara..." className="isg-input pl-8 text-[12.5px]" />
+          <input 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            placeholder="Ad, TC kimlik veya görev ara..." 
+            className="isg-input pl-8 text-[12.5px] w-full" 
+          />
         </div>
-        <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '150px' }}>
-          <option value="">Tüm Firmalar</option>
-          {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
-        </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '130px' }}>
-          <option value="">Tüm Durumlar</option>
-          <option value="Aktif">Aktif</option>
-          <option value="Ayrıldı">Ayrıldı</option>
-        </select>
-        {(search || firmaFilter || statusFilter) && (
-          <button onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); }} className="btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }}>
-            <i className="ri-filter-off-line text-xs" /> Temizle
-          </button>
-        )}
-        <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex gap-2.5 flex-wrap sm:flex-nowrap">
+          <select 
+            value={firmaFilter} 
+            onChange={e => setFirmaFilter(e.target.value)} 
+            className="isg-input text-[12.5px] flex-1 sm:flex-none" 
+            style={{ minWidth: '130px' }}
+          >
+            <option value="">Tüm Firmalar</option>
+            {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
+          </select>
+          <select 
+            value={statusFilter} 
+            onChange={e => setStatusFilter(e.target.value)} 
+            className="isg-input text-[12.5px] flex-1 sm:flex-none" 
+            style={{ minWidth: '110px' }}
+          >
+            <option value="">Tüm Durumlar</option>
+            <option value="Aktif">Aktif</option>
+            <option value="Ayrıldı">Ayrıldı</option>
+          </select>
+          {(search || firmaFilter || statusFilter) && (
+            <button 
+              onClick={() => { setSearch(''); setFirmaFilter(''); setStatusFilter(''); }} 
+              className="btn-secondary whitespace-nowrap" 
+              style={{ fontSize: '12px', padding: '6px 12px' }}
+            >
+              <i className="ri-filter-off-line text-xs" /> <span className="hidden sm:inline">Temizle</span>
+            </button>
+          )}
+        </div>
+        <div className="flex items-center justify-between sm:justify-end gap-1.5 text-[11px] sm:ml-auto pt-1 sm:pt-0" style={{ color: 'var(--text-muted)' }}>
           <i className="ri-list-check text-xs" />
           {filtered.length} sonuç
         </div>
@@ -672,22 +699,25 @@ export default function PersonellerPage() {
 
       {/* Toplu seçim aksiyonları */}
       {selected.size > 0 && canDelete && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
           <span className="text-sm font-semibold" style={{ color: '#F87171' }}>{selected.size} personel seçildi</span>
-          <button
-            onClick={() => setBulkDeleteConfirm(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
-            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
-          >
-            <i className="ri-delete-bin-line" /> Seçilenleri Sil
-          </button>
-          <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
-            Seçimi Kaldır
-          </button>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <button
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+              style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              <i className="ri-delete-bin-line" /> <span className="hidden sm:inline">Seçilenleri Sil</span>
+            </button>
+            <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+              <span className="hidden sm:inline">Seçimi Kaldır</span>
+              <i className="ri-close-line sm:hidden" />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ── Table ── */}
+      {/* ── Table / Cards ── */}
       {filtered.length === 0 ? (
         <div className="rounded-xl p-14 flex flex-col items-center text-center isg-card">
           <div className="w-14 h-14 flex items-center justify-center rounded-xl mb-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
@@ -699,76 +729,163 @@ export default function PersonellerPage() {
           {firmalar.filter(f => !f.silinmis).length === 0 && <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Önce bir firma eklemeniz gerekmektedir.</p>}
         </div>
       ) : (
-        <div className="rounded-xl overflow-hidden isg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full table-premium">
-              <thead>
-                <tr>
-                  {canDelete && (
-                    <th className="w-10 text-center">
-                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                    </th>
-                  )}
-                  <th className="text-left">Personel</th>
-                  <th className="text-left hidden md:table-cell">Firma</th>
-                  <th className="text-left hidden lg:table-cell">Görev / Departman</th>
-                  {canViewSensitiveData && <th className="text-left hidden lg:table-cell">İletişim</th>}
-                  <th className="text-left">Durum</th>
-                  <th className="w-28 text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(p => {
-                  const foto = getPersonelFoto(p.id);
-                  return (
-                    <tr key={p.id} style={{ background: selected.has(p.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
-                      {canDelete && (
-                        <td className="text-center">
-                          <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleOne(p.id)} className="cursor-pointer" />
-                        </td>
-                      )}
-                      <td>
-                        <div className="flex items-center gap-2.5">
-                          <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="sm" />
-                          <div>
-                            <button onClick={() => setDetailId(p.id)} className="text-[12.5px] font-semibold hover:text-blue-400 transition-colors cursor-pointer block text-left" style={{ color: 'var(--text-primary)' }}>{p.adSoyad}</button>
-                            {canViewSensitiveData
-                              ? <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.tc || 'TC yok'}</p>
-                              : <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>—</p>
-                            }
+        <>
+          {/* Desktop Table */}
+          <div className="rounded-xl overflow-hidden isg-card hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full table-premium">
+                <thead>
+                  <tr>
+                    {canDelete && (
+                      <th className="w-10 text-center">
+                        <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                      </th>
+                    )}
+                    <th className="text-left">Personel</th>
+                    <th className="text-left hidden md:table-cell">Firma</th>
+                    <th className="text-left hidden lg:table-cell">Görev / Departman</th>
+                    {canViewSensitiveData && <th className="text-left hidden lg:table-cell">İletişim</th>}
+                    <th className="text-left">Durum</th>
+                    <th className="w-28 text-right">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(p => {
+                    const foto = getPersonelFoto(p.id);
+                    return (
+                      <tr key={p.id} style={{ background: selected.has(p.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                        {canDelete && (
+                          <td className="text-center">
+                            <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleOne(p.id)} className="cursor-pointer" />
+                          </td>
+                        )}
+                        <td>
+                          <div className="flex items-center gap-2.5">
+                            <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="sm" />
+                            <div>
+                              <button onClick={() => setDetailId(p.id)} className="text-[12.5px] font-semibold hover:text-blue-400 transition-colors cursor-pointer block text-left" style={{ color: 'var(--text-primary)' }}>{p.adSoyad}</button>
+                              {canViewSensitiveData
+                                ? <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.tc || 'TC yok'}</p>
+                                : <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>—</p>
+                              }
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="hidden md:table-cell"><p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(p.firmaId)}</p></td>
-                      <td className="hidden lg:table-cell">
-                        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.gorev || '—'}</p>
-                        <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{p.departman || ''}</p>
-                      </td>
-                      {canViewSensitiveData && (
-                        <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.telefon || '—'}</p></td>
-                      )}
-                      <td><Badge label={p.durum} color={getPersonelStatusColor(p.durum)} /></td>
-                      <td>
-                        <div className="flex items-center gap-1 justify-end">
-                          <ABtn icon="ri-contacts-book-2-line" color="#818CF8" onClick={() => setKartvizitId(p.id)} title="Kartvizit" />
-                          <ABtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(p.id)} title="Detay" />
-                          {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
-                          {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="hidden md:table-cell"><p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(p.firmaId)}</p></td>
+                        <td className="hidden lg:table-cell">
+                          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.gorev || '—'}</p>
+                          <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{p.departman || ''}</p>
+                        </td>
+                        {canViewSensitiveData && (
+                          <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.telefon || '—'}</p></td>
+                        )}
+                        <td><Badge label={p.durum} color={getPersonelStatusColor(p.durum)} /></td>
+                        <td>
+                          <div className="flex items-center gap-1 justify-end">
+                            <ABtn icon="ri-contacts-book-2-line" color="#818CF8" onClick={() => setKartvizitId(p.id)} title="Kartvizit" />
+                            <ABtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(p.id)} title="Detay" />
+                            {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
+                            {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile Cards */}
+          <div className="grid grid-cols-1 gap-3 md:hidden">
+            {filtered.map(p => {
+              const foto = getPersonelFoto(p.id);
+              return (
+                <div 
+                  key={p.id} 
+                  className="rounded-xl p-4 isg-card"
+                  style={{ background: selected.has(p.id) ? 'rgba(239,68,68,0.04)' : undefined }}
+                >
+                  <div className="flex items-start gap-3">
+                    {canDelete && (
+                      <div className="pt-1">
+                        <input 
+                          type="checkbox" 
+                          checked={selected.has(p.id)} 
+                          onChange={() => toggleOne(p.id)} 
+                          className="cursor-pointer" 
+                        />
+                      </div>
+                    )}
+                    <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="md" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <button 
+                            onClick={() => setDetailId(p.id)} 
+                            className="text-sm font-semibold hover:text-blue-400 transition-colors cursor-pointer block text-left truncate"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            {p.adSoyad}
+                          </button>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            {canViewSensitiveData ? (p.tc || 'TC yok') : '—'}
+                          </p>
+                        </div>
+                        <Badge label={p.durum} color={getPersonelStatusColor(p.durum)} />
+                      </div>
+                      
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          <i className="ri-building-2-line mr-1" />
+                          {getFirmaAd(p.firmaId)}
+                        </p>
+                        {(p.gorev || p.departman) && (
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            <i className="ri-briefcase-line mr-1" />
+                            {[p.gorev, p.departman].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
+                        {canViewSensitiveData && p.telefon && (
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            <i className="ri-phone-line mr-1" />
+                            {p.telefon}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                        <ABtn icon="ri-contacts-book-2-line" color="#818CF8" onClick={() => setKartvizitId(p.id)} title="Kartvizit" />
+                        <ABtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(p.id)} title="Detay" />
+                        {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
+                        {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* ── Form Modal ── */}
-      <Modal open={formOpen} onClose={() => { setFormOpen(false); setPendingFotoFile(null); }} title={editingId ? 'Personel Düzenle' : 'Yeni Personel Ekle'} size="xl" icon="ri-user-line"
-        footer={<><button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button><button onClick={handleSave} disabled={saving} className="btn-primary"><i className="ri-save-line" /> {saving ? 'Kaydediliyor...' : 'Kaydet'}</button></>}>
-        <div className="space-y-5">
+      <Modal 
+        open={formOpen} 
+        onClose={() => { setFormOpen(false); setPendingFotoFile(null); }} 
+        title={editingId ? 'Personel Düzenle' : 'Yeni Personel Ekle'} 
+        size="xl" 
+        icon="ri-user-line"
+        footer={
+          <>
+            <button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary">
+              <i className="ri-save-line" /> {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
 
           {/* Bölüm 0: Profil Fotoğrafı */}
           <div className="form-section">
@@ -781,7 +898,7 @@ export default function PersonellerPage() {
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>İsteğe bağlı — yüklenmezse baş harfler gösterilir</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex-shrink-0">
                 {(() => {
                   const previewUrl = pendingFotoFile ? URL.createObjectURL(pendingFotoFile) : null;
@@ -808,7 +925,7 @@ export default function PersonellerPage() {
                     className="flex items-center gap-1 text-xs font-medium px-2.5 py-2 rounded-lg cursor-pointer whitespace-nowrap"
                     style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}
                   >
-                    <i className="ri-close-line" /> Kaldır
+                    <i className="ri-close-line" /> <span className="hidden sm:inline">Kaldır</span>
                   </button>
                 )}
               </div>
@@ -826,14 +943,14 @@ export default function PersonellerPage() {
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Kimlik ve iletişim bilgileri</p>
               </div>
             </div>
-            <div className="form-grid-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FF label="Ad Soyad *" value={f('adSoyad')} onChange={v => set('adSoyad', v)} placeholder="Personelin tam adı" />
               <FF label="TC Kimlik No" value={f('tc')} onChange={v => set('tc', v)} placeholder="12345678901" />
               <FF label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0555 000 00 00" />
               <FF label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="personel@email.com" type="email" />
               <FF label="Doğum Tarihi" value={f('dogumTarihi')} onChange={v => set('dogumTarihi', v)} type="date" />
               <FS label="Kan Grubu" value={f('kanGrubu')} onChange={v => set('kanGrubu', v)} options={['', ...KAN_GRUPLARI]} />
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <FF label="İkamet Adresi" value={f('adres')} onChange={v => set('adres', v)} placeholder="Açık adres" />
               </div>
             </div>
@@ -850,10 +967,10 @@ export default function PersonellerPage() {
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Firma, görev ve çalışma durumu</p>
               </div>
             </div>
-            <div className="form-grid-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>Firma *</label>
-                <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer">
+                <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer w-full">
                   <option value="">Firma Seçin...</option>
                   {firmalar.filter(fi => !fi.silinmis).map(firma => <option key={firma.id} value={firma.id}>{firma.ad}</option>)}
                 </select>
@@ -881,7 +998,7 @@ export default function PersonellerPage() {
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Acil durumda ulaşılacak kişi bilgileri</p>
               </div>
             </div>
-            <div className="form-grid-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FF label="Acil Durum Kişisi" value={f('acilKisi')} onChange={v => set('acilKisi', v)} placeholder="Yakınının adı soyadı" />
               <FF label="Acil Durum Telefonu" value={f('acilTelefon')} onChange={v => set('acilTelefon', v)} placeholder="0555 000 00 00" />
             </div>

@@ -267,7 +267,7 @@ export default function ActivityLogSection() {
         formatDateForExport(log.created_at),
         log.user_name || '',
         log.user_email || '',
-        log.user_role === 'admin' ? 'Admin' : log.user_role === 'denetci' ? 'Denetçi' : 'Kullanıcı',
+        log.user_role === 'admin' ? 'Admin Kullanıcı' : log.user_role === 'denetci' ? 'Saha Personeli' : 'Evrak/Dökümantasyon Denetçi',
         ACTION_LABELS[log.action_type] ?? log.action_type,
         log.module || '',
         log.record_name || '',
@@ -629,7 +629,7 @@ export default function ActivityLogSection() {
                         color: log.user_role === 'admin' ? '#F59E0B' : log.user_role === 'denetci' ? '#06B6D4' : '#818CF8',
                       }}
                     >
-                      {log.user_role === 'admin' ? 'Admin' : log.user_role === 'denetci' ? 'Denetçi' : 'Kullanıcı'}
+                      {log.user_role === 'admin' ? 'Admin Kullanıcı' : log.user_role === 'denetci' ? 'Saha Personeli' : 'Evrak/Dökümantasyon Denetçi'}
                     </span>
                   </div>
 

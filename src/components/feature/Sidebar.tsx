@@ -59,9 +59,9 @@ const menuGroups = [
 ];
 
 const ROLE_LABELS: Record<string, { label: string; color: string; dot: string }> = {
-  admin:   { label: 'Admin',     color: '#F59E0B', dot: '#F59E0B' },
-  denetci: { label: 'Denetçi',   color: '#22D3EE', dot: '#22D3EE' },
-  member:  { label: 'Kullanıcı', color: '#A78BFA', dot: '#A78BFA' },
+  admin:   { label: 'Admin Kullanıcı',                  color: '#F59E0B', dot: '#F59E0B' },
+  denetci: { label: 'Saha Personeli',                   color: '#22D3EE', dot: '#22D3EE' },
+  member:  { label: 'Evrak/Dökümantasyon Denetçi',      color: '#A78BFA', dot: '#A78BFA' },
 };
 
 interface SidebarProps {

@@ -1171,40 +1171,42 @@ export default function RaporlarPage() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
         {kpiCards.map((card, i) => (
           <AnimatedKPICard key={card.label} {...card} delay={i * 60} />
         ))}
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex items-center gap-1 p-1 rounded-xl flex-wrap"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer"
-            style={activeTab === tab.id ? {
-              background: `${tab.color}18`,
-              color: tab.color,
-              border: `1px solid ${tab.color}25`,
-            } : {
-              color: 'var(--text-muted)',
-              border: '1px solid transparent',
-            }}
-          >
-            <i className={`${tab.icon} text-xs`} />
-            {tab.label}
-          </button>
-        ))}
+      <div className="overflow-x-auto">
+        <div className="flex items-center gap-1 p-1 rounded-xl min-w-max sm:min-w-0 sm:flex-wrap"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer"
+              style={activeTab === tab.id ? {
+                background: `${tab.color}18`,
+                color: tab.color,
+                border: `1px solid ${tab.color}25`,
+              } : {
+                color: 'var(--text-muted)',
+                border: '1px solid transparent',
+              }}
+            >
+              <i className={`${tab.icon} text-xs`} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* GENEL BAKIŞ */}
       {activeTab === 'genel' && (
         <div className="space-y-5">
           {/* Trend + Health Score */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
             <div className="lg:col-span-2">
               <GlassCard>
                 <SectionHeader
@@ -1296,7 +1298,7 @@ export default function RaporlarPage() {
           </div>
 
           {/* Tehlike + Departman */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
             <GlassCard>
               <SectionHeader title="Tehlike Sınıfı Dağılımı" subtitle="Firmaların tehlike sınıflarına göre dağılımı" icon="ri-fire-line" color="#EF4444" />
               {tehlikeDagilim.length === 0 ? (
@@ -1334,7 +1336,7 @@ export default function RaporlarPage() {
           {aktifEkipmanlar.length > 0 && (
             <GlassCard>
               <SectionHeader title="Ekipman Durum Özeti" subtitle="Tüm ekipmanların durum dağılımı" icon="ri-tools-line" color="#F97316" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 {ekipmanDurum.map(d => (
                   <div key={d.name} className="rounded-xl p-3.5 flex items-center gap-3" style={{
                     background: `${d.color}08`,
@@ -1432,7 +1434,7 @@ export default function RaporlarPage() {
 
       {/* EVRAK ANALİZİ */}
       {activeTab === 'evrak' && (
-        <div className="space-y-5">
+        <div className="space-y-4 sm:space-y-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: 'Yüklü', value: evrakStats.yuklu, color: '#10B981', icon: 'ri-checkbox-circle-line', sub: 'Tamamlanmış' },
@@ -1444,7 +1446,7 @@ export default function RaporlarPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
             <GlassCard>
               <SectionHeader title="Aylık Evrak Trendi" subtitle="Son 12 ayda tamamlanan ve eksik evraklar" icon="ri-bar-chart-line" color="#10B981" />
               <ResponsiveContainer width="100%" height={230}>
@@ -1479,7 +1481,7 @@ export default function RaporlarPage() {
 
       {/* UYGUNSUZLUKLAR */}
       {activeTab === 'uygunsuzluk' && (
-        <div className="space-y-5">
+        <div className="space-y-4 sm:space-y-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: 'Açık', value: uygunsuzlukStats.acik, color: '#EF4444', icon: 'ri-alert-line', sub: 'Bekleyen' },
@@ -1491,7 +1493,7 @@ export default function RaporlarPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
             <GlassCard>
               <SectionHeader title="Aylık Uygunsuzluk Trendi" subtitle="Son 12 ayda açılan ve kapatılan uygunsuzluklar" icon="ri-line-chart-line" color="#EF4444" />
               <ResponsiveContainer width="100%" height={230}>

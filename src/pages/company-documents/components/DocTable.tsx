@@ -44,7 +44,62 @@ export default function DocTable({ documents, firmalar, onEdit, onDelete, onView
 
   return (
     <div className="isg-card rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* Mobil kart görünümü */}
+      <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+        {documents.map(doc => {
+          const sc = STATUS_CFG[doc.status] ?? STATUS_CFG['Aktif'];
+          const daysLeft = getDaysLeft(doc.valid_until);
+          const isSelected = selectedIds.has(doc.id);
+          return (
+            <div key={doc.id} className="p-4" style={{ background: isSelected ? 'rgba(52,211,153,0.04)' : undefined }}>
+              <div className="flex items-start gap-3">
+                <input type="checkbox" checked={isSelected} onChange={() => onToggleSelect(doc.id)} className="cursor-pointer mt-1 flex-shrink-0 accent-emerald-400" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap" style={{ background: sc.bg, color: sc.color }}>
+                      <i className={sc.icon} />{doc.status}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-md font-medium" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
+                      {doc.document_type}
+                    </span>
+                  </div>
+                  <button onClick={() => onView(doc)} className="text-sm font-semibold text-left cursor-pointer block mb-0.5" style={{ color: 'var(--text-primary)' }}>
+                    {doc.title}
+                  </button>
+                  {doc.description && (
+                    <p className="text-xs mb-1 line-clamp-1" style={{ color: 'var(--text-muted)' }}>{doc.description}</p>
+                  )}
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <span><i className="ri-building-2-line mr-1" />{getFirmaAd(doc.company_id)}</span>
+                    {doc.valid_until && (
+                      <span style={{ color: daysLeft !== null && daysLeft < 0 ? '#F87171' : daysLeft !== null && daysLeft <= 30 ? '#FBBF24' : 'var(--text-muted)' }}>
+                        <i className="ri-calendar-line mr-1" />{fmtDate(doc.valid_until)}
+                        {daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 && ` (${daysLeft}g)`}
+                        {daysLeft !== null && daysLeft < 0 && ' (Gecikmiş!)'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-3 justify-end">
+                <button onClick={() => onView(doc)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
+                  style={{ background: doc.file_url ? 'rgba(52,211,153,0.1)' : 'rgba(100,116,139,0.1)', color: doc.file_url ? '#34D399' : '#64748B' }}>
+                  <i className={doc.file_url ? 'ri-eye-line' : 'ri-eye-off-line'} />Görüntüle
+                </button>
+                <button onClick={() => onEdit(doc)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }}>
+                  <i className="ri-edit-line text-sm" />
+                </button>
+                <button onClick={() => onDelete(doc)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                  <i className="ri-delete-bin-line text-sm" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Masaüstü tablo görünümü */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="table-premium w-full">
           <thead>
             <tr>
@@ -77,34 +132,21 @@ export default function DocTable({ documents, firmalar, onEdit, onDelete, onView
                 <tr key={doc.id} style={isSelected ? { background: 'rgba(52,211,153,0.04)' } : {}}>
                   <td>
                     <div className="w-5 h-5 flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => onToggleSelect(doc.id)}
-                        className="w-4 h-4 rounded cursor-pointer accent-emerald-400"
-                      />
+                      <input type="checkbox" checked={isSelected} onChange={() => onToggleSelect(doc.id)} className="w-4 h-4 rounded cursor-pointer accent-emerald-400" />
                     </div>
                   </td>
                   <td>
                     <div>
-                      <button
-                        onClick={() => onView(doc)}
-                        className="text-sm font-semibold text-left hover:opacity-70 transition-opacity cursor-pointer block"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
+                      <button onClick={() => onView(doc)} className="text-sm font-semibold text-left hover:opacity-70 transition-opacity cursor-pointer block" style={{ color: 'var(--text-primary)' }}>
                         {doc.title}
                       </button>
                       {doc.description && (
-                        <p className="text-xs mt-0.5 truncate max-w-[200px]" style={{ color: 'var(--text-muted)' }}>
-                          {doc.description}
-                        </p>
+                        <p className="text-xs mt-0.5 truncate max-w-[200px]" style={{ color: 'var(--text-muted)' }}>{doc.description}</p>
                       )}
                     </div>
                   </td>
                   <td className="hidden md:table-cell">
-                    <span className="text-xs px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
-                      {doc.document_type}
-                    </span>
+                    <span className="text-xs px-2 py-1 rounded-lg font-medium" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>{doc.document_type}</span>
                   </td>
                   <td className="hidden md:table-cell">
                     <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(doc.company_id)}</span>
@@ -114,12 +156,8 @@ export default function DocTable({ documents, firmalar, onEdit, onDelete, onView
                       <span className="text-sm" style={{ color: daysLeft !== null && daysLeft < 0 ? '#F87171' : daysLeft !== null && daysLeft <= 30 ? '#FBBF24' : 'var(--text-muted)' }}>
                         {fmtDate(doc.valid_until)}
                       </span>
-                      {daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 && (
-                        <p className="text-[10px] mt-0.5" style={{ color: '#FBBF24' }}>{daysLeft} gün kaldı</p>
-                      )}
-                      {daysLeft !== null && daysLeft < 0 && (
-                        <p className="text-[10px] mt-0.5" style={{ color: '#F87171' }}>Gecikmiş!</p>
-                      )}
+                      {daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 && <p className="text-[10px] mt-0.5" style={{ color: '#FBBF24' }}>{daysLeft} gün kaldı</p>}
+                      {daysLeft !== null && daysLeft < 0 && <p className="text-[10px] mt-0.5" style={{ color: '#F87171' }}>Gecikmiş!</p>}
                     </div>
                   </td>
                   <td className="hidden lg:table-cell">
@@ -132,37 +170,25 @@ export default function DocTable({ documents, firmalar, onEdit, onDelete, onView
                   </td>
                   <td>
                     <div className="flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => onView(doc)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
-                        style={{
-                          background: doc.file_url ? 'rgba(52,211,153,0.1)' : 'rgba(100,116,139,0.1)',
-                          color: doc.file_url ? '#34D399' : '#64748B',
-                        }}
+                      <button onClick={() => onView(doc)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+                        style={{ background: doc.file_url ? 'rgba(52,211,153,0.1)' : 'rgba(100,116,139,0.1)', color: doc.file_url ? '#34D399' : '#64748B' }}
                         onMouseEnter={e => { e.currentTarget.style.background = doc.file_url ? 'rgba(52,211,153,0.2)' : 'rgba(100,116,139,0.2)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = doc.file_url ? 'rgba(52,211,153,0.1)' : 'rgba(100,116,139,0.1)'; }}
-                        title={doc.file_url ? 'Görüntüle / İndir' : 'Dosya eklenmemiş — Detayları Gör'}
-                      >
+                        title={doc.file_url ? 'Görüntüle / İndir' : 'Dosya eklenmemiş'}>
                         <i className={`${doc.file_url ? 'ri-eye-line' : 'ri-eye-off-line'} text-sm`} />
                       </button>
-                      <button
-                        onClick={() => onEdit(doc)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+                      <button onClick={() => onEdit(doc)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
                         style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }}
-                        title="Düzenle"
-                      >
+                        title="Düzenle">
                         <i className="ri-edit-line text-sm" />
                       </button>
-                      <button
-                        onClick={() => onDelete(doc)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+                      <button onClick={() => onDelete(doc)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
                         style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
-                        title="Sil"
-                      >
+                        title="Sil">
                         <i className="ri-delete-bin-line text-sm" />
                       </button>
                     </div>

@@ -185,14 +185,14 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
 
           {/* Tab bar */}
           <div
-            className="flex gap-1 p-1 rounded-xl overflow-x-auto"
+            className="flex gap-1 p-1 rounded-xl overflow-x-auto scrollbar-hide"
             style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}
           >
             {tabs.map(t => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap flex-shrink-0 flex-1"
+                className="flex items-center justify-center gap-1 py-2 px-2 sm:px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap flex-shrink-0 flex-1 min-w-0"
                 style={
                   tab === t.id
                     ? { background: 'linear-gradient(135deg, #3B82F6, #6366F1)', color: 'white', boxShadow: '0 4px 15px rgba(99,102,241,0.3)' }
@@ -200,10 +200,10 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
                 }
               >
                 <i className={t.icon} />
-                <span className="hidden sm:inline">{t.label}</span>
+                <span className="hidden xs:inline sm:inline">{t.label}</span>
                 {t.count !== undefined && t.count > 0 && (
                   <span
-                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    className="text-[10px] font-bold px-1 py-0.5 rounded-full hidden sm:inline-block"
                     style={
                       tab === t.id
                         ? { background: 'rgba(255,255,255,0.25)', color: 'white' }
@@ -219,7 +219,7 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
 
           {/* ── Bilgiler ── */}
           {tab === 'bilgiler' && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {canViewSensitiveData && <IR label="TC Kimlik" value={personel.tc} />}
               {canViewSensitiveData && <IR label="Telefon" value={personel.telefon} />}
               {canViewSensitiveData && <IR label="E-posta" value={personel.email} />}
@@ -232,12 +232,12 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
               {canViewSensitiveData && <IR label="Acil Kişi" value={personel.acilKisi} />}
               {canViewSensitiveData && <IR label="Acil Telefon" value={personel.acilTelefon} />}
               {canViewSensitiveData && (
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <IR label="Adres" value={personel.adres} />
                 </div>
               )}
               {!canViewSensitiveData && (
-                <div className="col-span-2 md:col-span-3">
+                <div className="col-span-1 sm:col-span-2 md:col-span-3">
                   <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.15)' }}>
                     <i className="ri-shield-keyhole-line text-xs flex-shrink-0" style={{ color: '#06B6D4' }} />
                     <p className="text-[11px]" style={{ color: '#06B6D4' }}>TC, iletişim ve adres bilgileri denetçi rolünde gizlidir.</p>

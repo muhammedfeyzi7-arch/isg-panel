@@ -265,7 +265,7 @@ export default function SettingsPage() {
                   className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1"
                   style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}
                 >
-                  {org?.role === 'admin' ? 'Admin' : org?.role === 'denetci' ? 'Denetçi' : 'Kullanıcı'}
+                  {org?.role === 'admin' ? 'Admin Kullanıcı' : org?.role === 'denetci' ? 'Saha Personeli' : 'Evrak/Dökümantasyon Denetçi'}
                 </span>
               </div>
             </div>
@@ -714,7 +714,7 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
                     { label: 'Org. Adı', value: org.name || '—' },
-                    { label: 'Rolünüz', value: org.role === 'admin' ? 'Admin' : org.role === 'denetci' ? 'Denetçi' : 'Kullanıcı' },
+                    { label: 'Rolünüz', value: org.role === 'admin' ? 'Admin Kullanıcı' : org.role === 'denetci' ? 'Saha Personeli' : 'Evrak/Dökümantasyon Denetçi' },
                     { label: 'Org. ID', value: org.id?.slice(0, 8) + '...' },
                     { label: 'Kayıt Tarihi', value: new Date().toLocaleDateString('tr-TR') },
                   ].map(item => (
