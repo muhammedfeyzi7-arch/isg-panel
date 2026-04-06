@@ -22,17 +22,14 @@ export function useOrganization(user: User | null) {
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const autoCreateInProgressRef = useRef(false);
-  const autoCreateDoneRef = useRef<string | null>(null);
+  const autoCreateDoneRef = useRef<string | null>(null); // tracks last auto-create attempt
 
   const loadOrg = useCallback(async () => {
     if (!user) {
-      console.log('[ISG] loadOrg: no user');
       setOrg(null);
       setLoading(false);
       return;
     }
-    console.log('[ISG] loadOrg starting for user:', user.id);
     setLoading(true);
     setLoadError(null);
 
@@ -84,7 +81,6 @@ export function useOrganization(user: User | null) {
           { onConflict: 'organization_id' },
         );
 
-        console.log('[ISG] createOrgDirectly: org created successfully with admin role');
         setOrg({
           id: newOrg.id,
           name: newOrg.name,
@@ -131,10 +127,6 @@ export function useOrganization(user: User | null) {
           created?: boolean;
         };
         if (resData?.organization) {
-          if (resData.created) {
-            console.log('[ISG] New org auto-created by edge function:', resData.organization.id);
-          }
-          console.log('[ISG] Edge function returned role:', resData.role, 'setting org with role:', resData.role ?? 'admin');
           setOrg({
             id: resData.organization.id,
             name: resData.organization.name,
@@ -145,7 +137,6 @@ export function useOrganization(user: User | null) {
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
           });
-          console.log('[ISG] Org set successfully');
           return true;
         }
         return false;
@@ -168,8 +159,6 @@ export function useOrganization(user: User | null) {
 
       clearTimeout(timeoutId);
 
-      clearTimeout(timeoutId);
-
       if (error) {
         // RLS error — fallback to edge function
         console.warn('[ISG] loadOrg RLS error, falling back to edge function:', error.message);
@@ -184,7 +173,6 @@ export function useOrganization(user: User | null) {
 
       if (data && data.organizations) {
         const o = data.organizations as { id: string; name: string; invite_code: string };
-        console.log('[ISG] loadOrg: found existing org with role:', data.role);
         setOrg({
           id: o.id,
           name: o.name,
@@ -196,16 +184,12 @@ export function useOrganization(user: User | null) {
           email: data.email ?? undefined,
         });
       } else {
-        // No org found — edge function will auto-create org + admin membership
-        // This handles: new users, manually created Supabase users, users with deleted memberships
-        console.log('[ISG] loadOrg: no org found for user, calling edge function to auto-create');
+        // No org found — try edge function first (auto-creates org + admin membership)
         const ok = await loadViaEdgeFunction();
         if (!ok) {
           // Edge function failed — fallback: create org directly via Supabase client
-          console.log('[ISG] loadOrg: edge function failed, trying direct org creation fallback');
           const fallbackOk = await createOrgDirectly();
           if (!fallbackOk) {
-            console.log('[ISG] loadOrg: all methods failed, setting org to null');
             setOrg(null);
           }
         }
@@ -213,7 +197,6 @@ export function useOrganization(user: User | null) {
     } catch (err) {
       clearTimeout(timeoutId);
       console.error('[ISG] loadOrg exception:', err);
-      // Last resort: edge function
       const ok = await loadViaEdgeFunction();
       if (!ok) {
         setLoadError(err instanceof Error ? err.message : String(err));
