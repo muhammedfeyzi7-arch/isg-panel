@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import Badge, { getFirmaStatusColor, getTehlikeColor } from '../../components/base/Badge';
+import type ExcelJS from 'exceljs';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -352,6 +353,365 @@ export default function RaporlarPage() {
     { label: 'Tutanaklar', value: aktifTutanaklar.length, icon: 'ri-article-line', color: '#F97316', sub: `${aktifTutanaklar.filter(t => t.durum === 'Onaylandı').length} onaylı` },
   ];
 
+  // ── Excel Export ──
+  const [exporting, setExporting] = useState(false);
+
+  const handleExcelExport = () => {
+    setExporting(true);
+    (async () => {
+      try {
+        const ExcelJS = (await import('exceljs')).default;
+        const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
+        const now = new Date();
+        const tarih = now.toLocaleDateString('tr-TR');
+        const tarihDosya = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+
+        const wb = new ExcelJS.Workbook();
+        wb.creator = 'ISG Denetim Sistemi';
+        wb.created = now;
+
+        // ── ExcelJS Stil Yardımcıları ──
+        const STATUS_COLORS: Record<string, { fg: string; bg: string }> = {
+          'Aktif':          { fg: 'FF16A34A', bg: 'FFDCFCE7' },
+          'Pasif':          { fg: 'FFD97706', bg: 'FFFEF3C7' },
+          'Askıda':         { fg: 'FF7C3AED', bg: 'FFEDE9FE' },
+          'Ayrıldı':        { fg: 'FFDC2626', bg: 'FFFEE2E2' },
+          'Açık':           { fg: 'FFDC2626', bg: 'FFFEE2E2' },
+          'Kapandı':        { fg: 'FF16A34A', bg: 'FFDCFCE7' },
+          'Tamamlandı':     { fg: 'FF16A34A', bg: 'FFDCFCE7' },
+          'Planlandı':      { fg: 'FF1D4ED8', bg: 'FFDBEAFE' },
+          'Eksik':          { fg: 'FFDC2626', bg: 'FFFEE2E2' },
+          'Yüklü':          { fg: 'FF16A34A', bg: 'FFDCFCE7' },
+          'Süre Dolmuş':    { fg: 'FFD97706', bg: 'FFFEF3C7' },
+          'Süre Yaklaşıyor':{ fg: 'FFD97706', bg: 'FFFEF3C7' },
+          'Uygun':          { fg: 'FF16A34A', bg: 'FFDCFCE7' },
+          'Bakımda':        { fg: 'FFD97706', bg: 'FFFEF3C7' },
+          'Uygun Değil':    { fg: 'FFDC2626', bg: 'FFFEE2E2' },
+          'Hurda':          { fg: 'FF64748B', bg: 'FFF1F5F9' },
+          'Az Tehlikeli':   { fg: 'FF16A34A', bg: 'FFDCFCE7' },
+          'Tehlikeli':      { fg: 'FFD97706', bg: 'FFFEF3C7' },
+          'Çok Tehlikeli':  { fg: 'FFDC2626', bg: 'FFFEE2E2' },
+          'Çalışabilir':    { fg: 'FF16A34A', bg: 'FFDCFCE7' },
+          'Çalışamaz':      { fg: 'FFDC2626', bg: 'FFFEE2E2' },
+          'Kritik':         { fg: 'FFDC2626', bg: 'FFFEE2E2' },
+          'Yüksek':         { fg: 'FFEA580C', bg: 'FFFFEDD5' },
+          'Orta':           { fg: 'FFD97706', bg: 'FFFEF3C7' },
+          'Düşük':          { fg: 'FF16A34A', bg: 'FFDCFCE7' },
+        };
+        const STATUS_COLS = ['Durum', 'Tehlike Sınıfı', 'Sonuç', 'Seviye'];
+
+        const applyHeaderRows = (ws: ExcelJS.Worksheet, title: string, subtitle: string, colCount: number) => {
+          ws.mergeCells(1, 1, 1, colCount);
+          ws.mergeCells(2, 1, 2, colCount);
+          ws.mergeCells(3, 1, 3, colCount);
+          const r1 = ws.getRow(1); r1.height = 32;
+          const r2 = ws.getRow(2); r2.height = 26;
+          const r3 = ws.getRow(3); r3.height = 18;
+          const c1 = ws.getCell(1, 1);
+          c1.value = 'ISG DENETİM YÖNETİM SİSTEMİ';
+          c1.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+          c1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF020817' } };
+          c1.alignment = { horizontal: 'left', vertical: 'middle' };
+          const c2 = ws.getCell(2, 1);
+          c2.value = title;
+          c2.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+          c2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A0F1E' } };
+          c2.alignment = { horizontal: 'left', vertical: 'middle' };
+          const c3 = ws.getCell(3, 1);
+          c3.value = subtitle;
+          c3.font = { italic: true, size: 10, color: { argb: 'FF94A3B8' }, name: 'Calibri' };
+          c3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+          c3.alignment = { horizontal: 'left', vertical: 'middle' };
+        };
+
+        const applyHeaderCols = (ws: ExcelJS.Worksheet, cols: string[], useBlue = false) => {
+          const hdrRow = ws.getRow(4); hdrRow.height = 22;
+          cols.forEach((h, ci) => {
+            const cell = hdrRow.getCell(ci + 1);
+            cell.value = h;
+            cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: useBlue ? 'FF0F4C75' : 'FF1E293B' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = { bottom: { style: 'medium', color: { argb: 'FF3B82F6' } } };
+          });
+        };
+
+        const applyDataRows = (
+          ws: ExcelJS.Worksheet,
+          rows: (string | number | null)[][][],
+          cols: string[],
+          startRow = 5,
+          rowHeight = 18,
+        ) => {
+          rows.forEach((rowVals, ri) => {
+            const exRow = ws.getRow(startRow + ri);
+            exRow.height = rowHeight;
+            const isEven = ri % 2 === 0;
+            const bg = isEven ? 'FFFFFFFF' : 'FFF0F4FF';
+            rowVals.forEach((val, ci) => {
+              const cell = exRow.getCell(ci + 1);
+              const v = val[0];
+              cell.value = v ?? '';
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+              cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF1E293B' } };
+              cell.alignment = { vertical: 'middle', wrapText: true };
+              cell.border = {
+                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+              };
+              // Sıra no
+              if (ci === 0) {
+                cell.font = { size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+              }
+              // Sayısal değer
+              if (typeof v === 'number' && ci > 0) {
+                cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: 'FF1E3A5F' } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+              }
+              // Durum sütunları
+              const colName = cols[ci] ?? '';
+              if (STATUS_COLS.some(k => colName.includes(k))) {
+                const sc = STATUS_COLORS[String(v)];
+                if (sc) {
+                  cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: sc.fg } };
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sc.bg } };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                }
+              }
+            });
+          });
+        };
+
+        const buildSheet = (
+          sheetName: string,
+          title: string,
+          subtitle: string,
+          cols: string[],
+          rows: (string | number | null)[][],
+          colWidths: number[],
+          useBlue = false,
+        ) => {
+          const ws = wb.addWorksheet(sheetName);
+          ws.columns = colWidths.map(w => ({ width: w }));
+          applyHeaderRows(ws, title, subtitle, cols.length);
+          applyHeaderCols(ws, cols, useBlue);
+          applyDataRows(ws, rows.map(r => r.map(v => [v])), cols);
+          ws.views = [{ state: 'frozen', ySplit: 4 }];
+          return ws;
+        };
+
+        // ── SAYFA 1: ÖZET ──
+        const ozetWs = wb.addWorksheet('Genel Özet');
+        ozetWs.columns = [{ width: 30 }, { width: 16 }, { width: 30 }, { width: 16 }];
+        applyHeaderRows(ozetWs, 'GENEL ÖZET RAPORU', `Rapor Tarihi: ${tarih}  |  Oluşturan: Sistem`, 4);
+        applyHeaderCols(ozetWs, ['Kategori', 'Toplam', 'Alt Kategori', 'Değer']);
+        const ozetRows = [
+          ['Toplam Firma', aktifFirmalar.length, 'Aktif Firma', aktifFirmalar.filter(f => f.durum === 'Aktif').length],
+          ['Toplam Personel', aktifPersoneller.length, 'Aktif Personel', aktifPersoneller.filter(p => p.durum === 'Aktif').length],
+          ['Toplam Evrak', aktifEvraklar.length, 'Sorunlu Evrak', evrakStats.eksik + evrakStats.sureDolmus],
+          ['Toplam Eğitim', aktifEgitimler.length, 'Tamamlanan', aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length],
+          ['Toplam Muayene', aktifMuayeneler.length, 'Çalışabilir', aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length],
+          ['Toplam Ekipman', aktifEkipmanlar.length, 'Uygun Değil', aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length],
+          ['Açık Uygunsuzluk', uygunsuzlukStats.acik, 'Kapatılan', uygunsuzlukStats.kapandi],
+          ['Sistem Sağlık Skoru', `${healthScore}/100`, 'Durum', healthLabel],
+        ];
+        ozetRows.forEach((row, ri) => {
+          const exRow = ozetWs.getRow(5 + ri);
+          exRow.height = 20;
+          const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
+          row.forEach((val, ci) => {
+            const cell = exRow.getCell(ci + 1);
+            cell.value = val;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+            cell.alignment = { vertical: 'middle', wrapText: false };
+            cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, right: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
+            if (ci === 1 || ci === 3) {
+              cell.font = { bold: true, size: 12, name: 'Calibri', color: { argb: 'FF1E3A5F' } };
+              cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            } else {
+              cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF1E293B' } };
+            }
+          });
+        });
+        ozetWs.views = [{ state: 'frozen', ySplit: 4 }];
+
+        // ── SAYFA 2: FİRMALAR ──
+        buildSheet('Firmalar', 'FİRMALAR LİSTESİ', `Toplam ${aktifFirmalar.length} firma  |  Rapor: ${tarih}`,
+          ['#', 'Firma Adı', 'Yetkili Kişi', 'Telefon', 'E-posta', 'Tehlike Sınıfı', 'Durum', 'Personel', 'Evrak', 'Açık Uyg.', 'Sözleşme Baş.', 'Sözleşme Bit.'],
+          aktifFirmalar.map((f, i) => {
+            const pS = aktifPersoneller.filter(p => p.firmaId === f.id).length;
+            const eS = aktifEvraklar.filter(e => e.firmaId === f.id).length;
+            const uS = aktifUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
+            return [i+1, f.ad, f.yetkiliKisi||'—', f.telefon||'—', f.email||'—', f.tehlikeSinifi, f.durum, pS, eS, uS, fmtDate(f.sozlesmeBas), fmtDate(f.sozlesmeBit)];
+          }),
+          [4, 28, 22, 16, 28, 16, 12, 10, 10, 12, 14, 14],
+        );
+
+        // ── SAYFA 3: PERSONELLER ──
+        buildSheet('Personeller', 'PERSONELLER LİSTESİ', `Toplam ${aktifPersoneller.length} personel  |  Rapor: ${tarih}`,
+          ['#', 'Ad Soyad', 'TC Kimlik', 'Telefon', 'E-posta', 'Firma', 'Görev', 'Departman', 'Durum', 'Kan Grubu', 'Doğum Tarihi', 'İşe Giriş'],
+          aktifPersoneller.map((p, i) => {
+            const firma = aktifFirmalar.find(f => f.id === p.firmaId);
+            return [i+1, p.adSoyad, p.tc||'—', p.telefon||'—', p.email||'—', firma?.ad||'—', p.gorev||'—', p.departman||'—', p.durum, p.kanGrubu||'—', fmtDate(p.dogumTarihi), fmtDate(p.iseGirisTarihi)];
+          }),
+          [4, 26, 14, 16, 28, 24, 20, 18, 12, 10, 14, 14],
+        );
+
+        // ── SAYFA 4: EVRAKLAR ──
+        buildSheet('Evraklar', 'EVRAKLAR LİSTESİ', `Toplam ${aktifEvraklar.length} evrak  |  Sorunlu: ${evrakStats.eksik + evrakStats.sureDolmus}  |  Rapor: ${tarih}`,
+          ['#', 'Evrak Adı', 'Tür', 'Firma', 'Personel', 'Durum', 'Geçerlilik Tarihi', 'Kalan Süre'],
+          aktifEvraklar.map((e, i) => {
+            const firma = aktifFirmalar.find(f => f.id === e.firmaId);
+            const personel = aktifPersoneller.find(p => p.id === e.personelId);
+            const t2 = new Date(); t2.setHours(0,0,0,0);
+            const kg = e.gecerlilikTarihi ? Math.ceil((new Date(e.gecerlilikTarihi).getTime() - t2.getTime()) / 86400000) : null;
+            return [i+1, e.ad, e.tur||'—', firma?.ad||'—', personel?.adSoyad||'—', e.durum, fmtDate(e.gecerlilikTarihi), kg !== null ? (kg < 0 ? `${Math.abs(kg)}g önce doldu` : `${kg}g kaldı`) : '—'];
+          }),
+          [4, 30, 20, 24, 24, 16, 16, 14],
+        );
+
+        // ── SAYFA 5: EĞİTİMLER ──
+        buildSheet('Eğitimler', 'EĞİTİMLER LİSTESİ', `Toplam ${aktifEgitimler.length} eğitim  |  Rapor: ${tarih}`,
+          ['#', 'Eğitim Adı', 'Tür', 'Firma', 'Eğitimci', 'Durum', 'Tarih', 'Süre', 'Katılımcı'],
+          aktifEgitimler.map((e, i) => {
+            const firma = aktifFirmalar.find(f => f.id === e.firmaId);
+            return [i+1, e.ad, e.tur||'—', firma?.ad||'—', e.egitimci||'—', e.durum, fmtDate(e.tarih), e.sure ? `${e.sure} dk` : '—', e.katilimciSayisi ?? '—'];
+          }),
+          [4, 30, 20, 24, 22, 14, 14, 10, 12],
+        );
+
+        // ── SAYFA 6: MUAYENELER ──
+        buildSheet('Muayeneler', 'MUAYENELER LİSTESİ', `Toplam ${aktifMuayeneler.length} muayene  |  Rapor: ${tarih}`,
+          ['#', 'Personel', 'Firma', 'Muayene Türü', 'Sonuç', 'Muayene Tarihi', 'Sonraki Tarih', 'Hekim'],
+          aktifMuayeneler.map((m, i) => {
+            const personel = aktifPersoneller.find(p => p.id === m.personelId);
+            const firma = aktifFirmalar.find(f => f.id === (personel?.firmaId ?? ''));
+            return [i+1, personel?.adSoyad||'—', firma?.ad||'—', m.muayeneTuru||'—', m.sonuc||'—', fmtDate(m.muayeneTarihi), fmtDate(m.sonrakiTarih), m.hekim||'—'];
+          }),
+          [4, 26, 24, 20, 14, 16, 16, 22],
+        );
+
+        // ── SAYFA 7: UYGUNSUZLUKLAR — fotoğraf embed ──
+        const resolvePhotoToBase64 = async (url: string | undefined | null): Promise<string | null> => {
+          if (!url) return null;
+          try {
+            const resp = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'no-store' });
+            if (!resp.ok) return null;
+            const blob = await resp.blob();
+            return new Promise(resolve => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = () => resolve(null);
+              reader.readAsDataURL(blob);
+            });
+          } catch { return null; }
+        };
+
+        const photoResults = await Promise.all(
+          aktifUygunsuzluklar.map(async u => ({
+            id: u.id,
+            acilis: await resolvePhotoToBase64(u.acilisFotoUrl),
+            kapanis: await resolvePhotoToBase64(u.kapatmaFotoUrl),
+          }))
+        );
+        const photoMap2 = new Map(photoResults.map(r => [r.id, { acilis: r.acilis, kapanis: r.kapanis }]));
+
+        const wsUyg = wb.addWorksheet('Uygunsuzluklar');
+        const uygCols = ['#', 'DÖF No', 'Başlık', 'Firma', 'Durum', 'Seviye', 'Açılış Tarihi', 'Kapanış Tarihi', 'Sorumlu', 'Açılış Fotosu', 'Kapanış Fotosu'];
+        wsUyg.columns = [5, 14, 36, 26, 13, 14, 16, 16, 22, 28, 28].map(w => ({ width: w }));
+        applyHeaderRows(wsUyg, 'UYGUNSUZLUKLAR LİSTESİ', `Açık: ${uygunsuzlukStats.acik}  |  Kapandı: ${uygunsuzlukStats.kapandi}  |  Kritik: ${uygunsuzlukStats.kritik}  |  Rapor: ${tarih}`, uygCols.length);
+        applyHeaderCols(wsUyg, uygCols, true);
+
+        for (let i = 0; i < aktifUygunsuzluklar.length; i++) {
+          const u = aktifUygunsuzluklar[i];
+          const firma = aktifFirmalar.find(f => f.id === u.firmaId);
+          const rowBg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
+          const exRow = wsUyg.getRow(5 + i);
+          exRow.height = 80;
+
+          const vals = [i+1, u.acilisNo||'—', u.baslik||u.aciklama?.slice(0,60)||'—', firma?.ad||'—', u.durum, u.severity||'—', fmtDate(u.olusturmaTarihi), fmtDate(u.kapatmaTarihi), u.sorumlu||'—', '', ''];
+          vals.forEach((val, ci) => {
+            const cell = exRow.getCell(ci + 1);
+            cell.value = val;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+            cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF1E293B' } };
+            cell.alignment = { vertical: 'middle', wrapText: true };
+            cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, right: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
+            if (ci === 0) { cell.font = { size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+            if (ci === 4 || ci === 5) {
+              const sc = STATUS_COLORS[String(val)];
+              if (sc) { cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: sc.fg } }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sc.bg } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+            }
+          });
+
+          const photos = photoMap2.get(u.id);
+          const embedPhoto = async (b64: string | null | undefined, colIdx: number, isMevcut: boolean | undefined) => {
+            if (!b64) {
+              const cell = exRow.getCell(colIdx);
+              cell.value = isMevcut ? 'Fotoğraf yüklenemedi' : '—';
+              cell.font = { size: 9, italic: true, color: { argb: isMevcut ? 'FFCA8A04' : 'FF94A3B8' }, name: 'Calibri' };
+              cell.alignment = { horizontal: 'center', vertical: 'middle' };
+              return;
+            }
+            try {
+              const [meta, data] = b64.split(',');
+              const mime = (meta.match(/data:([^;]+);/) ?? [])[1] ?? 'image/jpeg';
+              const ext = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : 'jpeg';
+              const imgId = wb.addImage({ base64: data, extension: ext as 'jpeg' | 'png' | 'gif' });
+              wsUyg.addImage(imgId, { tl: { col: colIdx - 1, row: 4 + i }, br: { col: colIdx, row: 5 + i }, editAs: 'oneCell' });
+              exRow.getCell(colIdx).value = '';
+            } catch { /* sessizce geç */ }
+          };
+
+          await embedPhoto(photos?.acilis, 10, u.acilisFotoMevcut);
+          await embedPhoto(photos?.kapanis, 11, u.kapatmaFotoMevcut);
+        }
+        wsUyg.views = [{ state: 'frozen', ySplit: 4 }];
+
+        // ── SAYFA 8: EKİPMANLAR ──
+        buildSheet('Ekipmanlar', 'EKİPMANLAR LİSTESİ', `Toplam ${aktifEkipmanlar.length} ekipman  |  Uygun Değil: ${aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length}  |  Rapor: ${tarih}`,
+          ['#', 'Ekipman Adı', 'Tür', 'Marka', 'Model', 'Firma', 'Durum', 'Sonraki Kontrol', 'Kalan Süre'],
+          aktifEkipmanlar.map((e, i) => {
+            const firma = aktifFirmalar.find(f => f.id === e.firmaId);
+            const t2 = new Date(); t2.setHours(0,0,0,0);
+            const kg = e.sonrakiKontrolTarihi ? Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - t2.getTime()) / 86400000) : null;
+            return [i+1, e.ad, e.tur||'—', e.marka||'—', e.model||'—', firma?.ad||'—', e.durum, fmtDate(e.sonrakiKontrolTarihi), kg !== null ? (kg < 0 ? `${Math.abs(kg)}g gecikti` : `${kg}g kaldı`) : '—'];
+          }),
+          [4, 28, 18, 16, 16, 24, 14, 16, 14],
+        );
+
+        // ── SAYFA 9: FİRMA BAZLI ÖZET ──
+        buildSheet('Firma Özeti', 'FİRMA BAZLI ÖZET', `${aktifFirmalar.length} firma için konsolide özet  |  Rapor: ${tarih}`,
+          ['#', 'Firma Adı', 'Tehlike Sınıfı', 'Durum', 'Personel', 'Aktif P.', 'Evrak', 'Sorunlu E.', 'Eğitim', 'Muayene', 'Açık Uyg.', 'Ekipman'],
+          aktifFirmalar.map((f, i) => {
+            const pS = aktifPersoneller.filter(p => p.firmaId === f.id).length;
+            const aP = aktifPersoneller.filter(p => p.firmaId === f.id && p.durum === 'Aktif').length;
+            const eS = aktifEvraklar.filter(e => e.firmaId === f.id).length;
+            const xE = aktifEvraklar.filter(e => e.firmaId === f.id && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
+            const egS = aktifEgitimler.filter(e => e.firmaId === f.id).length;
+            const muS = aktifMuayeneler.filter(m => aktifPersoneller.find(p => p.id === m.personelId)?.firmaId === f.id).length;
+            const uS = aktifUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
+            const ekS = aktifEkipmanlar.filter(e => e.firmaId === f.id).length;
+            return [i+1, f.ad, f.tehlikeSinifi, f.durum, pS, aP, eS, xE, egS, muS, uS, ekS];
+          }),
+          [4, 28, 16, 12, 10, 10, 10, 12, 10, 10, 12, 10],
+        );
+
+        // ── TEK DOSYA OLARAK İNDİR ──
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${tarihDosya}-GENEL-RAPOR.xlsx`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
+      } finally {
+        setExporting(false);
+      }
+    })();
+  };
+
   // Özet sağlık skoru
   const healthScore = useMemo(() => {
     const total = aktifEvraklar.length;
@@ -377,12 +737,23 @@ export default function RaporlarPage() {
             Sistemdeki tüm verilerin özet analizi ve grafikleri
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)', color: 'var(--text-muted)' }}>
             <i className="ri-calendar-line text-xs" />
             {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
+          <button
+            onClick={handleExcelExport}
+            disabled={exporting}
+            className="btn-primary whitespace-nowrap"
+            style={{ fontSize: '12.5px', padding: '8px 16px' }}
+          >
+            {exporting
+              ? <><i className="ri-loader-4-line animate-spin text-sm" /> Hazırlanıyor...</>
+              : <><i className="ri-file-excel-2-line text-sm" /> Excel Raporu İndir</>
+            }
+          </button>
         </div>
       </div>
 

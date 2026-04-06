@@ -187,19 +187,31 @@ export default function DashboardPage() {
   const insights = useMemo(() => {
     const list: { icon: string; text: string; color: string; bg: string; priority: number; subItems?: { icon: string; text: string; count: number; color: string }[] }[] = [];
     
-    // Kritik - Uygun Değil Ekipman
-    if (riskStats.uygunDegil > 0)      list.push({ icon: 'ri-error-warning-fill',  text: `${riskStats.uygunDegil} ekipman KRİTİK: Uygun Değil`,          color: '#EF4444', bg: 'rgba(239,68,68,0.12)', priority: 5 });
+    // Kritik - Uygun Değil Ekipman (EN YÜKSEK ÖNCELİK)
+    if (riskStats.uygunDegil > 0) {
+      list.push({ icon: 'ri-error-warning-fill', text: `${riskStats.uygunDegil} ekipman KRİTİK: Uygun Değil`, color: '#EF4444', bg: 'rgba(239,68,68,0.12)', priority: 100 });
+    }
     
-    // Gecikmiş işlemler
-    if (riskStats.gecikmisBelge > 0)   list.push({ icon: 'ri-file-damage-line',   text: `${riskStats.gecikmisBelge} evrak süresi dolmuş`,          color: '#F87171', bg: 'rgba(239,68,68,0.1)',   priority: 4 });
-    if (riskStats.gecikmisEkipman > 0) list.push({ icon: 'ri-tools-line',          text: `${riskStats.gecikmisEkipman} ekipman kontrolü gecikti`,    color: '#F87171', bg: 'rgba(239,68,68,0.1)',   priority: 4 });
-    if (riskStats.gecikmisMuayene > 0) list.push({ icon: 'ri-heart-pulse-line',    text: `${riskStats.gecikmisMuayene} muayene tarihi geçti`,         color: '#F87171', bg: 'rgba(239,68,68,0.1)',   priority: 4 });
+    // Gecikmiş işlemler (YÜKSEK ÖNCELİK)
+    if (riskStats.gecikmisBelge > 0) {
+      list.push({ icon: 'ri-file-damage-line', text: `${riskStats.gecikmisBelge} evrak süresi dolmuş`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', priority: 90 });
+    }
+    if (riskStats.gecikmisEkipman > 0) {
+      list.push({ icon: 'ri-tools-line', text: `${riskStats.gecikmisEkipman} ekipman kontrolü gecikti`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', priority: 90 });
+    }
+    if (riskStats.gecikmisMuayene > 0) {
+      list.push({ icon: 'ri-heart-pulse-line', text: `${riskStats.gecikmisMuayene} muayene tarihi geçti`, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', priority: 90 });
+    }
     
     // Açık uygunsuzluklar
-    if (stats.acikU > 0)               list.push({ icon: 'ri-alert-line',          text: `${stats.acikU} açık uygunsuzluk kapatılmayı bekliyor`,     color: '#F87171', bg: 'rgba(239,68,68,0.1)',   priority: 3 });
+    if (stats.acikU > 0) {
+      list.push({ icon: 'ri-alert-line', text: `${stats.acikU} açık uygunsuzluk kapatılmayı bekliyor`, color: '#F87171', bg: 'rgba(239,68,68,0.1)', priority: 80 });
+    }
     
     // Gecikmiş görevler
-    if (stats.gecikmiş > 0)            list.push({ icon: 'ri-time-line',           text: `${stats.gecikmiş} görev gecikmiş durumda`,                  color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 2 });
+    if (stats.gecikmiş > 0) {
+      list.push({ icon: 'ri-time-line', text: `${stats.gecikmiş} görev gecikmiş durumda`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 70 });
+    }
     
     // 7 gün içinde sona erenler - DETAYLI GÖSTERİM
     if (riskStats.toplam7 > 0) {
@@ -213,7 +225,7 @@ export default function DashboardPage() {
         text: `${riskStats.toplam7} işlem 7 gün içinde sona eriyor`,       
         color: '#F59E0B', 
         bg: 'rgba(245,158,11,0.1)', 
-        priority: 2,
+        priority: 60,
         subItems: subItems7
       });
     }
@@ -230,12 +242,16 @@ export default function DashboardPage() {
         text: `${riskStats.toplam30} işlem 30 gün içinde sona eriyor`,     
         color: '#FBBF24', 
         bg: 'rgba(251,191,36,0.1)', 
-        priority: 1,
+        priority: 50,
         subItems: subItems30
       });
     }
     
-    if (list.length === 0)             list.push({ icon: 'ri-checkbox-circle-line',text: 'Tüm sistemler normal çalışıyor',                            color: '#34D399', bg: 'rgba(16,185,129,0.1)', priority: 0 });
+    // Sadece gerçekten hiçbir sorun yoksa yeşil mesaj göster
+    if (list.length === 0) {
+      list.push({ icon: 'ri-checkbox-circle-line', text: 'Tüm sistemler normal çalışıyor', color: '#34D399', bg: 'rgba(16,185,129,0.1)', priority: 0 });
+    }
+    
     return list.sort((a, b) => b.priority - a.priority).slice(0, 5);
   }, [riskStats, stats]);
 
@@ -382,7 +398,11 @@ export default function DashboardPage() {
               </div>
               <h2 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Akıllı Özet</h2>
               <span className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-full"
-                style={{ background: 'rgba(99,102,241,0.1)', color: '#A5B4FC', border: '1px solid rgba(99,102,241,0.2)' }}>
+                style={insights.filter(i => i.priority >= 2).length > 0 
+                  ? { background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }
+                  : { background: 'rgba(16,185,129,0.1)', color: '#34D399', border: '1px solid rgba(16,185,129,0.2)' }
+                }
+              >
                 {insights.filter(i => i.priority >= 2).length > 0 ? `${insights.filter(i => i.priority >= 2).length} uyarı` : 'Temiz'}
               </span>
             </div>
@@ -808,14 +828,16 @@ function UpcomingTabs({
         <button onClick={() => setTab('evrak')}
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap"
           style={tab === 'evrak' ? { background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' } : { color: 'var(--text-muted)', border: '1px solid transparent' }}>
-          <i className="ri-file-warning-line text-[10px]" />Evraklar
-          {evraklar.length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>{evraklar.length}</span>}
+          <i className="ri-file-warning-line text-[10px]" style={{ color: tab === 'evrak' ? '#F59E0B' : 'var(--text-muted)' }} />
+          <span style={{ color: tab === 'evrak' ? '#F59E0B' : 'var(--text-muted)' }}>Evraklar</span>
+          {evraklar.length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: tab === 'evrak' ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>{evraklar.length}</span>}
         </button>
         <button onClick={() => setTab('ekipman')}
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap"
           style={tab === 'ekipman' ? { background: 'rgba(59,130,246,0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' } : { color: 'var(--text-muted)', border: '1px solid transparent' }}>
-          <i className="ri-tools-line text-[10px]" />Ekipmanlar
-          {ekipmanlar.length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(59,130,246,0.2)', color: '#60A5FA' }}>{ekipmanlar.length}</span>}
+          <i className="ri-tools-line text-[10px]" style={{ color: tab === 'ekipman' ? '#60A5FA' : 'var(--text-muted)' }} />
+          <span style={{ color: tab === 'ekipman' ? '#60A5FA' : 'var(--text-muted)' }}>Ekipmanlar</span>
+          {ekipmanlar.length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: tab === 'ekipman' ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.1)', color: '#60A5FA' }}>{ekipmanlar.length}</span>}
         </button>
       </div>
 
@@ -885,18 +907,18 @@ function InsightEmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-8 gap-2.5">
       <div className="w-14 h-14 flex items-center justify-center rounded-2xl"
-        style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+        style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}>
         <i className="ri-shield-check-line text-2xl" style={{ color: '#10B981' }} />
       </div>
       <div className="text-center">
-        <p className="text-[13px] font-bold" style={{ color: '#34D399' }}>Her şey yolunda!</p>
+        <p className="text-[13px] font-bold" style={{ color: '#10B981' }}>Her şey yolunda!</p>
         <p className="text-[11.5px] mt-1 leading-relaxed max-w-[200px]" style={{ color: 'var(--text-muted)' }}>
           Önümüzdeki 60 günde süresi dolacak kayıt bulunmuyor.
         </p>
         <div className="flex items-center justify-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-full mx-auto w-fit"
-          style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+          style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
           <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-          <span className="text-[10.5px] font-semibold" style={{ color: '#34D399' }}>Sistem sağlıklı çalışıyor</span>
+          <span className="text-[10.5px] font-semibold" style={{ color: '#10B981' }}>Sistem sağlıklı çalışıyor</span>
         </div>
       </div>
     </div>
