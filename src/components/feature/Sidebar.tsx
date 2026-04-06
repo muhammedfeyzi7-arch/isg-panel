@@ -75,8 +75,10 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
   const { logout } = useAuth();
   const [supportOpen, setSupportOpen] = useState(false);
 
+  const { orgLoading } = useApp();
   const userRole = org?.role ?? 'member';
-  const allowedModules = getAllowedModules(userRole);
+  // orgLoading sırasında tüm modüllere izin ver — yanlış kısıtlama olmasın
+  const allowedModules = orgLoading ? getAllowedModules('admin') : getAllowedModules(userRole);
   const roleInfo = ROLE_LABELS[userRole] ?? ROLE_LABELS.member;
 
   useEffect(() => {

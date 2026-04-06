@@ -44,6 +44,7 @@ export function useOrganization(user: User | null) {
     // Helper: load/create via edge function (uses service role key — bypasses RLS, auto-creates org if needed)
     const loadViaEdgeFunction = async (): Promise<boolean> => {
       try {
+        clearTimeout(timeoutId);
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) return false;
         const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
@@ -101,6 +102,8 @@ export function useOrganization(user: User | null) {
         .order('joined_at', { ascending: true })
         .limit(1)
         .maybeSingle();
+
+      clearTimeout(timeoutId);
 
       clearTimeout(timeoutId);
 
