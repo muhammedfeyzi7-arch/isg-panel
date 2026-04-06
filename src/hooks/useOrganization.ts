@@ -22,7 +22,7 @@ export function useOrganization(user: User | null) {
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const autoCreateDoneRef = useRef<string | null>(null); // tracks last auto-create attempt
+  const autoCreateDoneRef = useRef<string | null>(null);
 
   const loadOrg = useCallback(async () => {
     if (!user) {
