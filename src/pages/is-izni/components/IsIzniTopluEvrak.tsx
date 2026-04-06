@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import Modal from '@/components/base/Modal';
-import type { IsIzni, Firma } from '@/types';
+import type { IsIzni } from '@/types';
 import { uploadFileToStorage } from '@/utils/fileUpload';
 
 interface UploadFile {
@@ -17,7 +17,6 @@ interface Props {
   onClose: () => void;
   isIzni: IsIzni | null;
   isIzinleri?: IsIzni[];
-  firmalar?: Firma[];
   orgId: string;
   onEvrakEklendi: (izId: string, evraklar: IsIzni['evraklar']) => void;
 }
@@ -37,7 +36,7 @@ const ACCEPTED_TYPES = [
 ];
 
 const ACCEPTED_EXT = '.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt,.ppt,.pptx';
-const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
 function getFileIcon(type: string): string {
   if (type.includes('pdf')) return 'ri-file-pdf-line';
@@ -64,30 +63,13 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [], firmalar = [], orgId, onEvrakEklendi }: Props) {
-  const [seciliFirmaId, setSeciliFirmaId] = useState<string>(isIzni?.firmaId ?? '');
+export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [], orgId, onEvrakEklendi }: Props) {
   const [seciliIzniId, setSeciliIzniId] = useState<string>(isIzni?.id ?? '');
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(false);
-  const [evrakTur, setEvrakTur] = useState('Sıcak Çalışma');
+  const [evrakTur, setEvrakTur] = useState('Belge');
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setSeciliFirmaId(isIzni?.firmaId ?? '');
-      setSeciliIzniId(isIzni?.id ?? '');
-      setFiles([]);
-      setEvrakTur('Sıcak Çalışma');
-    }
-  }, [open, isIzni]);
-
-  // Seçili firmaya ait iş izinleri
-  const firmaIsIzinleri = seciliFirmaId
-    ? isIzinleri.filter(i => i.firmaId === seciliFirmaId)
-    : isIzinleri;
-
-  const seciliIzni = isIzni ?? isIzinleri.find(i => i.id === seciliIzniId) ?? null;
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const arr = Array.from(newFiles);
@@ -105,7 +87,9 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
     setFiles(prev => [...prev, ...valid]);
   }, []);
 
-  const removeFile = (id: string) => setFiles(prev => prev.filter(f => f.id !== id));
+  const removeFile = (id: string) => {
+    setFiles(prev => prev.filter(f => f.id !== id));
+  };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -114,17 +98,22 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
   };
 
   const handleUpload = async () => {
-    if (!seciliIzni || files.length === 0) return;
+    if (!isIzni || files.length === 0) return;
     setYukleniyor(true);
-    const yeniEvraklar = [...(seciliIzni.evraklar || [])];
+
+    const yeniEvraklar = [...(isIzni.evraklar || [])];
 
     for (const uf of files) {
       if (uf.status === 'tamamlandi') continue;
+
       setFiles(prev => prev.map(f => f.id === uf.id ? { ...f, status: 'yukleniyor', progress: 30 } : f));
+
       try {
         const evrakId = Math.random().toString(36).substring(2);
         const url = await uploadFileToStorage(uf.file, orgId, 'is-izni-evrak', evrakId);
+
         setFiles(prev => prev.map(f => f.id === uf.id ? { ...f, status: 'tamamlandi', progress: 100, url: url || '' } : f));
+
         yeniEvraklar.push({
           id: evrakId,
           ad: uf.file.name.replace(/\.[^/.]+$/, ''),
@@ -141,7 +130,7 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
       }
     }
 
-    onEvrakEklendi(seciliIzni.id, yeniEvraklar);
+    onEvrakEklendi(isIzni.id, yeniEvraklar);
     setYukleniyor(false);
   };
 
@@ -157,13 +146,11 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
   const hataCount = files.filter(f => f.status === 'hata').length;
   const tumTamamlandi = files.length > 0 && files.every(f => f.status === 'tamamlandi' || f.status === 'hata');
 
-  const showIzniSecim = !isIzni && isIzinleri.length > 0;
-
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title={seciliIzni ? `Toplu Evrak Yükle — ${seciliIzni.izinNo}` : 'Toplu Evrak Yükle'}
+      title={isIzni ? `Toplu Evrak Yükle — ${isIzni.izinNo}` : 'Toplu Evrak Yükle'}
       size="lg"
       icon="ri-upload-cloud-2-line"
       footer={
@@ -174,7 +161,7 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
           {!tumTamamlandi && (
             <button
               onClick={handleUpload}
-              disabled={bekleyenCount === 0 || yukleniyor || !seciliIzni}
+              disabled={bekleyenCount === 0 || yukleniyor}
               className="btn-primary whitespace-nowrap"
             >
               {yukleniyor
@@ -186,42 +173,16 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
       }
     >
       <div className="space-y-4">
-
-        {/* Firma + İş İzni Seçimi — sadece header butonundan açıldığında göster */}
-        {showIzniSecim && (
-          <div className="space-y-3">
-            <div>
-              <label className="form-label">Firma Seçin *</label>
-              <select
-                value={seciliFirmaId}
-                onChange={e => { setSeciliFirmaId(e.target.value); setSeciliIzniId(''); }}
-                className="isg-input w-full"
-              >
-                <option value="">— Firma seçin —</option>
-                {firmalar.map(f => (
-                  <option key={f.id} value={f.id}>{f.ad}</option>
-                ))}
-              </select>
-            </div>
-            {seciliFirmaId && (
-              <div>
-                <label className="form-label">İş İzni Seçin *</label>
-                <select
-                  value={seciliIzniId}
-                  onChange={e => setSeciliIzniId(e.target.value)}
-                  className="isg-input w-full"
-                >
-                  <option value="">— İş izni seçin —</option>
-                  {firmaIsIzinleri.map(iz => (
-                    <option key={iz.id} value={iz.id}>
-                      {iz.izinNo} — {iz.tip} {iz.sorumlu ? `(${iz.sorumlu})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+        {/* Bilgi */}
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
+          <i className="ri-information-line flex-shrink-0 mt-0.5" style={{ color: '#60A5FA' }} />
+          <div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Toplu Evrak Yükleme</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              PDF, Word, Excel, PowerPoint, resim ve metin dosyaları yükleyebilirsiniz. Maksimum dosya boyutu 25MB.
+            </p>
           </div>
-        )}
+        </div>
 
         {/* Evrak Türü */}
         <div>
@@ -231,12 +192,15 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
             onChange={e => setEvrakTur(e.target.value)}
             className="isg-input w-full"
           >
-            <option value="Sıcak Çalışma">Sıcak Çalışma</option>
-            <option value="Yüksekte Çalışma">Yüksekte Çalışma</option>
-            <option value="Kapalı Alan">Kapalı Alan</option>
-            <option value="Elektrikli Çalışma">Elektrikli Çalışma</option>
-            <option value="Kazı">Kazı</option>
-            <option value="Genel">Genel</option>
+            <option value="Belge">Belge</option>
+            <option value="Risk Analizi">Risk Analizi</option>
+            <option value="Çalışma Talimatı">Çalışma Talimatı</option>
+            <option value="Eğitim Belgesi">Eğitim Belgesi</option>
+            <option value="Yöntem Belgesi">Yöntem Belgesi</option>
+            <option value="Onay Belgesi">Onay Belgesi</option>
+            <option value="Fotoğraf">Fotoğraf</option>
+            <option value="Rapor">Rapor</option>
+            <option value="Diğer">Diğer</option>
           </select>
         </div>
 
@@ -278,14 +242,29 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
         {/* Dosya Listesi */}
         {files.length > 0 && (
           <div className="space-y-2">
+            {/* Özet */}
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{files.length} dosya seçildi</span>
-              {tamamlananCount > 0 && <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}>{tamamlananCount} tamamlandı</span>}
-              {hataCount > 0 && <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>{hataCount} hata</span>}
-              {bekleyenCount > 0 && <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>{bekleyenCount} bekliyor</span>}
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                {files.length} dosya seçildi
+              </span>
+              {tamamlananCount > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}>
+                  {tamamlananCount} tamamlandı
+                </span>
+              )}
+              {hataCount > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                  {hataCount} hata
+                </span>
+              )}
+              {bekleyenCount > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
+                  {bekleyenCount} bekliyor
+                </span>
+              )}
             </div>
 
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
               {files.map(uf => {
                 const icon = getFileIcon(uf.file.type);
                 const iconColor = getFileIconColor(uf.file.type);
@@ -294,34 +273,68 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
                     key={uf.id}
                     className="flex items-center gap-3 p-3 rounded-xl transition-all"
                     style={{
-                      background: uf.status === 'tamamlandi' ? 'rgba(52,211,153,0.06)' : uf.status === 'hata' ? 'rgba(239,68,68,0.06)' : 'var(--bg-item)',
-                      border: `1px solid ${uf.status === 'tamamlandi' ? 'rgba(52,211,153,0.2)' : uf.status === 'hata' ? 'rgba(239,68,68,0.2)' : 'var(--bg-item-border)'}`,
+                      background: uf.status === 'tamamlandi'
+                        ? 'rgba(52,211,153,0.06)'
+                        : uf.status === 'hata'
+                        ? 'rgba(239,68,68,0.06)'
+                        : 'var(--bg-item)',
+                      border: `1px solid ${
+                        uf.status === 'tamamlandi'
+                          ? 'rgba(52,211,153,0.2)'
+                          : uf.status === 'hata'
+                          ? 'rgba(239,68,68,0.2)'
+                          : 'var(--bg-item-border)'
+                      }`,
                     }}
                   >
-                    <div className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${iconColor}18` }}>
+                    {/* İkon */}
+                    <div
+                      className="w-9 h-9 flex items-center justify-center rounded-lg flex-shrink-0"
+                      style={{ background: `${iconColor}18` }}
+                    >
                       <i className={`${icon} text-base`} style={{ color: iconColor }} />
                     </div>
+
+                    {/* Bilgi */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{uf.file.name}</p>
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                        {uf.file.name}
+                      </p>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         {formatBytes(uf.file.size)}
                         {uf.error && <span style={{ color: '#EF4444' }}> • {uf.error}</span>}
                       </p>
                       {uf.status === 'yukleniyor' && (
                         <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: 'var(--border-main)' }}>
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${uf.progress}%`, background: 'linear-gradient(90deg, #60A5FA, #818CF8)' }} />
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${uf.progress}%`, background: 'linear-gradient(90deg, #60A5FA, #818CF8)' }}
+                          />
                         </div>
                       )}
                     </div>
+
+                    {/* Durum / Sil */}
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {uf.status === 'bekliyor' && (
-                        <button onClick={() => removeFile(uf.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Kaldır">
+                        <button
+                          onClick={() => removeFile(uf.id)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                          style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
+                          title="Kaldır"
+                        >
                           <i className="ri-close-line text-sm" />
                         </button>
                       )}
-                      {uf.status === 'yukleniyor' && <i className="ri-loader-4-line animate-spin text-base" style={{ color: '#60A5FA' }} />}
-                      {uf.status === 'tamamlandi' && <i className="ri-checkbox-circle-fill text-lg" style={{ color: '#34D399' }} />}
-                      {uf.status === 'hata' && <i className="ri-close-circle-fill text-lg" style={{ color: '#EF4444' }} />}
+                      {uf.status === 'yukleniyor' && (
+                        <i className="ri-loader-4-line animate-spin text-base" style={{ color: '#60A5FA' }} />
+                      )}
+                      {uf.status === 'tamamlandi' && (
+                        <i className="ri-checkbox-circle-fill text-lg" style={{ color: '#34D399' }} />
+                      )}
+                      {uf.status === 'hata' && (
+                        <i className="ri-close-circle-fill text-lg" style={{ color: '#EF4444' }} />
+                      )}
                     </div>
                   </div>
                 );
@@ -340,7 +353,11 @@ export default function IsIzniTopluEvrak({ open, onClose, isIzni, isIzinleri = [
             { ext: 'JPG/PNG', color: '#A855F7', icon: 'ri-image-line' },
             { ext: 'TXT', color: '#64748B', icon: 'ri-file-text-line' },
           ].map(f => (
-            <span key={f.ext} className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg" style={{ background: `${f.color}12`, color: f.color }}>
+            <span
+              key={f.ext}
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg"
+              style={{ background: `${f.color}12`, color: f.color }}
+            >
               <i className={`${f.icon} text-xs`} />{f.ext}
             </span>
           ))}
