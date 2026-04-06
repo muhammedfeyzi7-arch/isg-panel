@@ -177,33 +177,30 @@ export function useOrganization(user: User | null) {
   const createOrg = async (name: string, userId: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Kullanıcı bulunamadı.' };
     try {
-      const inviteCode = generateInviteCode();
-      const { data: newOrg, error: orgError } = await supabase
-        .from('organizations')
-        .insert({ name, invite_code: inviteCode, created_by: user.id })
-        .select()
-        .maybeSingle();
+      // Use setup-organization edge function with org name — bypasses RLS via service role
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) return { error: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };
 
-      if (orgError || !newOrg) return { error: orgError?.message ?? 'Organizasyon oluşturulamadı.' };
+      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ org_name: name }),
+      });
 
-      const { error: memberError } = await supabase
-        .from('user_organizations')
-        .insert({
-          user_id: user.id,
-          organization_id: newOrg.id,
-          role: 'admin',
-          email: user.email ?? '',
-          is_active: true,
-          must_change_password: false,
-        });
+      const data = await res.json() as { error?: string; organization?: { id: string } };
 
-      if (memberError) return { error: memberError.message };
+      if (!res.ok || data.error) {
+        return { error: data.error ?? 'Organizasyon oluşturulamadı.' };
+      }
 
-      await supabase.from('app_data').upsert(
-        { organization_id: newOrg.id, data: {}, updated_at: new Date().toISOString() },
-        { onConflict: 'organization_id' },
-      );
-      await migrateLegacyData(userId, newOrg.id);
+      if (data.organization?.id) {
+        await migrateLegacyData(userId, data.organization.id);
+      }
+
       await loadOrg();
       return { error: null };
     } catch (e) {
