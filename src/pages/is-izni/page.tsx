@@ -104,6 +104,7 @@ export default function IsIzniPage() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return isIzinleri
+      .filter(iz => !(iz as unknown as { silinmis?: boolean }).silinmis)
       .filter(iz => {
         const firma = firmalar.find(f => f.id === iz.firmaId);
         return (
@@ -131,12 +132,14 @@ export default function IsIzniPage() {
     setBulkDeleteConfirm(false);
   };
 
+  const aktifIsIzinleri = useMemo(() => isIzinleri.filter(i => !(i as unknown as { silinmis?: boolean }).silinmis), [isIzinleri]);
+
   const stats = useMemo(() => ({
-    total: isIzinleri.length,
-    onayBekliyor: isIzinleri.filter(i => i.durum === 'Onay Bekliyor').length,
-    onaylandi: isIzinleri.filter(i => i.durum === 'Onaylandı').length,
-    reddedildi: isIzinleri.filter(i => i.durum === 'Reddedildi').length,
-  }), [isIzinleri]);
+    total: aktifIsIzinleri.length,
+    onayBekliyor: aktifIsIzinleri.filter(i => i.durum === 'Onay Bekliyor').length,
+    onaylandi: aktifIsIzinleri.filter(i => i.durum === 'Onaylandı').length,
+    reddedildi: aktifIsIzinleri.filter(i => i.durum === 'Reddedildi').length,
+  }), [aktifIsIzinleri]);
 
   const sf = (field: string, value: unknown) => setForm(prev => ({ ...prev, [field]: value }));
 

@@ -554,9 +554,16 @@ export default function MuayenelerPage() {
                       </td>
                       <td className="hidden md:table-cell">
                         {hasFileError ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                            <i className="ri-error-warning-line" />Yüklenemedi
-                          </span>
+                          <button
+                            onClick={() => openEdit(m)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg cursor-pointer whitespace-nowrap transition-all"
+                            style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
+                            title="Dosya yüklenmemiş — düzenleyerek ekleyin"
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.2)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.1)'; }}
+                          >
+                            <i className="ri-upload-2-line" />Belge Ekle
+                          </button>
                         ) : m.dosyaUrl ? (
                           <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}>
                             <i className="ri-file-check-line" />Mevcut

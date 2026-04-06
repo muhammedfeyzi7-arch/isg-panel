@@ -1024,9 +1024,16 @@ export default function EkipmanlarPage() {
                       <td>
                         <div className="flex items-center gap-2">
                           {hasFileError && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Dosya yüklenemedi">
-                              <i className="ri-error-warning-line" />
-                            </span>
+                            <button
+                              onClick={() => openEdit(ekipman)}
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded cursor-pointer transition-all whitespace-nowrap"
+                              style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
+                              title="Dosya yüklenmemiş — düzenleyerek ekleyin"
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.2)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.1)'; }}
+                            >
+                              <i className="ri-upload-2-line" />Belge Ekle
+                            </button>
                           )}
                           {ekipman.dosyaUrl && (
                             <button onClick={async () => {

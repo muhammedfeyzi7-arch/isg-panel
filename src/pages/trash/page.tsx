@@ -15,7 +15,7 @@ export default function CopKutusuPage() {
     restoreEgitim, permanentDeleteEgitim,
     restoreMuayene, permanentDeleteMuayene,
     restoreEkipman, permanentDeleteEkipman, permanentDeleteEkipmanMany,
-    deleteUygunsuzluk,
+    deleteUygunsuzluk, permanentDeleteUygunsuzluk,
     restoreTutanak, permanentDeleteTutanak,
     restoreIsIzni, permanentDeleteIsIzni,
     addToast,
@@ -126,7 +126,7 @@ export default function CopKutusuPage() {
       if (tip === 'egitimler')      await permanentDeleteEgitim(id);
       if (tip === 'muayeneler')     await permanentDeleteMuayene(id);
       if (tip === 'ekipmanlar')     await permanentDeleteEkipmanMany([id]);
-      if (tip === 'uygunsuzluklar') deleteUygunsuzluk(id);
+      if (tip === 'uygunsuzluklar') await permanentDeleteUygunsuzluk(id);
       if (tip === 'tutanaklar')     await permanentDeleteTutanak(id);
       if (tip === 'is_izinleri')    await permanentDeleteIsIzni(id);
       addToast('Kayıt kalıcı olarak silindi.', 'info');
@@ -160,7 +160,7 @@ export default function CopKutusuPage() {
           if (activeTab === 'evraklar')       return permanentDeleteEvrak(id);
           if (activeTab === 'egitimler')      return permanentDeleteEgitim(id);
           if (activeTab === 'muayeneler')     return permanentDeleteMuayene(id);
-          if (activeTab === 'uygunsuzluklar') return Promise.resolve(deleteUygunsuzluk(id));
+          if (activeTab === 'uygunsuzluklar') return permanentDeleteUygunsuzluk(id);
           if (activeTab === 'tutanaklar')     return permanentDeleteTutanak(id);
           if (activeTab === 'is_izinleri')    return permanentDeleteIsIzni(id);
           return Promise.resolve();

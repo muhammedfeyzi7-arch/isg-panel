@@ -400,63 +400,107 @@ export default function FirmalarPage() {
           </>
         }
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Firma Adı *" value={f('ad')} onChange={v => set('ad', v)} placeholder="Firma adı giriniz" />
-          <FormField label="Yetkili Kişi" value={f('yetkiliKisi')} onChange={v => set('yetkiliKisi', v)} placeholder="Yetkili kişi adı" />
-          <FormField label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0212 000 00 00" />
-          <FormField label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="info@firma.com" type="email" />
-          <FormField label="SGK Sicil No" value={f('sgkSicil')} onChange={v => set('sgkSicil', v)} placeholder="SGK sicil numarası" />
-          <div className="md:col-span-2">
-            <FormField label="Adres" value={f('adres')} onChange={v => set('adres', v)} placeholder="Firma adresi" />
-          </div>
-          <FormSelect label="Tehlike Sınıfı" value={f('tehlikeSinifi')} onChange={v => set('tehlikeSinifi', v)} options={['Az Tehlikeli', 'Tehlikeli', 'Çok Tehlikeli']} />
-          <FormSelect label="Firma Durumu" value={f('durum')} onChange={v => set('durum', v)} options={['Aktif', 'Pasif', 'Askıda']} />
-          <FormField label="Sözleşme Başlangıcı" value={f('sozlesmeBas')} onChange={v => set('sozlesmeBas', v)} type="date" />
-          <FormField label="Sözleşme Bitişi" value={f('sozlesmeBit')} onChange={v => set('sozlesmeBit', v)} type="date" />
-          {/* Logo Upload */}
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Firma Logosu (PNG / JPG)</label>
-            <div
-              className="rounded-xl p-4 flex items-center gap-4 cursor-pointer transition-all duration-200"
-              style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
-              onClick={() => logoRef.current?.click()}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; e.currentTarget.style.background = 'rgba(59,130,246,0.04)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
-            >
-              {logoVeri ? (
-                <>
-                  <img src={logoVeri} alt="Logo önizleme" className="w-12 h-12 object-contain rounded-lg" style={{ background: 'white', padding: '4px' }} />
-                  <div>
-                    <p className="text-sm font-medium text-slate-200">Logo yüklendi</p>
-                    <p className="text-xs" style={{ color: '#475569' }}>Değiştirmek için tıklayın</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    <i className="ri-image-add-line text-2xl" style={{ color: '#334155' }} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-400">Logo yüklemek için tıklayın</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#334155' }}>PNG, JPG — Tutanak Word belgesinde kullanılır</p>
-                  </div>
-                </>
-              )}
+        <div className="space-y-5">
+          {/* Bölüm 1: Temel Bilgiler */}
+          <div className="form-section">
+            <div className="form-section-header">
+              <div className="form-section-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#60A5FA' }}>
+                <i className="ri-building-2-line text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Temel Bilgiler</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Firma kimlik ve iletişim bilgileri</p>
+              </div>
             </div>
-            <input ref={logoRef} type="file" accept=".png,.jpg,.jpeg" className="hidden" onChange={e => handleLogoChange(e.target.files?.[0])} />
+            <div className="form-grid-2">
+              <FormField label="Firma Adı *" value={f('ad')} onChange={v => set('ad', v)} placeholder="Firma adı giriniz" />
+              <FormField label="Yetkili Kişi" value={f('yetkiliKisi')} onChange={v => set('yetkiliKisi', v)} placeholder="Yetkili kişi adı" />
+              <FormField label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0212 000 00 00" />
+              <FormField label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="info@firma.com" type="email" />
+              <FormField label="Vergi No" value={f('vergiNo')} onChange={v => set('vergiNo', v)} placeholder="Vergi numarası" />
+              <FormField label="SGK Sicil No" value={f('sgkSicil')} onChange={v => set('sgkSicil', v)} placeholder="SGK sicil numarası" />
+              <div className="col-span-2">
+                <FormField label="Adres" value={f('adres')} onChange={v => set('adres', v)} placeholder="Firma adresi" />
+              </div>
+            </div>
           </div>
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Notlar</label>
-            <textarea
-              value={f('notlar')}
-              onChange={e => set('notlar', e.target.value)}
-              rows={3}
-              placeholder="Firma hakkında notlar..."
-              className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none resize-none transition-all"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#E2E8F0' }}
-              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
-              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.boxShadow = 'none'; }}
-            />
+
+          {/* Bölüm 2: Sözleşme & Durum */}
+          <div className="form-section">
+            <div className="form-section-header">
+              <div className="form-section-icon" style={{ background: 'rgba(16,185,129,0.12)', color: '#34D399' }}>
+                <i className="ri-file-text-line text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Sözleşme & Durum</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Tehlike sınıfı, durum ve sözleşme tarihleri</p>
+              </div>
+            </div>
+            <div className="form-grid-2">
+              <FormSelect label="Tehlike Sınıfı" value={f('tehlikeSinifi')} onChange={v => set('tehlikeSinifi', v)} options={['Az Tehlikeli', 'Tehlikeli', 'Çok Tehlikeli']} />
+              <FormSelect label="Firma Durumu" value={f('durum')} onChange={v => set('durum', v)} options={['Aktif', 'Pasif', 'Askıda']} />
+              <FormField label="Sözleşme Başlangıcı" value={f('sozlesmeBas')} onChange={v => set('sozlesmeBas', v)} type="date" />
+              <FormField label="Sözleşme Bitişi" value={f('sozlesmeBit')} onChange={v => set('sozlesmeBit', v)} type="date" />
+            </div>
+          </div>
+
+          {/* Bölüm 3: Logo & Notlar */}
+          <div className="form-section">
+            <div className="form-section-header">
+              <div className="form-section-icon" style={{ background: 'rgba(245,158,11,0.12)', color: '#FBBF24' }}>
+                <i className="ri-image-line text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Logo & Notlar</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Firma logosu ve ek açıklamalar</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>Firma Logosu (PNG / JPG)</label>
+                <div
+                  className="rounded-xl p-4 flex items-center gap-4 cursor-pointer transition-all duration-200"
+                  style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
+                  onClick={() => logoRef.current?.click()}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(245,158,11,0.35)'; e.currentTarget.style.background = 'rgba(245,158,11,0.04)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+                >
+                  {logoVeri ? (
+                    <>
+                      <img src={logoVeri} alt="Logo önizleme" className="w-12 h-12 object-contain rounded-lg" style={{ background: 'white', padding: '4px' }} />
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Logo yüklendi</p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Değiştirmek için tıklayın</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                        <i className="ri-image-add-line text-2xl" style={{ color: '#FBBF24' }} />
+                      </div>
+                      <div>
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Logo yüklemek için tıklayın</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>PNG, JPG — Tutanak Word belgesinde kullanılır</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <input ref={logoRef} type="file" accept=".png,.jpg,.jpeg" className="hidden" onChange={e => handleLogoChange(e.target.files?.[0])} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>Notlar</label>
+                <textarea
+                  value={f('notlar')}
+                  onChange={e => set('notlar', e.target.value)}
+                  rows={3}
+                  placeholder="Firma hakkında notlar..."
+                  className="input-premium resize-none"
+                  style={{ height: 'auto' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3.5px rgba(59,130,246,0.08)'; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </Modal>

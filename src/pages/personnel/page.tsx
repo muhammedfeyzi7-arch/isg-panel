@@ -769,44 +769,45 @@ export default function PersonellerPage() {
 
       {/* ── Form Modal ── */}
       <Modal open={formOpen} onClose={() => { setFormOpen(false); setPendingFotoFile(null); }} title={editingId ? 'Personel Düzenle' : 'Yeni Personel Ekle'} size="xl" icon="ri-user-line"
-        footer={<><button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button><button onClick={handleSave} disabled={saving} className="btn-primary"><i className="ri-save-line" /> Kaydet</button></>}>
-        <div className="space-y-4">
-          {/* Photo upload section */}
-          <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
-            <div className="flex-shrink-0">
-              {(() => {
-                const previewUrl = pendingFotoFile ? URL.createObjectURL(pendingFotoFile) : null;
-                const displayFoto = previewUrl || (editingId ? getPersonelFoto(editingId) : null);
-                return (
-                  <PersonelAvatar
-                    adSoyad={form.adSoyad || '?'}
-                    fotoUrl={displayFoto}
-                    size="lg"
-                    ring
-                  />
-                );
-              })()}
+        footer={<><button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button><button onClick={handleSave} disabled={saving} className="btn-primary"><i className="ri-save-line" /> {saving ? 'Kaydediliyor...' : 'Kaydet'}</button></>}>
+        <div className="space-y-5">
+
+          {/* Bölüm 0: Profil Fotoğrafı */}
+          <div className="form-section">
+            <div className="form-section-header">
+              <div className="form-section-icon" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }}>
+                <i className="ri-user-3-line text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Profil Fotoğrafı</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>İsteğe bağlı — yüklenmezse baş harfler gösterilir</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Profil Fotoğrafı</p>
-              <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>İsteğe bağlı. Yüklenmezse isim baş harfleri gösterilir.</p>
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">
+                {(() => {
+                  const previewUrl = pendingFotoFile ? URL.createObjectURL(pendingFotoFile) : null;
+                  const displayFoto = previewUrl || (editingId ? getPersonelFoto(editingId) : null);
+                  return <PersonelAvatar adSoyad={form.adSoyad || '?'} fotoUrl={displayFoto} size="lg" ring />;
+                })()}
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => fotoInputRef.current?.click()}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-all whitespace-nowrap"
-                  style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', color: '#818CF8' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.25)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.15)'; }}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-all whitespace-nowrap"
+                  style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', color: '#818CF8' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.22)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.12)'; }}
                 >
                   <i className="ri-upload-2-line" />
                   {pendingFotoFile || (editingId && getPersonelFoto(editingId)) ? 'Fotoğrafı Değiştir' : 'Fotoğraf Yükle'}
                 </button>
-                {(pendingFotoFile) && (
+                {pendingFotoFile && (
                   <button
                     type="button"
                     onClick={() => setPendingFotoFile(null)}
-                    className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg cursor-pointer"
+                    className="flex items-center gap-1 text-xs font-medium px-2.5 py-2 rounded-lg cursor-pointer whitespace-nowrap"
                     style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}
                   >
                     <i className="ri-close-line" /> Kaldır
@@ -816,30 +817,78 @@ export default function PersonellerPage() {
             </div>
           </div>
 
-          {/* Existing fields grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FF label="Ad Soyad *" value={f('adSoyad')} onChange={v => set('adSoyad', v)} placeholder="Personelin tam adı" />
-            <FF label="TC Kimlik No" value={f('tc')} onChange={v => set('tc', v)} placeholder="12345678901" />
-            <FF label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0555 000 00 00" />
-            <FF label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="personel@email.com" type="email" />
-            <FF label="Doğum Tarihi" value={f('dogumTarihi')} onChange={v => set('dogumTarihi', v)} type="date" />
-            <FF label="İşe Giriş Tarihi" value={f('iseGirisTarihi')} onChange={v => set('iseGirisTarihi', v)} type="date" />
-            <FF label="Görev / Unvan" value={f('gorev')} onChange={v => set('gorev', v)} placeholder="Operatör, Mühendis..." />
-            <FF label="Departman" value={f('departman')} onChange={v => set('departman', v)} placeholder="Üretim, Kalite..." />
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Firma *</label>
-              <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer">
-                <option value="">Firma Seçin...</option>
-                {firmalar.filter(fi => !fi.silinmis).map(firma => <option key={firma.id} value={firma.id}>{firma.ad}</option>)}
-              </select>
-              {firmalar.filter(fi => !fi.silinmis).length === 0 && <p className="text-xs mt-1" style={{ color: '#F59E0B' }}>Önce firma eklemeniz gerekmektedir.</p>}
+          {/* Bölüm 1: Temel Bilgiler */}
+          <div className="form-section">
+            <div className="form-section-header">
+              <div className="form-section-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#60A5FA' }}>
+                <i className="ri-id-card-line text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Temel Bilgiler</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Kimlik ve iletişim bilgileri</p>
+              </div>
             </div>
-            <FS label="Çalışma Durumu" value={f('durum')} onChange={v => set('durum', v)} options={['Aktif', 'Pasif', 'Ayrıldı']} />
-            <FS label="Kan Grubu" value={f('kanGrubu')} onChange={v => set('kanGrubu', v)} options={['', ...KAN_GRUPLARI]} />
-            <FF label="Acil Durum Kişisi" value={f('acilKisi')} onChange={v => set('acilKisi', v)} placeholder="Yakınının adı soyadı" />
-            <FF label="Acil Durum Telefonu" value={f('acilTelefon')} onChange={v => set('acilTelefon', v)} placeholder="0555 000 00 00" />
-            <div className="md:col-span-2"><FF label="İkamet Adresi" value={f('adres')} onChange={v => set('adres', v)} placeholder="Açık adres" /></div>
+            <div className="form-grid-2">
+              <FF label="Ad Soyad *" value={f('adSoyad')} onChange={v => set('adSoyad', v)} placeholder="Personelin tam adı" />
+              <FF label="TC Kimlik No" value={f('tc')} onChange={v => set('tc', v)} placeholder="12345678901" />
+              <FF label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0555 000 00 00" />
+              <FF label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="personel@email.com" type="email" />
+              <FF label="Doğum Tarihi" value={f('dogumTarihi')} onChange={v => set('dogumTarihi', v)} type="date" />
+              <FS label="Kan Grubu" value={f('kanGrubu')} onChange={v => set('kanGrubu', v)} options={['', ...KAN_GRUPLARI]} />
+              <div className="col-span-2">
+                <FF label="İkamet Adresi" value={f('adres')} onChange={v => set('adres', v)} placeholder="Açık adres" />
+              </div>
+            </div>
           </div>
+
+          {/* Bölüm 2: İş Bilgileri */}
+          <div className="form-section">
+            <div className="form-section-header">
+              <div className="form-section-icon" style={{ background: 'rgba(16,185,129,0.12)', color: '#34D399' }}>
+                <i className="ri-briefcase-line text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>İş Bilgileri</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Firma, görev ve çalışma durumu</p>
+              </div>
+            </div>
+            <div className="form-grid-2">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>Firma *</label>
+                <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer">
+                  <option value="">Firma Seçin...</option>
+                  {firmalar.filter(fi => !fi.silinmis).map(firma => <option key={firma.id} value={firma.id}>{firma.ad}</option>)}
+                </select>
+                {firmalar.filter(fi => !fi.silinmis).length === 0 && (
+                  <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#F59E0B' }}>
+                    <i className="ri-error-warning-line" /> Önce firma eklemeniz gerekmektedir.
+                  </p>
+                )}
+              </div>
+              <FS label="Çalışma Durumu" value={f('durum')} onChange={v => set('durum', v)} options={['Aktif', 'Pasif', 'Ayrıldı']} />
+              <FF label="Görev / Unvan" value={f('gorev')} onChange={v => set('gorev', v)} placeholder="Operatör, Mühendis..." />
+              <FF label="Departman" value={f('departman')} onChange={v => set('departman', v)} placeholder="Üretim, Kalite..." />
+              <FF label="İşe Giriş Tarihi" value={f('iseGirisTarihi')} onChange={v => set('iseGirisTarihi', v)} type="date" />
+            </div>
+          </div>
+
+          {/* Bölüm 3: Acil Durum */}
+          <div className="form-section">
+            <div className="form-section-header">
+              <div className="form-section-icon" style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171' }}>
+                <i className="ri-heart-pulse-line text-sm" />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Acil Durum</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Acil durumda ulaşılacak kişi bilgileri</p>
+              </div>
+            </div>
+            <div className="form-grid-2">
+              <FF label="Acil Durum Kişisi" value={f('acilKisi')} onChange={v => set('acilKisi', v)} placeholder="Yakınının adı soyadı" />
+              <FF label="Acil Durum Telefonu" value={f('acilTelefon')} onChange={v => set('acilTelefon', v)} placeholder="0555 000 00 00" />
+            </div>
+          </div>
+
         </div>
       </Modal>
 

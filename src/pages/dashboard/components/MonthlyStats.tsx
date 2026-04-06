@@ -2,7 +2,7 @@ import { useMemo, Fragment } from 'react';
 import { useApp } from '../../../store/AppContext';
 
 export default function MonthlyStats() {
-  const { personeller, egitimler, gorevler, muayeneler, theme, setActiveModule } = useApp();
+  const { personeller, egitimler, gorevler, muayeneler, uygunsuzluklar, theme, setActiveModule } = useApp();
   const isDark = theme === 'dark';
 
   const now = new Date();
@@ -61,6 +61,19 @@ export default function MonthlyStats() {
       return t >= monthStart && t <= monthEnd;
     });
 
+    // Uygunsuzluk istatistikleri
+    const acikUygunsuzluklar = uygunsuzluklar.filter(u => {
+      if (u.silinmis) return false;
+      return u.durum === 'Açık';
+    });
+
+    const kritikUygunsuzluklar = acikUygunsuzluklar.filter(u => u.oncelik === 'Kritik' || u.oncelik === 'Yüksek');
+    const buAyAcilanUygunsuzluklar = uygunsuzluklar.filter(u => {
+      if (u.silinmis) return false;
+      const t = new Date(u.olusturmaTarihi);
+      return t >= monthStart && t <= monthEnd;
+    });
+
     return {
       buAyPersonel,
       topDepts,
@@ -69,9 +82,12 @@ export default function MonthlyStats() {
       acikGorevler,
       gecikmisSayisi,
       buAyMuayene,
+      acikUygunsuzluklar,
+      kritikUygunsuzluklar,
+      buAyAcilanUygunsuzluklar,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personeller, egitimler, gorevler, muayeneler]);
+  }, [personeller, egitimler, gorevler, muayeneler, uygunsuzluklar]);
 
   const ayAdi = now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
@@ -273,19 +289,19 @@ export default function MonthlyStats() {
         )}
       </div>
 
-      {/* ── Bekleyen Görevler ── */}
+      {/* ── Uygunsuzluklar ── */}
       <div className="rounded-2xl p-5 isg-card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}
+              style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}
             >
-              <i className="ri-task-line text-base" style={{ color: '#818CF8' }} />
+              <i className="ri-alert-line text-base" style={{ color: '#EF4444' }} />
             </div>
             <div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bekleyen Görevler</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Açık &amp; devam eden</p>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Uygunsuzluklar</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Açık &amp; kritik</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -299,20 +315,20 @@ export default function MonthlyStats() {
             )}
             <span
               className="text-xl font-extrabold"
-              style={{ color: stats.acikGorevler.length > 0 ? '#818CF8' : '#34D399' }}
+              style={{ color: stats.acikUygunsuzluklar.length > 0 ? '#EF4444' : '#34D399' }}
             >
-              {stats.acikGorevler.length}
+              {stats.acikUygunsuzluklar.length}
             </span>
           </div>
         </div>
 
-        {stats.acikGorevler.length === 0 ? (
+        {stats.acikUygunsuzluklar.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-2">
             <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
-              <i className="ri-check-double-line text-lg" style={{ color: '#10B981' }} />
+              <i className="ri-shield-check-line text-lg" style={{ color: '#10B981' }} />
             </div>
             <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-              Tüm görevler tamamlandı!
+              Açık uygunsuzluk yok
             </p>
           </div>
         ) : (
@@ -321,20 +337,20 @@ export default function MonthlyStats() {
             <div className="grid grid-cols-3 gap-2">
               {[
                 {
-                  label: 'Yüksek',
-                  count: stats.acikGorevler.filter(g => g.oncelik === 'Yüksek' || g.oncelik === 'Kritik').length,
+                  label: 'Kritik',
+                  count: stats.kritikUygunsuzluklar.length,
                   color: '#EF4444',
                   bg: isDark ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.07)',
                 },
                 {
-                  label: 'Orta',
-                  count: stats.acikGorevler.filter(g => g.oncelik === 'Orta').length,
+                  label: 'Bu Ay',
+                  count: stats.buAyAcilanUygunsuzluklar.length,
                   color: '#F59E0B',
                   bg: isDark ? 'rgba(245,158,11,0.1)' : 'rgba(245,158,11,0.07)',
                 },
                 {
-                  label: 'Düşük',
-                  count: stats.acikGorevler.filter(g => g.oncelik === 'Düşük' || !g.oncelik).length,
+                  label: 'Toplam',
+                  count: stats.acikUygunsuzluklar.length,
                   color: isDark ? '#64748B' : '#94A3B8',
                   bg: isDark ? 'rgba(100,116,139,0.1)' : 'rgba(100,116,139,0.07)',
                 },
@@ -350,59 +366,59 @@ export default function MonthlyStats() {
               ))}
             </div>
 
-            {/* Son görevler */}
+            {/* Son uygunsuzluklar */}
             <div className="space-y-1.5">
-              {stats.acikGorevler.slice(0, 4).map(g => {
-                const isGecikmis = g.bitisTarihi && new Date(g.bitisTarihi) < now;
+              {stats.acikUygunsuzluklar.slice(0, 4).map(u => {
+                const isKritik = u.oncelik === 'Kritik' || u.oncelik === 'Yüksek';
                 return (
                   <div
-                    key={g.id}
+                    key={u.id}
                     className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
                     style={{
-                      background: isGecikmis ? urgentItemBg : itemBg,
-                      border: `1px solid ${isGecikmis ? urgentItemBorder : itemBorder}`,
+                      background: isKritik ? urgentItemBg : itemBg,
+                      border: `1px solid ${isKritik ? urgentItemBorder : itemBorder}`,
                     }}
                   >
                     <div
                       className="w-5 h-5 flex items-center justify-center rounded flex-shrink-0"
-                      style={{ background: isGecikmis ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.15)' }}
+                      style={{ background: isKritik ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)' }}
                     >
                       <i
-                        className="ri-checkbox-blank-circle-line text-xs"
-                        style={{ color: isGecikmis ? '#EF4444' : '#818CF8' }}
+                        className="ri-alert-line text-xs"
+                        style={{ color: isKritik ? '#EF4444' : '#F59E0B' }}
                       />
                     </div>
                     <p className="text-xs flex-1 min-w-0 truncate" style={{ color: 'var(--text-primary)' }}>
-                      {g.baslik}
+                      {u.baslik || u.aciklama?.slice(0, 30) || '—'}
                     </p>
-                    {isGecikmis && (
+                    {isKritik && (
                       <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: '#EF4444' }}>
-                        Gecikmiş
+                        Kritik
                       </span>
                     )}
                   </div>
                 );
               })}
-              {stats.acikGorevler.length > 4 && (
+              {stats.acikUygunsuzluklar.length > 4 && (
                 <p className="text-xs text-center pt-1" style={{ color: 'var(--text-muted)' }}>
-                  +{stats.acikGorevler.length - 4} görev daha
+                  +{stats.acikUygunsuzluklar.length - 4} uygunsuzluk daha
                 </p>
               )}
             </div>
 
             <button
-              onClick={() => setActiveModule('gorevler')}
+              onClick={() => setActiveModule('uygunsuzluklar')}
               className="w-full py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all"
               style={{
-                background: 'rgba(99,102,241,0.08)',
-                border: '1px solid rgba(99,102,241,0.15)',
-                color: '#818CF8',
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.15)',
+                color: '#F87171',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.14)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.14)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
             >
               <i className="ri-arrow-right-line mr-1" />
-              Görev Yönetimine Git
+              Uygunsuzluklara Git
             </button>
           </div>
         )}

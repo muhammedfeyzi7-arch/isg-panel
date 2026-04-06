@@ -518,9 +518,16 @@ export default function EgitimlerPage() {
                       <td className="hidden sm:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'}</span></td>
                       <td className="hidden lg:table-cell">
                         {hasFileError ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                            <i className="ri-error-warning-line" />Yüklenemedi
-                          </span>
+                          <button
+                            onClick={() => openEdit(eg)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg cursor-pointer whitespace-nowrap transition-all"
+                            style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
+                            title="Dosya yüklenmemiş — düzenleyerek ekleyin"
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.2)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.1)'; }}
+                          >
+                            <i className="ri-upload-2-line" />Belge Ekle
+                          </button>
                         ) : hasBelge ? (
                           <button onClick={() => handleBelgeIndir(eg)} disabled={isLoadingBelge} className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-all whitespace-nowrap disabled:opacity-50" style={{ color: '#34D399' }}
                             onMouseEnter={e => { e.currentTarget.style.opacity = '0.7'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>

@@ -153,7 +153,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           sidebarCollapsed ? 'lg:pl-[68px]' : 'lg:pl-[252px]'
         }`}
       >
-        <div className="px-4 md:px-6 py-5 max-w-[1680px]">
+        <div className="px-5 md:px-8 py-6 max-w-[1680px]">
           <div key={animKey} className="page-enter">
             {renderContent()}
           </div>

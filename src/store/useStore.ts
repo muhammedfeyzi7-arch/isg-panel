@@ -74,14 +74,19 @@ async function dbUpsert(
   userId: string,
   organizationId: string,
 ): Promise<void> {
-  const payload = {
+  const now = new Date().toISOString();
+  // Eğer kayıt silinmişse deleted_at kolonunu da set et, geri yüklendiyse null yap
+  const isSilinmis = item.silinmis === true;
+  const silinmeTarihi = typeof item.silinmeTarihi === 'string' ? item.silinmeTarihi : (isSilinmis ? now : null);
+  const payload: Record<string, unknown> = {
     id: item.id,
     user_id: userId,
     organization_id: organizationId,
     data: item,
-    updated_at: new Date().toISOString(),
+    updated_at: now,
+    deleted_at: isSilinmis ? silinmeTarihi : null,
   };
-  console.log(`[ISG] Saving ${table}/${item.id}`, { organization_id: organizationId, user_id: userId });
+  console.log(`[ISG] Saving ${table}/${item.id}`, { organization_id: organizationId, user_id: userId, deleted_at: payload.deleted_at });
   const { data, error } = await supabase.from(table).upsert(payload).select('id');
   if (error) {
     const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
@@ -270,12 +275,14 @@ export function useStore(
 
     // FIX 7: Use Promise.allSettled instead of Promise.all
     // This ensures partial failures don't wipe all data — each table loads independently
+    // deleted_at IS NULL filtresi: silinmiş kayıtları yükleme (soft-delete pattern)
     const results = await Promise.allSettled(
       TABLES.map(table =>
         supabase
           .from(table)
           .select('id, data, created_at')
           .eq('organization_id', orgId)
+          .is('deleted_at', null)
           .order('created_at', { ascending: false }),
       ),
     );
@@ -386,6 +393,7 @@ export function useStore(
         .from(table)
         .select('id, data, created_at')
         .eq('organization_id', organizationId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error || !data) return;
       const rows = data.map(r => r.data as unknown);
@@ -864,6 +872,23 @@ export function useStore(
     logFnRef.current?.('uygunsuzluk_deleted', 'Uygunsuzluklar', id, undefined, 'Uygunsuzluk silindi.');
   }, [setUygunsuzluklar, saveToDb]);
 
+  const uygunsuzluklarRef = useRef<Uygunsuzluk[]>([]);
+  useEffect(() => { uygunsuzluklarRef.current = uygunsuzluklar; }, [uygunsuzluklar]);
+
+  const permanentDeleteUygunsuzluk = useCallback(async (id: string) => {
+    const snapshot = uygunsuzluklarRef.current;
+    _setUygunsuzluklar(prev => prev.filter(u => u.id !== id));
+    try {
+      await dbDelete('uygunsuzluklar', id);
+      console.log(`[ISG] permanentDeleteUygunsuzluk OK: ${id}`);
+    } catch (err) {
+      console.error('[ISG] permanentDeleteUygunsuzluk FAILED, rolling back:', err);
+      _setUygunsuzluklar(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (uygunsuzluklar): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
+  }, []);
+
   const getUygunsuzlukPhoto = useCallback((id: string, type: 'acilis' | 'kapatma'): string | undefined => {
     const record = uygRef.current.find(u => u.id === id);
     if (record) {
@@ -1110,25 +1135,50 @@ export function useStore(
   }, [setIsIzinleri, saveToDb]);
 
   const deleteIsIzni = useCallback((id: string) => {
-    let updated: IsIzni | null = null;
-    setIsIzinleri(prev => prev.map(iz => {
-      if (iz.id !== id) return iz;
-      updated = { ...iz, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
-      return updated;
-    }));
-    if (updated) saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
+    const now = new Date().toISOString();
+    // Snapshot'tan updated kaydı bul — state setter async olduğu için önce ref'ten al
+    const current = isIzRef.current.find(iz => iz.id === id);
+    if (!current) return;
+    const updated: IsIzni = { ...current, silinmis: true as const, silinmeTarihi: now };
+    setIsIzinleri(prev => prev.map(iz => iz.id === id ? updated : iz));
+    // is_izinleri tablosu deleted_at kolonunu kullanıyor — direkt update
+    supabase
+      .from('is_izinleri')
+      .update({ deleted_at: now, data: updated, updated_at: now })
+      .eq('id', id)
+      .then(({ error }) => {
+        if (error) {
+          console.error('[ISG] deleteIsIzni DB error:', error);
+          // Rollback
+          setIsIzinleri(prev => prev.map(iz => iz.id === id ? current : iz));
+          onSaveErrorRef.current?.(`İş izni silme hatası: ${error.message}`);
+        } else {
+          console.log('[ISG] deleteIsIzni OK:', id);
+        }
+      });
     logFnRef.current?.('is_izni_deleted', 'İş İzinleri', id, undefined, 'İş izni silindi.');
-  }, [setIsIzinleri, saveToDb]);
+  }, [setIsIzinleri]);
 
   const restoreIsIzni = useCallback((id: string) => {
-    let updated: IsIzni | null = null;
-    setIsIzinleri(prev => prev.map(iz => {
-      if (iz.id !== id) return iz;
-      updated = { ...iz, silinmis: false as const, silinmeTarihi: undefined };
-      return updated;
-    }));
-    if (updated) saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
-  }, [setIsIzinleri, saveToDb]);
+    const now = new Date().toISOString();
+    const current = isIzRef.current.find(iz => iz.id === id);
+    if (!current) return;
+    const updated: IsIzni = { ...current, silinmis: false as const, silinmeTarihi: undefined };
+    setIsIzinleri(prev => prev.map(iz => iz.id === id ? updated : iz));
+    // is_izinleri tablosu deleted_at kolonunu kullanıyor — null'a çek
+    supabase
+      .from('is_izinleri')
+      .update({ deleted_at: null, data: updated, updated_at: now })
+      .eq('id', id)
+      .then(({ error }) => {
+        if (error) {
+          console.error('[ISG] restoreIsIzni DB error:', error);
+          setIsIzinleri(prev => prev.map(iz => iz.id === id ? current : iz));
+        } else {
+          console.log(`[ISG] restoreIsIzni OK: ${id}`);
+        }
+      });
+  }, [setIsIzinleri]);
 
   const isIzinleriRef2 = useRef<IsIzni[]>([]);
   useEffect(() => { isIzinleriRef2.current = isIzinleri; }, [isIzinleri]);
@@ -1208,7 +1258,7 @@ export function useStore(
     addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak,
     addEgitim, updateEgitim, deleteEgitim, restoreEgitim, permanentDeleteEgitim,
     addMuayene, updateMuayene, deleteMuayene, restoreMuayene, permanentDeleteMuayene,
-    addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, getUygunsuzlukPhoto, setUygunsuzlukPhoto,
+    addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, permanentDeleteUygunsuzluk, getUygunsuzlukPhoto, setUygunsuzlukPhoto,
     addEkipman, updateEkipman, deleteEkipman, restoreEkipman, permanentDeleteEkipman, permanentDeleteEkipmanMany,
     addGorev, updateGorev, deleteGorev,
     addTutanak, updateTutanak, deleteTutanak, restoreTutanak, permanentDeleteTutanak,

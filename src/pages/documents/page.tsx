@@ -408,10 +408,16 @@ export default function EvraklarPage() {
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
                             {!ev.dosyaUrl && ev.dosyaAdi && (
-                              <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md"
-                                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
-                                Dosya yükleniyor...
-                              </span>
+                              <button
+                                onClick={() => openEdit(ev)}
+                                className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md cursor-pointer transition-all whitespace-nowrap"
+                                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
+                                title="Dosya yüklenmemiş — düzenleyerek ekleyin"
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.22)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.12)'; }}
+                              >
+                                <i className="ri-upload-2-line mr-0.5" />Belge Ekle
+                              </button>
                             )}
                             {ev.dosyaUrl && (
                               <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md"

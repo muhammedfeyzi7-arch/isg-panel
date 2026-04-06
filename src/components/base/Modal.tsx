@@ -11,6 +11,7 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   footer?: ReactNode;
   icon?: string;
+  accentColor?: string;
 }
 
 const sizeClasses = {
@@ -20,7 +21,6 @@ const sizeClasses = {
   xl: 'max-w-5xl',
 };
 
-// Global counter to track open modals — prevents scroll unlock when nested modals close
 let openModalCount = 0;
 
 export default function Modal({
@@ -32,6 +32,7 @@ export default function Modal({
   size = 'md',
   footer,
   icon,
+  accentColor = '#6366F1',
 }: ModalProps) {
   const visible = open ?? isOpen ?? false;
   let theme: 'dark' | 'light' = 'dark';
@@ -54,7 +55,6 @@ export default function Modal({
     return () => {
       document.removeEventListener('keydown', handler, true);
       openModalCount--;
-      // Only restore scroll when ALL modals are closed
       if (openModalCount <= 0) {
         openModalCount = 0;
         document.body.style.overflow = '';
@@ -75,7 +75,7 @@ export default function Modal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '16px',
+        padding: '20px',
       }}
     >
       {/* Backdrop */}
@@ -83,9 +83,9 @@ export default function Modal({
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+          background: isDark ? 'rgba(0,0,0,0.72)' : 'rgba(15,23,42,0.45)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
           zIndex: 0,
         }}
         onClick={onClose}
@@ -99,79 +99,93 @@ export default function Modal({
           zIndex: 1,
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: 'calc(100vh - 32px)',
-          background: isDark ? 'rgba(11,16,27,0.98)' : 'rgba(255,255,255,0.99)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.12)'}`,
-          borderRadius: '20px',
+          maxHeight: 'calc(100vh - 40px)',
+          background: isDark ? '#0A0F1E' : '#FFFFFF',
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.1)'}`,
+          borderRadius: '22px',
           boxShadow: isDark
-            ? '0 40px 100px rgba(0,0,0,0.8)'
-            : '0 40px 100px rgba(0,0,0,0.15)',
+            ? `0 0 0 1px ${accentColor}18, 0 40px 100px rgba(0,0,0,0.85), 0 0 60px ${accentColor}08`
+            : `0 0 0 1px rgba(15,23,42,0.06), 0 32px 80px rgba(15,23,42,0.18)`,
+          overflow: 'hidden',
         }}
       >
+        {/* Accent top bar */}
+        <div style={{
+          height: '3px',
+          background: `linear-gradient(90deg, ${accentColor}, ${accentColor}88)`,
+          flexShrink: 0,
+        }} />
+
         {/* Header */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '16px 24px',
+            padding: '20px 28px 18px',
             flexShrink: 0,
-            borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)'}`,
-            borderRadius: '20px 20px 0 0',
+            borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             {icon && (
               <div
                 style={{
-                  width: 32,
-                  height: 32,
+                  width: 38,
+                  height: 38,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(99,102,241,0.1))',
-                  border: '1px solid rgba(99,102,241,0.2)',
+                  borderRadius: '12px',
+                  background: `linear-gradient(135deg, ${accentColor}28, ${accentColor}10)`,
+                  border: `1px solid ${accentColor}30`,
                   flexShrink: 0,
+                  boxShadow: `0 4px 12px ${accentColor}20`,
                 }}
               >
-                <i className={`${icon} text-sm`} style={{ color: '#60A5FA' }} />
+                <i className={`${icon} text-base`} style={{ color: accentColor }} />
               </div>
             )}
-            <h2
-              style={{
-                fontSize: '15px',
-                fontWeight: 700,
-                color: isDark ? '#E2E8F0' : '#0F172A',
-                margin: 0,
-              }}
-            >
-              {title}
-            </h2>
+            <div>
+              <h2
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 800,
+                  color: isDark ? '#F1F5F9' : '#0F172A',
+                  margin: 0,
+                  letterSpacing: '-0.025em',
+                  lineHeight: 1.2,
+                }}
+              >
+                {title}
+              </h2>
+            </div>
           </div>
           <button
             onClick={onClose}
             style={{
-              width: 32,
-              height: 32,
+              width: 34,
+              height: 34,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '10px',
               cursor: 'pointer',
-              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)'}`,
+              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.09)'}`,
               color: '#64748B',
               flexShrink: 0,
-              transition: 'all 0.2s ease',
+              transition: 'all 0.18s ease',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.color = isDark ? '#E2E8F0' : '#0F172A';
-              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)';
+              e.currentTarget.style.color = '#EF4444';
+              e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
+              e.currentTarget.style.borderColor = 'rgba(239,68,68,0.22)';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.color = '#64748B';
-              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)';
+              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)';
+              e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.09)';
             }}
           >
             <i className="ri-close-line" style={{ fontSize: '15px' }} />
@@ -183,7 +197,7 @@ export default function Modal({
           style={{
             flex: '1 1 auto',
             overflowY: 'auto',
-            padding: '20px 24px',
+            padding: '24px 28px',
             minHeight: 0,
             color: isDark ? '#E2E8F0' : '#0F172A',
           }}
@@ -198,12 +212,12 @@ export default function Modal({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',
-              gap: '12px',
-              padding: '16px 24px',
+              gap: '10px',
+              padding: '18px 28px',
               flexShrink: 0,
               flexWrap: 'wrap',
-              borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)'}`,
-              borderRadius: '0 0 20px 20px',
+              borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
+              background: isDark ? 'rgba(255,255,255,0.015)' : 'rgba(15,23,42,0.015)',
             }}
           >
             {footer}
