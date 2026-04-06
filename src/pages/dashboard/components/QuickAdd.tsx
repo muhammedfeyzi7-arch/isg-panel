@@ -84,14 +84,14 @@ const QUICK_ACTIONS: QuickAction[] = [
     module: 'ekipmanlar',
   },
   {
-    id: 'gorev',
-    label: 'Görev',
-    icon: 'ri-task-line',
-    description: 'Görev oluştur',
-    accentColor: '#34D399',
-    gradientFrom: '#34D399',
-    gradientTo: '#10B981',
-    module: 'gorevler',
+    id: 'kontrolform',
+    label: 'Kontrol Form',
+    icon: 'ri-folder-shield-2-line',
+    description: 'Kontrol formu yükle',
+    accentColor: '#C084FC',
+    gradientFrom: '#C084FC',
+    gradientTo: '#A855F7',
+    module: 'kontrol-formlari',
   },
 ];
 

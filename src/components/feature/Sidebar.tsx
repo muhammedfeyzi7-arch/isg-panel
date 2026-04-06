@@ -6,7 +6,7 @@ const ROLE_MODULES: Record<string, string[]> = {
   admin: [
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
-    'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
+    'uygunsuzluklar', 'ekipmanlar', 'kontrol-formlari', 'is-izinleri',
     'raporlar', 'copkutusu', 'ayarlar',
   ],
   denetci: [
@@ -16,7 +16,7 @@ const ROLE_MODULES: Record<string, string[]> = {
   member: [
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
-    'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'is-izinleri',
+    'uygunsuzluklar', 'ekipmanlar', 'kontrol-formlari', 'is-izinleri',
     'raporlar', 'copkutusu',
   ],
 };
@@ -44,7 +44,7 @@ const menuGroups = [
       { id: 'tutanaklar',      label: 'Tutanaklar',          icon: 'ri-article-line' },
       { id: 'uygunsuzluklar',  label: 'Saha Denetim',       icon: 'ri-map-pin-user-line' },
       { id: 'ekipmanlar',      label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },
-      { id: 'gorevler',        label: 'Kontrol Formları',    icon: 'ri-folder-shield-2-line' },
+      { id: 'kontrol-formlari', label: 'Kontrol Formları',    icon: 'ri-folder-shield-2-line' },
       { id: 'is-izinleri',     label: 'İş İzni Takip',      icon: 'ri-shield-keyhole-line' },
     ],
   },

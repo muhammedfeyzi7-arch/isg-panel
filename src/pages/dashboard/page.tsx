@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../../store/AppContext';
 import MonthlyStats from './components/MonthlyStats';
 import StatCard from './components/StatCard';
 import CompanyDocumentsWidget from './components/CompanyDocumentsWidget';
+import { supabase } from '../../lib/supabase';
 
 import {
   PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
@@ -20,8 +21,28 @@ function parseValidDate(dateStr: string | null | undefined): Date | null {
 export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
-    uygunsuzluklar, bildirimler, gorevler, ekipmanlar, setActiveModule,
+    uygunsuzluklar, bildirimler, ekipmanlar, setActiveModule, org,
   } = useApp();
+
+  // Kontrol Formları sayısını Supabase'den çek
+  const [acikKontrolFormu, setAcikKontrolFormu] = useState(0);
+  useEffect(() => {
+    if (!org?.id) return;
+    const today = new Date().toISOString().split('T')[0];
+    supabase
+      .from('kontrol_formlari')
+      .select('id, data')
+      .eq('organization_id', org.id)
+      .then(({ data }) => {
+        if (!data) return;
+        // Tarihi geçmiş veya yaklaşan kontrol formları
+        const count = data.filter(r => {
+          const form = r.data as { sonrakiKontrolTarihi?: string };
+          return form?.sonrakiKontrolTarihi && form.sonrakiKontrolTarihi <= today;
+        }).length;
+        setAcikKontrolFormu(count);
+      });
+  }, [org?.id]);
 
   const aktifFirmalar      = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
   const aktifPersoneller   = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);
@@ -29,7 +50,6 @@ export default function DashboardPage() {
   const aktifEgitimler     = useMemo(() => egitimler.filter(e => !e.silinmis), [egitimler]);
   const aktifMuayeneler    = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
   const aktifUygunsuzluklar= useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
-  const aktifGorevler      = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);
   const aktifEkipmanlar    = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
 
 
@@ -112,8 +132,6 @@ export default function DashboardPage() {
     }).length;
     const eksik = aktifEvraklar.filter(e => e.durum === 'Eksik' || e.durum === 'Süre Dolmuş').length;
     const acikU = aktifUygunsuzluklar.filter(u => u.durum === 'Açık').length;
-    const acikGorev = aktifGorevler.filter(g => g.durum !== 'Tamamlandı').length;
-    const gecikmiş = aktifGorevler.filter(g => g.durum !== 'Tamamlandı' && g.bitisTarihi && new Date(g.bitisTarihi) < today).length;
 
     const now = Date.now();
     const d30 = now - 30 * 86400000;
@@ -129,11 +147,11 @@ export default function DashboardPage() {
       return { pct: Math.abs(pct), dir: pct >= 0 ? 'up' as const : 'down' as const };
     };
     return {
-      yaklaşan, eksik, acikU, acikGorev, gecikmiş,
+      yaklaşan, eksik, acikU,
       firmaLast30, firmaTrend: calcTrend(firmaLast30, firmaPrev30),
       personelLast30, personelTrend: calcTrend(personelLast30, personelPrev30),
     };
-  }, [aktifEvraklar, aktifUygunsuzluklar, aktifGorevler, aktifFirmalar, aktifPersoneller]);
+  }, [aktifEvraklar, aktifUygunsuzluklar, aktifFirmalar, aktifPersoneller]);
 
   const evrakPie = useMemo(() => [
     { name: 'Yüklü',          value: aktifEvraklar.filter(e => e.durum === 'Yüklü').length },
@@ -208,9 +226,9 @@ export default function DashboardPage() {
       list.push({ icon: 'ri-alert-line', text: `${stats.acikU} açık uygunsuzluk kapatılmayı bekliyor`, color: '#F87171', bg: 'rgba(239,68,68,0.1)', priority: 80 });
     }
     
-    // Gecikmiş görevler
-    if (stats.gecikmiş > 0) {
-      list.push({ icon: 'ri-time-line', text: `${stats.gecikmiş} görev gecikmiş durumda`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 70 });
+    // Gecikmiş kontrol formları
+    if (acikKontrolFormu > 0) {
+      list.push({ icon: 'ri-folder-shield-2-line', text: `${acikKontrolFormu} kontrol formu tarihi geçti`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', priority: 70 });
     }
     
     // 7 gün içinde sona erenler - DETAYLI GÖSTERİM
@@ -253,7 +271,7 @@ export default function DashboardPage() {
     }
     
     return list.sort((a, b) => b.priority - a.priority).slice(0, 5);
-  }, [riskStats, stats]);
+  }, [riskStats, stats, acikKontrolFormu]);
 
   const isEmpty = aktifFirmalar.length === 0 && aktifPersoneller.length === 0;
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
@@ -293,10 +311,10 @@ export default function DashboardPage() {
               <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#10B981' }} />
               Sistem Aktif
             </div>
-            {stats.acikGorev > 0 && (
+            {acikKontrolFormu > 0 && (
               <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
                 style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
-                <i className="ri-task-line text-[11px]" />{stats.acikGorev} açık görev
+                <i className="ri-folder-shield-2-line text-[11px]" />{acikKontrolFormu} kontrol formu
               </div>
             )}
             {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
@@ -496,9 +514,9 @@ export default function DashboardPage() {
                       <div key={ek.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
                         style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}>
                         <i className="ri-tools-line text-[10px]" style={{ color: '#F87171' }} />
-                        <span className="text-[11px] font-medium flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</span>
+                        <span className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</span>
                         {firma && <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{firma.ad}</span>}
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap flex items-center gap-1"
                           style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>KRİTİK</span>
                       </div>
                     );

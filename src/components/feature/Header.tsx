@@ -12,7 +12,8 @@ const moduleTitles: Record<string, { label: string; icon: string }> = {
   tutanaklar:     { label: 'Tutanaklar',          icon: 'ri-article-line' },
   uygunsuzluklar: { label: 'Saha Denetim',       icon: 'ri-map-pin-user-line' },
   ekipmanlar:     { label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },
-  gorevler:       { label: 'Görevler',            icon: 'ri-task-line' },
+  gorevler:           { label: 'Kontrol Formları',   icon: 'ri-folder-shield-2-line' },
+  'kontrol-formlari': { label: 'Kontrol Formları',   icon: 'ri-folder-shield-2-line' },
   raporlar:       { label: 'Raporlar & Analiz',  icon: 'ri-bar-chart-2-line' },
   ayarlar:        { label: 'Ayarlar',             icon: 'ri-settings-4-line' },
 };
@@ -26,7 +27,7 @@ const quickCards = [
   { id: 'tutanak',     label: 'Tutanak Ekle',      desc: 'Tutanak oluştur',             icon: 'ri-article-line',        accent: '#14B8A6', primary: false, module: 'tutanaklar' },
   { id: 'sahadenetim', label: 'Saha Denetim',      desc: 'Denetim kaydı aç',            icon: 'ri-map-pin-user-line',   accent: '#FB923C', primary: false, module: 'uygunsuzluklar' },
   { id: 'ekipman',     label: 'Ekipman Kontrolü', desc: 'Kontrol kaydı oluştur',       icon: 'ri-tools-line',          accent: '#34D399', primary: false, module: 'ekipmanlar' },
-  { id: 'kontrolform', label: 'Kontrol Formları',  desc: 'Kontrol formu oluştur',       icon: 'ri-folder-shield-2-line', accent: '#C084FC', primary: false, module: 'gorevler' },
+  { id: 'kontrolform', label: 'Kontrol Formları',  desc: 'Kontrol formu oluştur',       icon: 'ri-folder-shield-2-line', accent: '#C084FC', primary: false, module: 'kontrol-formlari' },
   { id: 'isizni',      label: 'İş İzinleri',       desc: 'İş izni kaydı aç',            icon: 'ri-file-shield-2-line',  accent: '#38BDF8', primary: false, module: 'is-izinleri' },
 ];
 

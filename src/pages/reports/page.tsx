@@ -510,9 +510,20 @@ export default function RaporlarPage() {
     { label: 'Eğitim Kayıtları', value: aktifEgitimler.length, icon: 'ri-graduation-cap-line', color: '#6366F1', sub: `${aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length} tamamlandı` },
     { label: 'Açık Uygunsuzluk', value: uygunsuzlukStats.acik, icon: 'ri-alert-line', color: uygunsuzlukStats.acik > 0 ? '#EF4444' : '#10B981', sub: `${uygunsuzlukStats.kapandi} kapatıldı` },
     { label: 'Muayene Kayıtları', value: aktifMuayeneler.length, icon: 'ri-heart-pulse-line', color: '#EC4899', sub: `${aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length} uygun` },
-    { label: 'Görevler', value: aktifGorevler.length, icon: 'ri-task-line', color: '#8B5CF6', sub: `${aktifGorevler.filter(g => g.durum === 'Tamamlandı').length} tamamlandı` },
+    { label: 'Kontrol Formları', value: aktifGorevler.length, icon: 'ri-folder-shield-2-line', color: '#8B5CF6', sub: `${aktifGorevler.length} form kayıtlı` },
     { label: 'Tutanaklar', value: aktifTutanaklar.length, icon: 'ri-article-line', color: '#F97316', sub: `${aktifTutanaklar.filter(t => t.durum === 'Onaylandı').length} onaylı` },
   ];
+
+  // Özet sağlık skoru — Excel export'ta da kullanılıyor, bu yüzden export'tan önce tanımlanmalı
+  const healthScore = useMemo(() => {
+    const total = aktifEvraklar.length;
+    if (total === 0) return 100;
+    const sorunlu = evrakStats.eksik + evrakStats.sureDolmus;
+    return Math.max(0, Math.round(((total - sorunlu) / total) * 100));
+  }, [aktifEvraklar, evrakStats]);
+
+  const healthColor = healthScore >= 80 ? '#10B981' : healthScore >= 60 ? '#F59E0B' : '#EF4444';
+  const healthLabel = healthScore >= 80 ? 'İyi' : healthScore >= 60 ? 'Orta' : 'Kritik';
 
   // ── Excel Export ──
   const [exporting, setExporting] = useState(false);
@@ -752,7 +763,7 @@ export default function RaporlarPage() {
           ['#', 'Eğitim Adı', 'Tür', 'Firma', 'Eğitimci', 'Durum', 'Tarih', 'Süre', 'Katılımcı'],
           exEgitimler.map((e, i) => {
             const firma = aktifFirmalar.find(f => f.id === e.firmaId);
-            return [i+1, e.ad, e.tur||'—', firma?.ad||'—', e.egitimci||'—', e.durum, fmtDate(e.tarih), e.sure ? `${e.sure} dk` : '—', e.katilimciSayisi ?? '—'];
+            return [i+1, e.ad, (e as unknown as { tur?: string }).tur||'—', firma?.ad||'—', e.egitmen||'—', e.durum, fmtDate(e.tarih), e.sure ? `${e.sure} dk` : '—', e.katilimciIds?.length ?? '—'];
           }),
           [4, 30, 20, 24, 22, 14, 14, 10, 12],
         );
@@ -763,7 +774,7 @@ export default function RaporlarPage() {
           exMuayeneler.map((m, i) => {
             const personel = exPersoneller.find(p => p.id === m.personelId);
             const firma = aktifFirmalar.find(f => f.id === (personel?.firmaId ?? ''));
-            return [i+1, personel?.adSoyad||'—', firma?.ad||'—', m.muayeneTuru||'—', m.sonuc||'—', fmtDate(m.muayeneTarihi), fmtDate(m.sonrakiTarih), m.hekim||'—'];
+            return [i+1, personel?.adSoyad||'—', firma?.ad||'—', (m as unknown as { muayeneTuru?: string }).muayeneTuru||'—', m.sonuc||'—', fmtDate(m.muayeneTarihi), fmtDate(m.sonrakiTarih), m.doktor||'—'];
           }),
           [4, 26, 24, 20, 14, 16, 16, 22],
         );
@@ -874,17 +885,6 @@ export default function RaporlarPage() {
       }
     })();
   };
-
-  // Özet sağlık skoru
-  const healthScore = useMemo(() => {
-    const total = aktifEvraklar.length;
-    if (total === 0) return 100;
-    const sorunlu = evrakStats.eksik + evrakStats.sureDolmus;
-    return Math.max(0, Math.round(((total - sorunlu) / total) * 100));
-  }, [aktifEvraklar, evrakStats]);
-
-  const healthColor = healthScore >= 80 ? '#10B981' : healthScore >= 60 ? '#F59E0B' : '#EF4444';
-  const healthLabel = healthScore >= 80 ? 'İyi' : healthScore >= 60 ? 'Orta' : 'Kritik';
 
   const radialData = [{ name: 'Skor', value: healthScore, fill: healthColor }];
 
