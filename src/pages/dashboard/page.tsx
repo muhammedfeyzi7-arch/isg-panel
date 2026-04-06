@@ -250,43 +250,43 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
 
       {/* ── Premium Page Header ── */}
-      <div className="rounded-2xl overflow-hidden isg-card">
+      <div className="rounded-xl overflow-hidden isg-card">
         <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #6366F1, #10B981, #F59E0B, #EF4444)' }} />
-        <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 flex items-center justify-center rounded-2xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)', boxShadow: '0 8px 24px rgba(99,102,241,0.35)' }}>
-              <i className="ri-dashboard-3-line text-white text-xl" />
+        <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)', boxShadow: '0 6px 18px rgba(99,102,241,0.3)' }}>
+              <i className="ri-dashboard-3-line text-white text-base" />
             </div>
             <div>
-              <h1 className="text-[20px] font-black" style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>
+              <h1 className="text-[17px] font-black" style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>
                 Kontrol Paneli
               </h1>
-              <p className="text-[12px] mt-0.5 font-medium" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-[11px] mt-0.5 font-medium" style={{ color: 'var(--text-muted)' }}>
                 {new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold"
               style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}>
-              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
               Sistem Aktif
             </div>
             {gorevStats.gecikmiş > 0 && (
-              <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold"
                 style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
-                <i className="ri-task-line text-[11px]" />{gorevStats.gecikmiş} gecikmiş görev
+                <i className="ri-task-line text-[10px]" />{gorevStats.gecikmiş} gecikmiş görev
               </div>
             )}
 
             {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
-              <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold"
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold"
                 style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
-                <i className="ri-error-warning-line text-[11px]" />{riskStats.toplamGecikme + riskStats.uygunDegil} kritik
+                <i className="ri-error-warning-line text-[10px]" />{riskStats.toplamGecikme + riskStats.uygunDegil} kritik
               </div>
             )}
           </div>
@@ -295,15 +295,15 @@ export default function DashboardPage() {
 
       {/* ── Welcome Banner — Onboarding ── */}
       {isEmpty && (
-        <div className="rounded-2xl overflow-hidden animate-fade-in"
+        <div className="rounded-xl overflow-hidden animate-fade-in"
           style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.03))', border: '1px solid rgba(99,102,241,0.18)' }}>
-          <div className="px-5 pt-5 pb-4 flex items-start gap-4" style={{ borderBottom: '1px solid rgba(99,102,241,0.12)' }}>
-            <div className="w-11 h-11 flex items-center justify-center rounded-2xl flex-shrink-0"
+          <div className="px-4 pt-4 pb-3 flex items-start gap-3" style={{ borderBottom: '1px solid rgba(99,102,241,0.12)' }}>
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
-              <i className="ri-rocket-2-line text-white text-lg" />
+              <i className="ri-rocket-2-line text-white text-base" />
             </div>
             <div>
-              <p className="font-extrabold text-[15px]" style={{ color: 'var(--text-primary)' }}>ISG Denetim&apos;e Hoş Geldiniz!</p>
+              <p className="font-extrabold text-[14px]" style={{ color: 'var(--text-primary)' }}>ISG Denetim&apos;e Hoş Geldiniz!</p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 Sistemi 3 adımda kurabilirsiniz. Aşağıdaki adımları sırayla tamamlayın.
               </p>
@@ -318,26 +318,26 @@ export default function DashboardPage() {
               <button
                 key={item.step}
                 onClick={() => setActiveModule(item.module as Parameters<typeof setActiveModule>[0])}
-                className="flex items-start gap-3 px-5 py-4 text-left cursor-pointer transition-all group"
+                className="flex items-start gap-3 px-4 py-3 text-left cursor-pointer transition-all group"
                 style={{ background: 'transparent' }}
                 onMouseEnter={e => { e.currentTarget.style.background = `${item.color}08`; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
                 <div className="flex-shrink-0 mt-0.5">
-                  <div className="w-8 h-8 flex items-center justify-center rounded-xl"
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg"
                     style={{ background: item.bg, border: `1px solid ${item.color}30` }}>
-                    <i className={`${item.icon} text-sm`} style={{ color: item.color }} />
+                    <i className={`${item.icon} text-xs`} style={{ color: item.color }} />
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
                       style={{ background: `${item.color}18`, color: item.color }}>
                       Adım {item.step}
                     </span>
                   </div>
-                  <p className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
-                  <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>{item.desc}</p>
+                  <p className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
+                  <p className="text-[10.5px] mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>{item.desc}</p>
                 </div>
                 <i className="ri-arrow-right-s-line text-sm flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ color: item.color }} />
@@ -348,7 +348,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Ana Stat Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         {statCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -369,7 +369,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Görev + İş İzni Stat Cards ── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-2.5">
         {extraStatCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -390,33 +390,33 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Akıllı Özet + Bu Ay Özeti ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
         <AkilliOzet />
         <div className="lg:col-span-2">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-              <i className="ri-bar-chart-2-line text-white text-sm" />
+              <i className="ri-bar-chart-2-line text-white text-xs" />
             </div>
-            <h2 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
+            <h2 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
           </div>
           <MonthlyStats />
         </div>
       </div>
 
       {/* ── ISG Risk Paneli ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-2xl overflow-hidden isg-card">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="lg:col-span-2 rounded-xl overflow-hidden isg-card">
           <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #EF4444, #F87171)' }} />
-          <div className="p-5">
-            <div className="flex items-center gap-2.5 mb-5">
-              <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
                 style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}>
-                <i className="ri-shield-cross-line text-white text-sm" />
+                <i className="ri-shield-cross-line text-white text-xs" />
               </div>
-              <h3 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>İSG Risk Paneli</h3>
+              <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>İSG Risk Paneli</h3>
               {(riskStats.toplamGecikme > 0 || riskStats.uygunDegil > 0) && (
-                <span className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-full animate-pulse"
+                <span className="ml-auto text-[9.5px] font-bold px-2 py-0.5 rounded-full animate-pulse"
                   style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}>
                   {riskStats.toplamGecikme + riskStats.uygunDegil} kritik
                 </span>
@@ -424,27 +424,27 @@ export default function DashboardPage() {
             </div>
 
             {riskStats.uygunDegil > 0 && (
-              <div className="mb-5 rounded-xl p-3.5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                <div className="flex items-center gap-2 mb-2.5">
-                  <div className="w-6 h-6 flex items-center justify-center rounded-md" style={{ background: 'rgba(239,68,68,0.15)' }}>
-                    <i className="ri-error-warning-fill text-[11px]" style={{ color: '#EF4444' }} />
+              <div className="mb-4 rounded-xl p-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 flex items-center justify-center rounded-md" style={{ background: 'rgba(239,68,68,0.15)' }}>
+                    <i className="ri-error-warning-fill text-[10px]" style={{ color: '#EF4444' }} />
                   </div>
-                  <p className="text-[11px] font-bold" style={{ color: '#F87171' }}>
+                  <p className="text-[10.5px] font-bold" style={{ color: '#F87171' }}>
                     KRİTİK — {riskStats.uygunDegil} Uygunsuz Ekipman
                   </p>
-                  <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full animate-pulse"
+                  <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full animate-pulse"
                     style={{ background: 'rgba(239,68,68,0.2)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)' }}>
                     UYGUNSUZ
                   </span>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {uygunDegılEkipmanlar.map(ek => {
                     const firma = aktifFirmalar.find(f => f.id === ek.firmaId);
                     return (
-                      <div key={ek.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                      <div key={ek.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg"
                         style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}>
                         <i className="ri-tools-line text-[10px]" style={{ color: '#F87171' }} />
-                        <span className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</span>
+                        <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</span>
                         {firma && <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{firma.ad}</span>}
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap"
                           style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>KRİTİK</span>
@@ -458,44 +458,44 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <div className="mb-5">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+            <div className="mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>
                 <i className="ri-error-warning-line mr-1.5" style={{ color: '#EF4444' }} />Geciken İşlemler
               </p>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 gap-2">
                 {[
                   { label: 'Evrak', value: riskStats.gecikmisBelge,   icon: 'ri-file-damage-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
                   { label: 'Ekipman', value: riskStats.gecikmisEkipman, icon: 'ri-tools-line',        color: '#FB923C', bg: 'rgba(251,146,60,0.1)',   border: 'rgba(251,146,60,0.2)' },
                   { label: 'Muayene', value: riskStats.gecikmisMuayene, icon: 'ri-heart-pulse-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
                   { label: 'Görev', value: gorevStats.gecikmiş,         icon: 'ri-task-line',         color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.2)' },
                 ].map(item => (
-                  <div key={item.label} className="rounded-xl p-3.5 text-center"
+                  <div key={item.label} className="rounded-xl p-2.5 text-center"
                     style={{ background: item.value > 0 ? item.bg : 'var(--bg-item)', border: `1px solid ${item.value > 0 ? item.border : 'var(--bg-item-border)'}` }}>
-                    <div className="w-8 h-8 flex items-center justify-center rounded-lg mx-auto mb-2"
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg mx-auto mb-1.5"
                       style={{ background: item.value > 0 ? `${item.color}20` : 'var(--bg-item)' }}>
-                      <i className={`${item.icon} text-sm`} style={{ color: item.value > 0 ? item.color : 'var(--text-muted)' }} />
+                      <i className={`${item.icon} text-xs`} style={{ color: item.value > 0 ? item.color : 'var(--text-muted)' }} />
                     </div>
-                    <p className="text-2xl font-extrabold" style={{ color: item.value > 0 ? item.color : 'var(--text-muted)' }}>{item.value}</p>
-                    <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
+                    <p className="text-xl font-extrabold" style={{ color: item.value > 0 ? item.color : 'var(--text-muted)' }}>{item.value}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             <div>
-              <p className="text-[10.5px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>
                 <i className="ri-timer-line mr-1.5" style={{ color: '#F59E0B' }} />Yaklaşan Kritikler
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="rounded-xl p-4" style={{ background: riskStats.toplam7 > 0 ? 'rgba(245,158,11,0.07)' : 'var(--bg-item)', border: `1px solid ${riskStats.toplam7 > 0 ? 'rgba(245,158,11,0.2)' : 'var(--bg-item-border)'}` }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(245,158,11,0.12)' }}>
-                      <i className="ri-alarm-warning-line text-xs" style={{ color: '#F59E0B' }} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="rounded-xl p-3" style={{ background: riskStats.toplam7 > 0 ? 'rgba(245,158,11,0.07)' : 'var(--bg-item)', border: `1px solid ${riskStats.toplam7 > 0 ? 'rgba(245,158,11,0.2)' : 'var(--bg-item-border)'}` }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 flex items-center justify-center rounded-md" style={{ background: 'rgba(245,158,11,0.12)' }}>
+                      <i className="ri-alarm-warning-line text-[10px]" style={{ color: '#F59E0B' }} />
                     </div>
-                    <p className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>7 Gün İçinde</p>
-                    <span className="ml-auto text-[11px] font-bold" style={{ color: riskStats.toplam7 > 0 ? '#F59E0B' : 'var(--text-muted)' }}>{riskStats.toplam7}</span>
+                    <p className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>7 Gün İçinde</p>
+                    <span className="ml-auto text-[10.5px] font-bold" style={{ color: riskStats.toplam7 > 0 ? '#F59E0B' : 'var(--text-muted)' }}>{riskStats.toplam7}</span>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {[
                       { label: 'Evrak',   value: riskStats.yaklasan7Belge,   icon: 'ri-file-warning-line',  color: '#94A3B8' },
                       { label: 'Ekipman', value: riskStats.yaklasan7Ekipman, icon: 'ri-tools-line',          color: '#FB923C' },
@@ -504,23 +504,23 @@ export default function DashboardPage() {
                       <div key={r.label} className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <i className={`${r.icon} text-[10px]`} style={{ color: r.color }} />
-                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{r.label}</span>
+                          <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{r.label}</span>
                         </div>
-                        <span className="text-[11px] font-bold" style={{ color: r.value > 0 ? '#F59E0B' : 'var(--text-muted)' }}>{r.value}</span>
+                        <span className="text-[10.5px] font-bold" style={{ color: r.value > 0 ? '#F59E0B' : 'var(--text-muted)' }}>{r.value}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="rounded-xl p-4" style={{ background: riskStats.toplam30 > 0 ? 'rgba(251,191,36,0.05)' : 'var(--bg-item)', border: `1px solid ${riskStats.toplam30 > 0 ? 'rgba(251,191,36,0.15)' : 'var(--bg-item-border)'}` }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(251,191,36,0.1)' }}>
-                      <i className="ri-timer-line text-xs" style={{ color: '#FBBF24' }} />
+                <div className="rounded-xl p-3" style={{ background: riskStats.toplam30 > 0 ? 'rgba(251,191,36,0.05)' : 'var(--bg-item)', border: `1px solid ${riskStats.toplam30 > 0 ? 'rgba(251,191,36,0.15)' : 'var(--bg-item-border)'}` }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 flex items-center justify-center rounded-md" style={{ background: 'rgba(251,191,36,0.1)' }}>
+                      <i className="ri-timer-line text-[10px]" style={{ color: '#FBBF24' }} />
                     </div>
-                    <p className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>30 Gün İçinde</p>
-                    <span className="ml-auto text-[11px] font-bold" style={{ color: riskStats.toplam30 > 0 ? '#FBBF24' : 'var(--text-muted)' }}>{riskStats.toplam30}</span>
+                    <p className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>30 Gün İçinde</p>
+                    <span className="ml-auto text-[10.5px] font-bold" style={{ color: riskStats.toplam30 > 0 ? '#FBBF24' : 'var(--text-muted)' }}>{riskStats.toplam30}</span>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {[
                       { label: 'Evrak',   value: riskStats.yaklasan30Belge,   icon: 'ri-file-warning-line', color: '#94A3B8' },
                       { label: 'Ekipman', value: riskStats.yaklasan30Ekipman, icon: 'ri-tools-line',         color: '#FB923C' },
@@ -529,9 +529,9 @@ export default function DashboardPage() {
                       <div key={r.label} className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <i className={`${r.icon} text-[10px]`} style={{ color: r.color }} />
-                          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{r.label}</span>
+                          <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{r.label}</span>
                         </div>
-                        <span className="text-[11px] font-bold" style={{ color: r.value > 0 ? '#FBBF24' : 'var(--text-muted)' }}>{r.value}</span>
+                        <span className="text-[10.5px] font-bold" style={{ color: r.value > 0 ? '#FBBF24' : 'var(--text-muted)' }}>{r.value}</span>
                       </div>
                     ))}
                   </div>
@@ -541,27 +541,27 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="rounded-xl overflow-hidden isg-card">
           <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #6366F1, #8B5CF6)' }} />
-          <div className="p-5">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
                 style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
-                <i className="ri-pie-chart-2-line text-white text-sm" />
+                <i className="ri-pie-chart-2-line text-white text-xs" />
               </div>
               <div>
-                <h3 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Durumları</h3>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Toplam {aktifEvraklar.length} evrak</p>
+                <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Evrak Durumları</h3>
+                <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Toplam {aktifEvraklar.length} evrak</p>
               </div>
             </div>
             {evrakPie.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
-                  <Pie data={evrakPie} cx="50%" cy="42%" innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={4} strokeWidth={0}>
+                  <Pie data={evrakPie} cx="50%" cy="42%" innerRadius={42} outerRadius={64} dataKey="value" paddingAngle={4} strokeWidth={0}>
                     {evrakPie.map((_, index) => <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ background: 'var(--chart-tooltip-bg)', border: '1px solid var(--chart-tooltip-border)', borderRadius: '10px', color: 'var(--text-primary)', fontSize: '12px' }} itemStyle={{ color: 'var(--text-secondary)' }} />
-                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 10, color: 'var(--text-muted)' }} />
+                  <Tooltip contentStyle={{ background: 'var(--chart-tooltip-bg)', border: '1px solid var(--chart-tooltip-border)', borderRadius: '10px', color: 'var(--text-primary)', fontSize: '11px' }} itemStyle={{ color: 'var(--text-secondary)' }} />
+                  <Legend iconType="circle" iconSize={6} wrapperStyle={{ fontSize: 9, color: 'var(--text-muted)' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -569,31 +569,31 @@ export default function DashboardPage() {
             )}
 
             {riskStats.toplamGecikme > 0 && (
-              <div className="mt-4 rounded-xl p-3" style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                <p className="text-[11px] font-bold mb-2" style={{ color: '#F87171' }}>
+              <div className="mt-3 rounded-xl p-2.5" style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                <p className="text-[10.5px] font-bold mb-1.5" style={{ color: '#F87171' }}>
                   <i className="ri-error-warning-line mr-1" />Kritik Uyarılar
                 </p>
                 <div className="space-y-1">
                   {riskStats.gecikmisBelge > 0 && (
-                    <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                       <i className="ri-circle-fill text-[6px] mr-1.5" style={{ color: '#F87171' }} />
                       {riskStats.gecikmisBelge} evrak süresi dolmuş
                     </p>
                   )}
                   {riskStats.gecikmisEkipman > 0 && (
-                    <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                       <i className="ri-circle-fill text-[6px] mr-1.5" style={{ color: '#FB923C' }} />
                       {riskStats.gecikmisEkipman} ekipman kontrolü gecikti
                     </p>
                   )}
                   {riskStats.gecikmisMuayene > 0 && (
-                    <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                       <i className="ri-circle-fill text-[6px] mr-1.5" style={{ color: '#F87171' }} />
                       {riskStats.gecikmisMuayene} muayene tarihi geçti
                     </p>
                   )}
                   {gorevStats.gecikmiş > 0 && (
-                    <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                       <i className="ri-circle-fill text-[6px] mr-1.5" style={{ color: '#FBBF24' }} />
                       {gorevStats.gecikmiş} görev gecikmiş
                     </p>
@@ -607,33 +607,33 @@ export default function DashboardPage() {
 
       {/* ── Açık Uygunsuzluklar ── */}
       {acikUygunsuzluklar.length > 0 && (
-        <div className="rounded-2xl overflow-hidden isg-card" style={{ borderLeft: '3px solid #EF4444' }}>
-          <div className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 flex items-center justify-center rounded-lg" style={{ background: 'rgba(239,68,68,0.12)' }}>
-                  <i className="ri-alert-fill text-sm" style={{ color: '#EF4444' }} />
+        <div className="rounded-xl overflow-hidden isg-card" style={{ borderLeft: '3px solid #EF4444' }}>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(239,68,68,0.12)' }}>
+                  <i className="ri-alert-fill text-xs" style={{ color: '#EF4444' }} />
                 </div>
                 <div>
-                  <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Açık Uygunsuzluklar</h3>
-                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Kapatılmayı bekleyen kayıtlar</p>
+                  <h3 className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>Açık Uygunsuzluklar</h3>
+                  <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>Kapatılmayı bekleyen kayıtlar</p>
                 </div>
               </div>
-              <button onClick={() => setActiveModule('uygunsuzluklar')} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+              <button onClick={() => setActiveModule('uygunsuzluklar')} className="text-[10.5px] font-semibold px-2 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
                 style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.15)' }}>
                 Modüle Git
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
               {acikUygunsuzluklar.map(u => {
                 const firma = aktifFirmalar.find(f => f.id === u.firmaId);
                 return (
-                  <div key={u.id} className="rounded-lg p-3" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
-                    <div className="flex items-center gap-1.5 mb-1.5">
+                  <div key={u.id} className="rounded-lg p-2.5" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
+                    <div className="flex items-center gap-1.5 mb-1">
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171' }}>{u.acilisNo ?? 'DÖF'}</span>
                       <span className="text-[9px] ml-auto" style={{ color: 'var(--text-muted)' }}>{new Date(u.olusturmaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}</span>
                     </div>
-                    <p className="text-[11.5px] font-semibold line-clamp-2 mb-1" style={{ color: 'var(--text-primary)' }}>{u.baslik || u.aciklama?.slice(0, 40) || '—'}</p>
+                    <p className="text-[11px] font-semibold line-clamp-2 mb-1" style={{ color: 'var(--text-primary)' }}>{u.baslik || u.aciklama?.slice(0, 40) || '—'}</p>
                     {firma && <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}><i className="ri-building-2-line mr-1" />{firma.ad}</p>}
                   </div>
                 );
@@ -644,22 +644,22 @@ export default function DashboardPage() {
       )}
 
       {/* ── Yaklaşan Süreler + Son Aktiviteler ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-2xl overflow-hidden isg-card">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="rounded-xl overflow-hidden isg-card">
           <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #F59E0B, #FBBF24)' }} />
-          <div className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}>
-                  <i className="ri-time-line text-white text-sm" />
+                  <i className="ri-time-line text-white text-xs" />
                 </div>
                 <div>
-                  <h3 className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Süreler</h3>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Önümüzdeki 60 gün</p>
+                  <h3 className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Süreler</h3>
+                  <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Önümüzdeki 60 gün</p>
                 </div>
               </div>
-              <span className="flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full"
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
                 style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
                 <i className="ri-time-line text-[10px]" />{yaklaşanEvraklar.length + yaklaşanEkipmanlar.length} kayıt
               </span>
@@ -672,39 +672,39 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="rounded-xl overflow-hidden isg-card">
           <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
-          <div className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                  <i className="ri-history-line text-white text-sm" />
+                  <i className="ri-history-line text-white text-xs" />
                 </div>
                 <div>
-                  <h3 className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>Son Aktiviteler</h3>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>En son eklenen kayıtlar</p>
+                  <h3 className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>Son Aktiviteler</h3>
+                  <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>En son eklenen kayıtlar</p>
                 </div>
               </div>
             </div>
             {recentItems.length === 0 ? (
               <DashEmptyState icon="ri-time-line" text="Henüz aktivite yok" subtext="Kayıt ekledikçe burada görünecek" />
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {recentItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5"
+                  <div key={idx} className="flex items-center gap-2 rounded-lg px-2.5 py-2"
                     style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                    <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+                    <div className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0"
                       style={{ background: `${item.color}15`, border: `1px solid ${item.color}20` }}>
-                      <i className={`${item.icon} text-xs`} style={{ color: item.color }} />
+                      <i className={`${item.icon} text-[10px]`} style={{ color: item.color }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{item.ad}</p>
-                      <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{new Date(item.tarih).toLocaleDateString('tr-TR')}</p>
+                      <p className="text-[11.5px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{item.ad}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{new Date(item.tarih).toLocaleDateString('tr-TR')}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${item.color}12`, color: item.color }}>{item.tip}</span>
-                      <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: item.badgeBg, color: item.badgeColor }}>{item.badge}</span>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${item.color}12`, color: item.color }}>{item.tip}</span>
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: item.badgeBg, color: item.badgeColor }}>{item.badge}</span>
                     </div>
                   </div>
                 ))}
@@ -721,7 +721,7 @@ export default function DashboardPage() {
       <CompanyDocumentsWidget />
 
       {/* ── Progress Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         {[
           { label: 'Aktif Firmalar',        value: aktifFirmalar.filter(f => f.durum === 'Aktif').length,         total: aktifFirmalar.length,    color: '#3B82F6', icon: 'ri-building-2-line',     accent: 'linear-gradient(135deg, #3B82F6, #6366F1)' },
           { label: 'Aktif Personeller',     value: aktifPersoneller.filter(p => p.durum === 'Aktif').length,      total: aktifPersoneller.length, color: '#10B981', icon: 'ri-team-line',           accent: 'linear-gradient(135deg, #10B981, #059669)' },
@@ -732,19 +732,19 @@ export default function DashboardPage() {
           return (
             <div key={item.label} className="rounded-xl overflow-hidden isg-card">
               <div className="h-[2px]" style={{ background: item.accent }} />
-              <div className="p-3.5">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+              <div className="p-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0"
                     style={{ background: `${item.color}15` }}>
-                    <i className={`${item.icon} text-[12px]`} style={{ color: item.color }} />
+                    <i className={`${item.icon} text-[11px]`} style={{ color: item.color }} />
                   </div>
-                  <span className="text-[11px] font-bold" style={{ color: item.color }}>{pct}%</span>
+                  <span className="text-[10.5px] font-bold" style={{ color: item.color }}>{pct}%</span>
                 </div>
-                <p className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                <p className="text-xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
                   {item.value}<span className="text-xs font-normal ml-1" style={{ color: 'var(--text-muted)' }}>/ {item.total}</span>
                 </p>
-                <p className="text-[10.5px] mt-0.5 mb-2" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-item)' }}>
+                <p className="text-[10px] mt-0.5 mb-1.5" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--bg-item)' }}>
                   <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: item.accent }} />
                 </div>
               </div>
@@ -803,21 +803,21 @@ function UpcomingTabs({
         evraklar.length === 0 ? (
           <div className="py-6 text-center"><i className="ri-check-double-line text-xl" style={{ color: '#34D399' }} /><p className="text-[11px] mt-1 font-medium" style={{ color: '#34D399' }}>Yaklaşan evrak yok</p></div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {evraklar.map(ev => {
               const d = new Date(ev.gecerlilikTarihi!); d.setHours(0, 0, 0, 0);
               const days = Math.ceil((d.getTime() - today.getTime()) / 86400000);
               const isUrgent = days <= 15;
               return (
-                <div key={ev.id} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)' }}>
+                <div key={ev.id} className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                  <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)' }}>
                     <i className="ri-file-warning-line text-xs" style={{ color: isUrgent ? '#EF4444' : '#F59E0B' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
-                    <p className="text-[10.5px] truncate" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
+                    <p className="text-[11.5px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
+                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1"
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1"
                     style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', color: isUrgent ? '#F87171' : '#FCD34D' }}>
                     <i className="ri-timer-line" />{days === 0 ? 'Bugün!' : `${days}g`}
                   </span>
@@ -832,22 +832,22 @@ function UpcomingTabs({
         ekipmanlar.length === 0 ? (
           <div className="py-6 text-center"><i className="ri-check-double-line text-xl" style={{ color: '#34D399' }} /><p className="text-[11px] mt-1 font-medium" style={{ color: '#34D399' }}>Yaklaşan ekipman kontrolü yok</p></div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {ekipmanlar.map(ek => {
               const d = new Date(ek.sonrakiKontrolTarihi); d.setHours(0, 0, 0, 0);
               const days = Math.ceil((d.getTime() - today.getTime()) / 86400000);
               const isUrgent = days <= 15;
               const firma = firmalar.find(f => f.id === ek.firmaId);
               return (
-                <div key={ek.id} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)' }}>
+                <div key={ek.id} className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                  <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)' }}>
                     <i className="ri-tools-line text-xs" style={{ color: isUrgent ? '#EF4444' : '#60A5FA' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</p>
-                    <p className="text-[10.5px] truncate" style={{ color: 'var(--text-muted)' }}>{ek.tur}{firma ? ` · ${firma.ad}` : ''}</p>
+                    <p className="text-[11.5px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</p>
+                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{ek.tur}{firma ? ` · ${firma.ad}` : ''}</p>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1"
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1"
                     style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)', color: isUrgent ? '#F87171' : '#93C5FD' }}>
                     <i className="ri-timer-line" />{days === 0 ? 'Bugün!' : `${days}g`}
                   </span>

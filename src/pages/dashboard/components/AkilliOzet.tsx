@@ -289,43 +289,43 @@ export default function AkilliOzet() {
   };
 
   return (
-    <div className="rounded-2xl overflow-hidden isg-card h-full flex flex-col">
+    <div className="rounded-xl overflow-hidden isg-card h-full flex flex-col">
       <div className="h-[2px]" style={{ background: `linear-gradient(90deg, ${scoreColor}, ${scoreColor}80)` }} />
 
       {/* Header */}
-      <div className="px-5 pt-4 pb-3" style={{ borderBottom: '1px solid var(--bg-item-border)' }}>
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+      <div className="px-4 pt-3 pb-2.5" style={{ borderBottom: '1px solid var(--bg-item-border)' }}>
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
-            <i className="ri-brain-line text-white text-sm" />
+            <i className="ri-brain-line text-white text-xs" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Akıllı Özet</h2>
-            <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>Sistem durumu analizi</p>
+            <h2 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Akıllı Özet</h2>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Sistem durumu analizi</p>
           </div>
           {/* Sağlık Skoru */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl flex-shrink-0"
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg flex-shrink-0"
             style={{ background: scoreBg, border: `1px solid ${scoreColor}30` }}>
-            <div className="relative w-8 h-8 flex-shrink-0">
-              <svg className="w-8 h-8 -rotate-90" viewBox="0 0 32 32">
+            <div className="relative w-7 h-7 flex-shrink-0">
+              <svg className="w-7 h-7 -rotate-90" viewBox="0 0 32 32">
                 <circle cx="16" cy="16" r="12" fill="none" stroke="var(--bg-item)" strokeWidth="3" />
                 <circle cx="16" cy="16" r="12" fill="none" stroke={scoreColor} strokeWidth="3"
                   strokeDasharray={`${(healthScore / 100) * 75.4} 75.4`}
                   strokeLinecap="round" />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black" style={{ color: scoreColor }}>
+              <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black" style={{ color: scoreColor }}>
                 {healthScore}
               </span>
             </div>
             <div>
-              <p className="text-[11px] font-black" style={{ color: scoreColor }}>{scoreLabel}</p>
-              <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Sağlık Skoru</p>
+              <p className="text-[10.5px] font-black" style={{ color: scoreColor }}>{scoreLabel}</p>
+              <p className="text-[8.5px]" style={{ color: 'var(--text-muted)' }}>Sağlık Skoru</p>
             </div>
           </div>
         </div>
 
         {/* Özet sayaçlar */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           {[
             { label: 'Kritik', count: criticalItems.length, ...levelConfig.critical },
             { label: 'Uyarı',  count: warningItems.length,  ...levelConfig.warning },
@@ -334,14 +334,14 @@ export default function AkilliOzet() {
             <button
               key={item.label}
               onClick={() => setActiveFilter(activeFilter === item.label.toLowerCase() as typeof activeFilter ? 'all' : item.label.toLowerCase() as typeof activeFilter)}
-              className="rounded-lg p-2 text-center cursor-pointer transition-all"
+              className="rounded-lg p-1.5 text-center cursor-pointer transition-all"
               style={{
                 background: activeFilter === item.label.toLowerCase() ? item.bg : 'var(--bg-item)',
                 border: `1px solid ${activeFilter === item.label.toLowerCase() ? item.border : 'var(--bg-item-border)'}`,
               }}
             >
-              <p className="text-[16px] font-black" style={{ color: item.count > 0 ? item.color : 'var(--text-muted)' }}>{item.count}</p>
-              <p className="text-[9.5px] font-semibold" style={{ color: item.count > 0 ? item.color : 'var(--text-muted)' }}>{item.label}</p>
+              <p className="text-[14px] font-black" style={{ color: item.count > 0 ? item.color : 'var(--text-muted)' }}>{item.count}</p>
+              <p className="text-[9px] font-semibold" style={{ color: item.count > 0 ? item.color : 'var(--text-muted)' }}>{item.label}</p>
             </button>
           ))}
         </div>
@@ -349,8 +349,8 @@ export default function AkilliOzet() {
 
       {/* Filtre tab */}
       {activeFilter !== 'all' && (
-        <div className="px-5 pt-3 pb-0">
-          <div className="flex items-center gap-1.5 text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+        <div className="px-4 pt-2.5 pb-0">
+          <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
             <i className="ri-filter-3-line" />
             <span>Filtre:</span>
             <span className="font-bold" style={{ color: levelConfig[activeFilter as keyof typeof levelConfig]?.color }}>
@@ -365,73 +365,73 @@ export default function AkilliOzet() {
       )}
 
       {/* İnsight listesi */}
-      <div className="flex-1 overflow-y-auto p-5 pt-3 space-y-2" style={{ maxHeight: '420px' }}>
+      <div className="flex-1 overflow-y-auto p-4 pt-2.5 space-y-1.5" style={{ maxHeight: '380px' }}>
         {filteredInsights.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 gap-2">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl"
+          <div className="flex flex-col items-center justify-center py-6 gap-2">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl"
               style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
-              <i className="ri-checkbox-circle-line text-lg" style={{ color: '#34D399' }} />
+              <i className="ri-checkbox-circle-line text-base" style={{ color: '#34D399' }} />
             </div>
-            <p className="text-[12px] font-semibold" style={{ color: '#34D399' }}>Bu kategoride sorun yok</p>
+            <p className="text-[11.5px] font-semibold" style={{ color: '#34D399' }}>Bu kategoride sorun yok</p>
           </div>
         ) : (
           filteredInsights.map(insight => {
             const cfg = levelConfig[insight.level];
             const isOpen = expanded === insight.id;
             return (
-              <div key={insight.id} className="rounded-xl overflow-hidden transition-all"
+              <div key={insight.id} className="rounded-lg overflow-hidden transition-all"
                 style={{ background: insight.bg, border: `1px solid ${insight.border}` }}>
                 <button
-                  className="w-full flex items-start gap-2.5 px-3 py-2.5 cursor-pointer text-left"
+                  className="w-full flex items-start gap-2 px-2.5 py-2 cursor-pointer text-left"
                   onClick={() => setExpanded(isOpen ? null : insight.id)}
                 >
                   {/* Level badge */}
-                  <div className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0 mt-0.5"
+                  <div className="w-5 h-5 flex items-center justify-center rounded-md flex-shrink-0 mt-0.5"
                     style={{ background: `${insight.color}18` }}>
-                    <i className={`${insight.icon} text-[10px]`} style={{ color: insight.color }} />
+                    <i className={`${insight.icon} text-[9px]`} style={{ color: insight.color }} />
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-md"
                         style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
                         {cfg.label}
                       </span>
                       {insight.count !== undefined && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-md"
                           style={{ background: `${insight.color}15`, color: insight.color }}>
                           {insight.count}
                         </span>
                       )}
                     </div>
-                    <p className="text-[12px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
                       {insight.title}
                     </p>
                     {!isOpen && (
-                      <p className="text-[10.5px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                      <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
                         {insight.detail}
                       </p>
                     )}
                   </div>
 
                   {isOpen
-                    ? <i className="ri-arrow-up-s-line text-sm flex-shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
-                    : <i className="ri-arrow-down-s-line text-sm flex-shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
+                    ? <i className="ri-arrow-up-s-line text-xs flex-shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
+                    : <i className="ri-arrow-down-s-line text-xs flex-shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
                   }
                 </button>
 
                 {/* Expanded detail */}
                 {isOpen && (
-                  <div className="px-3 pb-3">
-                    <p className="text-[11px] mb-2.5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  <div className="px-2.5 pb-2.5">
+                    <p className="text-[10.5px] mb-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                       {insight.detail}
                     </p>
                     {insight.subItems && insight.subItems.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-2.5">
+                      <div className="flex flex-wrap gap-1 mb-2">
                         {insight.subItems.map((sub, idx) => (
-                          <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium"
+                          <div key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-medium"
                             style={{ background: `${sub.color}15`, border: `1px solid ${sub.color}25`, color: sub.color }}>
-                            <i className={`${sub.icon} text-[9px]`} />
+                            <i className={`${sub.icon} text-[8px]`} />
                             <span>{sub.count} {sub.text}</span>
                           </div>
                         ))}
@@ -440,10 +440,10 @@ export default function AkilliOzet() {
                     {insight.module && (
                       <button
                         onClick={() => setActiveModule(insight.module as Parameters<typeof setActiveModule>[0])}
-                        className="flex items-center gap-1.5 text-[10.5px] font-bold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap transition-all"
+                        className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap transition-all"
                         style={{ background: `${insight.color}15`, color: insight.color, border: `1px solid ${insight.color}25` }}
                       >
-                        <i className="ri-arrow-right-up-line text-[10px]" />
+                        <i className="ri-arrow-right-up-line text-[9px]" />
                         Modüle Git
                       </button>
                     )}
@@ -456,15 +456,15 @@ export default function AkilliOzet() {
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3" style={{ borderTop: '1px solid var(--bg-item-border)' }}>
+      <div className="px-4 py-2.5" style={{ borderTop: '1px solid var(--bg-item-border)' }}>
         <div className="flex items-center justify-between">
-          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>
             <i className="ri-refresh-line mr-1" />
             Gerçek zamanlı güncelleniyor
           </p>
           <div className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: scoreColor }} />
-            <span className="text-[10px] font-semibold" style={{ color: scoreColor }}>{scoreLabel}</span>
+            <span className="text-[9.5px] font-semibold" style={{ color: scoreColor }}>{scoreLabel}</span>
           </div>
         </div>
       </div>

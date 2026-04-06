@@ -127,32 +127,32 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
     <aside
       className={`
         fixed left-0 top-0 h-screen flex flex-col z-40
-        ${collapsed ? 'w-[68px]' : 'w-[252px]'}
+        ${collapsed ? 'w-[56px]' : 'w-[220px]'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}
       style={{
         background: sidebarBg,
         borderRight: sidebarBorder,
         transition: 'width 0.26s cubic-bezier(0.4,0,0.2,1), transform 0.26s cubic-bezier(0.4,0,0.2,1)',
-        maxWidth: '300px',
+        maxWidth: '260px',
       }}
     >
       {/* ── Logo ── */}
       <div
-        className={`flex items-center ${collapsed ? 'justify-center px-3' : 'px-4 gap-2.5'}`}
+        className={`flex items-center ${collapsed ? 'justify-center px-2' : 'px-3.5 gap-2'}`}
         style={{
           borderBottom: logoBorderBottom,
-          height: '60px',
-          minHeight: '60px',
+          height: '52px',
+          minHeight: '52px',
           flexShrink: 0,
         }}
       >
         <div
           className="flex items-center justify-center flex-shrink-0"
           style={{
-            width: '30px',
-            height: '30px',
-            borderRadius: '9px',
+            width: '26px',
+            height: '26px',
+            borderRadius: '8px',
             background: dark
               ? 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(99,102,241,0.1))'
               : 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.06))',
@@ -163,7 +163,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
             src="https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518"
             alt="ISG Logo"
             style={{
-              height: '18px',
+              height: '15px',
               width: 'auto',
               objectFit: 'contain',
               display: 'block',
@@ -176,13 +176,13 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <p
-              className="text-[13px] font-bold leading-tight truncate"
+              className="text-[12px] font-bold leading-tight truncate"
               style={{ color: logoTitleColor, letterSpacing: '-0.02em' }}
             >
               ISG Denetim
             </p>
             <p
-              className="text-[10px] mt-0.5 font-semibold truncate"
+              className="text-[9px] mt-0.5 font-semibold truncate"
               style={{ color: logoSubColor, letterSpacing: '0.01em' }}
             >
               Yönetim Sistemi
@@ -192,19 +192,19 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
       </div>
 
       {/* ── Navigation ── */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+      <nav className="flex-1 overflow-y-auto py-2 px-1.5 space-y-3">
         {filteredGroups.map(group => (
           <div key={group.label}>
             {!collapsed && (
               <p
-                className="text-[9px] font-bold uppercase px-2.5 mb-1.5 select-none tracking-[0.14em]"
+                className="text-[8.5px] font-bold uppercase px-2 mb-1 select-none tracking-[0.14em]"
                 style={{ color: groupLabelColor }}
               >
                 {group.label}
               </p>
             )}
             {collapsed && (
-              <div className="h-px mx-2 mb-2.5" style={{ background: groupDividerBg }} />
+              <div className="h-px mx-1.5 mb-2" style={{ background: groupDividerBg }} />
             )}
 
             <ul className="space-y-0.5">
@@ -228,10 +228,10 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                       id={`sidebar-${item.id}`}
                       onClick={() => { setActiveModule(item.id); onMobileClose?.(); }}
                       title={collapsed ? item.label : ''}
-                      className="w-full flex items-center gap-2.5 text-left cursor-pointer relative"
+                      className="w-full flex items-center gap-2 text-left cursor-pointer relative"
                       style={{
-                        padding: collapsed ? '9px 0' : '8px 10px',
-                        borderRadius: '10px',
+                        padding: collapsed ? '7px 0' : '6.5px 8px',
+                        borderRadius: '8px',
                         justifyContent: collapsed ? 'center' : undefined,
                         background: isActive ? activeBg : 'transparent',
                         border: isActive
@@ -269,21 +269,21 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                       <span
                         className="flex items-center justify-center flex-shrink-0"
                         style={{
-                          width: '18px',
-                          height: '18px',
+                          width: '16px',
+                          height: '16px',
                           color: isActive ? activeIconColor : inactiveIconColor,
                           transition: 'color 0.15s ease',
-                          marginLeft: isActive && !collapsed ? '6px' : undefined,
+                          marginLeft: isActive && !collapsed ? '5px' : undefined,
                         }}
                       >
-                        <i className={`${item.icon} text-[14.5px]`} />
+                        <i className={`${item.icon} text-[13px]`} />
                       </span>
 
                       {/* Label + badge */}
                       {!collapsed && (
                         <>
                           <span
-                            className="text-[12.5px] flex-1 leading-none truncate"
+                            className="text-[11.5px] flex-1 leading-none truncate"
                             style={{
                               color: isActive ? activeTextColor : inactiveTextColor,
                               fontWeight: isActive ? 600 : 500,
@@ -294,7 +294,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                           </span>
                           {badge != null && badge > 0 && (
                             <span
-                              className="text-[9px] font-bold text-white rounded-full min-w-[17px] h-[17px] flex items-center justify-center px-1 flex-shrink-0"
+                              className="text-[8.5px] font-bold text-white rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-1 flex-shrink-0"
                               style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}
                             >
                               {badge > 9 ? '9+' : badge}
@@ -321,9 +321,9 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
 
       {/* ── Mini Stats ── */}
       {!collapsed && (
-        <div className="px-2.5 pb-2">
+        <div className="px-2 pb-1.5">
           <div
-            className="rounded-xl p-3 flex gap-0"
+            className="rounded-lg p-2.5 flex gap-0"
             style={{ background: statsBg, border: statsBorder }}
           >
             {[
@@ -333,11 +333,11 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
             ].map((stat, i) => (
               <Fragment key={stat.label}>
                 {i > 0 && (
-                  <div className="w-px self-stretch mx-2" style={{ background: statsDivider }} />
+                  <div className="w-px self-stretch mx-1.5" style={{ background: statsDivider }} />
                 )}
                 <div className="flex-1 text-center">
-                  <p className="text-[13px] font-bold leading-none" style={{ color: stat.color }}>{stat.value}</p>
-                  <p className="text-[9px] font-semibold mt-1" style={{ color: statsLabelColor }}>{stat.label}</p>
+                  <p className="text-[12px] font-bold leading-none" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="text-[8.5px] font-semibold mt-0.5" style={{ color: statsLabelColor }}>{stat.label}</p>
                 </div>
               </Fragment>
             ))}
@@ -346,11 +346,11 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
       )}
 
       {/* ── Support Button ── */}
-      <div className="px-2.5 pb-2">
+      <div className="px-2 pb-1.5">
         <button
           onClick={() => setSupportOpen(true)}
           title={collapsed ? 'Destek / Sorun Bildir' : ''}
-          className={`w-full flex items-center cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2'}`}
+          className={`w-full flex items-center cursor-pointer rounded-lg transition-all duration-150 ${collapsed ? 'justify-center p-1.5' : 'gap-2 px-2.5 py-1.5'}`}
           style={{
             background: dark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.06)',
             border: '1px solid rgba(16,185,129,0.18)',
@@ -364,11 +364,11 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
             e.currentTarget.style.borderColor = 'rgba(16,185,129,0.18)';
           }}
         >
-          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-            <i className="ri-customer-service-2-line text-sm" style={{ color: '#10B981' }} />
+          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+            <i className="ri-customer-service-2-line text-xs" style={{ color: '#10B981' }} />
           </div>
           {!collapsed && (
-            <span className="text-[12px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>
+            <span className="text-[11px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>
               Destek
             </span>
           )}
@@ -380,7 +380,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
 
       {/* ── Profile ── */}
       <div
-        className={`mx-2.5 mb-3 rounded-xl flex items-center gap-2.5 cursor-pointer ${collapsed ? 'justify-center p-2' : 'px-3 py-2.5'}`}
+        className={`mx-2 mb-2.5 rounded-lg flex items-center gap-2 cursor-pointer ${collapsed ? 'justify-center p-1.5' : 'px-2.5 py-2'}`}
         style={{
           background: profileBg,
           border: profileBorder,
@@ -403,7 +403,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
       >
         {/* Avatar */}
         <div
-          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
+          className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
           style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}
         >
           {(currentUser.ad || 'U').charAt(0).toUpperCase()}
@@ -413,7 +413,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
           <>
             <div className="flex-1 min-w-0">
               <p
-                className="text-[12px] font-semibold truncate leading-tight"
+                className="text-[11px] font-semibold truncate leading-tight"
                 style={{ color: profileNameColor }}
               >
                 {currentUser.ad || 'Kullanıcı'}
@@ -423,7 +423,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                   className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ background: roleInfo.dot }}
                 />
-                <p className="text-[10px] font-semibold truncate" style={{ color: roleInfo.color }}>
+                <p className="text-[9px] font-semibold truncate" style={{ color: roleInfo.color }}>
                   {roleInfo.label}
                 </p>
               </div>
@@ -431,7 +431,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
             <button
               onClick={logout}
               title="Çıkış Yap"
-              className="flex items-center justify-center cursor-pointer rounded-lg w-6 h-6 flex-shrink-0"
+              className="flex items-center justify-center cursor-pointer rounded-md w-5 h-5 flex-shrink-0"
               style={{
                 color: logoutColor,
                 background: 'transparent',
@@ -447,7 +447,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                 e.currentTarget.style.background = 'transparent';
               }}
             >
-              <i className="ri-logout-box-r-line text-sm" />
+              <i className="ri-logout-box-r-line text-xs" />
             </button>
           </>
         )}

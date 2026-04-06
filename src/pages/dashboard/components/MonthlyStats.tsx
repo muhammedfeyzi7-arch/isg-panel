@@ -92,61 +92,61 @@ export default function MonthlyStats() {
   const ayAdi = now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
       {/* ── Bu Ay Personel ── */}
-      <div className="rounded-2xl p-5 isg-card">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+      <div className="rounded-xl p-4 isg-card">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
             <div
-              className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
               style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}
             >
-              <i className="ri-user-add-line text-base" style={{ color: '#10B981' }} />
+              <i className="ri-user-add-line text-sm" style={{ color: '#10B981' }} />
             </div>
             <div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Personel</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{ayAdi}</p>
+              <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Personel</h3>
+              <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{ayAdi}</p>
             </div>
           </div>
-          <span className="text-2xl font-extrabold" style={{ color: '#34D399' }}>
+          <span className="text-xl font-extrabold" style={{ color: '#34D399' }}>
             {stats.buAyPersonel.length}
           </span>
         </div>
 
         {stats.buAyPersonel.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 gap-2">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
-              <i className="ri-user-line text-lg" style={{ color: 'rgba(16,185,129,0.4)' }} />
+          <div className="flex flex-col items-center justify-center py-5 gap-2">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
+              <i className="ri-user-line text-base" style={{ color: 'rgba(16,185,129,0.4)' }} />
             </div>
-            <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[11px] text-center" style={{ color: 'var(--text-muted)' }}>
               Bu ay henüz personel eklenmedi
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
+          <div className="space-y-2.5">
+            <div className="space-y-1">
               {stats.buAyPersonel.slice(0, 4).map(p => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
                   style={{ background: itemBg, border: `1px solid ${itemBorder}` }}
                 >
                   <div
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
                     style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
                   >
                     {p.adSoyad.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                       {p.adSoyad}
                     </p>
-                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-[9.5px] truncate" style={{ color: 'var(--text-muted)' }}>
                       {p.gorev || p.departman || '—'}
                     </p>
                   </div>
                   <span
-                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                    className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                     style={{
                       background: p.durum === 'Aktif' ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.12)',
                       color: p.durum === 'Aktif' ? '#34D399' : '#94A3B8',
@@ -157,7 +157,7 @@ export default function MonthlyStats() {
                 </div>
               ))}
               {stats.buAyPersonel.length > 4 && (
-                <p className="text-xs text-center pt-1" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-[10.5px] text-center pt-0.5" style={{ color: 'var(--text-muted)' }}>
                   +{stats.buAyPersonel.length - 4} personel daha
                 </p>
               )}
@@ -165,16 +165,16 @@ export default function MonthlyStats() {
 
             {stats.topDepts.length > 0 && (
               <div
-                className="px-3 py-2.5 rounded-xl space-y-1.5"
+                className="px-2.5 py-2 rounded-lg space-y-1"
                 style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.1)' }}
               >
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#34D399' }}>
+                <p className="text-[9.5px] font-bold uppercase tracking-wider" style={{ color: '#34D399' }}>
                   Departman Dağılımı
                 </p>
                 {stats.topDepts.map(([dept, count]) => (
                   <div key={dept} className="flex items-center justify-between">
-                    <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{dept}</span>
-                    <span className="text-xs font-bold" style={{ color: '#34D399' }}>{count}</span>
+                    <span className="text-[10.5px] truncate" style={{ color: 'var(--text-muted)' }}>{dept}</span>
+                    <span className="text-[10.5px] font-bold" style={{ color: '#34D399' }}>{count}</span>
                   </div>
                 ))}
               </div>
@@ -184,24 +184,24 @@ export default function MonthlyStats() {
       </div>
 
       {/* ── Yaklaşan Eğitimler ── */}
-      <div className="rounded-2xl p-5 isg-card">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+      <div className="rounded-xl p-4 isg-card">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
             <div
-              className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
               style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' }}
             >
-              <i className="ri-graduation-cap-line text-base" style={{ color: '#F59E0B' }} />
+              <i className="ri-graduation-cap-line text-sm" style={{ color: '#F59E0B' }} />
             </div>
             <div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Eğitimler</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Sonraki 30 gün</p>
+              <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Eğitimler</h3>
+              <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Sonraki 30 gün</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {stats.acilEgitimler > 0 && (
               <span
-                className="text-[10px] font-bold px-2 py-1 rounded-full"
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                 style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}
               >
                 {stats.acilEgitimler} acil
@@ -214,16 +214,16 @@ export default function MonthlyStats() {
         </div>
 
         {stats.yaklaşanEgitimler.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 gap-2">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.12)' }}>
-              <i className="ri-graduation-cap-line text-lg" style={{ color: 'rgba(245,158,11,0.4)' }} />
+          <div className="flex flex-col items-center justify-center py-5 gap-2">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.12)' }}>
+              <i className="ri-graduation-cap-line text-base" style={{ color: 'rgba(245,158,11,0.4)' }} />
             </div>
-            <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[11px] text-center" style={{ color: 'var(--text-muted)' }}>
               Önümüzdeki 30 gün içinde eğitim yok
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {stats.yaklaşanEgitimler.map(eg => {
               const daysLeft = eg.tarih
                 ? Math.ceil((new Date(eg.tarih).getTime() - now.getTime()) / 86400000)
@@ -233,32 +233,32 @@ export default function MonthlyStats() {
               return (
                 <div
                   key={eg.id}
-                  className="flex items-start gap-3 px-3 py-2.5 rounded-xl"
+                  className="flex items-start gap-2 px-2.5 py-2 rounded-lg"
                   style={{
                     background: isUrgent ? urgentItemBg : itemBg,
                     border: `1px solid ${isUrgent ? urgentItemBorder : itemBorder}`,
                   }}
                 >
                   <div
-                    className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                    className="w-7 h-7 flex items-center justify-center rounded-md flex-shrink-0"
                     style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)' }}
                   >
                     <i
-                      className="ri-graduation-cap-line text-sm"
+                      className="ri-graduation-cap-line text-xs"
                       style={{ color: isUrgent ? '#EF4444' : '#F59E0B' }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                       {eg.ad}
                     </p>
-                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-[9.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
                       {eg.katilimciIds?.length ?? 0} katılımcı
                     </p>
                   </div>
                   {daysLeft !== null && (
                     <span
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
+                      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
                       style={{
                         background: isUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
                         color: isUrgent ? '#F87171' : '#FCD34D',
@@ -273,7 +273,7 @@ export default function MonthlyStats() {
 
             <button
               onClick={() => setActiveModule('egitimler')}
-              className="w-full py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all"
+              className="w-full py-1.5 rounded-lg text-[10.5px] font-semibold cursor-pointer transition-all"
               style={{
                 background: 'rgba(245,158,11,0.08)',
                 border: '1px solid rgba(245,158,11,0.15)',
@@ -290,24 +290,24 @@ export default function MonthlyStats() {
       </div>
 
       {/* ── Uygunsuzluklar ── */}
-      <div className="rounded-2xl p-5 isg-card">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+      <div className="rounded-xl p-4 isg-card">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
             <div
-              className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
               style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}
             >
-              <i className="ri-alert-line text-base" style={{ color: '#EF4444' }} />
+              <i className="ri-alert-line text-sm" style={{ color: '#EF4444' }} />
             </div>
             <div>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Uygunsuzluklar</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Açık &amp; kritik</p>
+              <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Uygunsuzluklar</h3>
+              <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Açık &amp; kritik</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {stats.gecikmisSayisi > 0 && (
               <span
-                className="text-[10px] font-bold px-2 py-1 rounded-full"
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                 style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}
               >
                 {stats.gecikmisSayisi} gecikmiş
@@ -323,18 +323,18 @@ export default function MonthlyStats() {
         </div>
 
         {stats.acikUygunsuzluklar.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 gap-2">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
-              <i className="ri-shield-check-line text-lg" style={{ color: '#10B981' }} />
+          <div className="flex flex-col items-center justify-center py-5 gap-2">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
+              <i className="ri-shield-check-line text-base" style={{ color: '#10B981' }} />
             </div>
-            <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[11px] text-center" style={{ color: 'var(--text-muted)' }}>
               Açık uygunsuzluk yok
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {/* Öncelik özeti */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               {[
                 {
                   label: 'Kritik',
@@ -357,23 +357,23 @@ export default function MonthlyStats() {
               ].map(item => (
                 <div
                   key={item.label}
-                  className="flex flex-col items-center py-2 rounded-xl"
+                  className="flex flex-col items-center py-1.5 rounded-lg"
                   style={{ background: item.bg }}
                 >
-                  <p className="text-base font-extrabold" style={{ color: item.color }}>{item.count}</p>
-                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
+                  <p className="text-[15px] font-extrabold" style={{ color: item.color }}>{item.count}</p>
+                  <p className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
                 </div>
               ))}
             </div>
 
             {/* Son uygunsuzluklar */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {stats.acikUygunsuzluklar.slice(0, 4).map(u => {
                 const isKritik = u.oncelik === 'Kritik' || u.oncelik === 'Yüksek';
                 return (
                   <div
                     key={u.id}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
                     style={{
                       background: isKritik ? urgentItemBg : itemBg,
                       border: `1px solid ${isKritik ? urgentItemBorder : itemBorder}`,
@@ -384,15 +384,15 @@ export default function MonthlyStats() {
                       style={{ background: isKritik ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)' }}
                     >
                       <i
-                        className="ri-alert-line text-xs"
+                        className="ri-alert-line text-[10px]"
                         style={{ color: isKritik ? '#EF4444' : '#F59E0B' }}
                       />
                     </div>
-                    <p className="text-xs flex-1 min-w-0 truncate" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-[11px] flex-1 min-w-0 truncate" style={{ color: 'var(--text-primary)' }}>
                       {u.baslik || u.aciklama?.slice(0, 30) || '—'}
                     </p>
                     {isKritik && (
-                      <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: '#EF4444' }}>
+                      <span className="text-[9px] font-bold whitespace-nowrap" style={{ color: '#EF4444' }}>
                         Kritik
                       </span>
                     )}
@@ -400,7 +400,7 @@ export default function MonthlyStats() {
                 );
               })}
               {stats.acikUygunsuzluklar.length > 4 && (
-                <p className="text-xs text-center pt-1" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-[10.5px] text-center pt-0.5" style={{ color: 'var(--text-muted)' }}>
                   +{stats.acikUygunsuzluklar.length - 4} uygunsuzluk daha
                 </p>
               )}
@@ -408,7 +408,7 @@ export default function MonthlyStats() {
 
             <button
               onClick={() => setActiveModule('uygunsuzluklar')}
-              className="w-full py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all"
+              className="w-full py-1.5 rounded-lg text-[10.5px] font-semibold cursor-pointer transition-all"
               style={{
                 background: 'rgba(239,68,68,0.08)',
                 border: '1px solid rgba(239,68,68,0.15)',

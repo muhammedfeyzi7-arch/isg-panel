@@ -149,11 +149,11 @@ export default function Layout({ children }: { children: ReactNode }) {
       <Header onMobileMenuToggle={() => setMobileOpen(v => !v)} />
 
       <main
-        className={`transition-all duration-300 pt-16 min-h-screen ${
-          sidebarCollapsed ? 'lg:pl-[68px]' : 'lg:pl-[252px]'
+        className={`transition-all duration-300 pt-12 min-h-screen ${
+          sidebarCollapsed ? 'lg:pl-[56px]' : 'lg:pl-[220px]'
         }`}
       >
-        <div className="px-5 md:px-8 py-6 max-w-[1680px]">
+        <div className="px-4 md:px-6 py-4 max-w-[1680px]">
           <div key={animKey} className="page-enter">
             {renderContent()}
           </div>
