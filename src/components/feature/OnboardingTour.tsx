@@ -175,13 +175,17 @@ export default function OnboardingTour() {
 
   // Turu göster: her kullanıcı için ayrı ayrı, sadece ilk kez
   useEffect(() => {
-    if (!org || !user) return;
+    if (!org?.id || !user?.id) return;
     // user_id bazlı key — aynı orgdaki farklı kullanıcılar ayrı ayrı görür
     const key = `${TOUR_STORAGE_KEY}_${user.id}`;
-    const done = localStorage.getItem(key);
-    if (!done) {
-      const t = setTimeout(() => setVisible(true), 800);
-      return () => clearTimeout(t);
+    try {
+      const done = localStorage.getItem(key);
+      if (!done) {
+        const t = setTimeout(() => setVisible(true), 800);
+        return () => clearTimeout(t);
+      }
+    } catch {
+      // localStorage erişim hatası — turu gösterme
     }
   }, [org?.id, user?.id]);
 
@@ -203,10 +207,14 @@ export default function OnboardingTour() {
   }, [visible, stepIndex, currentStep?.targetId]);
 
   const completeTour = useCallback(() => {
-    if (!user) return;
-    localStorage.setItem(`${TOUR_STORAGE_KEY}_${user.id}`, '1');
+    if (!user?.id) return;
+    try {
+      localStorage.setItem(`${TOUR_STORAGE_KEY}_${user.id}`, '1');
+    } catch {
+      // localStorage erişim hatası — sessizce geç
+    }
     setVisible(false);
-  }, [user]);
+  }, [user?.id]);
 
   const handleNext = useCallback(() => {
     const nextIndex = stepIndexRef.current + 1;

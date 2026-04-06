@@ -75,10 +75,10 @@ export default function ForcePasswordChange() {
   };
 
   const inputStyle: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.12)',
+    background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)',
+    border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(15,23,42,0.15)',
     borderRadius: '12px',
-    color: '#E2E8F0',
+    color: isDark ? '#E2E8F0' : '#0F172A',
     outline: 'none',
     width: '100%',
     padding: '12px 14px',

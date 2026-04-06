@@ -6,35 +6,33 @@ export interface Permissions {
   canDelete: boolean;
   isReadOnly: boolean;
   role: string;
-  // Modül erişim izinleri
   canAccessSettings: boolean;
   canAccessModule: (moduleId: string) => boolean;
-  // Hassas veri görünürlüğü
   canViewSensitiveData: boolean;
 }
 
-// Denetçi için izin verilen modüller
+// Saha Personeli (denetci) için izin verilen modüller
 const DENETCI_ALLOWED_MODULES = new Set([
   'dashboard', 'firmalar', 'personeller',
   'ekipmanlar', 'uygunsuzluklar',
 ]);
 
-// Member için yasak modüller
+// Evrak/Dökümantasyon Denetçi (member) için yasak modüller
 const MEMBER_BLOCKED_MODULES = new Set(['ayarlar']);
 
 /**
  * Returns the current user's permission flags based on their org role.
  *
- * ADMIN:
- *   - Full access, no restrictions
+ * ADMIN (Admin Kullanıcı):
+ *   - Tam yetki, kısıtlama yok
  *
- * MEMBER (evrakçı):
+ * MEMBER (Evrak/Dökümantasyon Denetçi):
  *   - Tüm modüllere erişebilir (ayarlar hariç)
  *   - create + edit yapabilir
  *   - delete yok
  *   - Hassas verileri görebilir
  *
- * DENETCI (sahacı):
+ * DENETCI (Saha Personeli):
  *   - Sadece: dashboard, firmalar, personeller, ekipmanlar, uygunsuzluklar
  *   - Uygunsuzluk açabilir + kapatabilir
  *   - Veri ekleyemez (uygunsuzluk hariç)
@@ -57,20 +55,13 @@ export function usePermissions(): Permissions {
   };
 
   return {
-    // Oluşturma: admin + member yapabilir, denetci sadece uygunsuzluk (sayfada özel kontrol)
     canCreate: isAdmin || isMember,
-    // Düzenleme: admin + member yapabilir
     canEdit: isAdmin || isMember,
-    // Silme: sadece admin
     canDelete: isAdmin,
-    // Salt okunur: denetci
     isReadOnly: isDenetci,
     role: org?.role ?? 'member',
-    // Ayarlar erişimi: sadece admin
     canAccessSettings: isAdmin,
-    // Modül erişim kontrolü
     canAccessModule,
-    // Hassas veri (TC, telefon, adres): denetci göremez
     canViewSensitiveData: !isDenetci,
   };
 }

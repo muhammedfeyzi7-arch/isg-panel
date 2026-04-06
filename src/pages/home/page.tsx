@@ -19,7 +19,7 @@ import IsIzniPage from '../is-izni/page';
 import FirmaEvraklariPage from '../company-documents/page';
 
 function AppContent() {
-  const { activeModule, dataLoading, orgLoading, orgError, org, mustChangePassword } = useApp();
+  const { activeModule, orgError, org, mustChangePassword } = useApp();
 
   if (mustChangePassword) {
     return <ForcePasswordChange />;

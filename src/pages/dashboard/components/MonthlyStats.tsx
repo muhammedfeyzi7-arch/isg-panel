@@ -1,4 +1,4 @@
-import { useMemo, Fragment } from 'react';
+import { useMemo } from 'react';
 import { useApp } from '../../../store/AppContext';
 
 export default function MonthlyStats() {
@@ -427,6 +427,4 @@ export default function MonthlyStats() {
   );
 }
 
-// Suppress unused import warning
-const _Fragment = Fragment;
-void _Fragment;
+
