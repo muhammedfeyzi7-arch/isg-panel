@@ -35,15 +35,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleAuthError = useCallback(async (error: Error | unknown) => {
     const errMsg = (error instanceof Error ? error.message : String(error)).toLowerCase();
-    const isRefreshTokenError = 
-      errMsg.includes('refresh token') ||
-      errMsg.includes('invalid') ||
-      errMsg.includes('not found') ||
-      errMsg.includes('expired') ||
-      errMsg.includes('revoked') ||
-      errMsg.includes('invalid refresh token');
+    // Sadece gerçek oturum/token yenileme hatalarında çalış — yanlış şifre hatalarında ÇALIŞMA
+    const isRefreshTokenError =
+      errMsg.includes('refresh token not found') ||
+      errMsg.includes('invalid refresh token') ||
+      errMsg.includes('token has expired') ||
+      errMsg.includes('token is expired') ||
+      errMsg.includes('revoked');
     
     if (isRefreshTokenError) {
+      // Login sayfasındayken hiçbir şey yapma — login kendi hatasını yönetir
+      if (window.location.pathname === '/login') return;
       clearAuthStorage();
       try {
         await supabase.auth.signOut({ scope: 'local' });
@@ -51,10 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Ignore signOut errors
       }
       setSession(null);
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.replace('/login');
-      }
+      window.location.replace('/login');
     }
   }, [clearAuthStorage]);
 
@@ -102,25 +101,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!email.trim()) return { error: 'E-posta adresi boş olamaz.' };
     if (password.length < 4) return { error: 'Şifre en az 4 karakter olmalıdır.' };
 
-    // Clear any stale tokens before login
-    clearAuthStorage();
+    try {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+      // Giriş başarısız — her türlü hata "yanlış şifre/mail" olarak göster
+      if (signInError) {
+        return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
+      }
 
-    if (!signInError) return { error: null };
+      // Giriş başarılı — kullanıcının aktif org üyeliği var mı kontrol et
+      if (signInData?.user) {
+        const { data: membership } = await supabase
+          .from('user_organizations')
+          .select('user_id, is_active')
+          .eq('user_id', signInData.user.id)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
 
-    // Handle specific auth errors
-    const errMsg = signInError.message?.toLowerCase() ?? '';
-    if (errMsg.includes('refresh token') || errMsg.includes('invalid')) {
-      clearAuthStorage();
-      return { error: 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.' };
+        if (!membership) {
+          await supabase.auth.signOut({ scope: 'local' });
+          clearAuthStorage();
+          return { error: 'Hesabınız devre dışı bırakılmış veya organizasyondan çıkarılmış. Lütfen yöneticinizle iletişime geçin.' };
+        }
+      }
+
+      return { error: null };
+    } catch {
+      return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
     }
-
-    // Always return a friendly error — never expose raw Supabase messages
-    return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
   }, [clearAuthStorage]);
 
   const logout = useCallback(async () => {

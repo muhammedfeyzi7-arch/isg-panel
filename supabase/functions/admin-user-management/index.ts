@@ -545,6 +545,7 @@ async function handleRequest(
       );
     }
 
+    // user_organizations'dan sil (tüm kayıtlar — aktif/pasif)
     const { error: deleteError } = await adminClient
       .from('user_organizations')
       .delete()
@@ -558,13 +559,37 @@ async function handleRequest(
       });
     }
 
+    // Kullanıcının başka herhangi bir org üyeliği var mı kontrol et (aktif veya pasif)
+    const { data: otherMemberships } = await adminClient
+      .from('user_organizations')
+      .select('organization_id')
+      .eq('user_id', target_user_id)
+      .limit(1);
+
+    // Başka hiçbir org üyeliği yoksa Supabase Auth'dan da sil
+    if (!otherMemberships || otherMemberships.length === 0) {
+      try {
+        const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(target_user_id);
+        if (authDeleteError) {
+          // "User not found" hatası — kullanıcı zaten Supabase'den silinmiş, sorun değil
+          const errMsg = authDeleteError.message?.toLowerCase() ?? '';
+          if (!errMsg.includes('not found') && !errMsg.includes('does not exist')) {
+            console.error('[DELETE] Auth delete failed:', authDeleteError.message);
+          }
+        }
+      } catch (authErr) {
+        // Auth silme başarısız olsa bile devam et — org kaydı zaten silindi
+        console.error('[DELETE] Auth delete exception:', authErr);
+      }
+    }
+
     const memberName = targetCheck.display_name || targetCheck.email || target_user_id;
     await logActivity(
       'user_deleted',
       'Kullanıcı Yönetimi',
       target_user_id,
       memberName,
-      `${memberName} kullanıcısı organizasyondan kaldırıldı.`,
+      `${memberName} kullanıcısı organizasyondan kaldırıldı ve hesabı silindi.`,
     );
 
     return new Response(JSON.stringify({ success: true }), {

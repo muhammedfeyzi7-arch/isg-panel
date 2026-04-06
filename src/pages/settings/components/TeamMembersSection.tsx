@@ -822,9 +822,9 @@ export default function TeamMembersSection() {
             </div>
             <div className="px-3 py-3 rounded-xl" style={{ background: isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
               <p className="text-sm" style={{ color: nameColor }}>
-                <strong>{deleteConfirm.display_name || deleteConfirm.email}</strong> kullanıcısını organizasyondan kaldırmak istediğinize emin misiniz?
+                <strong>{deleteConfirm.display_name || deleteConfirm.email}</strong> kullanıcısını organizasyondan kaldırmak ve hesabını silmek istediğinize emin misiniz?
               </p>
-              <p className="text-xs mt-1.5" style={{ color: subColor }}>Kullanıcı organizasyondan çıkarılacak ancak hesabı silinmeyecektir.</p>
+              <p className="text-xs mt-1.5" style={{ color: subColor }}>Kullanıcı organizasyondan çıkarılacak ve hesabı tamamen silinecektir. Bir daha giriş yapamayacaktır.</p>
             </div>
             <div className="flex gap-3 pt-1">
               <button onClick={() => setDeleteConfirm(null)} className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.1)', color: subColor }}>
