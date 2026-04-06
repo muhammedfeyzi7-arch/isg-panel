@@ -1,6 +1,7 @@
-import { useEffect, Fragment } from 'react';
+import { useEffect, Fragment, useState } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
+import SupportModal from './SupportModal';
 
 const ROLE_MODULES: Record<string, string[]> = {
   admin: [
@@ -73,6 +74,7 @@ interface SidebarProps {
 export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = false }: SidebarProps) {
   const { activeModule, setActiveModule, sidebarCollapsed, currentUser, firmalar, personeller, evraklar, org } = useApp();
   const { logout } = useAuth();
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const userRole = org?.role ?? 'member';
   const allowedModules = getAllowedModules(userRole);
@@ -121,6 +123,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
   const logoSubColor    = dark ? 'rgba(165,180,252,0.7)' : '#64748B';
 
   return (
+    <>
     <aside
       className={`
         fixed left-0 top-0 h-screen flex flex-col z-40
@@ -342,6 +345,39 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         </div>
       )}
 
+      {/* ── Support Button ── */}
+      <div className="px-2.5 pb-2">
+        <button
+          onClick={() => setSupportOpen(true)}
+          title={collapsed ? 'Destek / Sorun Bildir' : ''}
+          className={`w-full flex items-center cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2'}`}
+          style={{
+            background: dark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.06)',
+            border: '1px solid rgba(16,185,129,0.18)',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = dark ? 'rgba(16,185,129,0.13)' : 'rgba(16,185,129,0.11)';
+            e.currentTarget.style.borderColor = 'rgba(16,185,129,0.32)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = dark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.06)';
+            e.currentTarget.style.borderColor = 'rgba(16,185,129,0.18)';
+          }}
+        >
+          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+            <i className="ri-customer-service-2-line text-sm" style={{ color: '#10B981' }} />
+          </div>
+          {!collapsed && (
+            <span className="text-[12px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>
+              Destek
+            </span>
+          )}
+          {!collapsed && (
+            <i className="ri-arrow-right-s-line text-xs" style={{ color: 'rgba(16,185,129,0.5)' }} />
+          )}
+        </button>
+      </div>
+
       {/* ── Profile ── */}
       <div
         className={`mx-2.5 mb-3 rounded-xl flex items-center gap-2.5 cursor-pointer ${collapsed ? 'justify-center p-2' : 'px-3 py-2.5'}`}
@@ -417,5 +453,8 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         )}
       </div>
     </aside>
+
+    <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+    </>
   );
 }

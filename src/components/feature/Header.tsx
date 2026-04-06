@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
+import SupportModal from './SupportModal';
 
 const moduleTitles: Record<string, { label: string; icon: string }> = {
   dashboard:      { label: 'Kontrol Paneli',     icon: 'ri-dashboard-3-line' },
@@ -70,6 +71,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const [quickOpen, setQuickOpen]     = useState(false);
   const [notifOpen, setNotifOpen]     = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [search, setSearch]           = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -591,6 +593,19 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                   <i className="ri-arrow-right-s-line text-xs ml-auto" style={{ color: '#475569' }} />
                 </button>
 
+                <button
+                  onClick={() => { setSupportOpen(true); setProfileOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
+                  onMouseEnter={e => { e.currentTarget.style.background = dropdownItemHover; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                    <i className="ri-customer-service-2-line text-xs" style={{ color: '#10B981' }} />
+                  </div>
+                  <span className="text-[12.5px] font-medium" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>Destek / Sorun Bildir</span>
+                  <i className="ri-arrow-right-s-line text-xs ml-auto" style={{ color: '#475569' }} />
+                </button>
+
                 <div className="mx-3 my-1.5" style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)' }} />
 
                 <button
@@ -609,6 +624,9 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           )}
         </div>
       </header>
+
+      {/* Support Modal */}
+      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
 
       {/* ══════════════════════════════════════════════════════
           QUICK ADD MODAL
