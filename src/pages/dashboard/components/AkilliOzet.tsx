@@ -130,7 +130,7 @@ export default function AkilliOzet({ acikKontrolFormu, kontrolFormYuklendi }: Ak
         title: `${gecikmisgGorev.length} Görev Gecikmiş`,
         detail: gecikmisgGorev.slice(0, 3).map(g => g.baslik || 'Görev').join(', ') + (gecikmisgGorev.length > 3 ? ` +${gecikmisgGorev.length - 3} daha` : ''),
         color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',
-        priority: 85, level: 'warning', module: 'gorevler', count: gecikmisgGorev.length,
+        priority: 85, level: 'warning', count: gecikmisgGorev.length,
       });
     }
 
@@ -157,7 +157,7 @@ export default function AkilliOzet({ acikKontrolFormu, kontrolFormYuklendi }: Ak
       });
     }
 
-    const bekleyenIsIzni = aktifIsIzinleri.filter(iz => iz.durum === 'Beklemede' || iz.durum === 'İncelemede');
+    const bekleyenIsIzni = aktifIsIzinleri.filter(iz => iz.durum === 'Onay Bekliyor');
     if (bekleyenIsIzni.length > 0) {
       list.push({
         id: 'is-izni-bekliyor',
@@ -165,7 +165,7 @@ export default function AkilliOzet({ acikKontrolFormu, kontrolFormYuklendi }: Ak
         title: `${bekleyenIsIzni.length} İş İzni Onay Bekliyor`,
         detail: bekleyenIsIzni.slice(0, 3).map(iz => iz.baslik || iz.tip || 'İzin').join(', '),
         color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)',
-        priority: 70, level: 'warning', module: 'is-izni', count: bekleyenIsIzni.length,
+        priority: 70, level: 'warning', module: 'is-izinleri', count: bekleyenIsIzni.length,
       });
     }
 
@@ -230,7 +230,7 @@ export default function AkilliOzet({ acikKontrolFormu, kontrolFormYuklendi }: Ak
 
     // Eğitim eksikliği
     const egitimSizPersonel = aktifPersoneller.filter(p => {
-      return !aktifEgitimler.some(e => e.personelId === p.id || (e as unknown as Record<string, unknown>).katilimcilar?.includes?.(p.id));
+      return !aktifEgitimler.some(e => e.katilimciIds?.includes(p.id));
     });
     if (egitimSizPersonel.length > 0 && aktifPersoneller.length > 0) {
       list.push({

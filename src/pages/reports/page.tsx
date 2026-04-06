@@ -247,7 +247,7 @@ function DonutChart({ data, size = 160 }: {
 export default function RaporlarPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
-    uygunsuzluklar, ekipmanlar, gorevler, tutanaklar,
+    uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, isIzinleri,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'genel' | 'evrak' | 'uygunsuzluk' | 'egitim'>('genel');
@@ -398,6 +398,14 @@ export default function RaporlarPage() {
     ),
     [gorevler, selectedFirmaId, dateFrom, dateTo],
   );
+  const filtreIsIzinleri = useMemo(
+    () => isIzinleri.filter(iz =>
+      !(iz as unknown as { silinmis?: boolean }).silinmis &&
+      (selectedFirmaId === 'all' || iz.firmaId === selectedFirmaId) &&
+      isInDateRange(iz.olusturmaTarihi)
+    ),
+    [isIzinleri, selectedFirmaId, dateFrom, dateTo],
+  );
   const filtreTutanaklar = useMemo(
     () => tutanaklar.filter(t =>
       !(t as unknown as { silinmis?: boolean }).silinmis &&
@@ -416,6 +424,7 @@ export default function RaporlarPage() {
   const aktifEkipmanlar = filtreEkipmanlar;
   const aktifGorevler = filtreGorevler;
   const aktifTutanaklar = filtreTutanaklar;
+  const aktifIsIzinleri = filtreIsIzinleri;
 
   // Gösterilen firma listesi (genel bakış tablosunda)
   const goruntulenenFirmalar = useMemo(
@@ -510,7 +519,7 @@ export default function RaporlarPage() {
     { label: 'Eğitim Kayıtları', value: aktifEgitimler.length, icon: 'ri-graduation-cap-line', color: '#6366F1', sub: `${aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length} tamamlandı` },
     { label: 'Açık Uygunsuzluk', value: uygunsuzlukStats.acik, icon: 'ri-alert-line', color: uygunsuzlukStats.acik > 0 ? '#EF4444' : '#10B981', sub: `${uygunsuzlukStats.kapandi} kapatıldı` },
     { label: 'Muayene Kayıtları', value: aktifMuayeneler.length, icon: 'ri-heart-pulse-line', color: '#EC4899', sub: `${aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length} uygun` },
-    { label: 'Kontrol Formları', value: aktifGorevler.length, icon: 'ri-folder-shield-2-line', color: '#8B5CF6', sub: `${aktifGorevler.length} form kayıtlı` },
+    { label: 'İş İzinleri', value: aktifIsIzinleri.length, icon: 'ri-shield-keyhole-line', color: '#8B5CF6', sub: `${aktifIsIzinleri.filter(iz => iz.durum === 'Onaylandı').length} onaylı` },
     { label: 'Tutanaklar', value: aktifTutanaklar.length, icon: 'ri-article-line', color: '#F97316', sub: `${aktifTutanaklar.filter(t => t.durum === 'Onaylandı').length} onaylı` },
   ];
 

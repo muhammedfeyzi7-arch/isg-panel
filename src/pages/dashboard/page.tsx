@@ -74,8 +74,8 @@ export default function DashboardPage() {
 
   // İş izni istatistikleri
   const isIzniStats = useMemo(() => {
-    const aktif = aktifIsIzinleri.filter(iz => iz.durum === 'Onaylandı' || iz.durum === 'Aktif').length;
-    const bekleyen = aktifIsIzinleri.filter(iz => iz.durum === 'Beklemede' || iz.durum === 'İncelemede').length;
+    const aktif = aktifIsIzinleri.filter(iz => iz.durum === 'Onaylandı').length;
+    const bekleyen = aktifIsIzinleri.filter(iz => iz.durum === 'Onay Bekliyor').length;
     return { toplam: aktifIsIzinleri.length, aktif, bekleyen };
   }, [aktifIsIzinleri]);
 
@@ -190,10 +190,10 @@ export default function DashboardPage() {
       ...aktifFirmalar.map(f => ({ tip: 'Firma', ad: f.ad, tarih: f.olusturmaTarihi, icon: 'ri-building-2-line', color: '#3B82F6', badge: 'eklendi', badgeColor: '#10B981', badgeBg: 'rgba(16,185,129,0.12)' })),
       ...aktifPersoneller.map(p => ({ tip: 'Personel', ad: p.adSoyad, tarih: p.olusturmaTarihi, icon: 'ri-user-line', color: '#10B981', badge: 'eklendi', badgeColor: '#10B981', badgeBg: 'rgba(16,185,129,0.12)' })),
       ...aktifEgitimler.map(e => ({ tip: 'Eğitim', ad: e.ad, tarih: e.olusturmaTarihi, icon: 'ri-graduation-cap-line', color: '#F59E0B', badge: 'planlandı', badgeColor: '#F59E0B', badgeBg: 'rgba(245,158,11,0.12)' })),
-      ...aktifGorevler.slice(0, 5).map(g => ({ tip: 'Görev', ad: g.baslik || 'Görev', tarih: g.olusturmaTarihi, icon: 'ri-task-line', color: '#6366F1', badge: g.durum === 'Tamamlandı' ? 'tamamlandı' : 'açık', badgeColor: g.durum === 'Tamamlandı' ? '#10B981' : '#F59E0B', badgeBg: g.durum === 'Tamamlandı' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)' })),
+      ...aktifIsIzinleri.slice(0, 5).map(iz => ({ tip: 'İş İzni', ad: iz.izinNo || iz.tip, tarih: iz.olusturmaTarihi, icon: 'ri-shield-keyhole-line', color: '#8B5CF6', badge: iz.durum === 'Onaylandı' ? 'onaylandı' : 'bekliyor', badgeColor: iz.durum === 'Onaylandı' ? '#10B981' : '#F59E0B', badgeBg: iz.durum === 'Onaylandı' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)' })),
     ];
     return all.sort((a, b) => new Date(b.tarih).getTime() - new Date(a.tarih).getTime()).slice(0, 8);
-  }, [aktifFirmalar, aktifPersoneller, aktifEgitimler, aktifGorevler]);
+  }, [aktifFirmalar, aktifPersoneller, aktifEgitimler, aktifIsIzinleri]);
 
   const yaklaşanEvraklar = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -493,7 +493,7 @@ export default function DashboardPage() {
                   { label: 'Evrak', value: riskStats.gecikmisBelge,   icon: 'ri-file-damage-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
                   { label: 'Ekipman', value: riskStats.gecikmisEkipman, icon: 'ri-tools-line',        color: '#FB923C', bg: 'rgba(251,146,60,0.1)',   border: 'rgba(251,146,60,0.2)' },
                   { label: 'Muayene', value: riskStats.gecikmisMuayene, icon: 'ri-heart-pulse-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
-                  { label: 'Görev', value: gorevStats.gecikmiş,         icon: 'ri-task-line',         color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.2)' },
+                  { label: 'İş İzni', value: isIzniStats.bekleyen,      icon: 'ri-shield-check-line', color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.2)' },
                 ].map(item => (
                   <div key={item.label} className="rounded-xl p-3.5 text-center"
                     style={{ background: item.value > 0 ? item.bg : 'var(--bg-item)', border: `1px solid ${item.value > 0 ? item.border : 'var(--bg-item-border)'}` }}>
@@ -618,10 +618,10 @@ export default function DashboardPage() {
                       {riskStats.gecikmisMuayene} muayene tarihi geçti
                     </p>
                   )}
-                  {gorevStats.gecikmiş > 0 && (
+                  {isIzniStats.bekleyen > 0 && (
                     <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
                       <i className="ri-circle-fill text-[6px] mr-1.5" style={{ color: '#FBBF24' }} />
-                      {gorevStats.gecikmiş} görev gecikmiş
+                      {isIzniStats.bekleyen} iş izni onay bekliyor
                     </p>
                   )}
                 </div>
