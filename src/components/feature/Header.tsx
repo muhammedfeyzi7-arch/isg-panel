@@ -4,18 +4,22 @@ import { useAuth } from '../../store/AuthContext';
 import SupportModal from './SupportModal';
 
 const moduleTitles: Record<string, { label: string; icon: string }> = {
-  dashboard:      { label: 'Kontrol Paneli',     icon: 'ri-dashboard-3-line' },
+  dashboard:      { label: 'Genel Bakış',        icon: 'ri-dashboard-3-line' },
   firmalar:       { label: 'Firmalar',            icon: 'ri-building-2-line' },
-  personeller:    { label: 'Personeller',         icon: 'ri-team-line' },
-  evraklar:       { label: 'Evrak Takibi',        icon: 'ri-file-list-3-line' },
-  egitimler:      { label: 'Eğitim Yönetimi',    icon: 'ri-graduation-cap-line' },
-  muayeneler:     { label: 'Sağlık Evrakları',   icon: 'ri-heart-pulse-line' },
-  tutanaklar:     { label: 'Tutanaklar',          icon: 'ri-article-line' },
-  uygunsuzluklar: { label: 'Saha Denetim',       icon: 'ri-map-pin-user-line' },
-  ekipmanlar:     { label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },
-  gorevler:           { label: 'Görevler',            icon: 'ri-task-line' },
-  raporlar:       { label: 'Raporlar & Analiz',  icon: 'ri-bar-chart-2-line' },
+  personeller:    { label: 'Personel',            icon: 'ri-team-line' },
+  'firma-evraklari': { label: 'Firma Belgeleri', icon: 'ri-building-4-line' },
+  evraklar:       { label: 'Belge Takibi',        icon: 'ri-file-list-3-line' },
+  egitimler:      { label: 'Eğitimler',           icon: 'ri-graduation-cap-line' },
+  muayeneler:     { label: 'Sağlık Durumu',       icon: 'ri-heart-pulse-line' },
+  tutanaklar:     { label: 'Tutanak Yönetimi',    icon: 'ri-article-line' },
+  uygunsuzluklar: { label: 'Saha Denetimleri',   icon: 'ri-map-pin-user-line' },
+  ekipmanlar:     { label: 'Ekipman',             icon: 'ri-tools-line' },
+  'is-izinleri':  { label: 'İş İzinleri',         icon: 'ri-shield-keyhole-line' },
+  gorevler:       { label: 'Görevler',            icon: 'ri-task-line' },
+  raporlar:       { label: 'Raporlar',            icon: 'ri-bar-chart-2-line' },
   ayarlar:        { label: 'Ayarlar',             icon: 'ri-settings-4-line' },
+  copkutusu:      { label: 'Çöp Kutusu',          icon: 'ri-delete-bin-2-line' },
+  saha:           { label: 'Saha Denetimleri',    icon: 'ri-map-pin-user-line' },
 };
 
 const quickCards = [
@@ -197,71 +201,72 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   return (
     <>
       {/* ══════════════════════════════════════════════════════
-          HEADER
+          HEADER — Mobile-First
       ══════════════════════════════════════════════════════ */}
       <header
-        className={`fixed top-0 right-0 z-30 h-12 flex items-center px-3 gap-2 left-0 ${sidebarCollapsed ? 'lg:left-[56px]' : 'lg:left-[220px]'}`}
+        className={`fixed top-0 right-0 z-30 flex items-center left-0 ${sidebarCollapsed ? 'lg:left-[56px]' : 'lg:left-[220px]'}`}
         style={{
+          height: '52px',
           background: headerBg,
           backdropFilter: 'blur(28px)',
           WebkitBackdropFilter: 'blur(28px)',
           borderBottom: `1px solid ${headerBorder}`,
+          boxShadow: isDark ? '0 1px 8px rgba(0,0,0,0.25)' : '0 1px 6px rgba(15,23,42,0.06)',
           transition: 'left 0.26s cubic-bezier(0.4,0,0.2,1), background 0.3s ease',
+          paddingLeft: '12px',
+          paddingRight: '12px',
+          gap: '8px',
         }}
       >
-        {/* Mobile hamburger */}
+        {/* ── MOBİL: Hamburger ── */}
         <button
           onClick={onMobileMenuToggle}
-          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 lg:hidden flex-shrink-0"
+          className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 lg:hidden flex-shrink-0"
           style={{ color: textMuted, background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
         >
-          <i className="ri-menu-line text-xs" />
+          <i className="ri-menu-line text-base" />
         </button>
 
-        {/* Desktop sidebar toggle */}
+        {/* ── DESKTOP: Sidebar collapse toggle ── */}
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="w-7 h-7 items-center justify-center rounded-lg cursor-pointer transition-all duration-200 hidden lg:flex flex-shrink-0"
+          className="w-8 h-8 items-center justify-center rounded-lg cursor-pointer transition-all duration-200 hidden lg:flex flex-shrink-0"
           style={{ color: textMuted, background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
-          onMouseEnter={e => { e.currentTarget.style.color = isDark ? '#94A3B8' : '#334155'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = textMuted; }}
+          onMouseEnter={e => { e.currentTarget.style.color = isDark ? '#94A3B8' : '#334155'; e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = textMuted; e.currentTarget.style.background = iconBtnBg; }}
         >
-          <i className={`${sidebarCollapsed ? 'ri-menu-unfold-line' : 'ri-menu-fold-line'} text-xs`} />
+          <i className={`${sidebarCollapsed ? 'ri-menu-unfold-line' : 'ri-menu-fold-line'} text-sm`} />
         </button>
 
-        {/* Breadcrumb */}
-        <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
-          <div className="w-4 h-4 flex items-center justify-center">
-            <i className={`${currentModule?.icon || 'ri-home-line'} text-[11px]`} style={{ color: '#3B82F6' }} />
+        {/* ── Sayfa Başlığı (Mobil: orta, Desktop: sol) ── */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
+            style={{ background: `${isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.1)'}` }}>
+            <i className={`${currentModule?.icon || 'ri-home-line'} text-[11px]`} style={{ color: '#818CF8' }} />
           </div>
-          <div className="flex items-center gap-1 text-[11.5px]">
-            <span style={{ color: isDark ? '#334155' : '#94A3B8' }}>ISG</span>
-            <i className="ri-arrow-right-s-line text-xs" style={{ color: isDark ? '#334155' : '#94A3B8' }} />
-            <span className="font-semibold" style={{ color: nameColor }}>{currentModule?.label || activeModule}</span>
-          </div>
+          <span className="text-[13px] font-bold truncate" style={{ color: nameColor, maxWidth: '160px' }}>
+            {currentModule?.label || activeModule}
+          </span>
         </div>
 
+        {/* ── Spacer ── */}
         <div className="flex-1" />
 
-        {/* Greeting */}
+        {/* ── DESKTOP: Selamlama ── */}
         <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
-          <p className="text-[11.5px] font-semibold leading-tight" style={{ color: nameColor }}>
-            {greeting}, <span style={{ color: '#60A5FA' }}>{firstName}</span>
+          <p className="text-[11.5px] font-medium" style={{ color: textMuted }}>
+            {greeting}, <span className="font-bold" style={{ color: nameColor }}>{firstName}</span>
           </p>
         </div>
 
-        {/* Status badge */}
-        <div
-          className="hidden xl:flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0"
-          style={{ background: statusInfo.bg, border: `1px solid ${statusInfo.border}`, color: statusInfo.color }}
-        >
+        {/* ── DESKTOP: Status badge ── */}
+        <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold flex-shrink-0"
+          style={{ background: statusInfo.bg, border: `1px solid ${statusInfo.border}`, color: statusInfo.color }}>
           <i className={`${statusInfo.icon} text-[9px]`} />
           {statusInfo.text}
         </div>
 
-        <div className="hidden lg:block w-px h-3.5 flex-shrink-0" style={{ background: headerBorder }} />
-
-        {/* Global Search */}
+        {/* ── DESKTOP: Arama ── */}
         <div className="relative hidden md:flex items-center flex-shrink-0" ref={searchRef}>
           <i className="ri-search-line absolute left-2.5 text-[11px] z-10" style={{ color: '#475569' }} />
           <input
@@ -269,14 +274,14 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             onChange={e => setSearch(e.target.value)}
             onFocus={() => setSearchFocus(true)}
             placeholder="Ara..."
-            className={`w-36 pl-7 pr-2.5 py-1 text-[11.5px] rounded-lg outline-none transition-all duration-200 ${isDark ? 'search-dark' : 'search-light'}`}
+            className="w-36 pl-7 pr-2.5 py-1.5 text-[11.5px] rounded-lg outline-none transition-all duration-200"
             style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: isDark ? '#e5e7eb' : '#334155' }}
             onFocus={e => {
               setSearchFocus(true);
               e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(59,130,246,0.04)';
               e.currentTarget.style.borderColor = '#3b82f6';
               e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.2)';
-              e.currentTarget.style.width = '190px';
+              e.currentTarget.style.width = '200px';
             }}
             onBlur={e => {
               e.currentTarget.style.background = inputBg;
@@ -286,10 +291,8 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             }}
           />
           {showSearchDropdown && (
-            <div
-              className="absolute right-0 top-10 w-80 py-1 z-50 animate-slide-up"
-              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)', backdropFilter: 'blur(20px)' }}
-            >
+            <div className="absolute right-0 top-11 w-80 py-1 z-50 animate-slide-up"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)', backdropFilter: 'blur(20px)' }}>
               {searchResults.length === 0 ? (
                 <div className="px-4 py-6 text-center">
                   <i className="ri-search-line text-2xl" style={{ color: '#475569' }} />
@@ -301,21 +304,17 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                     <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#475569' }}>{searchResults.length} sonuç</p>
                   </div>
                   {searchResults.map(result => (
-                    <button
-                      key={result.id}
+                    <button key={result.id}
                       onClick={() => { setActiveModule(result.module); setSearch(''); setSearchFocus(false); }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all duration-150 text-left"
                       onMouseEnter={e => { e.currentTarget.style.background = dropdownItemHover; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                    >
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                       <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${result.color}18` }}>
                         <i className={`${result.icon} text-xs`} style={{ color: result.color }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: `${result.color}18`, color: result.color }}>{result.type}</span>
-                        </div>
-                        <p className="text-[12.5px] font-medium truncate" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{result.label}</p>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: `${result.color}18`, color: result.color }}>{result.type}</span>
+                        <p className="text-[12.5px] font-medium truncate mt-0.5" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{result.label}</p>
                         <p className="text-[11px] truncate" style={{ color: '#64748B' }}>{result.sub}</p>
                       </div>
                     </button>
@@ -326,52 +325,38 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           )}
         </div>
 
-        {/* Global Refresh Button */}
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing || dataLoading}
-          title="Verileri Yenile"
-          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0 disabled:opacity-50"
-          style={{
-            background: refreshDone ? 'rgba(52,211,153,0.12)' : iconBtnBg,
-            border: `1px solid ${refreshDone ? 'rgba(52,211,153,0.3)' : iconBtnBorder}`,
-          }}
+        {/* ── Yenile (Desktop) ── */}
+        <button onClick={handleRefresh} disabled={refreshing || dataLoading} title="Verileri Yenile"
+          className="w-8 h-8 hidden md:flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0 disabled:opacity-50"
+          style={{ background: refreshDone ? 'rgba(52,211,153,0.12)' : iconBtnBg, border: `1px solid ${refreshDone ? 'rgba(52,211,153,0.3)' : iconBtnBorder}` }}
           onMouseEnter={e => { if (!refreshing) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = refreshDone ? 'rgba(52,211,153,0.12)' : iconBtnBg; }}
-        >
-          <i
-            className={`${refreshing ? 'ri-loader-4-line animate-spin' : refreshDone ? 'ri-check-line' : 'ri-refresh-line'} text-xs`}
-            style={{ color: refreshDone ? '#34D399' : refreshing ? '#60A5FA' : textMuted }}
-          />
+          onMouseLeave={e => { e.currentTarget.style.background = refreshDone ? 'rgba(52,211,153,0.12)' : iconBtnBg; }}>
+          <i className={`${refreshing ? 'ri-loader-4-line animate-spin' : refreshDone ? 'ri-check-line' : 'ri-refresh-line'} text-sm`}
+            style={{ color: refreshDone ? '#34D399' : refreshing ? '#60A5FA' : textMuted }} />
         </button>
 
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0"
-          title={isDark ? 'Açık Tema' : 'Koyu Tema'}
+        {/* ── Tema Toggle ── */}
+        <button onClick={toggleTheme} title={isDark ? 'Açık Tema' : 'Koyu Tema'}
+          className="w-9 h-9 lg:w-8 lg:h-8 flex items-center justify-center rounded-xl lg:rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0"
           style={{ background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
           onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = iconBtnBg; }}
-        >
-          <i className={`${isDark ? 'ri-sun-line' : 'ri-moon-line'} text-xs`} style={{ color: isDark ? '#F59E0B' : '#475569' }} />
+          onMouseLeave={e => { e.currentTarget.style.background = iconBtnBg; }}>
+          <i className={`${isDark ? 'ri-sun-line' : 'ri-moon-line'} text-base lg:text-sm`} style={{ color: isDark ? '#F59E0B' : '#475569' }} />
         </button>
 
-        {/* Quick Add */}
-        <button
-          onClick={() => { setQuickOpen(true); setNotifOpen(false); setProfileOpen(false); }}
-          className="btn-primary flex-shrink-0"
-          style={{ padding: '5px 11px', fontSize: '11.5px', borderRadius: '8px' }}
-        >
-          <i className="ri-add-line text-xs" />
-          <span className="hidden sm:inline">Hızlı Ekle</span>
+        {/* ── Hızlı Ekle (Desktop) ── */}
+        <button onClick={() => { setQuickOpen(true); setNotifOpen(false); setProfileOpen(false); }}
+          className="btn-primary flex-shrink-0 hidden sm:flex"
+          style={{ padding: '6px 12px', fontSize: '11.5px', borderRadius: '8px' }}>
+          <i className="ri-add-line text-sm" />
+          <span className="hidden lg:inline">Hızlı Ekle</span>
         </button>
 
         {/* ── Notifications ── */}
         <div className="relative flex-shrink-0" ref={notifRef}>
           <button
             onClick={() => { setNotifOpen(v => !v); setQuickOpen(false); setProfileOpen(false); }}
-            className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 relative"
+            className="w-9 h-9 lg:w-8 lg:h-8 flex items-center justify-center rounded-xl lg:rounded-lg cursor-pointer transition-all duration-200 relative"
             style={{
               background: notifOpen ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)') : iconBtnBg,
               border: `1px solid ${notifOpen ? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.14)') : iconBtnBorder}`,
@@ -379,7 +364,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             onMouseEnter={e => { if (!notifOpen) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)'; }}
             onMouseLeave={e => { if (!notifOpen) e.currentTarget.style.background = iconBtnBg; }}
           >
-            <i className="ri-notification-3-line text-xs" style={{ color: notifOpen ? (isDark ? '#E2E8F0' : '#0F172A') : textMuted }} />
+            <i className="ri-notification-3-line text-base lg:text-sm" style={{ color: notifOpen ? (isDark ? '#E2E8F0' : '#0F172A') : textMuted }} />
             {okunmamisBildirimSayisi > 0 && (
               <span
                 className="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full px-1 notif-badge-enter"
@@ -524,7 +509,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         <div className="relative flex-shrink-0" ref={profileRef}>
           <button
             onClick={() => { setProfileOpen(v => !v); setNotifOpen(false); setQuickOpen(false); }}
-            className="flex items-center gap-1.5 cursor-pointer transition-all duration-200 rounded-lg py-1 px-1.5"
+            className="flex items-center gap-1.5 cursor-pointer transition-all duration-200 rounded-xl lg:rounded-lg py-1 px-1.5"
             style={{
               background: profileOpen ? (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.06)') : 'transparent',
               border: `1px solid ${profileOpen ? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)') : 'transparent'}`,
@@ -534,12 +519,12 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           >
             {/* Avatar */}
             <div
-              className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}
+              className="w-8 h-8 lg:w-7 lg:h-7 rounded-xl lg:rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 2px 8px rgba(99,102,241,0.3)' }}
             >
               {(currentUser.ad || 'U').charAt(0).toUpperCase()}
             </div>
-            <div className="hidden md:block text-left">
+            <div className="hidden lg:block text-left">
               <p className="text-[11px] font-semibold leading-tight" style={{ color: nameColor }}>{currentUser.ad || 'Kullanıcı'}</p>
             </div>
             <i

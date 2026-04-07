@@ -261,46 +261,54 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
 
-      {/* ── Premium Page Header ── */}
-      <div className="rounded-xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #6366F1, #10B981, #F59E0B, #EF4444)' }} />
-        <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)', boxShadow: '0 6px 18px rgba(99,102,241,0.3)' }}>
-              <i className="ri-dashboard-3-line text-white text-base" />
+      {/* ── Mobile-First Header ── */}
+      <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #6366F1, #10B981, #F59E0B, #EF4444)' }} />
+        <div className="px-4 py-4">
+          {/* Üst satır: başlık + sistem durumu */}
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)', boxShadow: '0 6px 18px rgba(99,102,241,0.3)' }}>
+                <i className="ri-dashboard-3-line text-white text-base" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg font-black leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>
+                  Genel Bakış
+                </h1>
+                <p className="text-[11px] mt-0.5 font-medium truncate" style={{ color: 'var(--text-muted)' }}>
+                  {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-[17px] font-black" style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>
-                Kontrol Paneli
-              </h1>
-              <p className="text-[11px] mt-0.5 font-medium" style={{ color: 'var(--text-muted)' }}>
-                {new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold"
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-shrink-0 text-[10px] font-bold"
               style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}>
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-              Sistem Aktif
+              <span className="hidden sm:inline">Sistem </span>Aktif
             </div>
-            {gorevStats.gecikmiş > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold"
-                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
-                <i className="ri-task-line text-[10px]" />{gorevStats.gecikmiş} gecikmiş görev
-              </div>
-            )}
-
-            {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold"
-                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
-                <i className="ri-error-warning-line text-[10px]" />{riskStats.toplamGecikme + riskStats.uygunDegil} kritik
-              </div>
-            )}
           </div>
+
+          {/* Uyarı badge'leri — sadece varsa göster */}
+          {(gorevStats.gecikmiş > 0 || (riskStats.toplamGecikme + riskStats.uygunDegil) > 0) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {gorevStats.gecikmiş > 0 && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold"
+                  style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
+                  <i className="ri-task-line text-[10px]" />
+                  {gorevStats.gecikmiş} gecikmiş görev
+                </div>
+              )}
+              {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold"
+                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
+                  <i className="ri-error-warning-line text-[10px]" />
+                  {riskStats.toplamGecikme + riskStats.uygunDegil} kritik
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -359,7 +367,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Ana Stat Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -380,7 +388,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Görev + İş İzni Stat Cards ── */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {extraStatCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -401,23 +409,23 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Akıllı Özet + Bu Ay Özeti ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <AkilliOzet />
         <div className="lg:col-span-2">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-              <i className="ri-bar-chart-2-line text-white text-xs" />
+              <i className="ri-bar-chart-2-line text-white text-sm" />
             </div>
-            <h2 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
           </div>
           <MonthlyStats />
         </div>
       </div>
 
       {/* ── ISG Risk Paneli ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div className="lg:col-span-2 rounded-xl overflow-hidden isg-card">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 rounded-2xl overflow-hidden isg-card">
           <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #EF4444, #F87171)' }} />
           <div className="p-4">
             <div className="flex items-center gap-2 mb-4">
@@ -552,8 +560,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-xl overflow-hidden isg-card">
-          <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #6366F1, #8B5CF6)' }} />
+        <div className="rounded-2xl overflow-hidden isg-card">
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #6366F1, #8B5CF6)' }} />
           <div className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
@@ -655,7 +663,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Yaklaşan Süreler + Son Aktiviteler ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="rounded-xl overflow-hidden isg-card">
           <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #F59E0B, #FBBF24)' }} />
           <div className="p-4">
@@ -732,7 +740,7 @@ export default function DashboardPage() {
       <CompanyDocumentsWidget />
 
       {/* ── Progress Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Aktif Firmalar',        value: aktifFirmalar.filter(f => f.durum === 'Aktif').length,         total: aktifFirmalar.length,    color: '#3B82F6', icon: 'ri-building-2-line',     accent: 'linear-gradient(135deg, #3B82F6, #6366F1)' },
           { label: 'Aktif Personeller',     value: aktifPersoneller.filter(p => p.durum === 'Aktif').length,      total: aktifPersoneller.length, color: '#10B981', icon: 'ri-team-line',           accent: 'linear-gradient(135deg, #10B981, #059669)' },
@@ -741,7 +749,7 @@ export default function DashboardPage() {
         ].map(item => {
           const pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;
           return (
-            <div key={item.label} className="rounded-xl overflow-hidden isg-card">
+            <div key={item.label} className="rounded-2xl overflow-hidden isg-card">
               <div className="h-[2px]" style={{ background: item.accent }} />
               <div className="p-3">
                 <div className="flex items-center gap-1.5 mb-1.5">

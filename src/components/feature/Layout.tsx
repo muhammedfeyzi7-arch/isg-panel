@@ -149,7 +149,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <Header onMobileMenuToggle={() => setMobileOpen(v => !v)} />
 
       <main
-        className={`transition-all duration-300 pt-12 min-h-screen ${
+        className={`transition-all duration-300 pt-[52px] min-h-screen ${
           sidebarCollapsed ? 'lg:pl-[56px]' : 'lg:pl-[220px]'
         }`}
       >

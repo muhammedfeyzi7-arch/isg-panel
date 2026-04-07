@@ -35,7 +35,7 @@ function parseValidDate(dateStr: string | null | undefined): Date | null {
 
 export default function AkilliOzet() {
   const {
-    firmalar, personeller, evraklar, egitimler, muayeneler,
+    firmalar, personeller, evraklar, muayeneler,
     uygunsuzluklar, ekipmanlar, gorevler, isIzinleri,
     setActiveModule,
   } = useApp();
@@ -46,7 +46,6 @@ export default function AkilliOzet() {
   const aktifFirmalar      = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
   const aktifPersoneller   = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);
   const aktifEvraklar      = useMemo(() => evraklar.filter(e => !e.silinmis), [evraklar]);
-  const aktifEgitimler     = useMemo(() => egitimler.filter(e => !e.silinmis), [egitimler]);
   const aktifMuayeneler    = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
   const aktifUygunsuzluklar= useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
   const aktifEkipmanlar    = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
@@ -221,21 +220,6 @@ export default function AkilliOzet() {
       });
     }
 
-    // Eğitim eksikliği
-    const egitimSizPersonel = aktifPersoneller.filter(p => {
-      return !aktifEgitimler.some(e => e.personelId === p.id || (e as unknown as Record<string, unknown>).katilimcilar?.includes?.(p.id));
-    });
-    if (egitimSizPersonel.length > 0 && aktifPersoneller.length > 0) {
-      list.push({
-        id: 'egitim-eksik',
-        icon: 'ri-graduation-cap-line',
-        title: `${egitimSizPersonel.length} Personelin Eğitim Kaydı Yok`,
-        detail: egitimSizPersonel.slice(0, 3).map(p => p.adSoyad).join(', ') + (egitimSizPersonel.length > 3 ? ` +${egitimSizPersonel.length - 3} daha` : ''),
-        color: '#60A5FA', bg: 'rgba(96,165,250,0.06)', border: 'rgba(96,165,250,0.15)',
-        priority: 40, level: 'info', module: 'egitimler', count: egitimSizPersonel.length,
-      });
-    }
-
     // Ayrılan personel
     const ayrilanPersonel = aktifPersoneller.filter(p => p.durum === 'Ayrıldı');
     if (ayrilanPersonel.length > 0) {
@@ -263,7 +247,7 @@ export default function AkilliOzet() {
     return list.sort((a, b) => b.priority - a.priority);
   }, [
     aktifEkipmanlar, aktifEvraklar, aktifMuayeneler, aktifGorevler,
-    aktifUygunsuzluklar, aktifIsIzinleri, aktifPersoneller, aktifEgitimler,
+    aktifUygunsuzluklar, aktifIsIzinleri, aktifPersoneller,
   ]);
 
   // Sağlık skoru hesapla

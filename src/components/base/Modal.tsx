@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../store/AppContext';
 
@@ -35,6 +35,8 @@ export default function Modal({
   accentColor = '#6366F1',
 }: ModalProps) {
   const visible = open ?? isOpen ?? false;
+  const [mounted, setMounted] = useState(false);
+  const [exiting, setExiting] = useState(false);
   let theme: 'dark' | 'light' = 'dark';
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -43,12 +45,30 @@ export default function Modal({
   } catch { /* outside context */ }
 
   useEffect(() => {
+    if (visible) {
+      setExiting(false);
+      setMounted(true);
+    } else if (mounted) {
+      setExiting(true);
+      const t = setTimeout(() => {
+        setMounted(false);
+        setExiting(false);
+      }, 220);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!visible) return;
     openModalCount++;
     document.body.style.overflow = 'hidden';
 
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        handleClose();
+      }
     };
     document.addEventListener('keydown', handler, true);
 
@@ -60,9 +80,16 @@ export default function Modal({
         document.body.style.overflow = '';
       }
     };
-  }, [visible, onClose]);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!visible) return null;
+  const handleClose = () => {
+    setExiting(true);
+    setTimeout(() => {
+      onClose();
+    }, 200);
+  };
+
+  if (!mounted) return null;
 
   const isDark = theme === 'dark';
 
@@ -75,7 +102,8 @@ export default function Modal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: '16px',
+        animation: exiting ? 'modal-backdrop-out 0.22s ease forwards' : 'modal-backdrop-in 0.2s ease both',
       }}
     >
       {/* Backdrop */}
@@ -88,25 +116,29 @@ export default function Modal({
           WebkitBackdropFilter: 'blur(12px)',
           zIndex: 0,
         }}
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal panel */}
       <div
-        className={`w-full ${sizeClasses[size]} animate-slide-up`}
+        className={`w-full ${sizeClasses[size]} modal-panel`}
         style={{
           position: 'relative',
           zIndex: 1,
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: 'calc(100vh - 40px)',
+          maxHeight: 'calc(100dvh - 48px)',
           background: isDark ? '#0A0F1E' : '#FFFFFF',
           border: `1px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.1)'}`,
-          borderRadius: '22px',
+          borderRadius: '16px',
           boxShadow: isDark
-            ? `0 0 0 1px ${accentColor}18, 0 40px 100px rgba(0,0,0,0.85), 0 0 60px ${accentColor}08`
-            : `0 0 0 1px rgba(15,23,42,0.06), 0 32px 80px rgba(15,23,42,0.18)`,
+            ? `0 0 0 1px ${accentColor}18, 0 24px 80px rgba(0,0,0,0.7), 0 0 60px ${accentColor}08`
+            : `0 0 0 1px rgba(15,23,42,0.06), 0 20px 60px rgba(15,23,42,0.18)`,
           overflow: 'hidden',
+          animation: exiting
+            ? 'modal-panel-out 0.2s cubic-bezier(0.55,0,1,0.45) forwards'
+            : 'modal-panel-in 0.26s cubic-bezier(0.34,1.2,0.64,1) both',
+          willChange: 'transform, opacity',
         }}
       >
         {/* Accent top bar */}
@@ -116,23 +148,24 @@ export default function Modal({
           flexShrink: 0,
         }} />
 
+
         {/* Header */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '20px 28px 18px',
+            padding: '16px 24px 14px',
             flexShrink: 0,
             borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {icon && (
               <div
                 style={{
-                  width: 38,
-                  height: 38,
+                  width: 40,
+                  height: 40,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -143,7 +176,7 @@ export default function Modal({
                   boxShadow: `0 4px 12px ${accentColor}20`,
                 }}
               >
-                <i className={`${icon} text-base`} style={{ color: accentColor }} />
+                <i className={`${icon} text-lg`} style={{ color: accentColor }} />
               </div>
             )}
             <div>
@@ -161,15 +194,16 @@ export default function Modal({
               </h2>
             </div>
           </div>
+          {/* Kapatma butonu — mobilde büyük touch alanı */}
           <button
-            onClick={onClose}
+            onClick={handleClose}
             style={{
-              width: 34,
-              height: 34,
+              width: 40,
+              height: 40,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: '10px',
+              borderRadius: '12px',
               cursor: 'pointer',
               background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.09)'}`,
@@ -188,7 +222,7 @@ export default function Modal({
               e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.09)';
             }}
           >
-            <i className="ri-close-line" style={{ fontSize: '15px' }} />
+            <i className="ri-close-line" style={{ fontSize: '18px' }} />
           </button>
         </div>
 
@@ -197,7 +231,7 @@ export default function Modal({
           style={{
             flex: '1 1 auto',
             overflowY: 'auto',
-            padding: '24px 28px',
+            padding: '24px',
             minHeight: 0,
             color: isDark ? '#E2E8F0' : '#0F172A',
           }}
@@ -205,19 +239,21 @@ export default function Modal({
           {children}
         </div>
 
-        {/* Footer */}
+        {/* Footer — mobilde full width butonlar */}
         {footer && (
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'flex-end',
               gap: '10px',
-              padding: '18px 28px',
+              padding: '16px 24px',
               flexShrink: 0,
-              flexWrap: 'wrap',
               borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
               background: isDark ? 'rgba(255,255,255,0.015)' : 'rgba(15,23,42,0.015)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '10px',
             }}
           >
             {footer}

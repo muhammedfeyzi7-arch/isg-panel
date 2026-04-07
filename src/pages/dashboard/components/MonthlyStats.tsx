@@ -92,9 +92,9 @@ export default function MonthlyStats() {
   const ayAdi = now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* ── Bu Ay Personel ── */}
-      <div className="rounded-xl p-4 isg-card">
+      <div className="rounded-2xl p-5 isg-card">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div
@@ -184,7 +184,7 @@ export default function MonthlyStats() {
       </div>
 
       {/* ── Yaklaşan Eğitimler ── */}
-      <div className="rounded-xl p-4 isg-card">
+      <div className="rounded-2xl p-5 isg-card">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div
@@ -290,7 +290,7 @@ export default function MonthlyStats() {
       </div>
 
       {/* ── Uygunsuzluklar ── */}
-      <div className="rounded-xl p-4 isg-card">
+      <div className="rounded-2xl p-5 isg-card">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div

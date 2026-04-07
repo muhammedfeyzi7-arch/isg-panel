@@ -87,7 +87,8 @@ export interface EgitimKatilimci {
 export interface Egitim {
   id: string;
   ad: string;
-  firmaId: string;
+  firmaId: string;       // Legacy — tek firma (eski kayıtlar için)
+  firmaIds?: string[];   // Yeni — çoklu firma desteği
   tarih: string;
   egitmen?: string;
   aciklama?: string;

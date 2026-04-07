@@ -6,19 +6,7 @@ import Modal from '../../components/base/Modal';
 import { usePermissions } from '@/hooks/usePermissions';
 import AiKatilimAnaliz from './components/AiKatilimAnaliz';
 
-// ── Sabit eğitim türleri ──
-const EGITIM_TURLERI = [
-  'İşe Giriş ve Oryantasyon Eğitimi',
-  'İSG Temel Eğitimi',
-  'Yangın Güvenliği Eğitimi',
-  'İlk Yardım Eğitimi',
-  'Kişisel Koruyucu Donanım Eğitimi',
-  'Acil Durum ve Tahliye Eğitimi',
-  'Tehlikeli Madde Eğitimi',
-  'Yüksekte Çalışma Güvenliği',
-  'Elektrik Güvenliği Eğitimi',
-  'Diğer',
-];
+
 
 // ── Katılım istatistikleri hesapla ──
 function getKatilimStats(eg: Egitim) {
@@ -272,16 +260,13 @@ export default function EgitimlerPage() {
   // ── Form state ──
   const emptyForm = {
     ad: '',
-    firmaId: '',
+    firmaIds: [] as string[],
     tarih: '',
     egitmen: '',
     aciklama: '',
     katilimcilar: [] as EgitimKatilimci[],
   };
   const [form, setForm] = useState({ ...emptyForm });
-
-  // Eğitim türü seçimi için ayrı state
-  const [turSecim, setTurSecim] = useState('');
 
   const handleRefresh = async () => {
     if (refreshing || dataLoading) return;
@@ -294,7 +279,6 @@ export default function EgitimlerPage() {
   useEffect(() => {
     if (quickCreate === 'egitimler') {
       setForm({ ...emptyForm });
-      setTurSecim('');
       setEditingId(null);
       setFormOpen(true);
       setQuickCreate(null);
@@ -315,20 +299,31 @@ export default function EgitimlerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [egitimler]);
 
-  // Firma değişince katılımcıları sıfırla
+  // Seçili firmalara ait personeller
   const firmaPersoneller = useMemo(() => {
-    if (!form.firmaId) return [];
-    return personeller.filter(p => p.firmaId === form.firmaId && !p.silinmis);
-  }, [form.firmaId, personeller]);
+    if (!form.firmaIds || form.firmaIds.length === 0) return [];
+    return personeller.filter(p => form.firmaIds.includes(p.firmaId) && !p.silinmis);
+  }, [form.firmaIds, personeller]);
 
-  // Firma değişince katılımcı listesini güncelle
-  const handleFirmaChange = (firmaId: string) => {
-    const yeniPersoneller = personeller.filter(p => p.firmaId === firmaId && !p.silinmis);
-    setForm(prev => ({
-      ...prev,
-      firmaId,
-      katilimcilar: yeniPersoneller.map(p => ({ personelId: p.id, katildi: true })),
-    }));
+  // Firma toggle (çoklu seçim)
+  const toggleFirma = (firmaId: string) => {
+    setForm(prev => {
+      const mevcutIds = prev.firmaIds ?? [];
+      const yeniFirmaIds = mevcutIds.includes(firmaId)
+        ? mevcutIds.filter(id => id !== firmaId)
+        : [...mevcutIds, firmaId];
+      // Kaldırılan firmanın personellerini katılımcılardan çıkar
+      const kaldirildi = mevcutIds.filter(id => !yeniFirmaIds.includes(id));
+      const kaldirilmisPersonelIds = new Set(
+        personeller.filter(p => kaldirildi.includes(p.firmaId)).map(p => p.id),
+      );
+      return {
+        ...prev,
+        firmaIds: yeniFirmaIds,
+        firmaId: yeniFirmaIds[0] ?? '',
+        katilimcilar: prev.katilimcilar.filter(k => !kaldirilmisPersonelIds.has(k.personelId)),
+      };
+    });
   };
 
   // Katılımcı toggle
@@ -360,16 +355,20 @@ export default function EgitimlerPage() {
       if (e.silinmis) return false;
       const q = search.toLowerCase();
       return (!search || e.ad.toLowerCase().includes(q) || (e.aciklama || '').toLowerCase().includes(q) || (e.egitmen || '').toLowerCase().includes(q))
-        && (!firmaFilter || e.firmaId === firmaFilter);
+        && (!firmaFilter || (e.firmaIds ? e.firmaIds.includes(firmaFilter) : e.firmaId === firmaFilter));
     })
     .sort((a, b) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? '')),
   [egitimler, search, firmaFilter]);
 
-  const getFirmaAd = (id: string) => firmalar.find(fi => fi.id === id)?.ad || '—';
+  const getFirmaAd = (eg: Egitim) => {
+    const ids = eg.firmaIds && eg.firmaIds.length > 0 ? eg.firmaIds : (eg.firmaId ? [eg.firmaId] : []);
+    if (ids.length === 0) return '—';
+    if (ids.length === 1) return firmalar.find(fi => fi.id === ids[0])?.ad || '—';
+    return ids.map(id => firmalar.find(fi => fi.id === id)?.ad || '—').join(', ');
+  };
 
   const openAdd = () => {
     setForm({ ...emptyForm });
-    setTurSecim('');
     setEditingId(null);
     setFormOpen(true);
   };
@@ -380,28 +379,32 @@ export default function EgitimlerPage() {
       ? eg.katilimcilar
       : (eg.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
 
+    // Legacy: firmaIds yoksa firmaId'den oluştur
+    const firmaIds = eg.firmaIds && eg.firmaIds.length > 0
+      ? eg.firmaIds
+      : eg.firmaId ? [eg.firmaId] : [];
+
     setForm({
       ad: eg.ad,
-      firmaId: eg.firmaId,
+      firmaIds,
       tarih: eg.tarih,
       egitmen: eg.egitmen || '',
       aciklama: eg.aciklama || '',
       katilimcilar,
     });
-    setTurSecim(EGITIM_TURLERI.includes(eg.ad) ? eg.ad : 'Diğer');
     setEditingId(eg.id);
     setFormOpen(true);
   };
 
   const handleSave = () => {
-    const adFinal = turSecim === 'Diğer' || !EGITIM_TURLERI.includes(turSecim) ? form.ad : turSecim;
-    if (!adFinal.trim()) { addToast('Eğitim adı zorunludur.', 'error'); return; }
-    if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
+    if (!form.ad.trim()) { addToast('Eğitim adı zorunludur.', 'error'); return; }
+    if (!form.firmaIds || form.firmaIds.length === 0) { addToast('En az bir firma seçimi zorunludur.', 'error'); return; }
     if (!form.tarih) { addToast('Eğitim tarihi zorunludur.', 'error'); return; }
 
     const payload: Omit<Egitim, 'id' | 'olusturmaTarihi'> = {
-      ad: adFinal,
-      firmaId: form.firmaId,
+      ad: form.ad,
+      firmaId: form.firmaIds[0] ?? '',
+      firmaIds: form.firmaIds,
       tarih: form.tarih,
       egitmen: form.egitmen,
       aciklama: form.aciklama,
@@ -587,7 +590,7 @@ export default function EgitimlerPage() {
                         <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{eg.ad}</p>
                         <DurumBadge eg={eg} />
                       </div>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{getFirmaAd(eg.firmaId)}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{getFirmaAd(eg)}</p>
                       <div className="flex items-center gap-3 mt-1">
                         {eg.tarih && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{new Date(eg.tarih).toLocaleDateString('tr-TR')}</span>}
                         {eg.egitmen && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{eg.egitmen}</span>}
@@ -654,7 +657,7 @@ export default function EgitimlerPage() {
                         </div>
                       </td>
                       <td className="hidden md:table-cell">
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(eg.firmaId)}</p>
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(eg)}</p>
                       </td>
                       <td className="hidden lg:table-cell">
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{eg.egitmen || '—'}</p>
@@ -708,34 +711,45 @@ export default function EgitimlerPage() {
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Firma */}
-            <div>
-              <label className="form-label">Firma *</label>
-              <select value={form.firmaId} onChange={e => handleFirmaChange(e.target.value)} className="isg-input">
-                <option value="">Firma Seçin</option>
-                {firmalar.filter(f => !f.silinmis).map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
-              </select>
+            {/* Eğitim Adı */}
+            <div className="sm:col-span-2">
+              <label className="form-label">Eğitim Adı *</label>
+              <input
+                value={form.ad}
+                onChange={e => setForm(p => ({ ...p, ad: e.target.value }))}
+                placeholder="Eğitim adını yazın..."
+                className="isg-input"
+              />
             </div>
 
-            {/* Eğitim Türü */}
-            <div>
-              <label className="form-label">Eğitim Adı *</label>
-              <select value={turSecim} onChange={e => {
-                setTurSecim(e.target.value);
-                if (e.target.value !== 'Diğer') setForm(p => ({ ...p, ad: e.target.value }));
-                else setForm(p => ({ ...p, ad: '' }));
-              }} className="isg-input">
-                <option value="">Seçin...</option>
-                {EGITIM_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              {(turSecim === 'Diğer' || (!EGITIM_TURLERI.includes(turSecim) && turSecim !== '')) && (
-                <input
-                  value={form.ad}
-                  onChange={e => setForm(p => ({ ...p, ad: e.target.value }))}
-                  placeholder="Özel eğitim adı yazın..."
-                  className="isg-input mt-2"
-                />
-              )}
+            {/* Çoklu Firma Seçimi */}
+            <div className="sm:col-span-2">
+              <label className="form-label">
+                Firma(lar) *
+                <span className="ml-2 text-[11px] font-normal" style={{ color: 'var(--text-faint)' }}>
+                  ({(form.firmaIds ?? []).length} seçili)
+                </span>
+              </label>
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-main)' }}>
+                <div className="max-h-36 overflow-y-auto divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                  {firmalar.filter(f => !f.silinmis).map(f => {
+                    const secili = (form.firmaIds ?? []).includes(f.id);
+                    return (
+                      <button key={f.id} type="button" onClick={() => toggleFirma(f.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors cursor-pointer"
+                        style={{ background: secili ? 'rgba(99,102,241,0.06)' : undefined }}>
+                        <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all"
+                          style={secili
+                            ? { background: 'linear-gradient(135deg, #6366F1, #818CF8)' }
+                            : { background: 'var(--bg-input)', border: '1.5px solid var(--border-main)' }}>
+                          {secili && <i className="ri-check-line text-white text-[10px]" />}
+                        </div>
+                        <span className="text-sm" style={{ color: secili ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{f.ad}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Tarih */}
@@ -778,7 +792,7 @@ export default function EgitimlerPage() {
           />
 
           {/* Katılımcı Seçimi */}
-          {form.firmaId && (
+          {(form.firmaIds ?? []).length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="form-label mb-0">
@@ -886,7 +900,7 @@ export default function EgitimlerPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Firma</p>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{getFirmaAd(detailEgitim.firmaId)}</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{getFirmaAd(detailEgitim)}</p>
               </div>
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Tarih</p>
