@@ -291,6 +291,7 @@ export default function AkilliOzet() {
     : infoItems;
 
   const levelConfig = {
+    all:      { label: 'Tümü',   color: '#64748B', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.2)', icon: 'ri-list-check' },
     critical: { label: 'Kritik', color: '#EF4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', icon: 'ri-error-warning-fill' },
     warning:  { label: 'Uyarı',  color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', icon: 'ri-alert-line' },
     info:     { label: 'Bilgi',  color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.2)', icon: 'ri-information-line' },
@@ -526,8 +527,8 @@ export default function AkilliOzet() {
           <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
             <i className="ri-filter-3-line" />
             <span>Filtre:</span>
-            <span className="font-bold" style={{ color: levelConfig[activeFilter as keyof typeof levelConfig]?.color }}>
-              {levelConfig[activeFilter as keyof typeof levelConfig]?.label}
+            <span className="font-bold" style={{ color: levelConfig[activeFilter as keyof typeof levelConfig]?.color ?? '#64748B' }}>
+              {levelConfig[activeFilter as keyof typeof levelConfig]?.label ?? activeFilter}
             </span>
             <button onClick={() => setActiveFilter('all')} className="ml-auto flex items-center gap-1 cursor-pointer"
               style={{ color: 'var(--text-muted)' }}>
