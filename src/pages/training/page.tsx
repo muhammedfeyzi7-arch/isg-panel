@@ -669,7 +669,7 @@ export default function EgitimlerPage() {
 
           {/* Belge / Evrak Yükleme */}
           <div className="sm:col-span-2">
-            <label className="form-label">Eğitim Belgesi / Evrak (PDF / JPG / PNG — Maks. 10MB)</label>
+            <label className="form-label">Eğitim Belgesi / Evrak (PDF / JPG / PNG — Maks. 50MB)</label>
             <div
               className="rounded-xl p-5 text-center cursor-pointer transition-all duration-200"
               style={{ border: '2px dashed var(--border-main)', background: 'var(--bg-item)' }}
@@ -693,7 +693,7 @@ export default function EgitimlerPage() {
                 <>
                   <i className="ri-upload-cloud-2-line text-2xl mb-2" style={{ color: 'var(--text-faint)' }} />
                   <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Belge sürükleyin veya tıklayın</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG • Maks. 10MB</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG • Maks. 50MB</p>
                 </>
               )}
             </div>

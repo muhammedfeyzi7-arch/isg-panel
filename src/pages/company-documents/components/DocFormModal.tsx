@@ -228,7 +228,7 @@ export default function DocFormModal({ isOpen, onClose, onSave, editDoc, firmala
               <>
                 <i className="ri-upload-cloud-2-line text-2xl mb-2" style={{ color: 'var(--text-faint)' }} />
                 <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Dosyayı sürükleyin veya tıklayın</p>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG, DOCX — Maks. 10MB</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG, DOCX — Maks. 50MB</p>
               </>
             )}
           </div>

@@ -6,8 +6,6 @@ import LoginPage from "../pages/login/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
-import QrDetailPage from "../pages/equipment/QrDetailPage";
-
 const routes: RouteObject[] = [
   {
     path: "/login",
@@ -30,17 +28,6 @@ const routes: RouteObject[] = [
     element: (
       <ProtectedRoute>
         <Home />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    // QR kod sayfası — ProtectedRoute ile korunuyor
-    // Giriş yapılmamışsa /login'e yönlendirir
-    // Giriş yapıldıktan sonra organization bazlı veri gösterir
-    path: "/equipment/qr/:id",
-    element: (
-      <ProtectedRoute>
-        <QrDetailPage />
       </ProtectedRoute>
     ),
   },

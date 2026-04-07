@@ -75,8 +75,8 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
         addToast(`${file.name} — desteklenmeyen format, atlandı.`, 'warning');
         continue;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        addToast(`${file.name} — 10MB sınırını aşıyor, atlandı.`, 'warning');
+      if (file.size > 50 * 1024 * 1024) {
+        addToast(`${file.name} — 50MB sınırını aşıyor, atlandı.`, 'warning');
         continue;
       }
       const nameWithoutExt = file.name.replace(/\.[^.]+$/, '');
@@ -316,7 +316,7 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
               Dosyaları sürükleyin veya tıklayın
             </p>
             <p className="text-xs" style={{ color: textSecondary }}>
-              PDF, JPG, PNG &bull; Aynı anda birden fazla dosya &bull; Maks. 10MB/dosya
+              PDF, JPG, PNG &bull; Aynı anda birden fazla dosya &bull; Maks. 50MB/dosya
             </p>
             <input
               ref={fileInputRef}

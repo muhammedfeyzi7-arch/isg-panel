@@ -1334,7 +1334,7 @@ export default function EkipmanlarPage() {
                     <>
                       <i className="ri-upload-cloud-2-line text-2xl mb-1.5" style={{ color: '#334155' }} />
                       <p className="text-sm font-medium text-slate-400">Belgeyi sürükleyin veya tıklayın</p>
-                      <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG • Maks. 10MB</p>
+                      <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG • Maks. 50MB</p>
                     </>
                   )}
                 </div>

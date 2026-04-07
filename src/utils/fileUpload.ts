@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
  * Dosya doğrulama — boyut ve tip kontrolü
  * @returns null if valid, error message string if invalid
  */
-export function validateFile(file: File, maxMB = 10): string | null {
+export function validateFile(file: File, maxMB = 50): string | null {
   const maxBytes = maxMB * 1024 * 1024;
   if (file.size > maxBytes) {
     return `Dosya boyutu ${maxMB}MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB).`;
@@ -66,11 +66,11 @@ export async function uploadFileToStorage(
   module: string,
   recordId?: string,
 ): Promise<string | null> {
-  // FIX 2: Enforce 10MB server-side limit — cannot be bypassed by frontend
-  const MAX_BYTES = 10 * 1024 * 1024;
+  // Enforce 50MB server-side limit — cannot be bypassed by frontend
+  const MAX_BYTES = 50 * 1024 * 1024;
   if (file.size > MAX_BYTES) {
-    console.error(`[fileUpload] File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB > 10MB limit`);
-    throw new Error(`Dosya boyutu 10MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB). Lütfen daha küçük bir dosya seçin.`);
+    console.error(`[fileUpload] File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB > 50MB limit`);
+    throw new Error(`Dosya boyutu 50MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB). Lütfen daha küçük bir dosya seçin.`);
   }
 
   try {
@@ -112,13 +112,13 @@ export async function uploadBase64ToStorage(
     const ext = fileName?.split('.').pop()?.toLowerCase() ?? mime.split('/')[1]?.split('+')[0] ?? 'bin';
     const filePath = `${orgId}/${module}/${recordId}.${ext}`;
 
-    // FIX 2: Enforce 10MB server-side limit on base64 uploads
+    // Enforce 50MB server-side limit on base64 uploads
     // base64 is ~33% larger than binary, so actual size = base64.length * 0.75
     const estimatedBytes = Math.ceil(data.length * 0.75);
-    const MAX_BYTES = 10 * 1024 * 1024;
+    const MAX_BYTES = 50 * 1024 * 1024;
     if (estimatedBytes > MAX_BYTES) {
-      console.error(`[fileUpload] base64 too large: ~${(estimatedBytes / 1024 / 1024).toFixed(1)}MB > 10MB limit`);
-      throw new Error(`Dosya boyutu 10MB sınırını aşıyor (~${(estimatedBytes / 1024 / 1024).toFixed(1)}MB). Lütfen daha küçük bir dosya seçin.`);
+      console.error(`[fileUpload] base64 too large: ~${(estimatedBytes / 1024 / 1024).toFixed(1)}MB > 50MB limit`);
+      throw new Error(`Dosya boyutu 50MB sınırını aşıyor (~${(estimatedBytes / 1024 / 1024).toFixed(1)}MB). Lütfen daha küçük bir dosya seçin.`);
     }
 
     const byteString = atob(data);

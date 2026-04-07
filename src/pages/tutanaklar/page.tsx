@@ -1308,7 +1308,7 @@ export default function TutanaklarPage() {
                     <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
                       Dosya sürükleyin veya tıklayın
                     </p>
-                    <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG • Maks. 5MB</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>PDF, JPG, PNG • Maks. 50MB</p>
                   </>
                 )}
               </div>

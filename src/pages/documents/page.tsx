@@ -588,7 +588,7 @@ export default function EvraklarPage() {
                     <i className="ri-upload-cloud-2-line text-2xl" style={{ color: '#334155' }} />
                   </div>
                   <p className="text-sm font-medium text-slate-400">Dosyayı buraya sürükleyin veya tıklayın</p>
-                  <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG desteklenir • Maks. 10MB</p>
+                  <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG desteklenir • Maks. 50MB</p>
                 </>
               )}
             </div>
