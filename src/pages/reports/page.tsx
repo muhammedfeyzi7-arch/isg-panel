@@ -481,6 +481,66 @@ export default function RaporlarPage() {
     yuksek: aktifUygunsuzluklar.filter(u => u.severity === 'Yüksek').length,
   }), [aktifUygunsuzluklar]);
 
+  // Yeni katılım istatistikleri
+  const egitimKatilimStats = useMemo(() => {
+    let toplamKatilimci = 0;
+    let toplamKatildi = 0;
+    let toplamKatilmadi = 0;
+    let egitimSayisiKatilimciVar = 0;
+
+    aktifEgitimler.forEach(e => {
+      const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
+      if (katilimcilar.length > 0) {
+        egitimSayisiKatilimciVar++;
+        toplamKatilimci += katilimcilar.length;
+        toplamKatildi += katilimcilar.filter(k => k.katildi).length;
+        toplamKatilmadi += katilimcilar.filter(k => !k.katildi).length;
+      }
+    });
+
+    const katilimOrani = toplamKatilimci > 0 ? Math.round((toplamKatildi / toplamKatilimci) * 100) : 0;
+
+    return {
+      toplamEgitim: aktifEgitimler.length,
+      egitimSayisiKatilimciVar,
+      toplamKatilimci,
+      toplamKatildi,
+      toplamKatilmadi,
+      katilimOrani,
+    };
+  }, [aktifEgitimler]);
+
+  // Firma bazlı eğitim dağılımı
+  const egitimFirmaDagilim = useMemo(() => {
+    const map = new Map<string, { firmaAd: string; egitimSayisi: number; toplamKatilimci: number; toplamKatildi: number }>();
+    aktifEgitimler.forEach(e => {
+      const firma = aktifFirmalar.find(f => f.id === e.firmaId);
+      if (!firma) return;
+      const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
+      const existing = map.get(e.firmaId) ?? { firmaAd: firma.ad, egitimSayisi: 0, toplamKatilimci: 0, toplamKatildi: 0 };
+      map.set(e.firmaId, {
+        firmaAd: firma.ad,
+        egitimSayisi: existing.egitimSayisi + 1,
+        toplamKatilimci: existing.toplamKatilimci + katilimcilar.length,
+        toplamKatildi: existing.toplamKatildi + katilimcilar.filter(k => k.katildi).length,
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => b.egitimSayisi - a.egitimSayisi).slice(0, 8);
+  }, [aktifEgitimler, aktifFirmalar]);
+
+  // Aylık katılım trendi
+  const egitimAylikKatilim = useMemo(() => months.map(m => {
+    const ayEgitimleri = aktifEgitimler.filter(e => getMonthKey(e.tarih || e.olusturmaTarihi) === m.key);
+    let katildi = 0;
+    let katilmadi = 0;
+    ayEgitimleri.forEach(e => {
+      const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
+      katildi += katilimcilar.filter(k => k.katildi).length;
+      katilmadi += katilimcilar.filter(k => !k.katildi).length;
+    });
+    return { ay: m.label, 'Katıldı': katildi, 'Katılmadı': katilmadi, 'Eğitim Sayısı': ayEgitimleri.length };
+  }), [months, aktifEgitimler]);
+
   const egitimDurum = useMemo(() => [
     { name: 'Tamamlandı', value: aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length, color: '#10B981' },
     { name: 'Planlandı', value: aktifEgitimler.filter(e => e.durum === 'Planlandı').length, color: '#3B82F6' },
@@ -534,7 +594,7 @@ export default function RaporlarPage() {
     { label: 'Toplam Firma', value: aktifFirmalar.length, icon: 'ri-building-2-line', color: '#3B82F6', sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma` },
     { label: 'Toplam Personel', value: aktifPersoneller.length, icon: 'ri-team-line', color: '#10B981', sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel` },
     { label: 'Toplam Evrak', value: aktifEvraklar.length, icon: 'ri-file-list-3-line', color: '#F59E0B', sub: `${evrakStats.eksik + evrakStats.sureDolmus} sorunlu evrak` },
-    { label: 'Eğitim Kayıtları', value: aktifEgitimler.length, icon: 'ri-graduation-cap-line', color: '#6366F1', sub: `${aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length} tamamlandı` },
+    { label: 'Eğitim Kayıtları', value: aktifEgitimler.length, icon: 'ri-graduation-cap-line', color: '#6366F1', sub: `%${egitimKatilimStats.katilimOrani} katılım oranı` },
     { label: 'Açık Uygunsuzluk', value: uygunsuzlukStats.acik, icon: 'ri-alert-line', color: uygunsuzlukStats.acik > 0 ? '#EF4444' : '#10B981', sub: `${uygunsuzlukStats.kapandi} kapatıldı` },
     { label: 'Sağlık Takibi', value: saglikStats.toplam, icon: 'ri-heart-pulse-line', color: '#EC4899', sub: `${saglikStats.gecmis} süresi geçmiş` },
     { label: 'Tutanaklar', value: aktifTutanaklar.length, icon: 'ri-article-line', color: '#F97316', sub: `${aktifTutanaklar.filter(t => t.durum === 'Onaylandı').length} onaylı` },
@@ -737,7 +797,7 @@ export default function RaporlarPage() {
           ['Toplam Firma', exFirmalar.length, 'Aktif Firma', exFirmalar.filter(f => f.durum === 'Aktif').length],
           ['Toplam Personel', exPersoneller.length, 'Aktif Personel', exPersoneller.filter(p => p.durum === 'Aktif').length],
           ['Toplam Evrak', exEvraklar.length, 'Sorunlu Evrak', evrakStats.eksik + evrakStats.sureDolmus],
-          ['Toplam Eğitim', exEgitimler.length, 'Tamamlanan', exEgitimler.filter(e => e.durum === 'Tamamlandı').length],
+          ['Toplam Eğitim', exEgitimler.length, 'Katılım Oranı', `%${egitimKatilimStats.katilimOrani}`],
           ['Sağlık Takibi', exMuayeneler.length, 'Süresi Geçmiş', exMuayeneler.filter(m => (calcDays(m.sonrakiTarih) ?? 1) < 0).length],
           ['Toplam Ekipman', exEkipmanlar.length, 'Uygun Değil', exEkipmanlar.filter(e => e.durum === 'Uygun Değil').length],
           ['Açık Uygunsuzluk', uygunsuzlukStats.acik, 'Kapatılan', uygunsuzlukStats.kapandi],
@@ -799,14 +859,83 @@ export default function RaporlarPage() {
         );
 
         // ── SAYFA 5: EĞİTİMLER ──
-        buildSheet('Eğitimler', 'EĞİTİMLER LİSTESİ', `Toplam ${exEgitimler.length} eğitim  |  ${firmaAdi}  |  Rapor: ${tarih}`,
-          ['#', 'Eğitim Adı', 'Tür', 'Firma', 'Eğitimci', 'Durum', 'Tarih', 'Süre', 'Katılımcı'],
-          exEgitimler.map((e, i) => {
+        const egitimListeWs = wb.addWorksheet('Eğitimler');
+        const egitimListeCols = ['#', 'Eğitim Adı', 'Firma', 'Eğitmen', 'Tarih', 'Açıklama', 'Toplam Katılımcı', 'Katıldı', 'Katılmadı', 'Katılım Oranı'];
+        egitimListeWs.columns = [4, 32, 26, 22, 14, 30, 16, 12, 12, 14].map(w => ({ width: w }));
+        applyHeaderRows(egitimListeWs, 'EĞİTİMLER LİSTESİ', `Toplam ${exEgitimler.length} eğitim  |  ${firmaAdi}  |  Rapor: ${tarih}`, egitimListeCols.length);
+        applyHeaderCols(egitimListeWs, egitimListeCols);
+        exEgitimler
+          .sort((a, b) => new Date(b.tarih || b.olusturmaTarihi).getTime() - new Date(a.tarih || a.olusturmaTarihi).getTime())
+          .forEach((e, i) => {
             const firma = aktifFirmalar.find(f => f.id === e.firmaId);
-            return [i+1, e.ad, (e as unknown as { tur?: string }).tur||'—', firma?.ad||'—', e.egitmen||'—', e.durum, fmtDate(e.tarih), e.sure ? `${e.sure} dk` : '—', e.katilimciIds?.length ?? '—'];
-          }),
-          [4, 30, 20, 24, 22, 14, 14, 10, 12],
-        );
+            const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
+            const katildi = katilimcilar.filter(k => k.katildi).length;
+            const katilmadi = katilimcilar.filter(k => !k.katildi).length;
+            const oran = katilimcilar.length > 0 ? `%${Math.round((katildi / katilimcilar.length) * 100)}` : '—';
+            const exRow = egitimListeWs.getRow(5 + i);
+            exRow.height = 20;
+            const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
+            const vals = [i+1, e.ad, firma?.ad||'—', e.egitmen||'—', fmtDate(e.tarih), e.aciklama||'—', katilimcilar.length, katildi, katilmadi, oran];
+            vals.forEach((val, ci) => {
+              const cell = exRow.getCell(ci + 1);
+              cell.value = val;
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+              cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF1E293B' } };
+              cell.alignment = { vertical: 'middle', wrapText: ci === 5 };
+              cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, right: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
+              if (ci === 0) { cell.font = { size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+              if (ci === 7) { cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: 'FF16A34A' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+              if (ci === 8 && katilmadi > 0) { cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: 'FFD97706' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+              if (ci === 9 && oran !== '—') {
+                const oranNum = parseInt(oran.replace('%', ''));
+                const oranColor = oranNum >= 80 ? 'FF16A34A' : oranNum >= 60 ? 'FFD97706' : 'FFDC2626';
+                const oranBg = oranNum >= 80 ? 'FFDCFCE7' : oranNum >= 60 ? 'FFFEF3C7' : 'FFFEE2E2';
+                cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: oranColor } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: oranBg } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+              }
+            });
+          });
+        egitimListeWs.views = [{ state: 'frozen', ySplit: 4 }];
+
+        // ── SAYFA 5b: EĞİTİM KATILIMCI DETAY ──
+        const katilimWs = wb.addWorksheet('Eğitim Katılım Detay');
+        const katilimCols = ['#', 'Eğitim Adı', 'Firma', 'Tarih', 'Personel Adı', 'Görev', 'Katılım Durumu'];
+        katilimWs.columns = [4, 30, 24, 14, 26, 20, 16].map(w => ({ width: w }));
+        applyHeaderRows(katilimWs, 'EĞİTİM KATILIM DETAY', `Tüm eğitimlerin katılımcı detayı  |  ${firmaAdi}  |  Rapor: ${tarih}`, katilimCols.length);
+        applyHeaderCols(katilimWs, katilimCols);
+        let katilimRowIdx = 0;
+        exEgitimler
+          .sort((a, b) => new Date(b.tarih || b.olusturmaTarihi).getTime() - new Date(a.tarih || a.olusturmaTarihi).getTime())
+          .forEach(e => {
+            const firma = aktifFirmalar.find(f => f.id === e.firmaId);
+            const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
+            katilimcilar.forEach(k => {
+              const personel = exPersoneller.find(p => p.id === k.personelId);
+              const exRow = katilimWs.getRow(5 + katilimRowIdx);
+              exRow.height = 18;
+              const bg = katilimRowIdx % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
+              const durumLabel = k.katildi ? 'Katıldı' : 'Katılmadı';
+              const vals = [katilimRowIdx + 1, e.ad, firma?.ad||'—', fmtDate(e.tarih), personel?.adSoyad||'—', personel?.gorev||'—', durumLabel];
+              vals.forEach((val, ci) => {
+                const cell = exRow.getCell(ci + 1);
+                cell.value = val;
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+                cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF1E293B' } };
+                cell.alignment = { vertical: 'middle' };
+                cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, right: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
+                if (ci === 0) { cell.font = { size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+                if (ci === 6) {
+                  const sc = k.katildi ? { fg: 'FF16A34A', bg: 'FFDCFCE7' } : { fg: 'FFD97706', bg: 'FFFEF3C7' };
+                  cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: sc.fg } };
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sc.bg } };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                }
+              });
+              katilimRowIdx++;
+            });
+          });
+        katilimWs.views = [{ state: 'frozen', ySplit: 4 }];
 
         // ── SAYFA 6: SAĞLIK TAKİBİ ──
         const saglikWs = wb.addWorksheet('Sağlık Takibi');
@@ -942,21 +1071,29 @@ export default function RaporlarPage() {
 
         // ── SAYFA 9: FİRMA BAZLI ÖZET ──
         buildSheet('Firma Özeti', 'FİRMA BAZLI ÖZET', `${exFirmalar.length} firma için konsolide özet  |  ${firmaAdi}  |  Rapor: ${tarih}`,
-          ['#', 'Firma Adı', 'Tehlike Sınıfı', 'Durum', 'Personel', 'Aktif P.', 'Evrak', 'Sorunlu E.', 'Eğitim', 'Sağlık Takibi', 'Geçmiş Muayene', 'Açık Uyg.', 'Ekipman'],
+          ['#', 'Firma Adı', 'Tehlike Sınıfı', 'Durum', 'Personel', 'Aktif P.', 'Evrak', 'Sorunlu E.', 'Eğitim', 'Katılım Oranı', 'Sağlık Takibi', 'Geçmiş Muayene', 'Açık Uyg.', 'Ekipman'],
           exFirmalar.map((f, i) => {
             const pS = exPersoneller.filter(p => p.firmaId === f.id).length;
             const aP = exPersoneller.filter(p => p.firmaId === f.id && p.durum === 'Aktif').length;
             const eS = exEvraklar.filter(e => e.firmaId === f.id).length;
             const xE = exEvraklar.filter(e => e.firmaId === f.id && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
-            const egS = exEgitimler.filter(e => e.firmaId === f.id).length;
+            const firmaEgitimler = exEgitimler.filter(e => e.firmaId === f.id);
+            const egS = firmaEgitimler.length;
+            let firmaToplamKatilimci = 0; let firmaKatildi = 0;
+            firmaEgitimler.forEach(eg => {
+              const kl = eg.katilimcilar ?? (eg.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
+              firmaToplamKatilimci += kl.length;
+              firmaKatildi += kl.filter(k => k.katildi).length;
+            });
+            const firmaKatilimOrani = firmaToplamKatilimci > 0 ? `%${Math.round((firmaKatildi / firmaToplamKatilimci) * 100)}` : '—';
             const firmaMuayeneler = exMuayeneler.filter(m => exPersoneller.find(p => p.id === m.personelId)?.firmaId === f.id);
             const muS = firmaMuayeneler.length;
             const muGecmis = firmaMuayeneler.filter(m => (calcDays(m.sonrakiTarih) ?? 1) < 0).length;
             const uS = exUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
             const ekS = exEkipmanlar.filter(e => e.firmaId === f.id).length;
-            return [i+1, f.ad, f.tehlikeSinifi, f.durum, pS, aP, eS, xE, egS, muS, muGecmis, uS, ekS];
+            return [i+1, f.ad, f.tehlikeSinifi, f.durum, pS, aP, eS, xE, egS, firmaKatilimOrani, muS, muGecmis, uS, ekS];
           }),
-          [4, 26, 16, 12, 10, 10, 10, 12, 10, 12, 14, 12, 10],
+          [4, 26, 16, 12, 10, 10, 10, 12, 10, 14, 12, 14, 12, 10],
         );
 
         // ── TEK DOSYA OLARAK İNDİR ──
@@ -1617,50 +1754,265 @@ export default function RaporlarPage() {
       {/* EĞİTİMLER */}
       {activeTab === 'egitim' && (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* KPI Kartları */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Toplam Eğitim', value: aktifEgitimler.length, color: '#6366F1', icon: 'ri-graduation-cap-line', sub: 'Tüm kayıtlar' },
-              { label: 'Tamamlandı', value: aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length, color: '#10B981', icon: 'ri-checkbox-circle-line', sub: 'Başarıyla bitti' },
-              { label: 'Planlandı', value: aktifEgitimler.filter(e => e.durum === 'Planlandı').length, color: '#3B82F6', icon: 'ri-calendar-check-line', sub: 'Yaklaşan eğitim' },
+              { label: 'Toplam Eğitim', value: egitimKatilimStats.toplamEgitim, color: '#6366F1', icon: 'ri-graduation-cap-line', sub: `${egitimKatilimStats.egitimSayisiKatilimciVar} eğitimde katılımcı var` },
+              { label: 'Toplam Katılımcı', value: egitimKatilimStats.toplamKatilimci, color: '#10B981', icon: 'ri-team-line', sub: 'Tüm eğitimlerde' },
+              { label: 'Katıldı', value: egitimKatilimStats.toplamKatildi, color: '#34D399', icon: 'ri-checkbox-circle-line', sub: `%${egitimKatilimStats.katilimOrani} katılım oranı` },
+              { label: 'Katılmadı', value: egitimKatilimStats.toplamKatilmadi, color: '#F59E0B', icon: 'ri-close-circle-line', sub: 'Devamsız personel' },
             ].map((item, i) => (
               <AnimatedKPICard key={item.label} {...item} trend={undefined} delay={i * 80} />
             ))}
           </div>
 
+          {/* Katılım Oranı Göstergesi */}
+          <GlassCard>
+            <SectionHeader title="Genel Katılım Oranı" subtitle="Tüm eğitimlerdeki toplam katılım performansı" icon="ri-bar-chart-grouped-line" color="#6366F1" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+              {/* Büyük oran göstergesi */}
+              <div className="flex flex-col items-center justify-center py-4">
+                <div className="relative w-36 h-36">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadialBarChart cx="50%" cy="50%" innerRadius="65%" outerRadius="90%" startAngle={225} endAngle={-45}
+                      data={[{ value: egitimKatilimStats.katilimOrani, fill: egitimKatilimStats.katilimOrani >= 80 ? '#10B981' : egitimKatilimStats.katilimOrani >= 60 ? '#F59E0B' : '#EF4444' }]}>
+                      <RadialBar dataKey="value" cornerRadius={8} background={{ fill: 'rgba(255,255,255,0.04)' }}
+                        fill={egitimKatilimStats.katilimOrani >= 80 ? '#10B981' : egitimKatilimStats.katilimOrani >= 60 ? '#F59E0B' : '#EF4444'} />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-black" style={{
+                      color: egitimKatilimStats.katilimOrani >= 80 ? '#10B981' : egitimKatilimStats.katilimOrani >= 60 ? '#F59E0B' : '#EF4444',
+                      letterSpacing: '-0.04em',
+                    }}>
+                      %{egitimKatilimStats.katilimOrani}
+                    </span>
+                    <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>katılım</span>
+                  </div>
+                </div>
+                <span className="mt-2 text-xs font-bold px-3 py-1 rounded-full" style={{
+                  background: egitimKatilimStats.katilimOrani >= 80 ? 'rgba(16,185,129,0.12)' : egitimKatilimStats.katilimOrani >= 60 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
+                  color: egitimKatilimStats.katilimOrani >= 80 ? '#10B981' : egitimKatilimStats.katilimOrani >= 60 ? '#F59E0B' : '#EF4444',
+                }}>
+                  {egitimKatilimStats.katilimOrani >= 80 ? 'İyi' : egitimKatilimStats.katilimOrani >= 60 ? 'Orta' : 'Düşük'}
+                </span>
+              </div>
+
+              {/* Progress barlar */}
+              <div className="lg:col-span-2 space-y-4">
+                <AnimatedProgressBar label="Katılan Personel" value={egitimKatilimStats.toplamKatildi} total={egitimKatilimStats.toplamKatilimci} color="#10B981" delay={0} />
+                <AnimatedProgressBar label="Katılmayan Personel" value={egitimKatilimStats.toplamKatilmadi} total={egitimKatilimStats.toplamKatilimci} color="#F59E0B" delay={100} />
+                <div className="pt-3 grid grid-cols-3 gap-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                  {[
+                    { label: 'Toplam Eğitim', value: egitimKatilimStats.toplamEgitim, color: '#6366F1' },
+                    { label: 'Toplam Katılımcı', value: egitimKatilimStats.toplamKatilimci, color: '#10B981' },
+                    { label: 'Ort. Katılımcı/Eğitim', value: egitimKatilimStats.egitimSayisiKatilimciVar > 0 ? Math.round(egitimKatilimStats.toplamKatilimci / egitimKatilimStats.egitimSayisiKatilimciVar) : 0, color: '#F59E0B' },
+                  ].map(s => (
+                    <div key={s.label} className="text-center rounded-xl p-3" style={{ background: `${s.color}08`, border: `1px solid ${s.color}15` }}>
+                      <p className="text-2xl font-black" style={{ color: s.color, letterSpacing: '-0.04em' }}>{s.value}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* Aylık Katılım Trendi */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <GlassCard>
-              <SectionHeader title="Eğitim Durum Dağılımı" subtitle="Eğitimlerin duruma göre dağılımı" icon="ri-pie-chart-line" color="#6366F1" />
-              {egitimDurum.length === 0 ? (
-                <div className="flex items-center justify-center h-40">
-                  <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Henüz eğitim kaydı yok</p>
-                </div>
-              ) : (
-                <DonutChart data={egitimDurum} size={160} />
-              )}
-            </GlassCard>
-
-            <GlassCard>
-              <SectionHeader title="Aylık Eğitim Trendi" subtitle="Son 12 ayda eklenen eğitimler" icon="ri-bar-chart-line" color="#6366F1" />
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={monthlyTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <SectionHeader title="Aylık Katılım Trendi" subtitle="Son 12 ayda katılan ve katılmayan personel sayısı" icon="ri-bar-chart-line" color="#6366F1" />
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={egitimAylikKatilim} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                   <XAxis dataKey="ay" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="Eğitim" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                  <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, paddingTop: 10, color: '#94A3B8' }} />
+                  <Bar dataKey="Katıldı" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Katılmadı" fill="#F59E0B" radius={[4, 4, 0, 0]} />
                 </BarChart>
+              </ResponsiveContainer>
+            </GlassCard>
+
+            <GlassCard>
+              <SectionHeader title="Aylık Eğitim Sayısı" subtitle="Son 12 ayda düzenlenen eğitim sayısı" icon="ri-line-chart-line" color="#6366F1" />
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={egitimAylikKatilim} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gEgitim" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="ay" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area type="monotone" dataKey="Eğitim Sayısı" stroke="#6366F1" strokeWidth={2} fill="url(#gEgitim)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                </AreaChart>
               </ResponsiveContainer>
             </GlassCard>
           </div>
 
-          <GlassCard>
-            <SectionHeader title="Eğitim Durum Analizi" subtitle="Tüm eğitimlerin durum bazlı dağılımı" icon="ri-bar-chart-grouped-line" color="#6366F1" />
-            <div className="space-y-4">
-              <AnimatedProgressBar label="Tamamlanan Eğitimler" value={aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length} total={aktifEgitimler.length} color="#10B981" delay={0} />
-              <AnimatedProgressBar label="Planlanmış Eğitimler" value={aktifEgitimler.filter(e => e.durum === 'Planlandı').length} total={aktifEgitimler.length} color="#3B82F6" delay={100} />
-              <AnimatedProgressBar label="Eksik Eğitimler" value={aktifEgitimler.filter(e => e.durum === 'Eksik').length} total={aktifEgitimler.length} color="#EF4444" delay={200} />
-            </div>
-          </GlassCard>
+          {/* Firma Bazlı Eğitim Dağılımı */}
+          {egitimFirmaDagilim.length > 0 && (
+            <GlassCard className="!p-0 overflow-hidden">
+              <div className="px-5 py-4 flex items-center gap-2.5" style={{ borderBottom: '1px solid var(--border-main)' }}>
+                <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(99,102,241,0.12)' }}>
+                  <i className="ri-building-2-line text-xs" style={{ color: '#6366F1' }} />
+                </div>
+                <h3 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Firma Bazlı Eğitim Özeti</h3>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>
+                  {egitimFirmaDagilim.length} firma
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table-premium w-full">
+                  <thead>
+                    <tr>
+                      <th className="text-left">Firma</th>
+                      <th className="text-center">Eğitim Sayısı</th>
+                      <th className="text-center">Toplam Katılımcı</th>
+                      <th className="text-center">Katıldı</th>
+                      <th className="text-center">Katılmadı</th>
+                      <th className="text-center">Katılım Oranı</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {egitimFirmaDagilim.map(firma => {
+                      const oran = firma.toplamKatilimci > 0 ? Math.round((firma.toplamKatildi / firma.toplamKatilimci) * 100) : 0;
+                      const oranColor = oran >= 80 ? '#10B981' : oran >= 60 ? '#F59E0B' : '#EF4444';
+                      return (
+                        <tr key={firma.firmaAd}>
+                          <td>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0 text-[10px] font-bold text-white"
+                                style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}>
+                                {firma.firmaAd.charAt(0)}
+                              </div>
+                              <span className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{firma.firmaAd}</span>
+                            </div>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>{firma.egitimSayisi}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>{firma.toplamKatilimci}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-[13px] font-bold" style={{ color: '#10B981' }}>{firma.toplamKatildi}</span>
+                          </td>
+                          <td className="text-center">
+                            <span className="text-[13px] font-bold" style={{ color: firma.toplamKatilmadi > 0 ? '#F59E0B' : 'var(--text-muted)' }}>{firma.toplamKatilmadi}</span>
+                          </td>
+                          <td className="text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-item)' }}>
+                                <div className="h-full rounded-full" style={{ width: `${oran}%`, background: oranColor }} />
+                              </div>
+                              <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: oranColor }}>%{oran}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          )}
+
+          {/* Son Eğitimler Listesi */}
+          {aktifEgitimler.length > 0 && (
+            <GlassCard className="!p-0 overflow-hidden">
+              <div className="px-5 py-4 flex items-center gap-2.5" style={{ borderBottom: '1px solid var(--border-main)' }}>
+                <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(99,102,241,0.12)' }}>
+                  <i className="ri-graduation-cap-line text-xs" style={{ color: '#6366F1' }} />
+                </div>
+                <h3 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Eğitim Listesi</h3>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>
+                  {aktifEgitimler.length}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table-premium w-full">
+                  <thead>
+                    <tr>
+                      <th className="text-left">Eğitim Adı</th>
+                      <th className="text-left hidden md:table-cell">Firma</th>
+                      <th className="text-left hidden lg:table-cell">Eğitmen</th>
+                      <th className="text-center">Tarih</th>
+                      <th className="text-center">Katılımcı</th>
+                      <th className="text-center">Katıldı</th>
+                      <th className="text-center">Oran</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aktifEgitimler
+                      .sort((a, b) => new Date(b.tarih || b.olusturmaTarihi).getTime() - new Date(a.tarih || a.olusturmaTarihi).getTime())
+                      .slice(0, 20)
+                      .map(e => {
+                        const firma = aktifFirmalar.find(f => f.id === e.firmaId);
+                        const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
+                        const katildi = katilimcilar.filter(k => k.katildi).length;
+                        const oran = katilimcilar.length > 0 ? Math.round((katildi / katilimcilar.length) * 100) : null;
+                        const oranColor = oran === null ? 'var(--text-muted)' : oran >= 80 ? '#10B981' : oran >= 60 ? '#F59E0B' : '#EF4444';
+                        return (
+                          <tr key={e.id}>
+                            <td>
+                              <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{e.ad}</p>
+                              {e.aciklama && <p className="text-[10.5px] truncate max-w-[200px]" style={{ color: 'var(--text-muted)' }}>{e.aciklama}</p>}
+                            </td>
+                            <td className="hidden md:table-cell">
+                              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{firma?.ad || '—'}</span>
+                            </td>
+                            <td className="hidden lg:table-cell">
+                              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>{e.egitmen || '—'}</span>
+                            </td>
+                            <td className="text-center">
+                              <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                                {e.tarih ? new Date(e.tarih).toLocaleDateString('tr-TR') : '—'}
+                              </span>
+                            </td>
+                            <td className="text-center">
+                              <span className="text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>{katilimcilar.length}</span>
+                            </td>
+                            <td className="text-center">
+                              <span className="text-[13px] font-bold" style={{ color: katildi > 0 ? '#10B981' : 'var(--text-muted)' }}>{katildi}</span>
+                            </td>
+                            <td className="text-center">
+                              {oran !== null ? (
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{
+                                  background: `${oranColor}15`,
+                                  color: oranColor,
+                                }}>
+                                  %{oran}
+                                </span>
+                              ) : (
+                                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          )}
+
+          {aktifEgitimler.length === 0 && (
+            <GlassCard>
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="w-16 h-16 flex items-center justify-center rounded-2xl" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                  <i className="ri-graduation-cap-line text-3xl" style={{ color: '#6366F1' }} />
+                </div>
+                <p className="text-[14px] font-bold" style={{ color: 'var(--text-primary)' }}>Henüz eğitim kaydı yok</p>
+                <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Eğitim modülünden kayıt ekleyebilirsiniz</p>
+              </div>
+            </GlassCard>
+          )}
         </div>
       )}
 

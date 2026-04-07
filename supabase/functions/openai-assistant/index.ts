@@ -25,6 +25,92 @@ Deno.serve(async (req) => {
     let systemPrompt = "";
     let userPrompt = "";
 
+    // ── EĞİTİM KATILIM ANALİZİ (Vision) ──
+    if (mode === "egitim-katilim-analiz") {
+      const { imageBase64, mimeType } = data || {};
+      if (!imageBase64) {
+        return new Response(JSON.stringify({ error: "Görsel verisi eksik." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const visionRes = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "meta-llama/llama-4-scout-17b-16e-instruct",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `Bu görsel bir eğitim katılım listesi veya imza listesidir. Görseldeki TÜM kişi isimlerini çıkar.
+
+KURALLAR:
+- Sadece kişi isimlerini listele (Ad Soyad formatında)
+- Numara, imza, tarih, unvan gibi bilgileri dahil etme
+- Her ismi ayrı satırda yaz
+- Eğer isim bulamazsan sadece "İSİM_YOK" yaz
+- Başka hiçbir açıklama ekleme, sadece isimler
+
+Örnek çıktı:
+Mehmet Yılmaz
+Ahmet Demir
+Ali Kaya`,
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${mimeType || "image/jpeg"};base64,${imageBase64}`,
+                  },
+                },
+              ],
+            },
+          ],
+          temperature: 0.1,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!visionRes.ok) {
+        const errText = await visionRes.text();
+        console.error("Groq vision error:", visionRes.status, errText);
+        return new Response(JSON.stringify({ error: `Görsel analiz hatası (${visionRes.status}): ${errText.substring(0, 200)}` }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const visionResult = await visionRes.json();
+      const content = visionResult.choices?.[0]?.message?.content ?? "";
+
+      if (!content || content.trim() === "İSİM_YOK" || content.trim() === "") {
+        return new Response(JSON.stringify({ success: true, isimler: [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Satır satır parse et, boş satırları ve "İSİM_YOK" olanları filtrele
+      const isimler = content
+        .split("\n")
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 1 && line !== "İSİM_YOK" && !line.startsWith("-") === false
+          ? line.replace(/^[-•*\d.)\s]+/, "").trim()
+          : line.replace(/^[-•*\d.)\s]+/, "").trim()
+        )
+        .map((line: string) => line.replace(/^[-•*\d.)\s]+/, "").trim())
+        .filter((line: string) => line.length > 2 && !/^\d+$/.test(line));
+
+      return new Response(JSON.stringify({ success: true, isimler }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (mode === "tutanak") {
       systemPrompt = `Sen deneyimli bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Görevin: kullanıcının verdiği kısa nottan profesyonel, resmi ve kapsamlı bir denetim tutanağı metni üretmek.
 

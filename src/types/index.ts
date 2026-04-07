@@ -79,25 +79,33 @@ export interface Evrak {
   cascadeFirmaId?: string;
 }
 
+export interface EgitimKatilimci {
+  personelId: string;
+  katildi: boolean;
+}
+
 export interface Egitim {
   id: string;
   ad: string;
   firmaId: string;
-  katilimciIds: string[];
   tarih: string;
-  gecerlilikSuresi: number;
-  egitmen: string;
-  yer: string;
-  sure: number;
-  durum: EgitimStatus;
-  belgeMevcut: boolean;
+  egitmen?: string;
   aciklama?: string;
+  katilimcilar?: EgitimKatilimci[];
+  // Legacy uyumluluk — eski kayıtlar için tutuldu
+  katilimciIds?: string[];
+  gecerlilikSuresi?: number;
+  egitmen_eski?: string;
+  yer?: string;
+  sure?: number;
+  durum?: EgitimStatus;
+  belgeMevcut?: boolean;
   belgeDosyaAdi?: string;
   belgeDosyaBoyutu?: number;
   belgeDosyaTipi?: string;
   belgeDosyaVeri?: string;
   belgeDosyaUrl?: string;
-  notlar: string;
+  notlar?: string;
   olusturmaTarihi: string;
   silinmis?: boolean;
   silinmeTarihi?: string;

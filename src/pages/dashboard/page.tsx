@@ -32,6 +32,17 @@ export default function DashboardPage() {
   const aktifPersoneller   = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);
   const aktifEvraklar      = useMemo(() => evraklar.filter(e => !e.silinmis), [evraklar]);
   const aktifEgitimler     = useMemo(() => egitimler.filter(e => !e.silinmis), [egitimler]);
+
+  // Eğitim katılım istatistikleri
+  const egitimKatilimOrani = useMemo(() => {
+    let toplam = 0; let katildi = 0;
+    aktifEgitimler.forEach(e => {
+      const kl = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
+      toplam += kl.length;
+      katildi += kl.filter(k => k.katildi).length;
+    });
+    return toplam > 0 ? Math.round((katildi / toplam) * 100) : 0;
+  }, [aktifEgitimler]);
   const aktifMuayeneler    = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
   const aktifUygunsuzluklar= useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
   const aktifEkipmanlar    = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);

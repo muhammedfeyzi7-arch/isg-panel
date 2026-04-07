@@ -466,35 +466,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     // ── Eğitimler ──
-    // Sadece gecerlilikSuresi > 0 olan eğitimler hesaplanır.
-    // Toolbox, seminer gibi "süresiz" eğitimler (gecerlilikSuresi = 0 veya null) → uyarı üretmez.
-    store.egitimler.forEach(eg => {
-      if (eg.silinmis) return;
-      const egitimTarihi = parseDate(eg.tarih);
-      if (!egitimTarihi) return; // Eğitim tarihi geçersizse atla
-      const suresi = eg.gecerlilikSuresi ?? 0;
-      if (suresi <= 0) return; // Geçerlilik süresi tanımlanmamış → uyarı üretme
-      const bitis = new Date(egitimTarihi);
-      // gecerlilikSuresi AY cinsinden — ay bazlı hesapla
-      bitis.setMonth(bitis.getMonth() + suresi);
-      bitis.setHours(0, 0, 0, 0);
-      if (isNaN(bitis.getTime())) return; // Hesaplama sonucu geçersizse atla
-      const tarihStr = bitis.toISOString().split('T')[0];
-      const kalanGun = getDaysRemaining(tarihStr);
-      if (kalanGun === null || kalanGun < 0 || kalanGun > 60) return;
-      const firma = store.firmalar.find(f => f.id === eg.firmaId);
-      result.push({
-        id: `egitim_${eg.id}`,
-        tip: 'egitim_surecek',
-        mesaj: `${eg.ad} eğitiminin geçerlilik süresi yaklaşıyor`,
-        detay: `${firma?.ad ? firma.ad + ' — ' : ''}${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`,
-        tarih: tarihStr,
-        okundu: okunanlar.has(`egitim_${eg.id}`),
-        kalanGun,
-        module: 'egitimler',
-        recordId: eg.id,
-      });
-    });
+    // Yeni modelde geçerlilik süresi yok — bildirim üretilmez.
+    // (Eğitim modülü artık sadece katılım takibi yapıyor)
 
     // ── Sağlık muayeneleri ──
     store.muayeneler.forEach(m => {
