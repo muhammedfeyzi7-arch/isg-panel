@@ -1,0 +1,649 @@
+import { useMemo, useState, useCallback } from 'react';
+import { useApp } from '@/store/AppContext';
+
+interface InsightItem {
+  id: string;
+  icon: string;
+  title: string;
+  detail: string;
+  color: string;
+  bg: string;
+  border: string;
+  priority: number;
+  level: 'critical' | 'warning' | 'info' | 'ok';
+  module?: string;
+  count?: number;
+  subItems?: { icon: string; text: string; count: number; color: string }[];
+}
+
+const SUPABASE_FUNC_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/openai-assistant';
+
+interface AiAnalysis {
+  genel_yorum: string;
+  en_acil: string;
+  oneriler: string[];
+  risk_seviyesi: 'Düşük' | 'Orta' | 'Yüksek' | 'Kritik';
+}
+
+function parseValidDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr || !dateStr.trim()) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export default function AkilliOzet() {
+  const {
+    firmalar, personeller, evraklar, egitimler, muayeneler,
+    uygunsuzluklar, ekipmanlar, gorevler, isIzinleri,
+    setActiveModule,
+  } = useApp();
+
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
+
+  const aktifFirmalar      = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
+  const aktifPersoneller   = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);
+  const aktifEvraklar      = useMemo(() => evraklar.filter(e => !e.silinmis), [evraklar]);
+  const aktifEgitimler     = useMemo(() => egitimler.filter(e => !e.silinmis), [egitimler]);
+  const aktifMuayeneler    = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
+  const aktifUygunsuzluklar= useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
+  const aktifEkipmanlar    = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
+  const aktifGorevler      = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);
+  const aktifIsIzinleri    = useMemo(() => isIzinleri.filter(iz => !iz.silinmis), [isIzinleri]);
+
+  const insights = useMemo((): InsightItem[] => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const in7   = new Date(today.getTime() + 7  * 86400000);
+    const in30  = new Date(today.getTime() + 30 * 86400000);
+    const list: InsightItem[] = [];
+
+    // ── KRİTİK ──
+    const uygunDegil = aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil');
+    if (uygunDegil.length > 0) {
+      list.push({
+        id: 'ekipman-uygun-degil',
+        icon: 'ri-error-warning-fill',
+        title: `${uygunDegil.length} Ekipman Uygun Değil`,
+        detail: uygunDegil.slice(0, 3).map(e => e.ad).join(', ') + (uygunDegil.length > 3 ? ` +${uygunDegil.length - 3} daha` : ''),
+        color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)',
+        priority: 100, level: 'critical', module: 'ekipmanlar', count: uygunDegil.length,
+      });
+    }
+
+    const gecikmisBelge = aktifEvraklar.filter(e => {
+      const d = parseValidDate(e.gecerlilikTarihi);
+      return d !== null && d < today;
+    });
+    if (gecikmisBelge.length > 0) {
+      list.push({
+        id: 'belge-suresi-dolmus',
+        icon: 'ri-file-damage-line',
+        title: `${gecikmisBelge.length} Evrak Süresi Dolmuş`,
+        detail: gecikmisBelge.slice(0, 3).map(e => e.ad).join(', ') + (gecikmisBelge.length > 3 ? ` +${gecikmisBelge.length - 3} daha` : ''),
+        color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)',
+        priority: 95, level: 'critical', module: 'evraklar', count: gecikmisBelge.length,
+      });
+    }
+
+    const gecikmisEkipman = aktifEkipmanlar.filter(e => {
+      if (e.durum === 'Uygun Değil') return false;
+      const d = parseValidDate(e.sonrakiKontrolTarihi);
+      return d !== null && d < today;
+    });
+    if (gecikmisEkipman.length > 0) {
+      list.push({
+        id: 'ekipman-kontrol-gecikti',
+        icon: 'ri-tools-line',
+        title: `${gecikmisEkipman.length} Ekipman Kontrolü Gecikti`,
+        detail: gecikmisEkipman.slice(0, 3).map(e => e.ad).join(', ') + (gecikmisEkipman.length > 3 ? ` +${gecikmisEkipman.length - 3} daha` : ''),
+        color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)',
+        priority: 90, level: 'critical', module: 'ekipmanlar', count: gecikmisEkipman.length,
+      });
+    }
+
+    const gecikmisMuayene = aktifMuayeneler.filter(m => {
+      const d = parseValidDate(m.sonrakiTarih || m.muayeneTarihi);
+      return d !== null && d < today;
+    });
+    if (gecikmisMuayene.length > 0) {
+      list.push({
+        id: 'muayene-gecikti',
+        icon: 'ri-heart-pulse-line',
+        title: `${gecikmisMuayene.length} Muayene Tarihi Geçti`,
+        detail: gecikmisMuayene.slice(0, 3).map(m => {
+          const p = aktifPersoneller.find(p => p.id === m.personelId);
+          return p ? p.adSoyad : 'Personel';
+        }).join(', ') + (gecikmisMuayene.length > 3 ? ` +${gecikmisMuayene.length - 3} daha` : ''),
+        color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)',
+        priority: 88, level: 'critical', module: 'saglik', count: gecikmisMuayene.length,
+      });
+    }
+
+    // ── UYARI ──
+    const gecikmisgGorev = aktifGorevler.filter(g => {
+      if (g.durum === 'Tamamlandı') return false;
+      if (!g.bitisTarihi) return false;
+      return new Date(g.bitisTarihi) < today;
+    });
+    if (gecikmisgGorev.length > 0) {
+      list.push({
+        id: 'gorev-gecikti',
+        icon: 'ri-task-line',
+        title: `${gecikmisgGorev.length} Görev Gecikmiş`,
+        detail: gecikmisgGorev.slice(0, 3).map(g => g.baslik || 'Görev').join(', ') + (gecikmisgGorev.length > 3 ? ` +${gecikmisgGorev.length - 3} daha` : ''),
+        color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',
+        priority: 85, level: 'warning', module: 'gorevler', count: gecikmisgGorev.length,
+      });
+    }
+
+    const acikUygunsuzluk = aktifUygunsuzluklar.filter(u => u.durum === 'Açık');
+    if (acikUygunsuzluk.length > 0) {
+      list.push({
+        id: 'acik-uygunsuzluk',
+        icon: 'ri-alert-line',
+        title: `${acikUygunsuzluk.length} Açık Uygunsuzluk`,
+        detail: `${acikUygunsuzluk.length} kayıt kapatılmayı bekliyor`,
+        color: '#F87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
+        priority: 80, level: 'warning', module: 'uygunsuzluklar', count: acikUygunsuzluk.length,
+      });
+    }
+
+    const bekleyenIsIzni = aktifIsIzinleri.filter(iz => iz.durum === 'Beklemede' || iz.durum === 'İncelemede');
+    if (bekleyenIsIzni.length > 0) {
+      list.push({
+        id: 'is-izni-bekliyor',
+        icon: 'ri-shield-check-line',
+        title: `${bekleyenIsIzni.length} İş İzni Onay Bekliyor`,
+        detail: bekleyenIsIzni.slice(0, 3).map(iz => iz.baslik || iz.tip || 'İzin').join(', '),
+        color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)',
+        priority: 70, level: 'warning', module: 'is-izni', count: bekleyenIsIzni.length,
+      });
+    }
+
+    // ── BİLGİ ──
+    const yaklasan7Sub: InsightItem['subItems'] = [];
+    const yaklasan7Belge = aktifEvraklar.filter(e => {
+      const d = parseValidDate(e.gecerlilikTarihi);
+      return d !== null && d >= today && d <= in7;
+    });
+    const yaklasan7Ekipman = aktifEkipmanlar.filter(e => {
+      if (e.durum === 'Uygun Değil') return false;
+      const d = parseValidDate(e.sonrakiKontrolTarihi);
+      return d !== null && d >= today && d <= in7;
+    });
+    const yaklasan7Muayene = aktifMuayeneler.filter(m => {
+      const d = parseValidDate(m.sonrakiTarih || m.muayeneTarihi);
+      return d !== null && d >= today && d <= in7;
+    });
+    if (yaklasan7Belge.length > 0) yaklasan7Sub.push({ icon: 'ri-file-warning-line', text: 'Evrak', count: yaklasan7Belge.length, color: '#94A3B8' });
+    if (yaklasan7Ekipman.length > 0) yaklasan7Sub.push({ icon: 'ri-tools-line', text: 'Ekipman', count: yaklasan7Ekipman.length, color: '#FB923C' });
+    if (yaklasan7Muayene.length > 0) yaklasan7Sub.push({ icon: 'ri-heart-pulse-line', text: 'Muayene', count: yaklasan7Muayene.length, color: '#34D399' });
+    const toplam7 = yaklasan7Belge.length + yaklasan7Ekipman.length + yaklasan7Muayene.length;
+    if (toplam7 > 0) {
+      list.push({
+        id: 'yaklasan-7',
+        icon: 'ri-alarm-warning-line',
+        title: `${toplam7} İşlem 7 Gün İçinde Sona Eriyor`,
+        detail: yaklasan7Sub.map(s => `${s.count} ${s.text}`).join(' · '),
+        color: '#F59E0B', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.15)',
+        priority: 65, level: 'info', count: toplam7, subItems: yaklasan7Sub,
+      });
+    }
+
+    const yaklasan30Sub: InsightItem['subItems'] = [];
+    const yaklasan30Belge = aktifEvraklar.filter(e => {
+      const d = parseValidDate(e.gecerlilikTarihi);
+      return d !== null && d > in7 && d <= in30;
+    });
+    const yaklasan30Ekipman = aktifEkipmanlar.filter(e => {
+      if (e.durum === 'Uygun Değil') return false;
+      const d = parseValidDate(e.sonrakiKontrolTarihi);
+      return d !== null && d > in7 && d <= in30;
+    });
+    const yaklasan30Muayene = aktifMuayeneler.filter(m => {
+      const d = parseValidDate(m.sonrakiTarih || m.muayeneTarihi);
+      return d !== null && d > in7 && d <= in30;
+    });
+    if (yaklasan30Belge.length > 0) yaklasan30Sub.push({ icon: 'ri-file-warning-line', text: 'Evrak', count: yaklasan30Belge.length, color: '#94A3B8' });
+    if (yaklasan30Ekipman.length > 0) yaklasan30Sub.push({ icon: 'ri-tools-line', text: 'Ekipman', count: yaklasan30Ekipman.length, color: '#FB923C' });
+    if (yaklasan30Muayene.length > 0) yaklasan30Sub.push({ icon: 'ri-heart-pulse-line', text: 'Muayene', count: yaklasan30Muayene.length, color: '#34D399' });
+    const toplam30 = yaklasan30Belge.length + yaklasan30Ekipman.length + yaklasan30Muayene.length;
+    if (toplam30 > 0) {
+      list.push({
+        id: 'yaklasan-30',
+        icon: 'ri-timer-line',
+        title: `${toplam30} İşlem 30 Gün İçinde Sona Eriyor`,
+        detail: yaklasan30Sub.map(s => `${s.count} ${s.text}`).join(' · '),
+        color: '#FBBF24', bg: 'rgba(251,191,36,0.06)', border: 'rgba(251,191,36,0.12)',
+        priority: 55, level: 'info', count: toplam30, subItems: yaklasan30Sub,
+      });
+    }
+
+    // Eğitim eksikliği
+    const egitimSizPersonel = aktifPersoneller.filter(p => {
+      return !aktifEgitimler.some(e => e.personelId === p.id || (e as unknown as Record<string, unknown>).katilimcilar?.includes?.(p.id));
+    });
+    if (egitimSizPersonel.length > 0 && aktifPersoneller.length > 0) {
+      list.push({
+        id: 'egitim-eksik',
+        icon: 'ri-graduation-cap-line',
+        title: `${egitimSizPersonel.length} Personelin Eğitim Kaydı Yok`,
+        detail: egitimSizPersonel.slice(0, 3).map(p => p.adSoyad).join(', ') + (egitimSizPersonel.length > 3 ? ` +${egitimSizPersonel.length - 3} daha` : ''),
+        color: '#60A5FA', bg: 'rgba(96,165,250,0.06)', border: 'rgba(96,165,250,0.15)',
+        priority: 40, level: 'info', module: 'egitimler', count: egitimSizPersonel.length,
+      });
+    }
+
+    // Ayrılan personel
+    const ayrilanPersonel = aktifPersoneller.filter(p => p.durum === 'Ayrıldı');
+    if (ayrilanPersonel.length > 0) {
+      list.push({
+        id: 'ayrilan-personel',
+        icon: 'ri-user-unfollow-line',
+        title: `${ayrilanPersonel.length} Personel Ayrıldı`,
+        detail: ayrilanPersonel.slice(0, 3).map(p => p.adSoyad).join(', ') + (ayrilanPersonel.length > 3 ? ` +${ayrilanPersonel.length - 3} daha` : ''),
+        color: '#94A3B8', bg: 'rgba(148,163,184,0.06)', border: 'rgba(148,163,184,0.15)',
+        priority: 30, level: 'info', module: 'personeller', count: ayrilanPersonel.length,
+      });
+    }
+
+    if (list.length === 0) {
+      list.push({
+        id: 'all-ok',
+        icon: 'ri-checkbox-circle-fill',
+        title: 'Tüm Sistemler Normal',
+        detail: 'Kritik veya uyarı gerektiren durum bulunmuyor',
+        color: '#34D399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.2)',
+        priority: 0, level: 'ok',
+      });
+    }
+
+    return list.sort((a, b) => b.priority - a.priority);
+  }, [
+    aktifEkipmanlar, aktifEvraklar, aktifMuayeneler, aktifGorevler,
+    aktifUygunsuzluklar, aktifIsIzinleri, aktifPersoneller, aktifEgitimler,
+  ]);
+
+  // Sağlık skoru hesapla
+  const healthScore = useMemo(() => {
+    const criticalCount = insights.filter(i => i.level === 'critical').reduce((s, i) => s + (i.count || 1), 0);
+    const warningCount  = insights.filter(i => i.level === 'warning').reduce((s, i) => s + (i.count || 1), 0);
+    const total = aktifEvraklar.length + aktifEkipmanlar.length + aktifMuayeneler.length + aktifGorevler.length;
+    if (total === 0) return 100;
+    const penalty = (criticalCount * 3 + warningCount * 1.5);
+    const score = Math.max(0, Math.min(100, Math.round(100 - (penalty / Math.max(total, 1)) * 100)));
+    return score;
+  }, [insights, aktifEvraklar, aktifEkipmanlar, aktifMuayeneler, aktifGorevler]);
+
+  const scoreColor = healthScore >= 80 ? '#34D399' : healthScore >= 50 ? '#F59E0B' : '#EF4444';
+  const scoreLabel = healthScore >= 80 ? 'İyi' : healthScore >= 50 ? 'Dikkat' : 'Kritik';
+  const scoreBg    = healthScore >= 80 ? 'rgba(52,211,153,0.1)' : healthScore >= 50 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)';
+
+  const criticalItems = insights.filter(i => i.level === 'critical');
+  const warningItems  = insights.filter(i => i.level === 'warning');
+  const infoItems     = insights.filter(i => i.level === 'info');
+
+  const filteredInsights = activeFilter === 'all' ? insights
+    : activeFilter === 'critical' ? criticalItems
+    : activeFilter === 'warning'  ? warningItems
+    : infoItems;
+
+  const levelConfig = {
+    all:      { label: 'Tümü',   color: '#64748B', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.2)', icon: 'ri-list-check' },
+    critical: { label: 'Kritik', color: '#EF4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', icon: 'ri-error-warning-fill' },
+    warning:  { label: 'Uyarı',  color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', icon: 'ri-alert-line' },
+    info:     { label: 'Bilgi',  color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.2)', icon: 'ri-information-line' },
+    ok:       { label: 'Tamam',  color: '#34D399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)', icon: 'ri-checkbox-circle-fill' },
+  };
+
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiVisible, setAiVisible] = useState(false);
+
+  const fetchAiAnalysis = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiVisible(true);
+
+    const sorunlar = insights
+      .filter(i => i.level !== 'ok')
+      .map(i => i.title);
+
+    try {
+      const res = await fetch(SUPABASE_FUNC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'dashboard-ozet',
+          data: {
+            saglikSkoru: healthScore,
+            kritikSayisi: criticalItems.length,
+            uyariSayisi: warningItems.length,
+            bilgiSayisi: infoItems.length,
+            sorunlar,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setAiAnalysis(json.data as AiAnalysis);
+      } else {
+        setAiError(json.error || 'Analiz alınamadı');
+      }
+    } catch (e) {
+      setAiError('Bağlantı hatası');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [insights, healthScore, criticalItems.length, warningItems.length, infoItems.length]);
+
+  const riskColor: Record<string, string> = {
+    'Düşük': '#34D399',
+    'Orta': '#F59E0B',
+    'Yüksek': '#F87171',
+    'Kritik': '#EF4444',
+  };
+
+  return (
+    <div className="rounded-xl overflow-hidden isg-card h-full flex flex-col">
+      <div className="h-[2px]" style={{ background: `linear-gradient(90deg, ${scoreColor}, ${scoreColor}80)` }} />
+
+      {/* Header */}
+      <div className="px-4 pt-3 pb-2.5" style={{ borderBottom: '1px solid var(--bg-item-border)' }}>
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
+            <i className="ri-brain-line text-white text-xs" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Akıllı Özet</h2>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Sistem durumu analizi</p>
+          </div>
+          {/* Sağlık Skoru */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg flex-shrink-0"
+            style={{ background: scoreBg, border: `1px solid ${scoreColor}30` }}>
+            <div className="relative w-7 h-7 flex-shrink-0">
+              <svg className="w-7 h-7 -rotate-90" viewBox="0 0 32 32">
+                <circle cx="16" cy="16" r="12" fill="none" stroke="var(--bg-item)" strokeWidth="3" />
+                <circle cx="16" cy="16" r="12" fill="none" stroke={scoreColor} strokeWidth="3"
+                  strokeDasharray={`${(healthScore / 100) * 75.4} 75.4`}
+                  strokeLinecap="round" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black" style={{ color: scoreColor }}>
+                {healthScore}
+              </span>
+            </div>
+            <div>
+              <p className="text-[10.5px] font-black" style={{ color: scoreColor }}>{scoreLabel}</p>
+              <p className="text-[8.5px]" style={{ color: 'var(--text-muted)' }}>Sağlık Skoru</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Özet sayaçlar */}
+        <div className="grid grid-cols-3 gap-1.5">
+          {[
+            { label: 'Kritik', count: criticalItems.length, ...levelConfig.critical },
+            { label: 'Uyarı',  count: warningItems.length,  ...levelConfig.warning },
+            { label: 'Bilgi',  count: infoItems.length,     ...levelConfig.info },
+          ].map(item => (
+            <button
+              key={item.label}
+              onClick={() => setActiveFilter(activeFilter === item.label.toLowerCase() as typeof activeFilter ? 'all' : item.label.toLowerCase() as typeof activeFilter)}
+              className="rounded-lg p-1.5 text-center cursor-pointer transition-all"
+              style={{
+                background: activeFilter === item.label.toLowerCase() ? item.bg : 'var(--bg-item)',
+                border: `1px solid ${activeFilter === item.label.toLowerCase() ? item.border : 'var(--bg-item-border)'}`,
+              }}
+            >
+              <p className="text-[14px] font-black" style={{ color: item.count > 0 ? item.color : 'var(--text-muted)' }}>{item.count}</p>
+              <p className="text-[9px] font-semibold" style={{ color: item.count > 0 ? item.color : 'var(--text-muted)' }}>{item.label}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* AI Analiz Butonu */}
+      <div className="px-4 pt-2.5 pb-0">
+        <button
+          onClick={fetchAiAnalysis}
+          disabled={aiLoading}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10.5px] font-bold cursor-pointer transition-all whitespace-nowrap"
+          style={{
+            background: aiLoading ? 'rgba(99,102,241,0.08)' : 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.12))',
+            border: '1px solid rgba(99,102,241,0.25)',
+            color: '#6366F1',
+          }}
+        >
+          {aiLoading ? (
+            <>
+              <i className="ri-loader-4-line animate-spin text-xs" />
+              Groq AI analiz ediyor...
+            </>
+          ) : (
+            <>
+              <i className="ri-sparkling-2-line text-xs" />
+              Groq AI ile Analiz Et
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* AI Analiz Sonucu */}
+      {aiVisible && (
+        <div className="mx-4 mt-2.5 rounded-lg overflow-hidden"
+          style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          {/* AI Panel Header */}
+          <div className="flex items-center justify-between px-2.5 py-1.5"
+            style={{ borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 flex items-center justify-center rounded-md"
+                style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
+                <i className="ri-sparkling-2-fill text-white" style={{ fontSize: '8px' }} />
+              </div>
+              <span className="text-[10px] font-bold" style={{ color: '#6366F1' }}>Groq AI Analizi</span>
+              {aiAnalysis && (
+                <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-md"
+                  style={{
+                    background: `${riskColor[aiAnalysis.risk_seviyesi] || '#F59E0B'}18`,
+                    color: riskColor[aiAnalysis.risk_seviyesi] || '#F59E0B',
+                    border: `1px solid ${riskColor[aiAnalysis.risk_seviyesi] || '#F59E0B'}30`,
+                  }}>
+                  Risk: {aiAnalysis.risk_seviyesi}
+                </span>
+              )}
+            </div>
+            <button onClick={() => setAiVisible(false)} className="cursor-pointer"
+              style={{ color: 'var(--text-muted)' }}>
+              <i className="ri-close-line text-xs" />
+            </button>
+          </div>
+
+          {/* AI İçerik */}
+          <div className="p-2.5 space-y-2">
+            {aiLoading && (
+              <div className="flex flex-col items-center gap-2 py-3">
+                <div className="flex gap-1">
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
+                      style={{ background: '#6366F1', animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+                <p className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>Llama 3.3 70B analiz ediyor...</p>
+              </div>
+            )}
+
+            {aiError && !aiLoading && (
+              <div className="flex items-center gap-1.5 py-2">
+                <i className="ri-error-warning-line text-xs" style={{ color: '#EF4444' }} />
+                <p className="text-[10px]" style={{ color: '#EF4444' }}>{aiError}</p>
+              </div>
+            )}
+
+            {aiAnalysis && !aiLoading && (
+              <>
+                {/* Genel Yorum */}
+                <p className="text-[10.5px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {aiAnalysis.genel_yorum}
+                </p>
+
+                {/* En Acil */}
+                <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-md"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <i className="ri-alarm-warning-line text-[10px] mt-0.5 flex-shrink-0" style={{ color: '#EF4444' }} />
+                  <div>
+                    <p className="text-[8.5px] font-bold mb-0.5" style={{ color: '#EF4444' }}>EN ACİL</p>
+                    <p className="text-[10px] leading-snug" style={{ color: 'var(--text-primary)' }}>{aiAnalysis.en_acil}</p>
+                  </div>
+                </div>
+
+                {/* Öneriler */}
+                {aiAnalysis.oneriler && aiAnalysis.oneriler.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[8.5px] font-bold" style={{ color: 'var(--text-muted)' }}>ÖNERİLER</p>
+                    {aiAnalysis.oneriler.map((oneri, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5">
+                        <div className="w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 mt-0.5"
+                          style={{ background: 'rgba(99,102,241,0.15)', minWidth: '14px' }}>
+                          <span className="text-[7px] font-black" style={{ color: '#6366F1' }}>{idx + 1}</span>
+                        </div>
+                        <p className="text-[10px] leading-snug" style={{ color: 'var(--text-secondary)' }}>{oneri}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Filtre tab */}
+      {activeFilter !== 'all' && (
+        <div className="px-4 pt-2.5 pb-0">
+          <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <i className="ri-filter-3-line" />
+            <span>Filtre:</span>
+            <span className="font-bold" style={{ color: levelConfig[activeFilter as keyof typeof levelConfig]?.color ?? '#64748B' }}>
+              {levelConfig[activeFilter as keyof typeof levelConfig]?.label ?? activeFilter}
+            </span>
+            <button onClick={() => setActiveFilter('all')} className="ml-auto flex items-center gap-1 cursor-pointer"
+              style={{ color: 'var(--text-muted)' }}>
+              <i className="ri-close-line" /> Temizle
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* İnsight listesi */}
+      <div className="flex-1 overflow-y-auto p-4 pt-2.5 space-y-1.5" style={{ maxHeight: '380px' }}>
+        {filteredInsights.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-6 gap-2">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl"
+              style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
+              <i className="ri-checkbox-circle-line text-base" style={{ color: '#34D399' }} />
+            </div>
+            <p className="text-[11.5px] font-semibold" style={{ color: '#34D399' }}>Bu kategoride sorun yok</p>
+          </div>
+        ) : (
+          filteredInsights.map(insight => {
+            const cfg = levelConfig[insight.level as keyof typeof levelConfig] ?? levelConfig.info;
+            const isOpen = expanded === insight.id;
+            const insightBg = insight.bg ?? 'rgba(100,116,139,0.08)';
+            const insightBorder = insight.border ?? 'rgba(100,116,139,0.2)';
+            return (
+              <div key={insight.id} className="rounded-lg overflow-hidden transition-all"
+                style={{ background: insightBg, border: `1px solid ${insightBorder}` }}>
+                <button
+                  className="w-full flex items-start gap-2 px-2.5 py-2 cursor-pointer text-left"
+                  onClick={() => setExpanded(isOpen ? null : insight.id)}
+                >
+                  {/* Level badge */}
+                  <div className="w-5 h-5 flex items-center justify-center rounded-md flex-shrink-0 mt-0.5"
+                    style={{ background: `${insight.color}18` }}>
+                    <i className={`${insight.icon} text-[9px]`} style={{ color: insight.color }} />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-md"
+                        style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
+                        {cfg.label}
+                      </span>
+                      {insight.count !== undefined && (
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-md"
+                          style={{ background: `${insight.color}15`, color: insight.color }}>
+                          {insight.count}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      {insight.title}
+                    </p>
+                    {!isOpen && (
+                      <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                        {insight.detail}
+                      </p>
+                    )}
+                  </div>
+
+                  {isOpen
+                    ? <i className="ri-arrow-up-s-line text-xs flex-shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
+                    : <i className="ri-arrow-down-s-line text-xs flex-shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
+                  }
+                </button>
+
+                {/* Expanded detail */}
+                {isOpen && (
+                  <div className="px-2.5 pb-2.5">
+                    <p className="text-[10.5px] mb-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {insight.detail}
+                    </p>
+                    {insight.subItems && insight.subItems.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {insight.subItems.map((sub, idx) => (
+                          <div key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9.5px] font-medium"
+                            style={{ background: `${sub.color}15`, border: `1px solid ${sub.color}25`, color: sub.color }}>
+                            <i className={`${sub.icon} text-[8px]`} />
+                            <span>{sub.count} {sub.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {insight.module && (
+                      <button
+                        onClick={() => setActiveModule(insight.module as Parameters<typeof setActiveModule>[0])}
+                        className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap transition-all"
+                        style={{ background: `${insight.color}15`, color: insight.color, border: `1px solid ${insight.color}25` }}
+                      >
+                        <i className="ri-arrow-right-up-line text-[9px]" />
+                        Modüle Git
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-2.5" style={{ borderTop: '1px solid var(--bg-item-border)' }}>
+        <div className="flex items-center justify-between">
+          <p className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>
+            <i className="ri-refresh-line mr-1" />
+            Gerçek zamanlı güncelleniyor
+          </p>
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: scoreColor }} />
+            <span className="text-[9.5px] font-semibold" style={{ color: scoreColor }}>{scoreLabel}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
