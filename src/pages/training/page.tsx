@@ -73,8 +73,9 @@ function exportEgitimlerToExcel(
   const COLS1 = ['#', 'Eğitim Türü / Adı', 'Firma', 'Tarih', 'Katılımcı', 'Katılımcılar', 'Geçerlilik', 'Durum', 'Belge', 'Açıklama'];
   const dataRows1 = aktif.map((e, i) => {
     const firma = firmalar.find(f => f.id === e.firmaId);
-    const katilimcilar = e.katilimciIds.map(id => personeller.find(p => p.id === id)?.adSoyad).filter(Boolean).join(', ');
-    return [i + 1, e.ad || '-', firma?.ad || '-', fmtDate(e.tarih), e.katilimciIds.length, katilimcilar || '-', e.gecerlilikSuresi ? `${e.gecerlilikSuresi} ay` : 'Süresiz', e.durum, e.belgeDosyaAdi ? 'Var' : 'Yok', e.aciklama || '-'];
+    const ids = e.katilimciIds ?? [];
+    const katilimcilar = ids.map(id => personeller.find(p => p.id === id)?.adSoyad).filter(Boolean).join(', ');
+    return [i + 1, e.ad || '-', firma?.ad || '-', fmtDate(e.tarih), ids.length, katilimcilar || '-', e.gecerlilikSuresi ? `${e.gecerlilikSuresi} ay` : 'Süresiz', e.durum, e.belgeDosyaAdi ? 'Var' : 'Yok', e.aciklama || '-'];
   });
   const ws1Rows = [
     [`ISG EĞİTİM RAPORU — ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`, ...Array(COLS1.length - 1).fill('')],
@@ -305,12 +306,13 @@ export default function EgitimlerPage() {
   };
 
   const toggleKatilimci = (id: string) => {
-    setForm(prev => ({
-      ...prev,
-      katilimciIds: prev.katilimciIds.includes(id)
-        ? prev.katilimciIds.filter(k => k !== id)
-        : [...prev.katilimciIds, id],
-    }));
+    setForm(prev => {
+      const ids = prev.katilimciIds ?? [];
+      return {
+        ...prev,
+        katilimciIds: ids.includes(id) ? ids.filter(k => k !== id) : [...ids, id],
+      };
+    });
   };
 
   const handleSave = async () => {
@@ -488,7 +490,7 @@ export default function EgitimlerPage() {
                       <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{getFirmaAd(eg.firmaId)}</p>
                       <div className="flex items-center gap-3 mt-1">
                         {eg.tarih && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{new Date(eg.tarih).toLocaleDateString('tr-TR')}</span>}
-                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>{eg.katilimciIds.length} kişi</span>
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>{(eg.katilimciIds ?? []).length} kişi</span>
                       </div>
                     </div>
                   </div>
@@ -546,7 +548,7 @@ export default function EgitimlerPage() {
                       <td className="hidden md:table-cell"><p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(eg.firmaId)}</p></td>
                       <td className="hidden lg:table-cell">
                         <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
-                          {eg.katilimciIds.length} kişi
+                          {(eg.katilimciIds ?? []).length} kişi
                         </span>
                       </td>
                       <td className="hidden sm:table-cell"><span className="text-sm" style={{ color: 'var(--text-muted)' }}>{eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'}</span></td>
@@ -645,19 +647,19 @@ export default function EgitimlerPage() {
           {firmaPersoneller.length > 0 && (
             <div className="sm:col-span-2">
               <label className="form-label">
-                Katılımcı Seçimi ({form.katilimciIds.length}/{firmaPersoneller.length})
+                Katılımcı Seçimi ({(form.katilimciIds ?? []).length}/{firmaPersoneller.length})
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
                 {firmaPersoneller.map(p => (
                   <label key={p.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 cursor-pointer transition-all duration-150"
-                    style={{ background: form.katilimciIds.includes(p.id) ? 'rgba(59,130,246,0.1)' : 'var(--bg-item)', border: form.katilimciIds.includes(p.id) ? '1px solid rgba(59,130,246,0.3)' : '1px solid var(--bg-item-border)' }}
+                    style={{ background: (form.katilimciIds ?? []).includes(p.id) ? 'rgba(59,130,246,0.1)' : 'var(--bg-item)', border: (form.katilimciIds ?? []).includes(p.id) ? '1px solid rgba(59,130,246,0.3)' : '1px solid var(--bg-item-border)' }}
                   >
                     <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
-                      style={form.katilimciIds.includes(p.id) ? { background: 'linear-gradient(135deg, #3B82F6, #6366F1)' } : { background: 'var(--bg-input)', border: '1.5px solid var(--border-main)' }}
+                      style={(form.katilimciIds ?? []).includes(p.id) ? { background: 'linear-gradient(135deg, #3B82F6, #6366F1)' } : { background: 'var(--bg-input)', border: '1.5px solid var(--border-main)' }}
                     >
-                      {form.katilimciIds.includes(p.id) && <i className="ri-check-line text-white text-[10px]" />}
+                      {(form.katilimciIds ?? []).includes(p.id) && <i className="ri-check-line text-white text-[10px]" />}
                     </div>
-                    <input type="checkbox" checked={form.katilimciIds.includes(p.id)} onChange={() => toggleKatilimci(p.id)} className="hidden" />
+                    <input type="checkbox" checked={(form.katilimciIds ?? []).includes(p.id)} onChange={() => toggleKatilimci(p.id)} className="hidden" />
                     <span className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{p.adSoyad}</span>
                   </label>
                 ))}
@@ -755,7 +757,7 @@ export default function EgitimlerPage() {
               </div>
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Katılımcı Sayısı</p>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{detailEgitim.katilimciIds.length} kişi</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{(detailEgitim.katilimciIds ?? []).length} kişi</p>
               </div>
             </div>
             {detailEgitim.aciklama && (
@@ -764,11 +766,11 @@ export default function EgitimlerPage() {
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{detailEgitim.aciklama}</p>
               </div>
             )}
-            {detailEgitim.katilimciIds.length > 0 && (
+            {(detailEgitim.katilimciIds ?? []).length > 0 && (
               <div>
                 <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Katılımcılar</p>
                 <div className="flex flex-wrap gap-2">
-                  {detailEgitim.katilimciIds.map(pid => {
+                  {(detailEgitim.katilimciIds ?? []).map(pid => {
                     const p = personeller.find(x => x.id === pid);
                     return p ? (
                       <span key={pid} className="text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>

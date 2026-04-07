@@ -95,7 +95,7 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
     : [];
 
   const pEgitimler = personelId
-    ? egitimler.filter(e => e.katilimciIds.includes(personelId) && !e.silinmis)
+    ? egitimler.filter(e => (e.katilimciIds ?? []).includes(personelId) && !e.silinmis)
     : [];
 
   const pMuayeneler = personelId

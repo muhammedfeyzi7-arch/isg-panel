@@ -38,7 +38,7 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
   const yaklasan = aktif.filter(e => {
     if (!e.sonrakiKontrolTarihi) return false;
     const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000);
-    return diff >= 0 && diff <= 30;
+    return diff >= 0 && diff <= 3;
   }).length;
   const gecikmis = aktif.filter(e => {
     if (!e.sonrakiKontrolTarihi) return false;
@@ -99,7 +99,7 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
       const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000);
       if (diff < 0) kontrolDurumu = 'GECİKMİŞ';
       else if (diff === 0) kontrolDurumu = 'BUGÜN';
-      else if (diff <= 30) kontrolDurumu = `${diff} gün kaldı`;
+      else if (diff <= 3) kontrolDurumu = `${diff} gün kaldı`;
       else kontrolDurumu = 'Zamanında';
     }
     return [idx + 1, e.ad || '-', e.tur || '-', firma?.ad || '-', e.bulunduguAlan || '-', e.marka || '-', e.model || '-', e.seriNo || '-', fmtDate(e.sonKontrolTarihi), fmtDate(e.sonrakiKontrolTarihi), kontrolDurumu, e.durum || '-', e.belgeMevcut ? 'Evet' : 'Hayır', e.aciklama || '-'];
@@ -201,7 +201,7 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
 
   // ── Sayfa 3: Kritik Kontroller ──
   const kritikler = aktif
-    .filter(e => { if (!e.sonrakiKontrolTarihi) return false; const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000); return diff <= 30; })
+    .filter(e => { if (!e.sonrakiKontrolTarihi) return false; const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000); return diff <= 3; })
     .sort((a, b) => new Date(a.sonrakiKontrolTarihi).getTime() - new Date(b.sonrakiKontrolTarihi).getTime());
 
   const COLS3 = ['Ekipman Adı', 'Tür', 'Firma', 'Kontrol Tarihi', 'Kalan Süre', 'Durum'];
@@ -466,7 +466,7 @@ export default function EkipmanlarPage() {
     const yaklasan = aktifEkipmanlar.filter(e => {
       if (getEffectiveDurum(e) === 'Uygun Değil') return false;
       const days = getDaysUntil(e.sonrakiKontrolTarihi);
-      return days >= 0 && days <= 30;
+      return days >= 0 && days <= 3;
     }).length;
     return { total, uygun, uygunDegil, yaklasan };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -954,7 +954,7 @@ export default function EkipmanlarPage() {
               const effectiveDurum = getEffectiveDurum(ekipman);
               const sc = STATUS_CONFIG[effectiveDurum] ?? { label: effectiveDurum, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
               const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
-              const isUrgent = days >= 0 && days <= 30;
+              const isUrgent = days >= 0 && days <= 3;
               const isOverdue = days < 0;
               return (
                 <div key={ekipman.id} className="p-4" style={{ background: selected.has(ekipman.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
@@ -1021,7 +1021,7 @@ export default function EkipmanlarPage() {
                   const effectiveDurum = getEffectiveDurum(ekipman);
                   const sc = STATUS_CONFIG[effectiveDurum] ?? { label: effectiveDurum, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
                   const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
-                  const isUrgent = days >= 0 && days <= 30;
+                  const isUrgent = days >= 0 && days <= 3;
                   const isOverdue = days < 0;
                   // Dosya durumu: dosyaAdi var ama dosyaUrl yoksa "yüklenemedi"
                   const hasFileError = ekipman.dosyaAdi && !ekipman.dosyaUrl;

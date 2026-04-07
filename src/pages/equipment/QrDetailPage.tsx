@@ -999,7 +999,7 @@ export default function QrDetailPage() {
   const sc = STATUS_CONFIG[localEkipman.durum] ?? STATUS_CONFIG['Uygun'];
   const days = getDaysUntil(localEkipman.sonrakiKontrolTarihi);
   const isOverdue = days < 0;
-  const isUrgent = days >= 0 && days <= 30;
+  const isUrgent = days >= 0 && days <= 3;
   const hasBelge = !!localEkipman.dosyaUrl;
 
   return (
