@@ -601,18 +601,27 @@ export default function IsIzniPage() {
           const izinTuruSlug = normalizeSlug(form.tip);
           setUploadProgress({ done: 0, total: formEvraklar.length });
           let uploadHata = 0;
+          const hataliDosyalar: string[] = [];
           for (let i = 0; i < formEvraklar.length; i++) {
             const file = formEvraklar[i];
             const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${editId}_${Date.now()}_${file.name}`;
-            const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
-            if (uploadErr) {
-              console.error('[ISG] Evrak upload error:', uploadErr);
+            try {
+              const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+              if (uploadErr) {
+                console.error('[ISG] Evrak upload error:', uploadErr.message, uploadErr);
+                uploadHata++;
+                hataliDosyalar.push(file.name);
+              }
+            } catch (uploadEx) {
+              console.error('[ISG] Evrak upload exception:', uploadEx);
               uploadHata++;
+              hataliDosyalar.push(file.name);
             }
             setUploadProgress({ done: i + 1, total: formEvraklar.length });
           }
           if (uploadHata > 0) {
-            addToast(`${uploadHata} evrak yüklenemedi. Lütfen tekrar deneyin.`, 'error');
+            addToast(`${uploadHata} evrak yüklenemedi: ${hataliDosyalar.join(', ')}`, 'error');
+            return;
           }
         }
         addToast('İş izni güncellendi ve tekrar onaya gönderildi.', 'success');
@@ -654,18 +663,30 @@ export default function IsIzniPage() {
           const izinTuruSlug = normalizeSlug(form.tip);
           setUploadProgress({ done: 0, total: formEvraklar.length });
           let uploadHata = 0;
+          const hataliDosyalar: string[] = [];
           for (let i = 0; i < formEvraklar.length; i++) {
             const file = formEvraklar[i];
             const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${newIz.id}_${Date.now()}_${file.name}`;
-            const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
-            if (uploadErr) {
-              console.error('[ISG] Evrak upload error:', uploadErr);
+            try {
+              const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+              if (uploadErr) {
+                console.error('[ISG] Evrak upload error:', uploadErr.message, uploadErr);
+                uploadHata++;
+                hataliDosyalar.push(file.name);
+              }
+            } catch (uploadEx) {
+              console.error('[ISG] Evrak upload exception:', uploadEx);
               uploadHata++;
+              hataliDosyalar.push(file.name);
             }
             setUploadProgress({ done: i + 1, total: formEvraklar.length });
           }
           if (uploadHata > 0) {
-            addToast(`${uploadHata} evrak yüklenemedi. Lütfen tekrar deneyin.`, 'error');
+            addToast(`${uploadHata} evrak yüklenemedi: ${hataliDosyalar.join(', ')}. İş izni oluşturuldu ama evraklar eksik.`, 'error');
+            setFormEvraklar([]);
+            setUploadProgress(null);
+            setShowModal(false);
+            return;
           }
         }
         setFormEvraklar([]);
