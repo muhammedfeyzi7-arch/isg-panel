@@ -437,7 +437,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                     {(['evrak_surecek','evrak_dolmus','ekipman_kontrol','egitim_surecek','saglik_surecek'] as const).map(tip => {
                       const count = bildirimler.filter(b => b.tip === tip).length;
                       if (count === 0) return null;
-                      const cfg = TYPE_CONFIG[tip];
+                      const cfg = TYPE_CONFIG[tip] ?? { icon: 'ri-notification-3-line', color: '#64748B', bg: 'rgba(100,116,139,0.12)', badge: 'Bildirim', badgeBg: 'rgba(100,116,139,0.12)' };
                       return (
                         <span key={tip} className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
                           style={{ background: cfg.badgeBg, color: cfg.color, border: `1px solid ${cfg.color}25` }}>

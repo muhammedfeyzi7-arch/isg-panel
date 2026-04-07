@@ -292,7 +292,7 @@ export default function EvraklarPage() {
       {/* ── Status Stats ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {(Object.keys(statusCounts) as Array<keyof typeof statusCounts>).map(key => {
-          const cfg = statusConfig[key];
+          const cfg = statusConfig[key] ?? { icon: 'ri-question-line', color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.2)' };
           const isActive = statusFilter === key;
           return (
             <div

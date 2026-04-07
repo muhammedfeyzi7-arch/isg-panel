@@ -232,7 +232,7 @@ export default function IsIzniPage() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return isIzinleri
-      .filter(iz => !(iz as unknown as { silinmis?: boolean }).silinmis)
+      .filter(iz => !iz.silinmis)
       .filter(iz => {
         const firma = firmalar.find(f => f.id === iz.firmaId);
         return (
@@ -257,7 +257,7 @@ export default function IsIzniPage() {
     setSelected(new Set()); setBulkDeleteConfirm(false);
   };
 
-  const aktifIsIzinleri = useMemo(() => isIzinleri.filter(i => !(i as unknown as { silinmis?: boolean }).silinmis), [isIzinleri]);
+  const aktifIsIzinleri = useMemo(() => isIzinleri.filter(i => !i.silinmis), [isIzinleri]);
 
   const stats = useMemo(() => {
     const today = new Date(); today.setHours(0,0,0,0);

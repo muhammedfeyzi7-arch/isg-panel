@@ -393,16 +393,16 @@ export default function RaporlarPage() {
   const filtreGorevler = useMemo(
     () => gorevler.filter(g =>
       !g.silinmis &&
-      (selectedFirmaId === 'all' || (g as unknown as { firmaId?: string }).firmaId === selectedFirmaId) &&
-      isInDateRange((g as unknown as { olusturmaTarihi?: string }).olusturmaTarihi)
+      (selectedFirmaId === 'all' || g.firmaId === selectedFirmaId) &&
+      isInDateRange(g.olusturmaTarihi)
     ),
     [gorevler, selectedFirmaId, dateFrom, dateTo],
   );
   const filtreTutanaklar = useMemo(
     () => tutanaklar.filter(t =>
-      !(t as unknown as { silinmis?: boolean }).silinmis &&
-      (selectedFirmaId === 'all' || (t as unknown as { firmaId?: string }).firmaId === selectedFirmaId) &&
-      isInDateRange((t as unknown as { olusturmaTarihi?: string }).olusturmaTarihi)
+      !t.silinmis &&
+      (selectedFirmaId === 'all' || t.firmaId === selectedFirmaId) &&
+      isInDateRange(t.olusturmaTarihi)
     ),
     [tutanaklar, selectedFirmaId, dateFrom, dateTo],
   );

@@ -21,23 +21,19 @@ const STATUS_CONFIG: Record<EkipmanStatus, {
 }> = {
   'Uygun': {
     label: 'Uygun', color: '#059669', bg: 'rgba(5,150,105,0.1)', border: 'rgba(5,150,105,0.25)',
-    icon: 'ri-checkbox-circle-fill',
-    lightBg: '#ECFDF5', lightBorder: '#A7F3D0',
+    icon: 'ri-checkbox-circle-fill', lightBg: '#ECFDF5', lightBorder: '#A7F3D0',
   },
   'Uygun Değil': {
     label: 'Uygun Değil', color: '#DC2626', bg: 'rgba(220,38,38,0.1)', border: 'rgba(220,38,38,0.25)',
-    icon: 'ri-close-circle-fill',
-    lightBg: '#FEF2F2', lightBorder: '#FECACA',
+    icon: 'ri-close-circle-fill', lightBg: '#FEF2F2', lightBorder: '#FECACA',
   },
   'Bakımda': {
     label: 'Bakımda', color: '#D97706', bg: 'rgba(217,119,6,0.1)', border: 'rgba(217,119,6,0.25)',
-    icon: 'ri-tools-fill',
-    lightBg: '#FFFBEB', lightBorder: '#FDE68A',
+    icon: 'ri-tools-fill', lightBg: '#FFFBEB', lightBorder: '#FDE68A',
   },
   'Hurda': {
     label: 'Hurda', color: '#64748B', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.25)',
-    icon: 'ri-delete-bin-fill',
-    lightBg: '#F8FAFC', lightBorder: '#CBD5E1',
+    icon: 'ri-delete-bin-fill', lightBg: '#F8FAFC', lightBorder: '#CBD5E1',
   },
 };
 
@@ -141,99 +137,6 @@ function KontrolModal({
           <label className="text-xs font-semibold block mb-2" style={{ color: '#374151' }}>Notlar</label>
           <textarea value={notlar} onChange={e => setNotlar(e.target.value)} rows={3} maxLength={500} placeholder="Kontrol notları..." className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none" style={{ background: '#fff', borderColor: '#E2E8F0', color: '#0F172A' }} />
         </div>
-      </div>
-    </Modal>
-  );
-}
-
-// ── Kontrol Geçmişi Modal ──
-function KontrolGecmisiModal({
-  open, onClose, ekipmanId, ekipmanAd,
-}: { open: boolean; onClose: () => void; ekipmanId: string; ekipmanAd: string }) {
-  const [gecmis, setGecmis] = useState<KontrolKayit[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open || !ekipmanId) return;
-    setLoading(true);
-    supabase.from('ekipmanlar').select('data').eq('id', ekipmanId).maybeSingle()
-      .then(({ data }) => {
-        if (data?.data) {
-          const kayitlar: KontrolKayit[] = (data.data as unknown as { kontrolGecmisi?: KontrolKayit[] }).kontrolGecmisi ?? [];
-          setGecmis(kayitlar.slice(0, 10));
-        } else { setGecmis([]); }
-      }).finally(() => setLoading(false));
-  }, [open, ekipmanId]);
-
-  const durumRenk: Record<EkipmanStatus, { color: string; bg: string; border: string; icon: string }> = {
-    'Uygun':       { color: '#059669', bg: '#ECFDF5',   border: '#A7F3D0',   icon: 'ri-checkbox-circle-fill' },
-    'Uygun Değil': { color: '#DC2626', bg: '#FEF2F2',   border: '#FECACA',   icon: 'ri-close-circle-fill' },
-    'Bakımda':     { color: '#D97706', bg: '#FFFBEB',   border: '#FDE68A',   icon: 'ri-tools-fill' },
-    'Hurda':       { color: '#64748B', bg: '#F8FAFC', border: '#E2E8F0', icon: 'ri-delete-bin-fill' },
-  };
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Kontrol Geçmişi" size="sm" icon="ri-history-line"
-      footer={<button onClick={onClose} className="px-4 py-2 rounded-lg font-semibold text-sm cursor-pointer transition-all whitespace-nowrap w-full" style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}>Kapat</button>}
-    >
-      <div>
-        <div className="px-3 py-2 rounded-xl mb-4" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-          <p className="text-xs" style={{ color: '#64748B' }}>Ekipman</p>
-          <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>{ekipmanAd}</p>
-        </div>
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-10 gap-3">
-            <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#A7F3D0', borderTopColor: '#059669' }} />
-            <p className="text-xs" style={{ color: '#94A3B8' }}>Yükleniyor...</p>
-          </div>
-        ) : gecmis.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 gap-3">
-            <div className="w-12 h-12 flex items-center justify-center rounded-2xl" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-              <i className="ri-history-line text-xl" style={{ color: '#94A3B8' }} />
-            </div>
-            <p className="text-sm font-semibold" style={{ color: '#64748B' }}>Henüz kontrol yapılmamış</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {gecmis.map((kayit, idx) => {
-              const dr = durumRenk[kayit.durum] ?? durumRenk['Uygun'];
-              const tarihObj = new Date(kayit.tarih);
-              const tarihStr = tarihObj.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
-              const saatStr = tarihObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-              return (
-                <div key={idx} className="flex items-start gap-3 px-3 py-3 rounded-xl"
-                  style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 mt-0.5"
-                    style={{ background: dr.bg, border: `1px solid ${dr.border}` }}>
-                    <i className={`${dr.icon} text-sm`} style={{ color: dr.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-lg whitespace-nowrap"
-                        style={{ background: dr.bg, color: dr.color, border: `1px solid ${dr.border}` }}>
-                        {kayit.durum}
-                      </span>
-                      {idx === 0 && (
-                        <span className="text-xs px-2 py-0.5 rounded-lg font-semibold whitespace-nowrap"
-                          style={{ background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>
-                          Son Kontrol
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold truncate" style={{ color: '#374151' }}>{kayit.yapanKisi}</p>
-                    <p className="text-xs" style={{ color: '#94A3B8' }}>{tarihStr} — {saatStr}</p>
-                    {kayit.notlar && (
-                      <p className="text-xs mt-1.5 px-2 py-1.5 rounded-lg leading-relaxed"
-                        style={{ background: '#F1F5F9', color: '#64748B' }}>
-                        {kayit.notlar}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
     </Modal>
   );
@@ -440,15 +343,394 @@ function EvrakModal({
 }
 
 // ── Lightbox ──
-function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+function PhotoLightbox({
+  photos, initialIndex, onClose,
+}: { photos: { url: string; aciklama?: string; tarih?: string; yukleyenKisi?: string }[]; initialIndex: number; onClose: () => void }) {
+  const [current, setCurrent] = useState(initialIndex);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') setCurrent(p => Math.max(0, p - 1));
+      if (e.key === 'ArrowRight') setCurrent(p => Math.min(photos.length - 1, p + 1));
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [photos.length, onClose]);
+
+  const photo = photos[current];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.95)' }} onClick={onClose}>
-      <button className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full cursor-pointer"
-        style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} onClick={onClose}>
-        <i className="ri-close-line text-xl" />
-      </button>
-      <img src={url} alt="Saha fotoğrafı" className="max-w-full max-h-full rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.97)' }} onClick={onClose}>
+      {/* Top bar */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 z-10"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)' }}>
+        <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.6)' }}>
+          {current + 1} / {photos.length}
+        </span>
+        <button className="w-9 h-9 flex items-center justify-center rounded-full cursor-pointer"
+          style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }} onClick={onClose}>
+          <i className="ri-close-line text-lg" />
+        </button>
+      </div>
+
+      {/* Image */}
+      <img src={photo.url} alt={photo.aciklama || 'Saha fotoğrafı'}
+        className="max-w-full max-h-[75vh] rounded-xl object-contain"
+        onClick={e => e.stopPropagation()} />
+
+      {/* Bottom info */}
+      {(photo.aciklama || photo.tarih || photo.yukleyenKisi) && (
+        <div className="absolute bottom-0 left-0 right-0 px-4 py-4"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}
+          onClick={e => e.stopPropagation()}>
+          {photo.aciklama && (
+            <p className="text-sm font-semibold text-white mb-1">{photo.aciklama}</p>
+          )}
+          <div className="flex items-center gap-3">
+            {photo.yukleyenKisi && (
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                <i className="ri-user-line mr-1" />{photo.yukleyenKisi}
+              </span>
+            )}
+            {photo.tarih && (
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                <i className="ri-calendar-line mr-1" />
+                {new Date(photo.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Nav arrows */}
+      {photos.length > 1 && (
+        <>
+          <button
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full cursor-pointer transition-all"
+            style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
+            onClick={e => { e.stopPropagation(); setCurrent(p => Math.max(0, p - 1)); }}
+            disabled={current === 0}
+          >
+            <i className="ri-arrow-left-s-line text-xl" />
+          </button>
+          <button
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full cursor-pointer transition-all"
+            style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
+            onClick={e => { e.stopPropagation(); setCurrent(p => Math.min(photos.length - 1, p + 1)); }}
+            disabled={current === photos.length - 1}
+          >
+            <i className="ri-arrow-right-s-line text-xl" />
+          </button>
+        </>
+      )}
+
+      {/* Thumbnail strip */}
+      {photos.length > 1 && (
+        <div className="absolute bottom-16 left-0 right-0 flex justify-center gap-1.5 px-4"
+          onClick={e => e.stopPropagation()}>
+          {photos.map((p, i) => (
+            <button key={i} onClick={() => setCurrent(i)}
+              className="rounded-lg overflow-hidden cursor-pointer transition-all flex-shrink-0"
+              style={{
+                width: 40, height: 40,
+                border: `2px solid ${i === current ? '#fff' : 'rgba(255,255,255,0.2)'}`,
+                opacity: i === current ? 1 : 0.5,
+              }}>
+              <img src={p.url} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Kontrol Geçmişi Inline ──
+function KontrolGecmisiSection({
+  ekipmanId, refreshKey,
+}: { ekipmanId: string; refreshKey: number }) {
+  const [gecmis, setGecmis] = useState<KontrolKayit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    supabase.from('ekipmanlar').select('data').eq('id', ekipmanId).maybeSingle()
+      .then(({ data }) => {
+        if (data?.data) {
+          const kayitlar: KontrolKayit[] = (data.data as unknown as { kontrolGecmisi?: KontrolKayit[] }).kontrolGecmisi ?? [];
+          setGecmis(kayitlar);
+        } else { setGecmis([]); }
+      }).finally(() => setLoading(false));
+  }, [ekipmanId, refreshKey]);
+
+  const durumRenk: Record<EkipmanStatus, { color: string; bg: string; border: string; icon: string }> = {
+    'Uygun':       { color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', icon: 'ri-checkbox-circle-fill' },
+    'Uygun Değil': { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', icon: 'ri-close-circle-fill' },
+    'Bakımda':     { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', icon: 'ri-tools-fill' },
+    'Hurda':       { color: '#64748B', bg: '#F8FAFC', border: '#E2E8F0', icon: 'ri-delete-bin-fill' },
+  };
+
+  const displayed = showAll ? gecmis : gecmis.slice(0, 5);
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #E2E8F0' }}>
+      {/* Header */}
+      <div className="px-4 pt-3.5 pb-2 flex items-center justify-between"
+        style={{ borderBottom: '1px solid #F1F5F9' }}>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: '#F1F5F9' }}>
+            <i className="ri-history-line text-sm" style={{ color: '#64748B' }} />
+          </div>
+          <p className="text-sm font-bold" style={{ color: '#0F172A' }}>Kontrol Geçmişi</p>
+        </div>
+        {gecmis.length > 0 && (
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+            style={{ background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}>
+            {gecmis.length} kayıt
+          </span>
+        )}
+      </div>
+
+      <div className="p-3">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor: '#A7F3D0', borderTopColor: '#059669' }} />
+            <p className="text-xs" style={{ color: '#94A3B8' }}>Yükleniyor...</p>
+          </div>
+        ) : gecmis.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <i className="ri-history-line text-lg" style={{ color: '#CBD5E1' }} />
+            </div>
+            <p className="text-xs font-semibold" style={{ color: '#94A3B8' }}>Henüz kontrol yapılmamış</p>
+            <p className="text-xs" style={{ color: '#CBD5E1' }}>İlk kontrolü yapmak için yukarıdaki butonu kullanın</p>
+          </div>
+        ) : (
+          <>
+            {/* İstatistik özeti */}
+            {gecmis.length >= 2 && (
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {(['Uygun', 'Uygun Değil', 'Bakımda'] as EkipmanStatus[]).map(s => {
+                  const count = gecmis.filter(k => k.durum === s).length;
+                  const dr = durumRenk[s];
+                  return (
+                    <div key={s} className="flex flex-col items-center py-2 rounded-xl"
+                      style={{ background: dr.bg, border: `1px solid ${dr.border}` }}>
+                      <span className="text-lg font-extrabold" style={{ color: dr.color }}>{count}</span>
+                      <span className="text-[10px] font-semibold mt-0.5" style={{ color: dr.color }}>{s}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Timeline */}
+            <div className="relative">
+              {/* Dikey çizgi */}
+              <div className="absolute left-[18px] top-3 bottom-3 w-px"
+                style={{ background: 'linear-gradient(to bottom, #E2E8F0, transparent)' }} />
+
+              <div className="space-y-2">
+                {displayed.map((kayit, idx) => {
+                  const dr = durumRenk[kayit.durum] ?? durumRenk['Uygun'];
+                  const tarihObj = new Date(kayit.tarih);
+                  const tarihStr = tarihObj.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+                  const saatStr = tarihObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                  const isFirst = idx === 0;
+
+                  return (
+                    <div key={idx} className="flex items-start gap-3 relative">
+                      {/* Timeline dot */}
+                      <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 z-10"
+                        style={{
+                          background: isFirst ? dr.bg : '#F8FAFC',
+                          border: `2px solid ${isFirst ? dr.border : '#E2E8F0'}`,
+                        }}>
+                        <i className={`${dr.icon} text-sm`} style={{ color: isFirst ? dr.color : '#CBD5E1' }} />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 pb-2"
+                        style={{ borderBottom: idx < displayed.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-lg whitespace-nowrap"
+                              style={{ background: dr.bg, color: dr.color, border: `1px solid ${dr.border}` }}>
+                              {kayit.durum}
+                            </span>
+                            {isFirst && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap"
+                                style={{ background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }}>
+                                Son
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold" style={{ color: '#374151' }}>
+                            <i className="ri-user-line mr-1" style={{ color: '#94A3B8' }} />
+                            {kayit.yapanKisi}
+                          </span>
+                          <span className="text-xs" style={{ color: '#94A3B8' }}>
+                            {tarihStr} {saatStr}
+                          </span>
+                        </div>
+                        {kayit.notlar && (
+                          <div className="mt-1.5 px-2.5 py-1.5 rounded-lg"
+                            style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                            <p className="text-xs leading-relaxed" style={{ color: '#64748B' }}>
+                              <i className="ri-chat-3-line mr-1" style={{ color: '#CBD5E1' }} />
+                              {kayit.notlar}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {gecmis.length > 5 && (
+              <button
+                onClick={() => setShowAll(p => !p)}
+                className="w-full mt-2 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all"
+                style={{ background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}>
+                {showAll
+                  ? <><i className="ri-arrow-up-s-line mr-1" />Daha az göster</>
+                  : <><i className="ri-arrow-down-s-line mr-1" />{gecmis.length - 5} kayıt daha göster</>
+                }
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Saha Fotoğrafları Section ──
+function SahaFotolariSection({
+  sahaFotolar, signedUrls, onAddPhoto, onOpenLightbox,
+}: {
+  sahaFotolar: EkipmanSahaFoto[];
+  signedUrls: Record<string, string>;
+  onAddPhoto: () => void;
+  onOpenLightbox: (index: number) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const reversed = [...sahaFotolar].reverse();
+  const displayed = showAll ? reversed : reversed.slice(0, 6);
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #E2E8F0' }}>
+      {/* Header */}
+      <div className="px-4 pt-3.5 pb-2 flex items-center justify-between"
+        style={{ borderBottom: '1px solid #F1F5F9' }}>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: '#FFFBEB' }}>
+            <i className="ri-image-line text-sm" style={{ color: '#D97706' }} />
+          </div>
+          <p className="text-sm font-bold" style={{ color: '#0F172A' }}>Saha Fotoğrafları</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {sahaFotolar.length > 0 && (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ background: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A' }}>
+              {sahaFotolar.length}
+            </span>
+          )}
+          <button onClick={onAddPhoto}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+            style={{ background: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A' }}>
+            <i className="ri-camera-line" />Ekle
+          </button>
+        </div>
+      </div>
+
+      <div className="p-3">
+        {sahaFotolar.length === 0 ? (
+          <button onClick={onAddPhoto}
+            className="w-full flex flex-col items-center justify-center py-8 rounded-xl cursor-pointer transition-all"
+            style={{ border: '2px dashed #FDE68A', background: '#FFFBEB' }}>
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl mb-2"
+              style={{ background: '#fff', border: '1px solid #FDE68A' }}>
+              <i className="ri-camera-line text-lg" style={{ color: '#D97706' }} />
+            </div>
+            <p className="text-xs font-semibold" style={{ color: '#D97706' }}>Saha fotoğrafı ekle</p>
+            <p className="text-[10px] mt-0.5" style={{ color: '#FCD34D' }}>Ekipmanın güncel durumunu belgele</p>
+          </button>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-1.5">
+              {displayed.map((foto, idx) => {
+                const displayUrl = signedUrls[foto.url] || foto.url;
+                const originalIdx = reversed.indexOf(foto);
+                return (
+                  <button key={foto.id} onClick={() => onOpenLightbox(originalIdx)}
+                    className="relative rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all group"
+                    style={{ aspectRatio: '1/1', background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    <img src={displayUrl} alt={foto.aciklama || 'Saha fotoğrafı'}
+                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ background: 'rgba(0,0,0,0.4)' }}>
+                      <i className="ri-zoom-in-line text-white text-lg" />
+                    </div>
+                    {/* Bottom gradient */}
+                    <div className="absolute inset-x-0 bottom-0 h-10"
+                      style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent)' }}>
+                      <p className="absolute bottom-1 left-1.5 right-1.5 text-[9px] text-white leading-tight line-clamp-1 font-medium">
+                        {foto.aciklama || new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
+                      </p>
+                    </div>
+                    {/* Yeni badge */}
+                    {idx === 0 && (
+                      <div className="absolute top-1 left-1">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                          style={{ background: '#D97706', color: '#fff' }}>YENİ</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Son fotoğraf detayı */}
+            {reversed[0] && (
+              <div className="mt-2 px-3 py-2 rounded-xl flex items-center gap-2"
+                style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                <i className="ri-time-line text-xs flex-shrink-0" style={{ color: '#D97706' }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold truncate" style={{ color: '#92400E' }}>
+                    Son fotoğraf: {reversed[0].yukleyenKisi || 'Bilinmiyor'}
+                  </p>
+                  <p className="text-[10px]" style={{ color: '#D97706' }}>
+                    {new Date(reversed[0].tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {sahaFotolar.length > 6 && (
+              <button
+                onClick={() => setShowAll(p => !p)}
+                className="w-full mt-2 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all"
+                style={{ background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}>
+                {showAll
+                  ? <><i className="ri-arrow-up-s-line mr-1" />Daha az göster</>
+                  : <><i className="ri-image-line mr-1" />{sahaFotolar.length - 6} fotoğraf daha</>
+                }
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -466,11 +748,11 @@ export default function QrDetailPage() {
 
   const [localEkipman, setLocalEkipman] = useState<Ekipman | null | undefined>(undefined);
   const [localLoading, setLocalLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [showKontrol, setShowKontrol] = useState(false);
   const [showUygunsuzluk, setShowUygunsuzluk] = useState(false);
   const [showFoto, setShowFoto] = useState(false);
-  const [showGecmis, setShowGecmis] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fetchedRef = useRef(false);
 
   const fetchEkipmanFromDb = useCallback(async () => {
@@ -509,7 +791,10 @@ export default function QrDetailPage() {
     if (fromStore) setLocalEkipman(fromStore);
   }, [ekipmanlar, id]);
 
-  const handleAfterSave = useCallback(() => { fetchEkipmanFromDb(); }, [fetchEkipmanFromDb]);
+  const handleAfterSave = useCallback(() => {
+    fetchEkipmanFromDb();
+    setRefreshKey(k => k + 1);
+  }, [fetchEkipmanFromDb]);
 
   const ekipmanEvraklari = evraklar.filter(
     e => !e.silinmis && e.firmaId === localEkipman?.firmaId &&
@@ -519,6 +804,14 @@ export default function QrDetailPage() {
   const sahaFotolar = localEkipman?.sahaFotolari ?? [];
   const fotoFilePaths = sahaFotolar.map(f => f.url);
   const signedFotoUrls = useSignedUrls(fotoFilePaths);
+
+  // Lightbox için fotoğraf listesi (ters sıralı — en yeni önce)
+  const lightboxPhotos = [...sahaFotolar].reverse().map(f => ({
+    url: signedFotoUrls[f.url] || f.url,
+    aciklama: f.aciklama,
+    tarih: f.tarih,
+    yukleyenKisi: f.yukleyenKisi,
+  }));
 
   const [belgeUrl, setBelgeUrl] = useState<string | null>(null);
   const [belgeAdi, setBelgeAdi] = useState<string>('');
@@ -569,7 +862,9 @@ export default function QrDetailPage() {
           </div>
           <h2 className="text-xl font-bold mb-2" style={{ color: '#0F172A' }}>Ekipman Bulunamadı</h2>
           <p className="text-sm mb-6" style={{ color: '#64748B' }}>Bu QR koda ait ekipman kaydı mevcut değil veya silinmiş.</p>
-          <button onClick={() => navigate('/')} className="btn-primary whitespace-nowrap">
+          <button onClick={() => navigate('/')}
+            className="px-5 py-2.5 rounded-xl font-semibold text-sm cursor-pointer whitespace-nowrap"
+            style={{ background: '#059669', color: '#fff' }}>
             <i className="ri-home-line mr-1" />Ana Sayfaya Dön
           </button>
         </div>
@@ -610,11 +905,8 @@ export default function QrDetailPage() {
 
         {/* ── Ekipman Kimlik Kartı ── */}
         <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #E2E8F0' }}>
-          {/* Renkli üst şerit */}
           <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${sc.color}, ${sc.color}88)` }} />
-
           <div className="p-4">
-            {/* Durum + seri no */}
             <div className="flex items-center justify-between mb-3">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
                 style={{ background: sc.lightBg, color: sc.color, border: `1px solid ${sc.lightBorder}` }}>
@@ -629,7 +921,6 @@ export default function QrDetailPage() {
               )}
             </div>
 
-            {/* İkon + ad */}
             <div className="flex items-center gap-3 mb-3">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: sc.lightBg, border: `1px solid ${sc.lightBorder}` }}>
@@ -648,7 +939,6 @@ export default function QrDetailPage() {
               </div>
             </div>
 
-            {/* Chip'ler */}
             {(localEkipman.tur || localEkipman.bulunduguAlan || localEkipman.marka) && (
               <div className="flex flex-wrap gap-1.5">
                 {localEkipman.tur && (
@@ -703,7 +993,6 @@ export default function QrDetailPage() {
             <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Hızlı İşlemler</p>
           </div>
           <div className="p-3 grid grid-cols-2 gap-2">
-            {/* Kontrol Yap */}
             <button onClick={() => setShowKontrol(true)}
               className="flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer transition-all active:scale-95 text-center"
               style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}
@@ -718,7 +1007,6 @@ export default function QrDetailPage() {
               </div>
             </button>
 
-            {/* Uygunsuzluk Bildir */}
             <button onClick={() => setShowUygunsuzluk(true)}
               className="flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer transition-all active:scale-95 text-center"
               style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
@@ -732,68 +1020,64 @@ export default function QrDetailPage() {
                 <p className="text-[10px] mt-0.5 leading-tight" style={{ color: '#FCA5A5' }}>Sorun bildir</p>
               </div>
             </button>
-
-            {/* Fotoğraf Yükle */}
-            <button onClick={() => setShowFoto(true)}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer transition-all active:scale-95 text-center"
-              style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#FEF3C7'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#FFFBEB'; }}>
-              <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: '#fff', border: '1px solid #FDE68A' }}>
-                <i className="ri-camera-line text-xl" style={{ color: '#D97706' }} />
-              </div>
-              <div>
-                <p className="text-sm font-bold" style={{ color: '#D97706' }}>Fotoğraf</p>
-                <p className="text-[10px] mt-0.5 leading-tight" style={{ color: '#FCD34D' }}>Saha fotoğrafı</p>
-              </div>
-            </button>
-
-            {/* Kontrol Geçmişi */}
-            <button onClick={() => setShowGecmis(true)}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer transition-all active:scale-95 text-center"
-              style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#F1F5F9'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#F8FAFC'; }}>
-              <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: '#fff', border: '1px solid #E2E8F0' }}>
-                <i className="ri-history-line text-xl" style={{ color: '#64748B' }} />
-              </div>
-              <div>
-                <p className="text-sm font-bold" style={{ color: '#475569' }}>Geçmiş</p>
-                <p className="text-[10px] mt-0.5 leading-tight" style={{ color: '#94A3B8' }}>Kontrol kayıtları</p>
-              </div>
-            </button>
           </div>
         </div>
 
-        {/* ── Detay Bilgileri ── */}
+        {/* ── Son Kontrol Özeti ── */}
         <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #E2E8F0' }}>
           <div className="px-4 pt-3.5 pb-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Ekipman Bilgileri</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Kontrol Durumu</p>
           </div>
           <div className="px-2 pb-2 pt-1">
             {[
-              { icon: 'ri-price-tag-3-line', label: 'Marka / Model', value: [localEkipman.marka, localEkipman.model].filter(Boolean).join(' / ') || null, color: '#64748B' },
               {
                 icon: 'ri-calendar-check-line', label: 'Son Kontrol',
-                value: localEkipman.sonKontrolTarihi ? new Date(localEkipman.sonKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null,
-                color: '#059669',
+                value: localEkipman.sonKontrolTarihi
+                  ? new Date(localEkipman.sonKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
+                  : 'Henüz yapılmadı',
+                color: localEkipman.sonKontrolTarihi ? '#059669' : '#94A3B8',
+                iconBg: '#ECFDF5', iconColor: '#059669',
               },
               {
                 icon: 'ri-calendar-2-line', label: 'Sonraki Kontrol',
-                value: localEkipman.sonrakiKontrolTarihi ? new Date(localEkipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : null,
+                value: localEkipman.sonrakiKontrolTarihi
+                  ? new Date(localEkipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })
+                  : 'Belirlenmedi',
                 color: isOverdue ? '#DC2626' : isUrgent ? '#D97706' : '#0F172A',
+                iconBg: isOverdue ? '#FEF2F2' : isUrgent ? '#FFFBEB' : '#F8FAFC',
+                iconColor: isOverdue ? '#DC2626' : isUrgent ? '#D97706' : '#94A3B8',
+                badge: isOverdue ? `${Math.abs(days)} gün gecikmiş` : isUrgent ? `${days} gün kaldı` : null,
+                badgeColor: isOverdue ? '#DC2626' : '#D97706',
+                badgeBg: isOverdue ? '#FEF2F2' : '#FFFBEB',
+                badgeBorder: isOverdue ? '#FECACA' : '#FDE68A',
               },
-              ...(localEkipman.aciklama ? [{ icon: 'ri-file-text-line', label: 'Açıklama', value: localEkipman.aciklama, color: '#64748B' }] : []),
-            ].filter(r => r.value).map((row, i, arr) => (
+              ...(localEkipman.marka || localEkipman.model ? [{
+                icon: 'ri-price-tag-3-line', label: 'Marka / Model',
+                value: [localEkipman.marka, localEkipman.model].filter(Boolean).join(' / '),
+                color: '#64748B', iconBg: '#F8FAFC', iconColor: '#94A3B8',
+              }] : []),
+              ...(localEkipman.aciklama ? [{
+                icon: 'ri-file-text-line', label: 'Açıklama',
+                value: localEkipman.aciklama, color: '#64748B', iconBg: '#F8FAFC', iconColor: '#94A3B8',
+              }] : []),
+            ].map((row, i, arr) => (
               <div key={i} className="flex items-center gap-3 px-2 py-3 rounded-xl"
                 style={{ borderBottom: i < arr.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
                 <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-                  style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                  <i className={`${row.icon} text-sm`} style={{ color: '#94A3B8' }} />
+                  style={{ background: row.iconBg, border: '1px solid #E2E8F0' }}>
+                  <i className={`${row.icon} text-sm`} style={{ color: row.iconColor }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] font-semibold mb-0.5" style={{ color: '#94A3B8' }}>{row.label}</p>
-                  <p className="text-sm font-semibold break-words" style={{ color: row.color }}>{row.value}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold break-words" style={{ color: row.color }}>{row.value}</p>
+                    {'badge' in row && row.badge && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                        style={{ background: row.badgeBg, color: row.badgeColor, border: `1px solid ${row.badgeBorder}` }}>
+                        {row.badge}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -801,37 +1085,15 @@ export default function QrDetailPage() {
         </div>
 
         {/* ── Saha Fotoğrafları ── */}
-        {sahaFotolar.length > 0 && (
-          <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #E2E8F0' }}>
-            <div className="px-4 pt-3.5 pb-1 flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Saha Fotoğrafları</p>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                style={{ background: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A' }}>
-                {sahaFotolar.length}
-              </span>
-            </div>
-            <div className="p-3 grid grid-cols-2 gap-2">
-              {[...sahaFotolar].reverse().slice(0, 4).map((foto) => {
-                const displayUrl = signedFotoUrls[foto.url] || foto.url;
-                return (
-                  <button key={foto.id} onClick={() => setLightboxUrl(displayUrl)}
-                    className="relative rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-all"
-                    style={{ aspectRatio: '1/1', background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                    <img src={displayUrl} alt={foto.aciklama || 'Saha fotoğrafı'}
-                      className="w-full h-full object-cover"
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    <div className="absolute inset-0 flex items-end p-2"
-                      style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 55%)' }}>
-                      <p className="text-xs text-white leading-tight line-clamp-1 font-medium">
-                        {foto.aciklama || new Date(foto.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <SahaFotolariSection
+          sahaFotolar={sahaFotolar}
+          signedUrls={signedFotoUrls}
+          onAddPhoto={() => setShowFoto(true)}
+          onOpenLightbox={(idx) => setLightboxIndex(idx)}
+        />
+
+        {/* ── Kontrol Geçmişi ── */}
+        <KontrolGecmisiSection ekipmanId={localEkipman.id} refreshKey={refreshKey} />
 
         {/* ── Belgeler ── */}
         {(hasBelge || ekipmanEvraklari.length > 0) && (
@@ -909,9 +1171,16 @@ export default function QrDetailPage() {
         ekipmanAd={localEkipman.ad} firmaId={localEkipman.firmaId} />
       <FotoModal open={showFoto} onClose={() => setShowFoto(false)}
         ekipmanAd={localEkipman.ad} ekipmanId={localEkipman.id} onUploaded={handleAfterSave} />
-      <KontrolGecmisiModal open={showGecmis} onClose={() => setShowGecmis(false)}
-        ekipmanId={localEkipman.id} ekipmanAd={localEkipman.ad} />
-      {lightboxUrl && <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && lightboxPhotos.length > 0 && (
+        <PhotoLightbox
+          photos={lightboxPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
       {showBelge && belgeUrl && (
         <EvrakModal open={showBelge} onClose={() => setShowBelge(false)}
           dosyaVeri={belgeUrl} dosyaAdi={belgeAdi} dosyaTipi={belgeTipi} />

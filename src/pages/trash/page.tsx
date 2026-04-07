@@ -36,8 +36,8 @@ export default function CopKutusuPage() {
   const deletedMuayeneler  = useMemo(() => muayeneler.filter(m => m.silinmis), [muayeneler]);
   const deletedEkipmanlar      = useMemo(() => ekipmanlar.filter(e => e.silinmis || e.cascadeSilindi), [ekipmanlar]);
   const deletedUygunsuzluklar  = useMemo(() => uygunsuzluklar.filter(u => u.silinmis || u.cascadeSilindi), [uygunsuzluklar]);
-  const deletedTutanaklar  = useMemo(() => tutanaklar.filter(t => (t as unknown as { silinmis?: boolean }).silinmis), [tutanaklar]);
-  const deletedIsIzinleri  = useMemo(() => isIzinleri.filter(iz => (iz as unknown as { silinmis?: boolean }).silinmis), [isIzinleri]);
+  const deletedTutanaklar  = useMemo(() => tutanaklar.filter(t => t.silinmis), [tutanaklar]);
+  const deletedIsIzinleri  = useMemo(() => isIzinleri.filter(iz => iz.silinmis), [isIzinleri]);
 
   // Aktif tab'daki silinen kayıtlar
   const activeItems = useMemo(() => {

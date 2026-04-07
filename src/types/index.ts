@@ -209,6 +209,7 @@ export interface Gorev {
   silinmeTarihi?: string;
   cascadeSilindi?: boolean;
   cascadeFirmaId?: string;
+  belgeDosyaUrl?: string;
 }
 
 export interface Tutanak {
@@ -229,6 +230,8 @@ export interface Tutanak {
   notlar: string;
   olusturmaTarihi: string;
   guncellemeTarihi: string;
+  silinmis?: boolean;
+  silinmeTarihi?: string;
 }
 
 export interface CurrentUser {
@@ -283,6 +286,8 @@ export interface IsIzni {
   belgeDosyaBoyutu?: number;
   belgeDosyaTipi?: string;
   belgeDosyaUrl?: string;
+  silinmis?: boolean;
+  silinmeTarihi?: string;
 }
 
 export interface AppData {
