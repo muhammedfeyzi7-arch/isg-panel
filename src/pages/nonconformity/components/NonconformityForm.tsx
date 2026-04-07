@@ -60,8 +60,9 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
       if (!json.success) throw new Error(json.error || 'Hata');
       setForm(prev => ({ ...prev, onlem: json.data.onlem || prev.onlem }));
       addToast('AI önlem önerisi oluşturuldu!', 'success');
-    } catch {
-      addToast('AI yanıt veremedi, lütfen tekrar deneyin.', 'error');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      addToast(`AI hatası: ${msg}`, 'error');
     } finally {
       setAiOnlemLoading(false);
     }

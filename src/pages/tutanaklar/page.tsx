@@ -710,7 +710,8 @@ export default function TutanaklarPage() {
       setAiKisaAciklama('');
       addToast('Tutanak AI tarafından oluşturuldu!', 'success');
     } catch (e) {
-      addToast('AI yanıt veremedi, lütfen tekrar deneyin.', 'error');
+      const msg = e instanceof Error ? e.message : String(e);
+      addToast(`AI hatası: ${msg}`, 'error');
     } finally {
       setAiLoading(false);
     }

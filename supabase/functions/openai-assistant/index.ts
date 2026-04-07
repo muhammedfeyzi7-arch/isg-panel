@@ -1,38 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const GEMINI_API_KEY = "AIzaSyBnxL5ZFPzwiHotyyZ4SimWRUV-hTW4p-Y";
+const GROQ_API_KEY = "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";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-async function callGemini(prompt: string): Promise<string> {
-  // gemini-1.5-flash ile dene (en stabil ücretsiz model)
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-  
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 600,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API hatası (${response.status}): ${errText}`);
-  }
-
-  const result = await response.json();
-  const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Gemini boş yanıt döndürdü");
-  return text;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -41,31 +15,23 @@ Deno.serve(async (req) => {
 
   try {
     const { mode, data } = await req.json();
-
-    let prompt = "";
+    let systemPrompt = "";
+    let userPrompt = "";
 
     if (mode === "tutanak") {
-      prompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. 
-Aşağıdaki bilgilere göre profesyonel bir denetim tutanağı oluştur.
-Türkçe yaz. Resmi ve profesyonel dil kullan.
-SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir şey ekleme, markdown kullanma:
-{"baslik":"Tutanak başlığı max 80 karakter","aciklama":"200-400 karakter detaylı açıklama","notlar":"100-200 karakter ek notlar"}
-
-Firma: ${data.firmaAdi || "Belirtilmemiş"}
-Açıklama: ${data.kisaAciklama}
-Tarih: ${data.tarih || new Date().toLocaleDateString("tr-TR")}`;
+      systemPrompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Kullanıcının verdiği kısa açıklamadan profesyonel bir denetim tutanağı oluşturuyorsun. Türkçe yaz. Resmi ve profesyonel dil kullan. SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
+{"baslik":"Tutanak başlığı max 80 karakter","aciklama":"200-400 karakter detaylı açıklama","notlar":"100-200 karakter ek notlar"}`;
+      userPrompt = `Firma: ${data?.firmaAdi || "Belirtilmemiş"}
+Açıklama: ${data?.kisaAciklama || ""}
+Tarih: ${data?.tarih || new Date().toLocaleDateString("tr-TR")}`;
 
     } else if (mode === "uygunsuzluk") {
-      prompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın.
-Aşağıdaki uygunsuzluk için alınması gereken önlemleri öner.
-Türkçe yaz. Pratik ve uygulanabilir önlemler ver.
-SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir şey ekleme, markdown kullanma:
-{"onlem":"150-350 karakter düz metin önlemler"}
-
-Başlık: ${data.baslik || "Belirtilmemiş"}
-Açıklama: ${data.aciklama}
-Önem: ${data.severity || "Orta"}
-Firma: ${data.firmaAdi || "Belirtilmemiş"}`;
+      systemPrompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Uygunsuzluk açıklamasına göre alınması gereken önlemleri öneriyorsun. Türkçe yaz. Pratik ve uygulanabilir önlemler ver. SADECE JSON formatında yanıt ver:
+{"onlem":"150-350 karakter düz metin önlemler"}`;
+      userPrompt = `Başlık: ${data?.baslik || "Belirtilmemiş"}
+Açıklama: ${data?.aciklama || ""}
+Önem: ${data?.severity || "Orta"}
+Firma: ${data?.firmaAdi || "Belirtilmemiş"}`;
 
     } else {
       return new Response(JSON.stringify({ error: "Geçersiz mod" }), {
@@ -74,21 +40,43 @@ Firma: ${data.firmaAdi || "Belirtilmemiş"}`;
       });
     }
 
-    const rawText = await callGemini(prompt);
-    
-    // JSON temizle - markdown code block varsa kaldır
-    let cleaned = rawText.trim();
-    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
-    
-    // İlk { ile son } arasını al
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1) {
-      throw new Error("JSON bulunamadı: " + cleaned);
-    }
-    const jsonStr = cleaned.substring(start, end + 1);
-    const parsed = JSON.parse(jsonStr);
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 600,
+        response_format: { type: "json_object" },
+      }),
+    });
 
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Groq error:", res.status, errText);
+      return new Response(JSON.stringify({ error: `Groq hatası (${res.status}): ${errText.substring(0, 200)}` }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const result = await res.json();
+    const content = result.choices?.[0]?.message?.content;
+    if (!content) {
+      return new Response(JSON.stringify({ error: "Boş yanıt alındı" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const parsed = JSON.parse(content);
     return new Response(JSON.stringify({ success: true, data: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
