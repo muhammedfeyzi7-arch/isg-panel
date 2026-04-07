@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+const GEMINI_API_KEY = "AIzaSyBnxL5ZFPzwiHotyyZ4SimWRUV-hTW4p-Y";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,35 +16,33 @@ Deno.serve(async (req) => {
   try {
     const { mode, data } = await req.json();
 
-    let systemPrompt = "";
-    let userPrompt = "";
+    let prompt = "";
 
     if (mode === "tutanak") {
-      // Tutanak oluşturma modu
-      systemPrompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. 
-Kullanıcının verdiği kısa açıklamadan profesyonel bir denetim tutanağı oluşturuyorsun.
+      prompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. 
+Kullanıcının verdiği kısa açıklamadan profesyonel bir denetim tutanağı oluştur.
 Türkçe yaz. Resmi ve profesyonel bir dil kullan.
-JSON formatında yanıt ver:
+SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
 {
   "baslik": "Tutanak başlığı (kısa, öz, max 80 karakter)",
   "aciklama": "Detaylı tutanak açıklaması (200-400 karakter arası, profesyonel dil)",
   "notlar": "Ek notlar ve öneriler (100-200 karakter)"
-}`;
-      userPrompt = `Şu bilgilere göre tutanak oluştur:
+}
+
 Firma: ${data.firmaAdi || "Belirtilmemiş"}
 Kısa Açıklama: ${data.kisaAciklama}
 Tarih: ${data.tarih || new Date().toLocaleDateString("tr-TR")}`;
 
     } else if (mode === "uygunsuzluk") {
-      // Uygunsuzluk önlem önerisi modu
-      systemPrompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın.
-Kullanıcının girdiği uygunsuzluk açıklamasına göre alınması gereken önlemleri öneriyorsun.
+      prompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın.
+Kullanıcının girdiği uygunsuzluk açıklamasına göre alınması gereken önlemleri öner.
 Türkçe yaz. Pratik, uygulanabilir ve net önlemler ver.
-JSON formatında yanıt ver:
+SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
 {
   "onlem": "Alınması gereken önlemler (150-350 karakter, madde madde değil düz metin, pratik ve uygulanabilir)"
-}`;
-      userPrompt = `Uygunsuzluk Başlığı: ${data.baslik || "Belirtilmemiş"}
+}
+
+Uygunsuzluk Başlığı: ${data.baslik || "Belirtilmemiş"}
 Uygunsuzluk Açıklaması: ${data.aciklama}
 Önem Derecesi: ${data.severity || "Orta"}
 Firma: ${data.firmaAdi || "Belirtilmemiş"}`;
@@ -54,44 +53,46 @@ Firma: ${data.firmaAdi || "Belirtilmemiş"}`;
       });
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(GEMINI_URL, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
         ],
-        temperature: 0.7,
-        max_tokens: 500,
-        response_format: { type: "json_object" },
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 500,
+        },
       }),
     });
 
     if (!response.ok) {
       const err = await response.text();
-      console.error("OpenAI error:", err);
-      return new Response(JSON.stringify({ error: "OpenAI API hatası: " + err }), {
+      console.error("Gemini error:", err);
+      return new Response(JSON.stringify({ error: "Gemini API hatası: " + err }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const result = await response.json();
-    const content = result.choices?.[0]?.message?.content;
+    const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!content) {
+    if (!rawText) {
       return new Response(JSON.stringify({ error: "Yanıt alınamadı" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const parsed = JSON.parse(content);
+    // JSON'u temizle (markdown code block varsa kaldır)
+    const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(cleaned);
 
     return new Response(JSON.stringify({ success: true, data: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -688,7 +688,10 @@ export default function TutanaklarPage() {
       const firmaAdi = aktivFirmalar.find(f => f.id === form.firmaId)?.ad || '';
       const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/openai-assistant', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+        },
         body: JSON.stringify({
           mode: 'tutanak',
           data: { kisaAciklama: aiKisaAciklama, firmaAdi, tarih: form.tarih },
