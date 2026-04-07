@@ -8,6 +8,7 @@ import type { Ekipman, EkipmanStatus, Uygunsuzluk, Evrak } from '@/types';
 import { useOfflineQueue, type OfflineQueueItem } from '@/hooks/useOfflineQueue';
 import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHelper';
 import { getSignedUrlFromPath } from '@/utils/fileUpload';
+import { supabase } from '@/lib/supabase';
 
 // jsQR modül yükleyici
 let jsQRModule: ((data: Uint8ClampedArray, width: number, height: number, opts?: { inversionAttempts?: string }) => { data: string } | null) | null = null;
@@ -770,7 +771,7 @@ function EkipmanListeModal({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// QR Ekipman Kartı — offline destekli
+// QR Ekipman Kartı — offline destekli + evraklar
 // ─────────────────────────────────────────────────────────────────────────────
 function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, isOnline }: {
   ekipman: Ekipman; onClose: () => void;
@@ -778,12 +779,77 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
   onDurumDegistir: (ekipmanId: string, durum: EkipmanStatus) => void;
   isOnline: boolean;
 }) {
-  const { firmalar } = useApp();
+  const { firmalar, addToast, org } = useApp();
   const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
   const firma = firmalar.find(f => f.id === ekipman.firmaId);
   const days = ekipman.sonrakiKontrolTarihi
     ? Math.ceil((new Date(ekipman.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000)
     : null;
+
+  // Evraklar — direkt Supabase'den çek
+  const [evraklar, setEvraklar] = useState<Evrak[]>([]);
+  const [evraklarLoading, setEvraklarLoading] = useState(true);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!ekipman.firmaId || !org?.id) {
+      setEvraklar([]);
+      setEvraklarLoading(false);
+      return;
+    }
+    setEvraklarLoading(true);
+    supabase
+      .from('evraklar')
+      .select('id, data')
+      .eq('organization_id', org.id)
+      .is('deleted_at', null)
+      .then(({ data, error }) => {
+        if (error || !data) { setEvraklar([]); setEvraklarLoading(false); return; }
+        const parsed: Evrak[] = data
+          .map((row: { id: string; data: Evrak }) => ({ ...row.data, id: row.id }))
+          .filter((e: Evrak) =>
+            !e.silinmis &&
+            !e.cascadeSilindi &&
+            e.firmaId === ekipman.firmaId
+          )
+          .sort((a: Evrak, b: Evrak) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? ''));
+        setEvraklar(parsed);
+        setEvraklarLoading(false);
+      });
+  }, [ekipman.firmaId, org?.id]);
+
+  const fmtDate = (iso?: string) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const getStatusColor = (durum: string) => {
+    if (durum === 'Yüklü') return { color: '#34D399', bg: 'rgba(52,211,153,0.12)' };
+    if (durum === 'Süre Yaklaşıyor') return { color: '#FBBF24', bg: 'rgba(251,191,36,0.12)' };
+    if (durum === 'Süre Dolmuş') return { color: '#F87171', bg: 'rgba(248,113,113,0.12)' };
+    return { color: '#94A3B8', bg: 'rgba(148,163,184,0.12)' };
+  };
+
+  const handleView = async (evrak: Evrak) => {
+    const url = evrak.dosyaUrl ? await getSignedUrlFromPath(evrak.dosyaUrl) : null;
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    else addToast('Belge erişim linki alınamadı.', 'error');
+  };
+
+  const handleDownload = async (evrak: Evrak) => {
+    if (!evrak.dosyaUrl) { addToast('Bu evrak için dosya bulunamadı.', 'error'); return; }
+    setDownloading(evrak.id);
+    try {
+      const url = await getSignedUrlFromPath(evrak.dosyaUrl);
+      if (!url) { addToast('Dosya indirilemedi.', 'error'); return; }
+      const a = document.createElement('a');
+      a.href = url; a.download = evrak.dosyaAdi || evrak.ad;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      addToast(`"${evrak.ad}" indiriliyor...`, 'success');
+    } finally { setDownloading(null); }
+  };
 
   return (
     <div className="rounded-2xl p-4" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.25)' }}>
@@ -799,6 +865,8 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
           <i className="ri-close-line text-xs" />
         </button>
       </div>
+
+      {/* Ekipman başlık */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: sc.bg }}>
           <i className={`${sc.icon} text-xl`} style={{ color: sc.color }} />
@@ -811,6 +879,8 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
         </div>
         <span className="text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
       </div>
+
+      {/* Kontrol tarihi */}
       {days !== null && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl mb-3" style={{ background: days < 0 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${days < 0 ? 'rgba(239,68,68,0.2)' : days <= 7 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
           <i className="ri-calendar-line text-xs" style={{ color: days < 0 ? '#EF4444' : days <= 7 ? '#FBBF24' : '#475569' }} />
@@ -819,6 +889,8 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
           </span>
         </div>
       )}
+
+      {/* Kontrol Yaptım butonu */}
       <button
         onClick={() => onKontrolYapildi(ekipman.id)}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200 mb-3"
@@ -833,7 +905,9 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
           {!isOnline ? 'Kontrol Yaptım (Çevrimdışı Kaydedilir)' : 'Kontrol Yaptım'}
         </span>
       </button>
-      <div>
+
+      {/* Durum Değiştir */}
+      <div className="mb-4">
         <p className="text-[10px] font-semibold mb-2 uppercase tracking-wide" style={{ color: '#475569' }}>Durum Değiştir</p>
         <div className="grid grid-cols-4 gap-1.5">
           {(['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'] as EkipmanStatus[]).map(d => {
@@ -846,6 +920,101 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
             );
           })}
         </div>
+      </div>
+
+      {/* ── EVRAKLAR BÖLÜMÜ ── */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#475569' }}>Firma Evrakları</p>
+          {!evraklarLoading && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }}>{evraklar.length} evrak</span>
+          )}
+        </div>
+
+        {evraklarLoading ? (
+          <div className="flex items-center gap-2 px-3 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin flex-shrink-0" style={{ borderColor: 'rgba(99,102,241,0.3)', borderTopColor: '#818CF8' }} />
+            <span className="text-xs" style={{ color: '#475569' }}>Evraklar yükleniyor...</span>
+          </div>
+        ) : evraklar.length === 0 ? (
+          <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)' }}>
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <i className="ri-folder-open-line text-sm" style={{ color: '#475569' }} />
+            </div>
+            <p className="text-xs" style={{ color: '#475569' }}>Bu firmaya ait evrak bulunamadı</p>
+          </div>
+        ) : (
+          <div className="space-y-2 overflow-y-auto pr-0.5" style={{ maxHeight: '240px' }}>
+            {evraklar.map(evrak => {
+              const sc2 = getStatusColor(evrak.durum);
+              const isExpired = evrak.durum === 'Süre Dolmuş';
+              const isNearing = evrak.durum === 'Süre Yaklaşıyor';
+              return (
+                <div key={evrak.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${isExpired ? 'rgba(248,113,113,0.2)' : isNearing ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.07)'}` }}>
+                  <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: sc2.bg }}>
+                    <i className="ri-file-text-line text-sm" style={{ color: sc2.color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{evrak.ad}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {evrak.tur && <span className="text-[10px]" style={{ color: '#475569' }}>{evrak.tur}</span>}
+                      {evrak.gecerlilikTarihi && (
+                        <span className="text-[10px]" style={{ color: isExpired ? '#F87171' : isNearing ? '#FCD34D' : '#475569' }}>
+                          <i className="ri-calendar-line mr-0.5" />{fmtDate(evrak.gecerlilikTarihi)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap" style={{ background: sc2.bg, color: sc2.color }}>{evrak.durum}</span>
+                    {evrak.dosyaUrl && (
+                      <>
+                        <button onClick={() => handleView(evrak)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Görüntüle">
+                          <i className="ri-eye-line text-xs" />
+                        </button>
+                        <button onClick={() => handleDownload(evrak)} disabled={downloading === evrak.id} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} title="İndir">
+                          <i className={`${downloading === evrak.id ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} text-xs`} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Ekipmanın kendi belgesi varsa onu da göster */}
+        {ekipman.dosyaUrl && (
+          <div className="mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: '#475569' }}>Ekipman Belgesi</p>
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
+              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(52,211,153,0.15)' }}>
+                <i className="ri-file-check-line text-sm" style={{ color: '#34D399' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ekipman.dosyaAdi || 'Ekipman Belgesi'}</p>
+                {ekipman.dosyaBoyutu ? <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{(ekipman.dosyaBoyutu / 1024).toFixed(1)} KB</p> : null}
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={async () => { const url = await getSignedUrlFromPath(ekipman.dosyaUrl!); if (url) window.open(url, '_blank', 'noopener,noreferrer'); else addToast('Belge açılamadı.', 'error'); }}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                  style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }} title="Görüntüle"
+                >
+                  <i className="ri-eye-line text-xs" />
+                </button>
+                <button
+                  onClick={async () => { const url = await getSignedUrlFromPath(ekipman.dosyaUrl!); if (url) { const a = document.createElement('a'); a.href = url; a.download = ekipman.dosyaAdi || 'belge'; document.body.appendChild(a); a.click(); document.body.removeChild(a); addToast('İndiriliyor...', 'success'); } else addToast('Dosya indirilemedi.', 'error'); }}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                  style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399' }} title="İndir"
+                >
+                  <i className="ri-download-2-line text-xs" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
