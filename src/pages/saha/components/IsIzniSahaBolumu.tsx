@@ -36,6 +36,7 @@ interface EvrakDosya {
   updated_at: string;
   metadata?: { size?: number };
   _slug?: string;
+  _prefix?: string;
 }
 
 function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
@@ -67,19 +68,22 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
       let allFiles: EvrakDosya[] = [];
       for (const slug of slugsToTry) {
         const prefix = `${orgId}/is-izni-evrak/${firmaId}/${slug}`;
+        console.log('[ISG] Listing prefix:', prefix);
         const { data, error } = await supabase.storage
           .from('uploads')
           .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
+        console.log('[ISG] List result:', { slug, count: data?.length, error: error?.message, files: data?.map(f => f.name) });
         if (!error && data && data.length > 0) {
           const filtered = data
-            .filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'))
-            .map(f => ({ ...f, _slug: slug } as EvrakDosya));
+            .filter(f => f.name && f.name !== '.emptyFolderPlaceholder' && !f.name.includes('_red_'))
+            .map(f => ({ ...f, _slug: slug, _prefix: prefix } as EvrakDosya & { _prefix: string }));
           allFiles = [...allFiles, ...filtered];
         }
       }
       const seen = new Set<string>();
       setDosyalar(allFiles.filter(f => { if (seen.has(f.name)) return false; seen.add(f.name); return true; }));
-    } catch {
+    } catch (e) {
+      console.error('[ISG] fetchDosyalar error:', e);
       setDosyalar([]);
     } finally {
       setYukleniyor(false);
@@ -90,22 +94,59 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
 
   const handleAc = async (dosya: EvrakDosya, usedSlug: string) => {
     setAcikDosya(dosya.name);
-    const filePath = `${orgId}/is-izni-evrak/${firmaId}/${usedSlug}/${dosya.name}`;
-    console.log('[ISG] Opening file:', filePath);
-    const url = await getSignedUrl(filePath);
-    console.log('[ISG] Signed URL:', url ? 'OK' : 'NULL', filePath);
-    if (url) {
-      window.open(url, '_blank');
-    } else {
+    try {
+      // _prefix varsa direkt kullan — en güvenilir yol
+      const prefix = (dosya as EvrakDosya & { _prefix?: string })._prefix ?? `${orgId}/is-izni-evrak/${firmaId}/${usedSlug}`;
+      const filePath = `${prefix}/${dosya.name}`;
+      console.log('[ISG] Opening file path:', filePath);
+      console.log('[ISG] orgId:', orgId, 'firmaId:', firmaId, 'slug:', usedSlug);
+
+      // Önce createSignedUrl ile dene
+      const { data: signData, error: signErr } = await supabase.storage
+        .from('uploads')
+        .createSignedUrl(filePath, 86400);
+
+      console.log('[ISG] createSignedUrl result:', { ok: !!signData?.signedUrl, error: signErr?.message });
+
+      if (signData?.signedUrl) {
+        window.open(signData.signedUrl, '_blank');
+        return;
+      }
+
       // Fallback: tüm olası slug'larla dene
       const slugs = [usedSlug, izinTuruSlug, izinTuruSlugOrig].filter((s, i, arr) => arr.indexOf(s) === i);
+      let opened = false;
       for (const slug of slugs) {
         const fp = `${orgId}/is-izni-evrak/${firmaId}/${slug}/${dosya.name}`;
-        const u = await getSignedUrl(fp);
-        if (u) { window.open(u, '_blank'); break; }
+        console.log('[ISG] Fallback trying:', fp);
+        const { data: fd, error: fe } = await supabase.storage.from('uploads').createSignedUrl(fp, 86400);
+        console.log('[ISG] Fallback result:', { path: fp, ok: !!fd?.signedUrl, error: fe?.message });
+        if (fd?.signedUrl) { window.open(fd.signedUrl, '_blank'); opened = true; break; }
       }
+
+      // Son çare: storage list ile tam path bul
+      if (!opened) {
+        console.log('[ISG] Trying storage list fallback...');
+        const slugs2 = [izinTuruSlug, izinTuruSlugOrig].filter((s, i, arr) => arr.indexOf(s) === i);
+        for (const slug of slugs2) {
+          const pfx = `${orgId}/is-izni-evrak/${firmaId}/${slug}`;
+          const { data: listData } = await supabase.storage.from('uploads').list(pfx, { limit: 200 });
+          console.log('[ISG] List fallback:', pfx, listData?.map(f => f.name));
+          const found = listData?.find(f => f.name === dosya.name || f.name.includes(dosya.name.split('.')[0]));
+          if (found) {
+            const fp2 = `${pfx}/${found.name}`;
+            const { data: fd2 } = await supabase.storage.from('uploads').createSignedUrl(fp2, 86400);
+            if (fd2?.signedUrl) { window.open(fd2.signedUrl, '_blank'); opened = true; break; }
+          }
+        }
+      }
+
+      if (!opened) {
+        console.error('[ISG] Tüm yollar denendi, dosya açılamadı:', dosya.name);
+      }
+    } finally {
+      setAcikDosya(null);
     }
-    setAcikDosya(null);
   };
 
   const getFileIcon = (name: string) => {

@@ -13,6 +13,7 @@ const ROLE_MODULES: Record<string, string[]> = {
   denetci: [
     'dashboard', 'firmalar', 'personeller',
     'ekipmanlar', 'uygunsuzluklar', 'saha',
+    // muayeneler kasıtlı olarak yok — KVKK uyumu
   ],
   member: [
     'dashboard', 'firmalar', 'personeller',
@@ -45,10 +46,10 @@ const menuGroups: { label: string; items: MenuItem[] }[] = [
   {
     label: 'YÖNETİM',
     items: [
-      { id: 'evraklar',        label: 'Evrak Takibi',        icon: 'ri-file-list-3-line' },
       { id: 'firma-evraklari', label: 'Firma Evrakları',     icon: 'ri-building-4-line' },
+      { id: 'evraklar',        label: 'Evrak Takibi',        icon: 'ri-file-list-3-line' },
       { id: 'egitimler',       label: 'Eğitim Evrakları',   icon: 'ri-graduation-cap-line' },
-      { id: 'muayeneler',      label: 'Sağlık Evrakları',   icon: 'ri-heart-pulse-line' },
+      { id: 'muayeneler',      label: 'Sağlık Takibi',      icon: 'ri-heart-pulse-line' },
       { id: 'tutanaklar',      label: 'Tutanaklar',          icon: 'ri-article-line' },
       { id: 'uygunsuzluklar',  label: 'Saha Denetim',       icon: 'ri-map-pin-user-line' },
       { id: 'ekipmanlar',      label: 'Ekipman Kontrolleri', icon: 'ri-tools-line' },

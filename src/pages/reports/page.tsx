@@ -250,7 +250,7 @@ export default function RaporlarPage() {
     uygunsuzluklar, ekipmanlar, gorevler, tutanaklar,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'genel' | 'evrak' | 'uygunsuzluk' | 'egitim'>('genel');
+  const [activeTab, setActiveTab] = useState<'genel' | 'evrak' | 'uygunsuzluk' | 'egitim' | 'saglik'>('genel');
   const [selectedFirmaId, setSelectedFirmaId] = useState<string>('all');
   const [firmaDropdownOpen, setFirmaDropdownOpen] = useState(false);
   const firmaDropdownRef = useRef<HTMLDivElement>(null);
@@ -501,7 +501,34 @@ export default function RaporlarPage() {
     { id: 'evrak', label: 'Evrak Analizi', icon: 'ri-file-chart-line', color: '#F59E0B' },
     { id: 'uygunsuzluk', label: 'Uygunsuzluklar', icon: 'ri-alert-line', color: '#EF4444' },
     { id: 'egitim', label: 'Eğitimler', icon: 'ri-graduation-cap-line', color: '#6366F1' },
+    { id: 'saglik', label: 'Sağlık Takibi', icon: 'ri-heart-pulse-line', color: '#EC4899' },
   ] as const;
+
+  // ── Sağlık Takibi İstatistikleri ──
+  const getDaysUntil = (dateStr: string) => {
+    if (!dateStr) return 9999;
+    const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    return Math.ceil((d.getTime() - now.getTime()) / 86400000);
+  };
+
+  const saglikStats = useMemo(() => ({
+    toplam: aktifMuayeneler.length,
+    guncel: aktifMuayeneler.filter(m => getDaysUntil(m.sonrakiTarih) > 30).length,
+    yaklasan: aktifMuayeneler.filter(m => { const d = getDaysUntil(m.sonrakiTarih); return d >= 0 && d <= 30; }).length,
+    gecmis: aktifMuayeneler.filter(m => getDaysUntil(m.sonrakiTarih) < 0).length,
+  }), [aktifMuayeneler]);
+
+  const saglikTrend = useMemo(() => months.map(m => ({
+    ay: m.label,
+    Muayene: aktifMuayeneler.filter(mu => getMonthKey(mu.muayeneTarihi) === m.key).length,
+  })), [months, aktifMuayeneler]);
+
+  const saglikDurumData = useMemo(() => [
+    { name: 'Güncel', value: saglikStats.guncel, color: '#10B981' },
+    { name: 'Yaklaşıyor', value: saglikStats.yaklasan, color: '#F59E0B' },
+    { name: 'Süresi Geçmiş', value: saglikStats.gecmis, color: '#EF4444' },
+  ].filter(d => d.value > 0), [saglikStats]);
 
   const kpiCards = [
     { label: 'Toplam Firma', value: aktifFirmalar.length, icon: 'ri-building-2-line', color: '#3B82F6', sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma` },
@@ -509,8 +536,7 @@ export default function RaporlarPage() {
     { label: 'Toplam Evrak', value: aktifEvraklar.length, icon: 'ri-file-list-3-line', color: '#F59E0B', sub: `${evrakStats.eksik + evrakStats.sureDolmus} sorunlu evrak` },
     { label: 'Eğitim Kayıtları', value: aktifEgitimler.length, icon: 'ri-graduation-cap-line', color: '#6366F1', sub: `${aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length} tamamlandı` },
     { label: 'Açık Uygunsuzluk', value: uygunsuzlukStats.acik, icon: 'ri-alert-line', color: uygunsuzlukStats.acik > 0 ? '#EF4444' : '#10B981', sub: `${uygunsuzlukStats.kapandi} kapatıldı` },
-    { label: 'Muayene Kayıtları', value: aktifMuayeneler.length, icon: 'ri-heart-pulse-line', color: '#EC4899', sub: `${aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length} uygun` },
-
+    { label: 'Sağlık Takibi', value: saglikStats.toplam, icon: 'ri-heart-pulse-line', color: '#EC4899', sub: `${saglikStats.gecmis} süresi geçmiş` },
     { label: 'Tutanaklar', value: aktifTutanaklar.length, icon: 'ri-article-line', color: '#F97316', sub: `${aktifTutanaklar.filter(t => t.durum === 'Onaylandı').length} onaylı` },
   ];
 
@@ -698,7 +724,7 @@ export default function RaporlarPage() {
           ['Toplam Personel', exPersoneller.length, 'Aktif Personel', exPersoneller.filter(p => p.durum === 'Aktif').length],
           ['Toplam Evrak', exEvraklar.length, 'Sorunlu Evrak', evrakStats.eksik + evrakStats.sureDolmus],
           ['Toplam Eğitim', exEgitimler.length, 'Tamamlanan', exEgitimler.filter(e => e.durum === 'Tamamlandı').length],
-          ['Toplam Muayene', exMuayeneler.length, 'Çalışabilir', exMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length],
+          ['Sağlık Takibi', exMuayeneler.length, 'Süresi Geçmiş', exMuayeneler.filter(m => (calcDays(m.sonrakiTarih) ?? 1) < 0).length],
           ['Toplam Ekipman', exEkipmanlar.length, 'Uygun Değil', exEkipmanlar.filter(e => e.durum === 'Uygun Değil').length],
           ['Açık Uygunsuzluk', uygunsuzlukStats.acik, 'Kapatılan', uygunsuzlukStats.kapandi],
           ['Sistem Sağlık Skoru', `${healthScore}/100`, 'Durum', healthLabel],
@@ -768,16 +794,75 @@ export default function RaporlarPage() {
           [4, 30, 20, 24, 22, 14, 14, 10, 12],
         );
 
-        // ── SAYFA 6: MUAYENELER ──
-        buildSheet('Muayeneler', 'MUAYENELER LİSTESİ', `Toplam ${exMuayeneler.length} muayene  |  ${firmaAdi}  |  Rapor: ${tarih}`,
-          ['#', 'Personel', 'Firma', 'Muayene Türü', 'Sonuç', 'Muayene Tarihi', 'Sonraki Tarih', 'Hekim'],
-          exMuayeneler.map((m, i) => {
+        // ── SAYFA 6: SAĞLIK TAKİBİ ──
+        const calcDays = (dateStr: string | null | undefined) => {
+          if (!dateStr) return null;
+          const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+          const n = new Date(); n.setHours(0, 0, 0, 0);
+          return Math.ceil((d.getTime() - n.getTime()) / 86400000);
+        };
+        const getDurumLabel = (days: number | null) => {
+          if (days === null) return '—';
+          if (days < 0) return 'Süresi Geçmiş';
+          if (days <= 30) return 'Yaklaşıyor';
+          return 'Güncel';
+        };
+
+        const saglikWs = wb.addWorksheet('Sağlık Takibi');
+        const saglikCols = ['#', 'Ad Soyad', 'Görev', 'Firma', 'Muayene Tarihi', 'Sonraki Muayene', 'Kalan Gün', 'Durum', 'Sağlık Durumu'];
+        saglikWs.columns = [4, 26, 20, 24, 16, 18, 12, 16, 20].map(w => ({ width: w }));
+        applyHeaderRows(saglikWs, 'SAĞLIK TAKİBİ', `Toplam ${exMuayeneler.length} kayıt  |  Geçmiş: ${exMuayeneler.filter(m => (calcDays(m.sonrakiTarih) ?? 1) < 0).length}  |  ${firmaAdi}  |  Rapor: ${tarih}`, saglikCols.length);
+        applyHeaderCols(saglikWs, saglikCols);
+
+        exMuayeneler
+          .sort((a, b) => (calcDays(a.sonrakiTarih) ?? 9999) - (calcDays(b.sonrakiTarih) ?? 9999))
+          .forEach((m, i) => {
             const personel = exPersoneller.find(p => p.id === m.personelId);
             const firma = aktifFirmalar.find(f => f.id === (personel?.firmaId ?? ''));
-            return [i+1, personel?.adSoyad||'—', firma?.ad||'—', (m as unknown as { muayeneTuru?: string }).muayeneTuru||'—', m.sonuc||'—', fmtDate(m.muayeneTarihi), fmtDate(m.sonrakiTarih), m.doktor||'—'];
-          }),
-          [4, 26, 24, 20, 14, 16, 16, 22],
-        );
+            const days = calcDays(m.sonrakiTarih);
+            const durumLabel = getDurumLabel(days);
+            const saglikDurumu = (m as unknown as { saglikDurumu?: string }).saglikDurumu || '—';
+
+            const exRow = saglikWs.getRow(5 + i);
+            exRow.height = 18;
+            const isEven = i % 2 === 0;
+            const rowBg = isEven ? 'FFFFFFFF' : 'FFF8F0FF';
+
+            const vals = [i+1, personel?.adSoyad||'—', personel?.gorev||'—', firma?.ad||'—', fmtDate(m.muayeneTarihi), fmtDate(m.sonrakiTarih), days !== null ? days : '—', durumLabel, saglikDurumu];
+            vals.forEach((val, ci) => {
+              const cell = exRow.getCell(ci + 1);
+              cell.value = val;
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+              cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF1E293B' } };
+              cell.alignment = { vertical: 'middle', wrapText: false };
+              cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, right: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
+
+              // Sıra no
+              if (ci === 0) { cell.font = { size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+
+              // Kalan gün — renkli
+              if (ci === 6 && days !== null) {
+                const dayColor = days < 0 ? 'FFDC2626' : days <= 30 ? 'FFD97706' : 'FF16A34A';
+                const dayBg = days < 0 ? 'FFFEE2E2' : days <= 30 ? 'FFFEF3C7' : 'FFDCFCE7';
+                cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: dayColor } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: dayBg } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+              }
+
+              // Durum sütunu — renkli
+              if (ci === 7) {
+                const sc = STATUS_COLORS[durumLabel] ?? (
+                  durumLabel === 'Güncel' ? { fg: 'FF16A34A', bg: 'FFDCFCE7' } :
+                  durumLabel === 'Yaklaşıyor' ? { fg: 'FFD97706', bg: 'FFFEF3C7' } :
+                  { fg: 'FFDC2626', bg: 'FFFEE2E2' }
+                );
+                cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: sc.fg } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sc.bg } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+              }
+            });
+          });
+        saglikWs.views = [{ state: 'frozen', ySplit: 4 }];
 
         // ── SAYFA 7: UYGUNSUZLUKLAR — fotoğraf embed ──
         // urlToBase64: filePath ise signed URL üretir, http URL ise direkt fetch eder
@@ -856,19 +941,21 @@ export default function RaporlarPage() {
 
         // ── SAYFA 9: FİRMA BAZLI ÖZET ──
         buildSheet('Firma Özeti', 'FİRMA BAZLI ÖZET', `${exFirmalar.length} firma için konsolide özet  |  ${firmaAdi}  |  Rapor: ${tarih}`,
-          ['#', 'Firma Adı', 'Tehlike Sınıfı', 'Durum', 'Personel', 'Aktif P.', 'Evrak', 'Sorunlu E.', 'Eğitim', 'Muayene', 'Açık Uyg.', 'Ekipman'],
+          ['#', 'Firma Adı', 'Tehlike Sınıfı', 'Durum', 'Personel', 'Aktif P.', 'Evrak', 'Sorunlu E.', 'Eğitim', 'Sağlık Takibi', 'Geçmiş Muayene', 'Açık Uyg.', 'Ekipman'],
           exFirmalar.map((f, i) => {
             const pS = exPersoneller.filter(p => p.firmaId === f.id).length;
             const aP = exPersoneller.filter(p => p.firmaId === f.id && p.durum === 'Aktif').length;
             const eS = exEvraklar.filter(e => e.firmaId === f.id).length;
             const xE = exEvraklar.filter(e => e.firmaId === f.id && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
             const egS = exEgitimler.filter(e => e.firmaId === f.id).length;
-            const muS = exMuayeneler.filter(m => exPersoneller.find(p => p.id === m.personelId)?.firmaId === f.id).length;
+            const firmaMuayeneler = exMuayeneler.filter(m => exPersoneller.find(p => p.id === m.personelId)?.firmaId === f.id);
+            const muS = firmaMuayeneler.length;
+            const muGecmis = firmaMuayeneler.filter(m => (calcDays(m.sonrakiTarih) ?? 1) < 0).length;
             const uS = exUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
             const ekS = exEkipmanlar.filter(e => e.firmaId === f.id).length;
-            return [i+1, f.ad, f.tehlikeSinifi, f.durum, pS, aP, eS, xE, egS, muS, uS, ekS];
+            return [i+1, f.ad, f.tehlikeSinifi, f.durum, pS, aP, eS, xE, egS, muS, muGecmis, uS, ekS];
           }),
-          [4, 28, 16, 12, 10, 10, 10, 12, 10, 10, 12, 10],
+          [4, 26, 16, 12, 10, 10, 10, 12, 10, 12, 14, 12, 10],
         );
 
         // ── TEK DOSYA OLARAK İNDİR ──
@@ -1573,6 +1660,134 @@ export default function RaporlarPage() {
               <AnimatedProgressBar label="Eksik Eğitimler" value={aktifEgitimler.filter(e => e.durum === 'Eksik').length} total={aktifEgitimler.length} color="#EF4444" delay={200} />
             </div>
           </GlassCard>
+        </div>
+      )}
+
+      {/* SAĞLIK TAKİBİ */}
+      {activeTab === 'saglik' && (
+        <div className="space-y-5">
+          {/* KPI */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Toplam Kayıt',    value: saglikStats.toplam,   color: '#EC4899', icon: 'ri-heart-pulse-line',    sub: 'Tüm muayeneler' },
+              { label: 'Güncel',          value: saglikStats.guncel,   color: '#10B981', icon: 'ri-checkbox-circle-line', sub: '30+ gün kaldı' },
+              { label: 'Yaklaşıyor',      value: saglikStats.yaklasan, color: '#F59E0B', icon: 'ri-time-line',            sub: '0–30 gün kaldı' },
+              { label: 'Süresi Geçmiş',   value: saglikStats.gecmis,   color: '#EF4444', icon: 'ri-alarm-warning-line',   sub: 'Yenilenmeli' },
+            ].map((item, i) => (
+              <AnimatedKPICard key={item.label} {...item} trend={undefined} delay={i * 80} />
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Aylık trend */}
+            <GlassCard>
+              <SectionHeader title="Aylık Muayene Trendi" subtitle="Son 12 ayda yapılan muayeneler" icon="ri-bar-chart-line" color="#EC4899" />
+              <ResponsiveContainer width="100%" height={230}>
+                <BarChart data={saglikTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="ay" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="Muayene" fill="#EC4899" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </GlassCard>
+
+            {/* Durum dağılımı */}
+            <GlassCard>
+              <SectionHeader title="Muayene Durum Dağılımı" subtitle="Sonraki muayene tarihine göre durum analizi" icon="ri-pie-chart-line" color="#EC4899" />
+              {saglikDurumData.length === 0 ? (
+                <div className="flex items-center justify-center h-40">
+                  <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Henüz muayene kaydı yok</p>
+                </div>
+              ) : (
+                <DonutChart data={saglikDurumData} size={160} />
+              )}
+            </GlassCard>
+          </div>
+
+          {/* Durum analizi progress */}
+          <GlassCard>
+            <SectionHeader title="Sağlık Takibi Analizi" subtitle="Tüm kayıtların durum bazlı dağılımı" icon="ri-bar-chart-grouped-line" color="#EC4899" />
+            <div className="space-y-4">
+              <AnimatedProgressBar label="Güncel (30+ gün)" value={saglikStats.guncel} total={saglikStats.toplam} color="#10B981" delay={0} />
+              <AnimatedProgressBar label="Yaklaşıyor (0–30 gün)" value={saglikStats.yaklasan} total={saglikStats.toplam} color="#F59E0B" delay={100} />
+              <AnimatedProgressBar label="Süresi Geçmiş" value={saglikStats.gecmis} total={saglikStats.toplam} color="#EF4444" delay={200} />
+            </div>
+            <div className="mt-5 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+              <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Toplam Kayıt</span>
+              <span className="text-[15px] font-black" style={{ color: 'var(--text-primary)' }}>{saglikStats.toplam}</span>
+            </div>
+          </GlassCard>
+
+          {/* Yaklaşan / Geçmiş tablo */}
+          {(saglikStats.yaklasan > 0 || saglikStats.gecmis > 0) && (
+            <GlassCard className="!p-0 overflow-hidden">
+              <div className="px-5 py-4 flex items-center gap-2.5" style={{ borderBottom: '1px solid var(--border-main)' }}>
+                <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(239,68,68,0.12)' }}>
+                  <i className="ri-alarm-warning-line text-xs" style={{ color: '#EF4444' }} />
+                </div>
+                <h3 className="text-[13.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Dikkat Gerektiren Kayıtlar</h3>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                  {saglikStats.yaklasan + saglikStats.gecmis}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table-premium w-full">
+                  <thead>
+                    <tr>
+                      <th className="text-left">Personel</th>
+                      <th className="text-left hidden md:table-cell">Firma</th>
+                      <th className="text-left">Muayene Tarihi</th>
+                      <th className="text-left">Sonraki Muayene</th>
+                      <th className="text-left">Durum</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aktifMuayeneler
+                      .filter(m => getDaysUntil(m.sonrakiTarih) <= 30)
+                      .sort((a, b) => getDaysUntil(a.sonrakiTarih) - getDaysUntil(b.sonrakiTarih))
+                      .slice(0, 20)
+                      .map(m => {
+                        const p = personeller.find(x => x.id === m.personelId);
+                        const f = aktifFirmalar.find(x => x.id === p?.firmaId);
+                        const days = getDaysUntil(m.sonrakiTarih);
+                        const color = days < 0 ? '#EF4444' : '#F59E0B';
+                        const label = days < 0 ? `${Math.abs(days)}g geçti` : `${days}g kaldı`;
+                        const icon = days < 0 ? 'ri-alarm-warning-line' : 'ri-time-line';
+                        return (
+                          <tr key={m.id}>
+                            <td>
+                              <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{p?.adSoyad || '—'}</p>
+                              {p?.gorev && <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{p.gorev}</p>}
+                            </td>
+                            <td className="hidden md:table-cell">
+                              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f?.ad || '—'}</span>
+                            </td>
+                            <td>
+                              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                {m.muayeneTarihi ? new Date(m.muayeneTarihi).toLocaleDateString('tr-TR') : '—'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="text-sm font-medium" style={{ color }}>
+                                {m.sonrakiTarih ? new Date(m.sonrakiTarih).toLocaleDateString('tr-TR') : '—'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap"
+                                style={{ background: `${color}15`, color, border: `1px solid ${color}25` }}>
+                                <i className={`${icon} text-xs`} />{label}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          )}
         </div>
       )}
     </div>
