@@ -246,7 +246,8 @@ export function useStore(
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[ISG] SAVE FAILED ${table}/${item.id}:`, msg);
       onSaveErrorRef.current?.(`Kayıt hatası (${table}): ${msg}`);
-      throw err; // Re-throw so callers can handle
+      // Don't re-throw — callers should not crash on save errors
+      // The optimistic UI update already happened, data is in local state
     }
   }, []);
 

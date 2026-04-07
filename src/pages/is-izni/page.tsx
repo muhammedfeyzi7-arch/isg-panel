@@ -61,24 +61,49 @@ function IsIzniEvraklari({ izinId, orgId, firmaId, izinTuru, onRefresh }: {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [acikDosya, setAcikDosya] = useState<string | null>(null);
 
-  const izinTuruSlug = izinTuru.replace(/\s+/g, '-');
+  // Türkçe karakterleri normalize et — upload sırasında da aynı slug kullanılmalı
+  const izinTuruSlug = izinTuru
+    .replace(/\s+/g, '-')
+    .replace(/ş/g, 's').replace(/Ş/g, 'S')
+    .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+    .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+    .replace(/ı/g, 'i').replace(/İ/g, 'I')
+    .replace(/ç/g, 'c').replace(/Ç/g, 'C');
 
   const fetchDosyalar = useCallback(async () => {
+    if (!orgId || orgId === 'unknown' || !firmaId) {
+      setDosyalar([]);
+      setYukleniyor(false);
+      return;
+    }
     setYukleniyor(true);
     try {
-      const prefix = `${orgId}/is-izni-evrak/${firmaId}/${izinTuruSlug}`;
-      const { data, error } = await supabase.storage
-        .from('uploads')
-        .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
-      if (error || !data) { setDosyalar([]); return; }
-      const filtered = data.filter(f => f.name.startsWith(izinId));
-      setDosyalar(filtered as EvrakDosya[]);
+      // Önce normalize slug ile dene, bulamazsa orijinal slug ile de dene
+      const slugNorm = izinTuruSlug;
+      const slugOrig = izinTuru.replace(/\s+/g, '-');
+      const slugsToTry = slugNorm === slugOrig ? [slugNorm] : [slugNorm, slugOrig];
+
+      let allFiles: EvrakDosya[] = [];
+      for (const slug of slugsToTry) {
+        const prefix = `${orgId}/is-izni-evrak/${firmaId}/${slug}`;
+        const { data, error } = await supabase.storage
+          .from('uploads')
+          .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
+        if (!error && data && data.length > 0) {
+          const filtered = data.filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'));
+          allFiles = [...allFiles, ...(filtered as EvrakDosya[])];
+        }
+      }
+      // Deduplicate by name
+      const seen = new Set<string>();
+      setDosyalar(allFiles.filter(f => { if (seen.has(f.name)) return false; seen.add(f.name); return true; }));
     } catch {
       setDosyalar([]);
     } finally {
       setYukleniyor(false);
     }
-  }, [orgId, firmaId, izinTuruSlug, izinId]);
+  }, [orgId, firmaId, izinTuruSlug, izinTuru, izinId]);
 
   useEffect(() => { void fetchDosyalar(); }, [fetchDosyalar, onRefresh]);
 
@@ -418,6 +443,18 @@ function DenetciDegerlendirmeModal({ izin, firma, orgId, onClose, onUygun, onUyg
   );
 }
 
+// ─── Yardımcı: izin türü slug normalize ────────────────────────────────────
+function normalizeSlug(str: string): string {
+  return str
+    .replace(/\s+/g, '-')
+    .replace(/ş/g, 's').replace(/Ş/g, 'S')
+    .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+    .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+    .replace(/ı/g, 'i').replace(/İ/g, 'I')
+    .replace(/ç/g, 'c').replace(/Ç/g, 'C');
+}
+
 // ─── Ana Sayfa ──────────────────────────────────────────────────────────────
 const emptyForm = {
   tip: 'Genel' as IsIzniTip,
@@ -556,7 +593,7 @@ export default function IsIzniPage() {
           durum: 'Onay Bekliyor',
         } as Partial<IsIzni>);
         if (formEvraklar.length > 0) {
-          const izinTuruSlug = form.tip.replace(/\s+/g, '-');
+          const izinTuruSlug = normalizeSlug(form.tip);
           setUploadProgress({ done: 0, total: formEvraklar.length });
           for (let i = 0; i < formEvraklar.length; i++) {
             const file = formEvraklar[i];
@@ -594,7 +631,7 @@ export default function IsIzniPage() {
         const newIz = await addIsIzni(saveData as Omit<IsIzni, 'id' | 'izinNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>);
         if (!newIz?.id) { addToast('İş izni oluşturulurken hata oluştu.', 'error'); return; }
         if (formEvraklar.length > 0) {
-          const izinTuruSlug = form.tip.replace(/\s+/g, '-');
+          const izinTuruSlug = normalizeSlug(form.tip);
           setUploadProgress({ done: 0, total: formEvraklar.length });
           for (let i = 0; i < formEvraklar.length; i++) {
             const file = formEvraklar[i];
@@ -639,7 +676,7 @@ export default function IsIzniPage() {
     const orgId = org?.id ?? 'unknown';
     let redFotoUrl: string | undefined;
     if (foto && orgId !== 'unknown') {
-      const izinTuruSlug = iz.tip.replace(/\s+/g, '-');
+      const izinTuruSlug = normalizeSlug(iz.tip);
       const path = `${orgId}/is-izni-evrak/${iz.firmaId}/${izinTuruSlug}/${iz.id}_red_${Date.now()}_${foto.name}`;
       const { data: uploadData } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
       if (uploadData?.path) {

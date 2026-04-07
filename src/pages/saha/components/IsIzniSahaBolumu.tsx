@@ -30,26 +30,41 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [acikDosya, setAcikDosya] = useState<string | null>(null);
 
-  const izinTuruSlug = izinTuru.replace(/\s+/g, '-');
+  const izinTuruSlug = izinTuru
+    .replace(/\s+/g, '-')
+    .replace(/ş/g, 's').replace(/Ş/g, 'S')
+    .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+    .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+    .replace(/ı/g, 'i').replace(/İ/g, 'I')
+    .replace(/ç/g, 'c').replace(/Ç/g, 'C');
+
+  const izinTuruSlugOrig = izinTuru.replace(/\s+/g, '-');
 
   const fetchDosyalar = useCallback(async () => {
-    if (!orgId || orgId === 'unknown') { setDosyalar([]); setYukleniyor(false); return; }
+    if (!orgId || orgId === 'unknown' || !firmaId) { setDosyalar([]); setYukleniyor(false); return; }
     setYukleniyor(true);
     try {
-      const prefix = `${orgId}/is-izni-evrak/${firmaId}/${izinTuruSlug}`;
-      const { data, error } = await supabase.storage
-        .from('uploads')
-        .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
-      if (error || !data) { setDosyalar([]); return; }
-      // izinId ile başlayan dosyaları filtrele (red fotoğrafları hariç)
-      const filtered = data.filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'));
-      setDosyalar(filtered as EvrakDosya[]);
+      const slugsToTry = izinTuruSlug === izinTuruSlugOrig ? [izinTuruSlug] : [izinTuruSlug, izinTuruSlugOrig];
+      let allFiles: EvrakDosya[] = [];
+      for (const slug of slugsToTry) {
+        const prefix = `${orgId}/is-izni-evrak/${firmaId}/${slug}`;
+        const { data, error } = await supabase.storage
+          .from('uploads')
+          .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
+        if (!error && data && data.length > 0) {
+          const filtered = data.filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'));
+          allFiles = [...allFiles, ...(filtered as EvrakDosya[])];
+        }
+      }
+      const seen = new Set<string>();
+      setDosyalar(allFiles.filter(f => { if (seen.has(f.name)) return false; seen.add(f.name); return true; }));
     } catch {
       setDosyalar([]);
     } finally {
       setYukleniyor(false);
     }
-  }, [orgId, firmaId, izinTuruSlug, izinId]);
+  }, [orgId, firmaId, izinTuruSlug, izinTuruSlugOrig, izinId]);
 
   useEffect(() => { void fetchDosyalar(); }, [fetchDosyalar]);
 
@@ -441,11 +456,20 @@ export default function IsIzniSahaBolumu() {
     setSeciliIzinId(null);
   };
 
+  const normalizeSlug = (str: string) => str
+    .replace(/\s+/g, '-')
+    .replace(/ş/g, 's').replace(/Ş/g, 'S')
+    .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+    .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+    .replace(/ı/g, 'i').replace(/İ/g, 'I')
+    .replace(/ç/g, 'c').replace(/Ç/g, 'C');
+
   const handleUygunDegil = async (izin: IsIzni, not: string, foto?: File): Promise<void> => {
     const orgId = org?.id ?? 'unknown';
     let redFotoUrl: string | undefined;
     if (foto && orgId !== 'unknown') {
-      const izinTuruSlug = izin.tip.replace(/\s+/g, '-');
+      const izinTuruSlug = normalizeSlug(izin.tip);
       const path = `${orgId}/is-izni-evrak/${izin.firmaId}/${izinTuruSlug}/${izin.id}_red_${Date.now()}_${foto.name}`;
       const { data: uploadData } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
       if (uploadData?.path) {
