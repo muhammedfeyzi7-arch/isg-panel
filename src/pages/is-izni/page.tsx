@@ -5,7 +5,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { generateIsIzniNo } from '@/store/useStore';
 import Modal from '@/components/base/Modal';
 import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
-import { uploadFileToStorage, getSignedUrl } from '@/utils/fileUpload';
+import { uploadFileToStorage, getSignedUrl, getSignedUrlFromPath } from '@/utils/fileUpload';
 import { supabase } from '@/lib/supabase';
 
 // ─── Tip renk/ikon config ───────────────────────────────────────────────────
@@ -40,6 +40,36 @@ function getDaysLeft(bitisTarihi: string): number | null {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   return Math.ceil((end.getTime() - now.getTime()) / 86400000);
+}
+
+// ─── Red fotoğrafı bileşeni — path veya URL'den signed URL üretir ──────────
+function RedFotoImg({ src, className, style }: { src: string; className?: string; style?: React.CSSProperties }) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!src) return;
+    // Zaten tam URL ise direkt kullan
+    if (src.startsWith('http')) {
+      // Eski signed URL — yenile
+      if (src.includes('/sign/') || src.includes('token=')) {
+        // Signed URL'den path çıkar ve yeniden üret
+        const match = src.match(/\/object\/(?:sign|public)\/uploads\/(.+?)(?:\?|$)/);
+        if (match) {
+          getSignedUrlFromPath(match[1]).then(url => setSignedUrl(url));
+        } else {
+          setSignedUrl(src);
+        }
+      } else {
+        setSignedUrl(src);
+      }
+      return;
+    }
+    // Storage path ise signed URL üret
+    getSignedUrlFromPath(src).then(url => setSignedUrl(url));
+  }, [src]);
+
+  if (!signedUrl) return <div className="rounded-lg h-20 animate-pulse" style={{ background: 'rgba(239,68,68,0.1)' }} />;
+  return <img src={signedUrl} alt="Red fotoğrafı" className={className} style={style} />;
 }
 
 // ─── Evrak listesi bileşeni ─────────────────────────────────────────────────
@@ -325,14 +355,11 @@ function DenetciDegerlendirmeModal({ izin, firma, orgId, onClose, onUygun, onUyg
                   <p className="text-[10px] font-semibold mb-2" style={{ color: '#EF4444' }}>
                     <i className="ri-camera-line mr-1" />Red Fotoğrafı
                   </p>
-                  <a href={izin.redFotoUrl} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src={izin.redFotoUrl}
-                      alt="Red fotoğrafı"
-                      className="rounded-lg max-h-40 object-cover cursor-pointer"
-                      style={{ border: '1px solid rgba(239,68,68,0.2)' }}
-                    />
-                  </a>
+                  <RedFotoImg
+                    src={izin.redFotoUrl!}
+                    className="rounded-lg max-h-40 object-cover cursor-pointer w-full"
+                    style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+                  />
                 </div>
               )}
             </div>
@@ -786,8 +813,8 @@ export default function IsIzniPage() {
       const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true, contentType: redMime });
       if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr.message, uploadErr.statusCode, JSON.stringify(uploadErr));
       if (uploadData?.path) {
-        const { data: signedData } = await supabase.storage.from('uploads').createSignedUrl(uploadData.path, 86400 * 365);
-        redFotoUrl = signedData?.signedUrl;
+        // Path olarak kaydet — gösterirken signed URL üretilir, expire olmaz
+        redFotoUrl = uploadData.path;
       }
     }
     try {
@@ -1320,14 +1347,11 @@ export default function IsIzniPage() {
                       <p className="text-[10px] font-semibold mb-2" style={{ color: '#EF4444' }}>
                         <i className="ri-camera-line mr-1" />Red Fotoğrafı
                       </p>
-                      <a href={viewRecord.redFotoUrl} target="_blank" rel="noopener noreferrer">
-                        <img
-                          src={viewRecord.redFotoUrl}
-                          alt="Red fotoğrafı"
-                          className="rounded-lg max-h-40 object-cover cursor-pointer"
-                          style={{ border: '1px solid rgba(239,68,68,0.2)' }}
-                        />
-                      </a>
+                      <RedFotoImg
+                        src={viewRecord.redFotoUrl!}
+                        className="rounded-lg max-h-40 object-cover cursor-pointer w-full"
+                        style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+                      />
                     </div>
                   )}
                 </div>

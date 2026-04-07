@@ -1,9 +1,26 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useApp } from '@/store/AppContext';
 import type { IsIzni } from '@/types';
-import { getSignedUrl } from '@/utils/fileUpload';
+import { getSignedUrl, getSignedUrlFromPath } from '@/utils/fileUpload';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/base/Modal';
+
+// ─── Red fotoğrafı bileşeni ───────────────────────────────────────────────────
+function RedFotoImg({ src, className, style }: { src: string; className?: string; style?: React.CSSProperties }) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!src) return;
+    if (src.startsWith('http')) {
+      const match = src.match(/\/object\/(?:sign|public)\/uploads\/(.+?)(?:\?|$)/);
+      if (match) { getSignedUrlFromPath(match[1]).then(url => setSignedUrl(url)); }
+      else { setSignedUrl(src); }
+      return;
+    }
+    getSignedUrlFromPath(src).then(url => setSignedUrl(url));
+  }, [src]);
+  if (!signedUrl) return <div className="rounded-lg h-20 animate-pulse" style={{ background: 'rgba(239,68,68,0.1)' }} />;
+  return <img src={signedUrl} alt="Red fotoğrafı" className={className} style={style} />;
+}
 
 // ─── Durum config ────────────────────────────────────────────────────────────
 const DURUM_CFG = {
@@ -74,11 +91,19 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
   const handleAc = async (dosya: EvrakDosya, usedSlug: string) => {
     setAcikDosya(dosya.name);
     const filePath = `${orgId}/is-izni-evrak/${firmaId}/${usedSlug}/${dosya.name}`;
+    console.log('[ISG] Opening file:', filePath);
     const url = await getSignedUrl(filePath);
+    console.log('[ISG] Signed URL:', url ? 'OK' : 'NULL', filePath);
     if (url) {
       window.open(url, '_blank');
     } else {
-      console.error('[ISG] Signed URL alınamadı:', filePath);
+      // Fallback: tüm olası slug'larla dene
+      const slugs = [usedSlug, izinTuruSlug, izinTuruSlugOrig].filter((s, i, arr) => arr.indexOf(s) === i);
+      for (const slug of slugs) {
+        const fp = `${orgId}/is-izni-evrak/${firmaId}/${slug}/${dosya.name}`;
+        const u = await getSignedUrl(fp);
+        if (u) { window.open(u, '_blank'); break; }
+      }
     }
     setAcikDosya(null);
   };
@@ -289,14 +314,11 @@ function DegerlendirmeModal({ izin, firmaAd, orgId, onClose, onUygun, onUygunDeg
                   <p className="text-[10px] font-semibold mb-2" style={{ color: '#EF4444' }}>
                     <i className="ri-camera-line mr-1" />Red Fotoğrafı
                   </p>
-                  <a href={izin.redFotoUrl} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src={izin.redFotoUrl}
-                      alt="Red fotoğrafı"
-                      className="rounded-lg max-h-40 object-cover cursor-pointer"
-                      style={{ border: '1px solid rgba(239,68,68,0.2)' }}
-                    />
-                  </a>
+                  <RedFotoImg
+                    src={izin.redFotoUrl!}
+                    className="rounded-lg max-h-40 object-cover cursor-pointer w-full"
+                    style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+                  />
                 </div>
               )}
             </div>
@@ -505,8 +527,8 @@ export default function IsIzniSahaBolumu() {
       const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true, contentType: redMime });
       if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr.message, uploadErr.statusCode, JSON.stringify(uploadErr));
       if (uploadData?.path) {
-        const { data: signedData } = await supabase.storage.from('uploads').createSignedUrl(uploadData.path, 86400 * 365);
-        redFotoUrl = signedData?.signedUrl;
+        // Path olarak kaydet — gösterirken signed URL üretilir, expire olmaz
+        redFotoUrl = uploadData.path;
       }
     }
     try {

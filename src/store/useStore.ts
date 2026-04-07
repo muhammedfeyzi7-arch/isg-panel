@@ -952,7 +952,6 @@ export function useStore(
   const updateEkipman = useCallback((id: string, updates: Partial<Ekipman>, callerRole?: string) => {
     const { dosyaVeri: _ignored, ...rest } = updates as Partial<Ekipman> & { dosyaVeri?: string };
 
-    // FIX 1: If caller is denetci, only allow whitelisted fields
     let safeRest = rest;
     if (callerRole === 'denetci') {
       safeRest = Object.fromEntries(
@@ -961,13 +960,33 @@ export function useStore(
     }
 
     let updated: Ekipman | null = null;
+    let snapshot: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
+      snapshot = e;
       updated = { ...e, ...safeRest };
       return updated;
     }));
-    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
-  }, [setEkipmanlar, saveToDb]);
+
+    if (updated) {
+      const now = new Date().toISOString();
+      const orgId = orgIdRef.current;
+      const uid = userIdRef.current;
+      // Denetçi için direkt UPDATE — upsert with_check'i bypass eder
+      supabase
+        .from('ekipmanlar')
+        .update({ data: updated, updated_at: now, organization_id: orgId, user_id: uid })
+        .eq('id', id)
+        .eq('organization_id', orgId)
+        .then(({ error }) => {
+          if (error) {
+            console.error('[ISG] updateEkipman DB error:', error.message);
+            if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
+            onSaveErrorRef.current?.(`Ekipman güncellenemedi: ${error.message}`);
+          }
+        });
+    }
+  }, [setEkipmanlar]);
 
   const deleteEkipman = useCallback((id: string) => {
     let updated: Ekipman | null = null;
