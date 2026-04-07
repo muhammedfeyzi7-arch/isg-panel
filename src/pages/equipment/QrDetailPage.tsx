@@ -877,6 +877,9 @@ export default function QrDetailPage() {
   const [showFoto, setShowFoto] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [kontrolSonuc, setKontrolSonuc] = useState<KontrolSonucBanner | null>(null);
+  // Evraklar — direkt DB'den çekilen
+  const [dbEvraklar, setDbEvraklar] = useState<import('../../types').Evrak[]>([]);
+  const [evraklarLoading, setEvraklarLoading] = useState(true);
   const fetchedRef = useRef(false);
 
   const fetchEkipmanFromDb = useCallback(async () => {
@@ -915,16 +918,41 @@ export default function QrDetailPage() {
     if (fromStore) setLocalEkipman(fromStore);
   }, [ekipmanlar, id]);
 
+  // Ekipman firmaId'si belli olunca evrakları direkt DB'den çek
+  useEffect(() => {
+    const firmaId = localEkipman?.firmaId;
+    if (!firmaId) {
+      setEvraklarLoading(false);
+      return;
+    }
+    setEvraklarLoading(true);
+    supabase
+      .from('evraklar')
+      .select('data')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) {
+          const tumEvraklar = data
+            .map(r => r.data as import('../../types').Evrak)
+            .filter(e => e && !e.silinmis && !e.cascadeSilindi && e.firmaId === firmaId);
+          setDbEvraklar(tumEvraklar);
+        }
+      })
+      .finally(() => setEvraklarLoading(false));
+  }, [localEkipman?.firmaId]);
+
   const handleAfterSave = useCallback(() => {
     fetchEkipmanFromDb();
     setRefreshKey(k => k + 1);
   }, [fetchEkipmanFromDb]);
 
-  // Ekipman evraklarını filtrele — firmaId eşleşmesi + silinmemiş
+  // Evraklar: önce DB'den çekilen, yoksa store'dan filtrele
   const ekipmanFirmaId = localEkipman?.firmaId;
-  const ekipmanEvraklari = evraklar.filter(
+  const storeEvraklar = evraklar.filter(
     e => !e.silinmis && !e.cascadeSilindi && ekipmanFirmaId && e.firmaId === ekipmanFirmaId
   );
+  // DB'den gelen varsa onu kullan, yoksa store'dan
+  const ekipmanEvraklari = dbEvraklar.length > 0 ? dbEvraklar : storeEvraklar;
 
   const sahaFotolar = localEkipman?.sahaFotolari ?? [];
   const fotoFilePaths = sahaFotolar.map(f => f.url);
@@ -1240,7 +1268,7 @@ export default function QrDetailPage() {
           </div>
           <div className="px-2 pb-2 pt-1">
             {/* Veri yükleniyorsa loading göster */}
-            {dataLoading ? (
+            {evraklarLoading ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
                 <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
                   style={{ borderColor: '#BFDBFE', borderTopColor: '#2563EB' }} />
