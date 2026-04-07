@@ -10,7 +10,7 @@ import type { Toast } from '../types';
 
 export interface Bildirim {
   id: string;
-  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek';
+  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek' | 'ekipman_kontrol_yapildi';
   mesaj: string;
   detay: string;
   tarih: string;
@@ -50,6 +50,7 @@ interface AppContextType extends StoreType {
   okunmamisBildirimSayisi: number;
   bildirimOku: (id: string) => void;
   tumunuOku: () => void;
+  ekipmanKontrolBildirimi: (ekipmanAd: string, ekipmanId: string, durum: string, gecikmisDi: boolean) => void;
   org: OrgInfo | null;
   orgLoading: boolean;
   orgError: string | null;
@@ -193,6 +194,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [quickCreate, setQuickCreate] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  // Kontrol yapıldı bildirimleri — geçici, sadece session'da tutulur
+  const [kontrolBildirimleri, setKontrolBildirimleri] = useState<Bildirim[]>([]);
+
+  const ekipmanKontrolBildirimi = useCallback((
+    ekipmanAd: string, ekipmanId: string, durum: string, gecikmisDi: boolean,
+  ) => {
+    const id = `kontrol_yapildi_${ekipmanId}_${Date.now()}`;
+    const now = new Date().toISOString().split('T')[0];
+    const yeniBildirim: Bildirim = {
+      id,
+      tip: 'ekipman_kontrol_yapildi',
+      mesaj: gecikmisDi
+        ? `${ekipmanAd} — Gecikmiş kontrol tamamlandı`
+        : `${ekipmanAd} — Kontrol tamamlandı`,
+      detay: `Durum: ${durum} · ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`,
+      tarih: now,
+      okundu: false,
+      kalanGun: 0,
+      module: 'ekipmanlar',
+      recordId: ekipmanId,
+    };
+    setKontrolBildirimleri(prev => [yeniBildirim, ...prev].slice(0, 20));
+    // 30 saniye sonra otomatik okundu işaretle
+    setTimeout(() => {
+      setKontrolBildirimleri(prev => prev.map(b => b.id === id ? { ...b, okundu: true } : b));
+    }, 30000);
+  }, []);
+
   const [okunanlar, setOkunanlar] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('isg_okunan_bildirimler');
@@ -239,6 +268,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const bildirimler = useMemo<Bildirim[]>(() => {
+    // kontrolBildirimleri önce gelsin (en güncel)
+    const kontrolMerged = kontrolBildirimleri.map(b => ({
+      ...b,
+      okundu: b.okundu || okunanlar.has(b.id),
+    }));
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const in60 = new Date(today.getTime() + 60 * 86400000);
@@ -458,9 +492,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    return result.sort((a, b) => a.kalanGun - b.kalanGun);
+    const sorted = result.sort((a, b) => a.kalanGun - b.kalanGun);
+    return [...kontrolMerged, ...sorted];
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar]);
+  }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar, kontrolBildirimleri]);
 
   const okunmamisBildirimSayisi = useMemo(
     () => bildirimler.filter(b => !b.okundu).length,
@@ -507,7 +542,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sidebarCollapsed, setSidebarCollapsed,
       quickCreate, setQuickCreate,
       theme, toggleTheme,
-      bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
+      bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku, ekipmanKontrolBildirimi,
       org, orgLoading, orgError: loadError,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,

@@ -182,12 +182,12 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   };
 
   const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; badge: string; badgeBg: string }> = {
-    evrak_surecek:           { icon: 'ri-file-warning-line',      color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', badge: 'Evrak',          badgeBg: 'rgba(148,163,184,0.12)' },
-    evrak_dolmus:            { icon: 'ri-file-damage-line',        color: '#F87171', bg: 'rgba(248,113,113,0.12)', badge: 'Evrak',          badgeBg: 'rgba(248,113,113,0.12)' },
-    ekipman_kontrol:         { icon: 'ri-tools-line',              color: '#FB923C', bg: 'rgba(251,146,60,0.12)',  badge: 'Ekipman',        badgeBg: 'rgba(251,146,60,0.12)' },
-    egitim_surecek:          { icon: 'ri-graduation-cap-line',     color: '#60A5FA', bg: 'rgba(96,165,250,0.12)',  badge: 'Eğitim',         badgeBg: 'rgba(96,165,250,0.12)' },
-    saglik_surecek:          { icon: 'ri-heart-pulse-line',        color: '#34D399', bg: 'rgba(52,211,153,0.12)',  badge: 'Sağlık',         badgeBg: 'rgba(52,211,153,0.12)' },
-
+    evrak_surecek:            { icon: 'ri-file-warning-line',      color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', badge: 'Evrak',          badgeBg: 'rgba(148,163,184,0.12)' },
+    evrak_dolmus:             { icon: 'ri-file-damage-line',        color: '#F87171', bg: 'rgba(248,113,113,0.12)', badge: 'Evrak',          badgeBg: 'rgba(248,113,113,0.12)' },
+    ekipman_kontrol:          { icon: 'ri-tools-line',              color: '#FB923C', bg: 'rgba(251,146,60,0.12)',  badge: 'Ekipman',        badgeBg: 'rgba(251,146,60,0.12)' },
+    ekipman_kontrol_yapildi:  { icon: 'ri-checkbox-circle-fill',   color: '#34D399', bg: 'rgba(52,211,153,0.12)',  badge: 'Kontrol ✓',      badgeBg: 'rgba(52,211,153,0.12)' },
+    egitim_surecek:           { icon: 'ri-graduation-cap-line',     color: '#60A5FA', bg: 'rgba(96,165,250,0.12)',  badge: 'Eğitim',         badgeBg: 'rgba(96,165,250,0.12)' },
+    saglik_surecek:           { icon: 'ri-heart-pulse-line',        color: '#34D399', bg: 'rgba(52,211,153,0.12)',  badge: 'Sağlık',         badgeBg: 'rgba(52,211,153,0.12)' },
   };
 
   const hour      = new Date().getHours();
@@ -434,7 +434,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                 <>
                   {/* Summary chips */}
                   <div className="px-4 py-2.5 flex flex-wrap gap-1.5" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
-                    {(['evrak_surecek','evrak_dolmus','ekipman_kontrol','egitim_surecek','saglik_surecek'] as const).map(tip => {
+                    {(['ekipman_kontrol_yapildi','evrak_surecek','evrak_dolmus','ekipman_kontrol','egitim_surecek','saglik_surecek'] as const).map(tip => {
                       const count = bildirimler.filter(b => b.tip === tip).length;
                       if (count === 0) return null;
                       const cfg = TYPE_CONFIG[tip] ?? { icon: 'ri-notification-3-line', color: '#64748B', bg: 'rgba(100,116,139,0.12)', badge: 'Bildirim', badgeBg: 'rgba(100,116,139,0.12)' };

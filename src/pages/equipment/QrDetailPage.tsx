@@ -8,6 +8,77 @@ import Modal from '../../components/base/Modal';
 import ImageUpload from '../nonconformity/components/ImageUpload';
 import type { Ekipman, EkipmanStatus, EkipmanSahaFoto, UygunsuzlukSeverity } from '../../types';
 
+// ── Kontrol Başarı Banner ──
+interface KontrolSonucBanner {
+  durum: EkipmanStatus;
+  yapanKisi: string;
+  gecikmisDi: boolean;
+  gecikmeGun: number;
+  notlar?: string;
+}
+
+function KontrolBasariBanner({ sonuc, onClose }: { sonuc: KontrolSonucBanner; onClose: () => void }) {
+  const sc = STATUS_CONFIG[sonuc.durum] ?? STATUS_CONFIG['Uygun'];
+
+  useEffect(() => {
+    const t = setTimeout(onClose, 8000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className="fixed bottom-4 left-4 right-4 z-50 max-w-lg mx-auto animate-slide-up">
+      <div className="rounded-2xl overflow-hidden"
+        style={{ background: '#fff', border: `2px solid ${sc.lightBorder}`, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        {/* Renkli üst şerit */}
+        <div className="h-1" style={{ background: `linear-gradient(90deg, ${sc.color}, ${sc.color}88)` }} />
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: sc.lightBg, border: `1px solid ${sc.lightBorder}` }}>
+              <i className={`${sc.icon} text-lg`} style={{ color: sc.color }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-extrabold" style={{ color: '#0F172A' }}>
+                  Kontrol Kaydedildi
+                </p>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                  style={{ background: sc.lightBg, color: sc.color, border: `1px solid ${sc.lightBorder}` }}>
+                  {sonuc.durum}
+                </span>
+              </div>
+              {sonuc.gecikmisDi && (
+                <div className="flex items-center gap-1.5 mb-1.5 px-2 py-1 rounded-lg"
+                  style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
+                  <i className="ri-check-double-line text-xs" style={{ color: '#059669' }} />
+                  <p className="text-xs font-semibold" style={{ color: '#059669' }}>
+                    {sonuc.gecikmeGun} günlük gecikme giderildi!
+                  </p>
+                </div>
+              )}
+              <p className="text-xs" style={{ color: '#64748B' }}>
+                <i className="ri-user-line mr-1" />{sonuc.yapanKisi}
+                <span className="mx-1.5">·</span>
+                <i className="ri-time-line mr-1" />{new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              {sonuc.notlar && (
+                <p className="text-xs mt-1.5 px-2 py-1 rounded-lg" style={{ background: '#F8FAFC', color: '#64748B' }}>
+                  {sonuc.notlar}
+                </p>
+              )}
+            </div>
+            <button onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
+              style={{ background: '#F1F5F9', color: '#94A3B8' }}>
+              <i className="ri-close-line text-sm" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface KontrolKayit {
   tarih: string;
   yapanKisi: string;
@@ -46,14 +117,28 @@ function getDaysUntil(dateStr: string): number {
 
 // ── Kontrol Yap Modal ──
 function KontrolModal({
-  open, onClose, ekipmanAd, ekipmanId, onSaved,
-}: { open: boolean; onClose: () => void; ekipmanAd: string; ekipmanId: string; onSaved: () => void }) {
-  const { updateEkipman, addToast, currentUser, org } = useApp();
+  open, onClose, ekipmanAd, ekipmanId, sonrakiKontrolTarihi, onSaved, onKontrolTamamlandi,
+}: {
+  open: boolean;
+  onClose: () => void;
+  ekipmanAd: string;
+  ekipmanId: string;
+  sonrakiKontrolTarihi?: string;
+  onSaved: () => void;
+  onKontrolTamamlandi: (durum: EkipmanStatus, yapanKisi: string, gecikmisDi: boolean, gecikmeGun: number, notlar?: string) => void;
+}) {
+  const { updateEkipman, addToast, currentUser, org, ekipmanKontrolBildirimi } = useApp();
   const [durum, setDurum] = useState<EkipmanStatus>('Uygun');
   const [notlar, setNotlar] = useState('');
   const [sonrakiTarih, setSonrakiTarih] = useState('');
   const [saving, setSaving] = useState(false);
   const submittingRef = useRef(false);
+
+  // Gecikme hesapla
+  const gecikmeGun = sonrakiKontrolTarihi
+    ? Math.max(0, Math.ceil((Date.now() - new Date(sonrakiKontrolTarihi).getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  const gecikmisDi = gecikmeGun > 0;
 
   const handleSave = async () => {
     if (submittingRef.current) return;
@@ -83,9 +168,16 @@ function KontrolModal({
         ...(sonrakiTarih ? { sonrakiKontrolTarihi: sonrakiTarih } : {}),
         notlar: notlarVal, kontrolGecmisi: yeniGecmis,
       } as Partial<Ekipman>, org?.role?.toLowerCase());
-      addToast('Kontrol kaydedildi.', 'success');
+
+      // Bildirim sistemi
+      ekipmanKontrolBildirimi(ekipmanAd, ekipmanId, durum, gecikmisDi);
+
       onClose();
-      setTimeout(() => onSaved(), 800);
+      // Banner göster
+      setTimeout(() => {
+        onKontrolTamamlandi(durum, yapanKisi, gecikmisDi, gecikmeGun, notlar.trim() || undefined);
+        onSaved();
+      }, 400);
     } finally {
       setSaving(false);
       submittingRef.current = false;
@@ -108,6 +200,26 @@ function KontrolModal({
           <p className="text-xs" style={{ color: '#64748B' }}>Ekipman</p>
           <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>{ekipmanAd}</p>
         </div>
+
+        {/* Gecikme uyarısı */}
+        {gecikmisDi && (
+          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
+            style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+              style={{ background: '#FEE2E2' }}>
+              <i className="ri-alarm-warning-fill text-sm" style={{ color: '#DC2626' }} />
+            </div>
+            <div>
+              <p className="text-xs font-bold" style={{ color: '#DC2626' }}>
+                {gecikmeGun} günlük gecikmiş kontrol
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: '#EF4444' }}>
+                Bu kontrol kaydedilince gecikme giderilecek
+              </p>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="text-xs font-semibold block mb-2" style={{ color: '#374151' }}>Kontrol Sonucu *</label>
           <div className="grid grid-cols-2 gap-2">
@@ -253,24 +365,35 @@ function FotoModal({
 
   const handleSave = async () => {
     if (!foto) { addToast('Fotoğraf seçiniz.', 'error'); return; }
-    if (!foto.startsWith('data:')) { addToast('Geçersiz fotoğraf formatı.', 'error'); return; }
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSaving(true);
     try {
-      const fotoId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
-      const orgId = org?.id ?? 'unknown';
-      const filePath = await uploadBase64ToStorage(foto, orgId, `ekipman-saha/${ekipmanId}`, fotoId);
-      if (!filePath) { addToast('Fotoğraf yüklenemedi.', 'error'); return; }
+      let filePath: string | null = null;
+
+      if (foto.startsWith('data:')) {
+        // Fallback: base64 ise Storage'a yükle
+        const fotoId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+        const orgId = org?.id ?? 'unknown';
+        filePath = await uploadBase64ToStorage(foto, orgId, `ekipman-saha/${ekipmanId}`, fotoId);
+        if (!filePath) { addToast('Fotoğraf yüklenemedi.', 'error'); return; }
+      } else {
+        // ImageUpload zaten Storage'a yükledi, filePath direkt geldi
+        filePath = foto;
+      }
+
+      const fotoId = filePath.split('/').pop()?.split('.')[0] ?? `${Date.now()}`;
       const yeniFoto: EkipmanSahaFoto = {
         id: fotoId, url: filePath, aciklama: aciklama.trim(),
         tarih: new Date().toISOString(), yukleyenKisi: currentUser.ad || 'Kullanıcı',
       };
+
       let mevcutFotolar: EkipmanSahaFoto[] = [];
       try {
         const { data: freshData } = await supabase.from('ekipmanlar').select('data').eq('id', ekipmanId).maybeSingle();
         if (freshData?.data) mevcutFotolar = (freshData.data as unknown as { sahaFotolari?: EkipmanSahaFoto[] }).sahaFotolari ?? [];
       } catch { mevcutFotolar = ekipman?.sahaFotolari ?? []; }
+
       updateEkipman(ekipmanId, { sahaFotolari: [...mevcutFotolar, yeniFoto] });
       addToast('Fotoğraf başarıyla yüklendi.', 'success');
       handleClose();
@@ -300,7 +423,7 @@ function FotoModal({
           <p className="text-xs" style={{ color: '#64748B' }}>Ekipman</p>
           <p className="text-sm font-semibold" style={{ color: '#0F172A' }}>{ekipmanAd}</p>
         </div>
-        <ImageUpload label="Saha Fotoğrafı *" value={foto} onChange={setFoto} />
+        <ImageUpload label="Saha Fotoğrafı *" value={foto} onChange={setFoto} pathPrefix={`ekipman-saha/${ekipmanId}`} />
         <div>
           <label className="text-xs font-semibold block mb-2" style={{ color: '#374151' }}>Açıklama <span style={{ color: '#94A3B8', fontSize: '11px' }}>(İsteğe bağlı)</span></label>
           <textarea value={aciklama} onChange={e => setAciklama(e.target.value)} rows={2} maxLength={300} placeholder="Fotoğraf hakkında not..." className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none" style={{ background: '#fff', borderColor: '#E2E8F0', color: '#0F172A' }} />
@@ -753,6 +876,7 @@ export default function QrDetailPage() {
   const [showUygunsuzluk, setShowUygunsuzluk] = useState(false);
   const [showFoto, setShowFoto] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [kontrolSonuc, setKontrolSonuc] = useState<KontrolSonucBanner | null>(null);
   const fetchedRef = useRef(false);
 
   const fetchEkipmanFromDb = useCallback(async () => {
@@ -1165,8 +1289,17 @@ export default function QrDetailPage() {
       </div>
 
       {/* Modaller */}
-      <KontrolModal open={showKontrol} onClose={() => setShowKontrol(false)}
-        ekipmanAd={localEkipman.ad} ekipmanId={localEkipman.id} onSaved={handleAfterSave} />
+      <KontrolModal
+        open={showKontrol}
+        onClose={() => setShowKontrol(false)}
+        ekipmanAd={localEkipman.ad}
+        ekipmanId={localEkipman.id}
+        sonrakiKontrolTarihi={localEkipman.sonrakiKontrolTarihi}
+        onSaved={handleAfterSave}
+        onKontrolTamamlandi={(dur, kisi, gecikmisDi, gecikmeGun, not) => {
+          setKontrolSonuc({ durum: dur, yapanKisi: kisi, gecikmisDi, gecikmeGun, notlar: not });
+        }}
+      />
       <UygunsuzlukModal open={showUygunsuzluk} onClose={() => setShowUygunsuzluk(false)}
         ekipmanAd={localEkipman.ad} firmaId={localEkipman.firmaId} />
       <FotoModal open={showFoto} onClose={() => setShowFoto(false)}
@@ -1184,6 +1317,14 @@ export default function QrDetailPage() {
       {showBelge && belgeUrl && (
         <EvrakModal open={showBelge} onClose={() => setShowBelge(false)}
           dosyaVeri={belgeUrl} dosyaAdi={belgeAdi} dosyaTipi={belgeTipi} />
+      )}
+
+      {/* Kontrol Başarı Banner */}
+      {kontrolSonuc && (
+        <KontrolBasariBanner
+          sonuc={kontrolSonuc}
+          onClose={() => setKontrolSonuc(null)}
+        />
       )}
     </div>
   );
