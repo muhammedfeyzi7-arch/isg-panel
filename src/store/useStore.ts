@@ -1149,10 +1149,14 @@ export function useStore(
       const now = new Date().toISOString();
       try {
         // Direkt UPDATE kullan — denetci INSERT yapamaz ama UPDATE yapabilir
+        // organization_id'yi de ekle — with_check politikası bunu kontrol ediyor
+        const orgId = orgIdRef.current;
+        const uid = userIdRef.current;
         const { error } = await supabase
           .from('is_izinleri')
-          .update({ data: updated, updated_at: now })
-          .eq('id', id);
+          .update({ data: updated, updated_at: now, organization_id: orgId, user_id: uid })
+          .eq('id', id)
+          .eq('organization_id', orgId);
         if (error) {
           const errMsg = error.message || error.details || JSON.stringify(error);
           console.error('[ISG] updateIsIzni DB error:', errMsg, error);
