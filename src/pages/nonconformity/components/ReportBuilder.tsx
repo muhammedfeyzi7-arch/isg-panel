@@ -152,8 +152,8 @@ export default function ReportBuilder({ isOpen, onClose }: Props) {
               <tbody>
                 {filtered.map(u => {
                   const firma = firmalar.find(f => f.id === u.firmaId);
-                  const sc = STATUS_CONFIG[u.durum];
-                  const sev = SEV_CONFIG[u.severity];
+                  const sc = STATUS_CONFIG[u.durum] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: 'rgba(100,116,139,0.2)', icon: 'ri-question-line', label: u.durum };
+                  const sev = SEV_CONFIG[u.severity] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8' };
                   const isChecked = selected.has(u.id);
                   return (
                     <tr

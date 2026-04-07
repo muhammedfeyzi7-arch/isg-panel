@@ -30,8 +30,8 @@ export default function DetailModal({ record, onClose, onKapat, onEdit }: Props)
 
   const firma = firmalar.find(f => f.id === record.firmaId);
   const personel = personeller.find(p => p.id === record.personelId);
-  const sc = STATUS_CONFIG[record.durum];
-  const sev = SEV_CONFIG[record.severity];
+  const sc = STATUS_CONFIG[record.durum] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: 'rgba(100,116,139,0.2)', icon: 'ri-question-line', label: record.durum };
+  const sev = SEV_CONFIG[record.severity] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8' };
 
   const Field = ({ label, value }: { label: string; value?: string | null }) => (
     <div>

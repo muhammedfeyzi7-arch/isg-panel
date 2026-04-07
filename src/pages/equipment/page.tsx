@@ -952,7 +952,7 @@ export default function EkipmanlarPage() {
             {filtered.map(ekipman => {
               const firma = firmalar.find(f => f.id === ekipman.firmaId);
               const effectiveDurum = getEffectiveDurum(ekipman);
-              const sc = STATUS_CONFIG[effectiveDurum];
+              const sc = STATUS_CONFIG[effectiveDurum] ?? { label: effectiveDurum, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
               const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
               const isUrgent = days >= 0 && days <= 30;
               const isOverdue = days < 0;
@@ -1019,7 +1019,7 @@ export default function EkipmanlarPage() {
                 {filtered.map(ekipman => {
                   const firma = firmalar.find(f => f.id === ekipman.firmaId);
                   const effectiveDurum = getEffectiveDurum(ekipman);
-                  const sc = STATUS_CONFIG[effectiveDurum];
+                  const sc = STATUS_CONFIG[effectiveDurum] ?? { label: effectiveDurum, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
                   const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
                   const isUrgent = days >= 0 && days <= 30;
                   const isOverdue = days < 0;

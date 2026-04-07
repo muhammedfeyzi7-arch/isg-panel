@@ -991,7 +991,7 @@ export default function TutanaklarPage() {
           <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
             {filtered.map(t => {
               const firma = firmalar.find(f => f.id === t.firmaId);
-              const stc = STS_CONFIG[t.durum];
+              const stc = STS_CONFIG[t.durum] ?? { color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
               return (
                 <div key={t.id} className="p-4" style={{ background: selected.has(t.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
                   <div className="flex items-start gap-3">
@@ -1064,7 +1064,7 @@ export default function TutanaklarPage() {
               <tbody>
                 {filtered.map(t => {
                   const firma = firmalar.find(f => f.id === t.firmaId);
-                  const stc = STS_CONFIG[t.durum];
+                  const stc = STS_CONFIG[t.durum] ?? { color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
                   return (
                     <tr key={t.id} style={{ background: selected.has(t.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
                       {canDelete && (

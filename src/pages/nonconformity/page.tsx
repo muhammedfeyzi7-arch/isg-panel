@@ -322,8 +322,8 @@ export default function UygunsuzluklarPage() {
                 <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
                   {filtered.map(u => {
                     const firma = firmalar.find(f => f.id === u.firmaId);
-                    const sc = STATUS_CONFIG[u.durum];
-                    const sev = SEV_CONFIG[u.severity];
+                    const sc = STATUS_CONFIG[u.durum] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: 'rgba(100,116,139,0.2)', icon: 'ri-question-line', label: u.durum };
+                    const sev = SEV_CONFIG[u.severity] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8' };
                     const isChecked = selected.has(u.id);
                     return (
                       <div key={u.id} className="p-4" style={{ background: isChecked ? 'rgba(99,102,241,0.04)' : undefined }}>
@@ -391,8 +391,8 @@ export default function UygunsuzluklarPage() {
                       {filtered.map(u => {
                         const firma = firmalar.find(f => f.id === u.firmaId);
                         const personel = personeller.find(p => p.id === u.personelId);
-                        const sc = STATUS_CONFIG[u.durum];
-                        const sev = SEV_CONFIG[u.severity];
+                        const sc = STATUS_CONFIG[u.durum] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: 'rgba(100,116,139,0.2)', icon: 'ri-question-line', label: u.durum };
+                        const sev = SEV_CONFIG[u.severity] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8' };
                         const isChecked = selected.has(u.id);
                         return (
                           <tr key={u.id} style={{ background: isChecked ? 'rgba(99,102,241,0.04)' : undefined }}>

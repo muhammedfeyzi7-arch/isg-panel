@@ -77,7 +77,7 @@ export default function TutanakDetailModal({ tutanak, firma, dosyaVeri, onClose,
 
   if (!tutanak) return null;
 
-  const stc = STS_CONFIG[tutanak.durum];
+  const stc = STS_CONFIG[tutanak.durum] ?? { color: '#94A3B8', bg: 'rgba(148,163,184,0.15)', icon: 'ri-question-line', label: tutanak.durum };
   const tarihStr = tutanak.tarih ? new Date(tutanak.tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
   const olusturmaTarih = new Date(tutanak.olusturmaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
 
