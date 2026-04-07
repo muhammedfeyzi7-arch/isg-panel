@@ -560,6 +560,20 @@ export default function RaporlarPage() {
       try {
         const ExcelJS = (await import('exceljs')).default;
         const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
+
+        // ── calcDays: en başta tanımla, tüm sayfalarda kullanılıyor ──
+        const calcDays = (dateStr: string | null | undefined): number | null => {
+          if (!dateStr) return null;
+          const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+          const n = new Date(); n.setHours(0, 0, 0, 0);
+          return Math.ceil((d.getTime() - n.getTime()) / 86400000);
+        };
+        const getDurumLabel = (days: number | null) => {
+          if (days === null) return '—';
+          if (days < 0) return 'Süresi Geçmiş';
+          if (days <= 30) return 'Yaklaşıyor';
+          return 'Güncel';
+        };
         const now = new Date();
         const tarih = now.toLocaleDateString('tr-TR');
         const tarihDosya = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
@@ -795,19 +809,6 @@ export default function RaporlarPage() {
         );
 
         // ── SAYFA 6: SAĞLIK TAKİBİ ──
-        const calcDays = (dateStr: string | null | undefined) => {
-          if (!dateStr) return null;
-          const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
-          const n = new Date(); n.setHours(0, 0, 0, 0);
-          return Math.ceil((d.getTime() - n.getTime()) / 86400000);
-        };
-        const getDurumLabel = (days: number | null) => {
-          if (days === null) return '—';
-          if (days < 0) return 'Süresi Geçmiş';
-          if (days <= 30) return 'Yaklaşıyor';
-          return 'Güncel';
-        };
-
         const saglikWs = wb.addWorksheet('Sağlık Takibi');
         const saglikCols = ['#', 'Ad Soyad', 'Görev', 'Firma', 'Muayene Tarihi', 'Sonraki Muayene', 'Kalan Gün', 'Durum', 'Sağlık Durumu'];
         saglikWs.columns = [4, 26, 20, 24, 16, 18, 12, 16, 20].map(w => ({ width: w }));
