@@ -245,15 +245,12 @@ export default function Modal({
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'flex-end',
               gap: '10px',
               padding: '16px 24px',
               flexShrink: 0,
               borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
               background: isDark ? 'rgba(255,255,255,0.015)' : 'rgba(15,23,42,0.015)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: '10px',
             }}
           >
             {footer}
