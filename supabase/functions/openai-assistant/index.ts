@@ -1,12 +1,38 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const GEMINI_API_KEY = "AIzaSyBnxL5ZFPzwiHotyyZ4SimWRUV-hTW4p-Y";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+async function callGemini(prompt: string): Promise<string> {
+  // gemini-1.5-flash ile dene (en stabil ücretsiz model)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 600,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini API hatası (${response.status}): ${errText}`);
+  }
+
+  const result = await response.json();
+  const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Gemini boş yanıt döndürdü");
+  return text;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,32 +46,27 @@ Deno.serve(async (req) => {
 
     if (mode === "tutanak") {
       prompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. 
-Kullanıcının verdiği kısa açıklamadan profesyonel bir denetim tutanağı oluştur.
-Türkçe yaz. Resmi ve profesyonel bir dil kullan.
-SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
-{
-  "baslik": "Tutanak başlığı (kısa, öz, max 80 karakter)",
-  "aciklama": "Detaylı tutanak açıklaması (200-400 karakter arası, profesyonel dil)",
-  "notlar": "Ek notlar ve öneriler (100-200 karakter)"
-}
+Aşağıdaki bilgilere göre profesyonel bir denetim tutanağı oluştur.
+Türkçe yaz. Resmi ve profesyonel dil kullan.
+SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir şey ekleme, markdown kullanma:
+{"baslik":"Tutanak başlığı max 80 karakter","aciklama":"200-400 karakter detaylı açıklama","notlar":"100-200 karakter ek notlar"}
 
 Firma: ${data.firmaAdi || "Belirtilmemiş"}
-Kısa Açıklama: ${data.kisaAciklama}
+Açıklama: ${data.kisaAciklama}
 Tarih: ${data.tarih || new Date().toLocaleDateString("tr-TR")}`;
 
     } else if (mode === "uygunsuzluk") {
       prompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın.
-Kullanıcının girdiği uygunsuzluk açıklamasına göre alınması gereken önlemleri öner.
-Türkçe yaz. Pratik, uygulanabilir ve net önlemler ver.
-SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
-{
-  "onlem": "Alınması gereken önlemler (150-350 karakter, madde madde değil düz metin, pratik ve uygulanabilir)"
-}
+Aşağıdaki uygunsuzluk için alınması gereken önlemleri öner.
+Türkçe yaz. Pratik ve uygulanabilir önlemler ver.
+SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir şey ekleme, markdown kullanma:
+{"onlem":"150-350 karakter düz metin önlemler"}
 
-Uygunsuzluk Başlığı: ${data.baslik || "Belirtilmemiş"}
-Uygunsuzluk Açıklaması: ${data.aciklama}
-Önem Derecesi: ${data.severity || "Orta"}
+Başlık: ${data.baslik || "Belirtilmemiş"}
+Açıklama: ${data.aciklama}
+Önem: ${data.severity || "Orta"}
 Firma: ${data.firmaAdi || "Belirtilmemiş"}`;
+
     } else {
       return new Response(JSON.stringify({ error: "Geçersiz mod" }), {
         status: 400,
@@ -53,53 +74,27 @@ Firma: ${data.firmaAdi || "Belirtilmemiş"}`;
       });
     }
 
-    const response = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 500,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      console.error("Gemini error:", err);
-      return new Response(JSON.stringify({ error: "Gemini API hatası: " + err }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const rawText = await callGemini(prompt);
+    
+    // JSON temizle - markdown code block varsa kaldır
+    let cleaned = rawText.trim();
+    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+    
+    // İlk { ile son } arasını al
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end === -1) {
+      throw new Error("JSON bulunamadı: " + cleaned);
     }
-
-    const result = await response.json();
-    const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      return new Response(JSON.stringify({ error: "Yanıt alınamadı" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // JSON'u temizle (markdown code block varsa kaldır)
-    const cleaned = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const jsonStr = cleaned.substring(start, end + 1);
+    const parsed = JSON.parse(jsonStr);
 
     return new Response(JSON.stringify({ success: true, data: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err) {
-    console.error("Edge function error:", err);
+    console.error("Edge function error:", String(err));
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
