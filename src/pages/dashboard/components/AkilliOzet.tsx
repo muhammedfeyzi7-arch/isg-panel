@@ -550,11 +550,13 @@ export default function AkilliOzet() {
           </div>
         ) : (
           filteredInsights.map(insight => {
-            const cfg = levelConfig[insight.level];
+            const cfg = levelConfig[insight.level as keyof typeof levelConfig] ?? levelConfig.info;
             const isOpen = expanded === insight.id;
+            const insightBg = insight.bg ?? 'rgba(100,116,139,0.08)';
+            const insightBorder = insight.border ?? 'rgba(100,116,139,0.2)';
             return (
               <div key={insight.id} className="rounded-lg overflow-hidden transition-all"
-                style={{ background: insight.bg, border: `1px solid ${insight.border}` }}>
+                style={{ background: insightBg, border: `1px solid ${insightBorder}` }}>
                 <button
                   className="w-full flex items-start gap-2 px-2.5 py-2 cursor-pointer text-left"
                   onClick={() => setExpanded(isOpen ? null : insight.id)}
