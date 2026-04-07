@@ -470,14 +470,34 @@ export default function IsIzniSahaBolumu() {
     .replace(/ı/g, 'i').replace(/İ/g, 'I')
     .replace(/ç/g, 'c').replace(/Ç/g, 'C');
 
+  const sanitizeFileName = (name: string): string => {
+    const ext = name.split('.').pop()?.toLowerCase() ?? 'bin';
+    const base = name.slice(0, name.lastIndexOf('.'));
+    const safe = base
+      .replace(/ş/g, 's').replace(/Ş/g, 'S')
+      .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+      .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+      .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+      .replace(/ı/g, 'i').replace(/İ/g, 'I')
+      .replace(/ç/g, 'c').replace(/Ç/g, 'C')
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+    return `${safe || 'file'}.${ext}`;
+  };
+
   const handleUygunDegil = async (izin: IsIzni, not: string, foto?: File): Promise<void> => {
     const orgId = org?.id ?? 'unknown';
     let redFotoUrl: string | undefined;
     if (foto && orgId !== 'unknown') {
       const izinTuruSlug = normalizeSlug(izin.tip);
-      const path = `${orgId}/is-izni-evrak/${izin.firmaId}/${izinTuruSlug}/${izin.id}_red_${Date.now()}_${foto.name}`;
-      const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
-      if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr);
+      const safeFileName = sanitizeFileName(foto.name);
+      const path = `${orgId}/is-izni-evrak/${izin.firmaId}/${izinTuruSlug}/${izin.id}_red_${Date.now()}_${safeFileName}`;
+      const ext = safeFileName.split('.').pop()?.toLowerCase() ?? '';
+      const mimeMap: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
+      const redMime = foto.type || mimeMap[ext] || 'image/jpeg';
+      const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true, contentType: redMime });
+      if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr.message, uploadErr.statusCode, JSON.stringify(uploadErr));
       if (uploadData?.path) {
         const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(uploadData.path);
         redFotoUrl = urlData?.publicUrl;

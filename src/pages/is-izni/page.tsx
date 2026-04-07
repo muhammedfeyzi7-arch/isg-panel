@@ -455,6 +455,42 @@ function normalizeSlug(str: string): string {
     .replace(/ç/g, 'c').replace(/Ç/g, 'C');
 }
 
+// ─── Yardımcı: uzantıdan MIME tipi belirle ─────────────────────────────────
+function getMimeFromExt(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  const map: Record<string, string> = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', webp: 'image/webp',
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    txt: 'text/plain',
+    zip: 'application/zip',
+  };
+  return map[ext] ?? 'application/octet-stream';
+}
+
+// ─── Yardımcı: dosya adını storage için güvenli hale getir ─────────────────
+function sanitizeFileName(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? 'bin';
+  const base = name.slice(0, name.lastIndexOf('.'));
+  const safe = base
+    .replace(/ş/g, 's').replace(/Ş/g, 'S')
+    .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+    .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+    .replace(/ı/g, 'i').replace(/İ/g, 'I')
+    .replace(/ç/g, 'c').replace(/Ç/g, 'C')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  return `${safe || 'file'}.${ext}`;
+}
+
 // ─── Ana Sayfa ──────────────────────────────────────────────────────────────
 const emptyForm = {
   tip: 'Genel' as IsIzniTip,
@@ -610,11 +646,13 @@ export default function IsIzniPage() {
           const hataliDosyalar: string[] = [];
           for (let i = 0; i < formEvraklar.length; i++) {
             const file = formEvraklar[i];
-            const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${editId}_${Date.now()}_${file.name}`;
+            const safeFileName = sanitizeFileName(file.name);
+            const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${editId}_${Date.now()}_${safeFileName}`;
+            const mimeType = file.type || getMimeFromExt(safeFileName);
             try {
-              const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+              const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true, contentType: mimeType });
               if (uploadErr) {
-                console.error('[ISG] Evrak upload error:', uploadErr.message, uploadErr);
+                console.error('[ISG] Evrak upload error:', uploadErr.message, uploadErr.statusCode, JSON.stringify(uploadErr));
                 uploadHata++;
                 hataliDosyalar.push(file.name);
               }
@@ -672,11 +710,13 @@ export default function IsIzniPage() {
           const hataliDosyalar: string[] = [];
           for (let i = 0; i < formEvraklar.length; i++) {
             const file = formEvraklar[i];
-            const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${newIz.id}_${Date.now()}_${file.name}`;
+            const safeFileName = sanitizeFileName(file.name);
+            const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${newIz.id}_${Date.now()}_${safeFileName}`;
+            const mimeType = file.type || getMimeFromExt(safeFileName);
             try {
-              const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+              const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true, contentType: mimeType });
               if (uploadErr) {
-                console.error('[ISG] Evrak upload error:', uploadErr.message, uploadErr);
+                console.error('[ISG] Evrak upload error:', uploadErr.message, uploadErr.statusCode, JSON.stringify(uploadErr));
                 uploadHata++;
                 hataliDosyalar.push(file.name);
               }
@@ -737,9 +777,11 @@ export default function IsIzniPage() {
     let redFotoUrl: string | undefined;
     if (foto && orgId !== 'unknown') {
       const izinTuruSlug = normalizeSlug(iz.tip);
-      const path = `${orgId}/is-izni-evrak/${iz.firmaId}/${izinTuruSlug}/${iz.id}_red_${Date.now()}_${foto.name}`;
-      const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
-      if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr);
+      const safeRedFileName = sanitizeFileName(foto.name);
+      const path = `${orgId}/is-izni-evrak/${iz.firmaId}/${izinTuruSlug}/${iz.id}_red_${Date.now()}_${safeRedFileName}`;
+      const redMime = foto.type || getMimeFromExt(safeRedFileName);
+      const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true, contentType: redMime });
+      if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr.message, uploadErr.statusCode, JSON.stringify(uploadErr));
       if (uploadData?.path) {
         const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(uploadData.path);
         redFotoUrl = urlData?.publicUrl;
