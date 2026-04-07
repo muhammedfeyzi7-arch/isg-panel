@@ -921,8 +921,7 @@ export default function QrDetailPage() {
   }, [fetchEkipmanFromDb]);
 
   const ekipmanEvraklari = evraklar.filter(
-    e => !e.silinmis && e.firmaId === localEkipman?.firmaId &&
-      e.ad?.toLowerCase().includes(localEkipman?.ad?.toLowerCase() ?? '')
+    e => !e.silinmis && e.firmaId === localEkipman?.firmaId
   );
 
   const sahaFotolar = localEkipman?.sahaFotolari ?? [];
@@ -1220,56 +1219,85 @@ export default function QrDetailPage() {
         <KontrolGecmisiSection ekipmanId={localEkipman.id} refreshKey={refreshKey} />
 
         {/* ── Belgeler ── */}
-        {(hasBelge || ekipmanEvraklari.length > 0) && (
-          <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #E2E8F0' }}>
-            <div className="px-4 pt-3.5 pb-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94A3B8' }}>Belgeler</p>
+        <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #E2E8F0' }}>
+          <div className="px-4 pt-3.5 pb-2 flex items-center justify-between"
+            style={{ borderBottom: '1px solid #F1F5F9' }}>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+                <i className="ri-file-list-3-line text-sm" style={{ color: '#2563EB' }} />
+              </div>
+              <p className="text-sm font-bold" style={{ color: '#0F172A' }}>Belgeler</p>
             </div>
-            <div className="px-2 pb-2 pt-1">
-              {hasBelge && (
-                <button onClick={handleOpenBelge}
-                  className="w-full flex items-center gap-3 px-2 py-3 rounded-xl cursor-pointer transition-all text-left"
-                  style={{ borderBottom: ekipmanEvraklari.length > 0 ? '1px solid #F1F5F9' : 'none' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                  <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-                    style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
-                    <i className="ri-file-check-line text-sm" style={{ color: '#059669' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{localEkipman.dosyaAdi || 'Ekipman Belgesi'}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Görüntüle / İndir</p>
-                  </div>
-                  <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#059669' }} />
-                </button>
-              )}
-              {ekipmanEvraklari.map((evrak, idx) => (
-                <div key={evrak.id} className="flex items-center gap-3 px-2 py-3 rounded-xl"
-                  style={{ borderBottom: idx < ekipmanEvraklari.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                  <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-                    style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                    <i className="ri-file-text-line text-sm" style={{ color: '#94A3B8' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{evrak.ad}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
-                      {evrak.tur || 'Evrak'}
-                      {evrak.gecerlilikTarihi && ` — ${new Date(evrak.gecerlilikTarihi).toLocaleDateString('tr-TR')} tarihine kadar`}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 font-semibold"
-                    style={{
-                      background: evrak.durum === 'Yüklü' ? '#ECFDF5' : '#FEF2F2',
-                      color: evrak.durum === 'Yüklü' ? '#059669' : '#DC2626',
-                      border: `1px solid ${evrak.durum === 'Yüklü' ? '#A7F3D0' : '#FECACA'}`,
-                    }}>
-                    {evrak.durum}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {(hasBelge || ekipmanEvraklari.length > 0) && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                style={{ background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE' }}>
+                {(hasBelge ? 1 : 0) + ekipmanEvraklari.length} belge
+              </span>
+            )}
           </div>
-        )}
+          <div className="px-2 pb-2 pt-1">
+            {!hasBelge && ekipmanEvraklari.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2">
+                <div className="w-10 h-10 flex items-center justify-center rounded-xl"
+                  style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                  <i className="ri-file-line text-lg" style={{ color: '#CBD5E1' }} />
+                </div>
+                <p className="text-xs font-semibold" style={{ color: '#94A3B8' }}>Belge bulunamadı</p>
+                <p className="text-xs" style={{ color: '#CBD5E1' }}>Bu ekipmana ait belge yüklenmemiş</p>
+              </div>
+            ) : (
+              <>
+                {hasBelge && (
+                  <button onClick={handleOpenBelge}
+                    className="w-full flex items-center gap-3 px-2 py-3 rounded-xl cursor-pointer transition-all text-left"
+                    style={{ borderBottom: ekipmanEvraklari.length > 0 ? '1px solid #F1F5F9' : 'none' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                    <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                      style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
+                      <i className="ri-file-check-line text-sm" style={{ color: '#059669' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{localEkipman.dosyaAdi || 'Ekipman Belgesi'}</p>
+                      <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Ekipman belgesi · Görüntüle / İndir</p>
+                    </div>
+                    <i className="ri-eye-line text-sm flex-shrink-0" style={{ color: '#059669' }} />
+                  </button>
+                )}
+                {ekipmanEvraklari.map((evrak, idx) => {
+                  const isExpired = evrak.durum === 'Süre Dolmuş';
+                  const isWarning = evrak.durum === 'Süre Yaklaşıyor';
+                  const statusColor = isExpired ? '#DC2626' : isWarning ? '#D97706' : '#059669';
+                  const statusBg = isExpired ? '#FEF2F2' : isWarning ? '#FFFBEB' : '#ECFDF5';
+                  const statusBorder = isExpired ? '#FECACA' : isWarning ? '#FDE68A' : '#A7F3D0';
+                  return (
+                    <div key={evrak.id} className="flex items-center gap-3 px-2 py-3 rounded-xl"
+                      style={{
+                        borderBottom: idx < ekipmanEvraklari.length - 1 ? '1px solid #F1F5F9' : 'none',
+                        background: isExpired ? '#FFF5F5' : 'transparent',
+                      }}>
+                      <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                        style={{ background: statusBg, border: `1px solid ${statusBorder}` }}>
+                        <i className="ri-file-text-line text-sm" style={{ color: statusColor }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{evrak.ad}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>
+                          {evrak.tur || 'Evrak'}
+                          {evrak.gecerlilikTarihi && ` · ${new Date(evrak.gecerlilikTarihi).toLocaleDateString('tr-TR')} tarihine kadar`}
+                        </p>
+                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 font-semibold"
+                        style={{ background: statusBg, color: statusColor, border: `1px solid ${statusBorder}` }}>
+                        {evrak.durum}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        </div>
 
         {/* ── Footer ── */}
         <div className="flex items-center justify-between pt-1">

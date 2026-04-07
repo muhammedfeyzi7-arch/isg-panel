@@ -360,7 +360,7 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
     <div className="space-y-4">
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#475569' }}>Ekipman Belgesi</p>
-        {(ekipman.dosyaUrl || ekipman.dosyaVeri) ? (
+        {ekipman.dosyaUrl ? (
           <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.15)' }}>
               <i className="ri-file-check-line text-base" style={{ color: '#34D399' }} />
@@ -370,55 +370,12 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
               {ekipman.dosyaBoyutu ? <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{(ekipman.dosyaBoyutu / 1024).toFixed(1)} KB</p> : null}
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              <button
-                onClick={async () => {
-                  if (ekipman.dosyaUrl) {
-                    const url = await getSignedUrlFromPath(ekipman.dosyaUrl);
-                    if (url) { window.open(url, '_blank', 'noopener,noreferrer'); return; }
-                  }
-                  if (ekipman.dosyaVeri) {
-                    const a = document.createElement('a');
-                    a.href = ekipman.dosyaVeri; a.target = '_blank';
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    return;
-                  }
-                  addToast('Belge açılamadı.', 'error');
-                }}
-                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }} title="Görüntüle"
-              >
+              <button onClick={async () => { const url = await getSignedUrlFromPath(ekipman.dosyaUrl!); if (url) window.open(url, '_blank', 'noopener,noreferrer'); else addToast('Belge açılamadı.', 'error'); }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }} title="Görüntüle">
                 <i className="ri-eye-line text-sm" />
               </button>
-              <button
-                onClick={async () => {
-                  if (ekipman.dosyaUrl) {
-                    const url = await getSignedUrlFromPath(ekipman.dosyaUrl);
-                    if (url) {
-                      const a = document.createElement('a'); a.href = url; a.download = ekipman.dosyaAdi || 'belge';
-                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                      addToast('İndiriliyor...', 'success'); return;
-                    }
-                  }
-                  if (ekipman.dosyaVeri) {
-                    const a = document.createElement('a'); a.href = ekipman.dosyaVeri; a.download = ekipman.dosyaAdi || 'belge';
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    addToast('İndiriliyor...', 'success'); return;
-                  }
-                  addToast('Dosya indirilemedi.', 'error');
-                }}
-                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399' }} title="İndir"
-              >
+              <button onClick={async () => { const url = await getSignedUrlFromPath(ekipman.dosyaUrl!); if (url) { const a = document.createElement('a'); a.href = url; a.download = ekipman.dosyaAdi || 'belge'; document.body.appendChild(a); a.click(); document.body.removeChild(a); addToast('İndiriliyor...', 'success'); } else addToast('Dosya indirilemedi.', 'error'); }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399' }} title="İndir">
                 <i className="ri-download-2-line text-sm" />
               </button>
-            </div>
-          </div>
-        ) : ekipman.belgeMevcut ? (
-          <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(251,191,36,0.06)', border: '1px dashed rgba(251,191,36,0.25)' }}>
-            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(251,191,36,0.12)' }}>
-              <i className="ri-file-warning-line text-base" style={{ color: '#FBBF24' }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold" style={{ color: '#FCD34D' }}>Belge mevcut ama dosya yüklenmemiş</p>
-              <p className="text-xs mt-0.5" style={{ color: '#92400E' }}>Ekipman sayfasından dosyayı yükleyebilirsiniz</p>
             </div>
           </div>
         ) : (
