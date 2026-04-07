@@ -36,6 +36,36 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+// Kullanıcı için profiles kaydı oluştur veya güncelle (tour_completed korunur)
+async function ensureProfileRecord(
+  adminClient: ReturnType<typeof createClient>,
+  userId: string,
+  role: string,
+): Promise<void> {
+  try {
+    const { data: existing } = await adminClient
+      .from('profiles')
+      .select('id, tour_completed')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (existing?.id) {
+      // Kayıt var — sadece role güncelle, tour_completed'a dokunma
+      await adminClient
+        .from('profiles')
+        .update({ role: normalizeRole(role) })
+        .eq('user_id', userId);
+    } else {
+      // Kayıt yok — yeni oluştur, tour_completed false
+      await adminClient
+        .from('profiles')
+        .insert({ user_id: userId, role: normalizeRole(role), tour_completed: false });
+    }
+  } catch (err) {
+    console.warn('[ensureProfileRecord] Failed:', err);
+  }
+}
+
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
@@ -334,16 +364,8 @@ async function handleRequest(
       });
     }
 
-    try {
-      await adminClient
-        .from('profiles')
-        .upsert({
-          user_id: newUserId,
-          role: normalizeRole(role),
-        }, { onConflict: 'user_id', ignoreDuplicates: true });
-    } catch (profileErr) {
-      console.warn('[CREATE] Profile upsert skipped:', profileErr);
-    }
+    // Profiles kaydını güvenli şekilde oluştur (tour_completed: false ile)
+    await ensureProfileRecord(adminClient, newUserId, normalizeRole(role));
 
     const roleLabel = getRoleLabel(normalizeRole(role));
     await logActivity(
@@ -571,14 +593,12 @@ async function handleRequest(
       try {
         const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(target_user_id);
         if (authDeleteError) {
-          // "User not found" hatası — kullanıcı zaten Supabase'den silinmiş, sorun değil
           const errMsg = authDeleteError.message?.toLowerCase() ?? '';
           if (!errMsg.includes('not found') && !errMsg.includes('does not exist')) {
             console.error('[DELETE] Auth delete failed:', authDeleteError.message);
           }
         }
       } catch (authErr) {
-        // Auth silme başarısız olsa bile devam et — org kaydı zaten silindi
         console.error('[DELETE] Auth delete exception:', authErr);
       }
     }

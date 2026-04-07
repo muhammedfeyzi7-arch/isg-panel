@@ -33,6 +33,24 @@ Açıklama: ${data?.aciklama || ""}
 Önem: ${data?.severity || "Orta"}
 Firma: ${data?.firmaAdi || "Belirtilmemiş"}`;
 
+    } else if (mode === "dashboard-ozet") {
+      systemPrompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Sana verilen sistem durumu verilerini analiz edip kısa, net ve eyleme dönüştürülebilir öneriler sunuyorsun. Türkçe yaz. Samimi ama profesyonel ol. SADECE JSON formatında yanıt ver:
+{
+  "genel_yorum": "2-3 cümle genel durum değerlendirmesi. Sağlık skoru ve kritik durumları özetle.",
+  "en_acil": "En acil yapılması gereken 1 şey, max 120 karakter",
+  "oneriler": ["Öneri 1 max 100 karakter", "Öneri 2 max 100 karakter", "Öneri 3 max 100 karakter"],
+  "risk_seviyesi": "Düşük veya Orta veya Yüksek veya Kritik"
+}`;
+      const { saglikSkoru, kritikSayisi, uyariSayisi, bilgiSayisi, sorunlar } = data || {};
+      userPrompt = `Sistem Sağlık Skoru: ${saglikSkoru}/100
+Kritik Sorun Sayısı: ${kritikSayisi}
+Uyarı Sayısı: ${uyariSayisi}
+Bilgi Sayısı: ${bilgiSayisi}
+Aktif Sorunlar:
+${(sorunlar || []).map((s: string) => `- ${s}`).join("\n")}
+
+Bu verilere göre İSG yöneticisine kısa ve net bir analiz sun.`;
+
     } else {
       return new Response(JSON.stringify({ error: "Geçersiz mod" }), {
         status: 400,
@@ -52,8 +70,8 @@ Firma: ${data?.firmaAdi || "Belirtilmemiş"}`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.7,
-        max_tokens: 600,
+        temperature: 0.6,
+        max_tokens: 500,
         response_format: { type: "json_object" },
       }),
     });

@@ -11,6 +11,29 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
+// Kullanıcı için profiles kaydı oluştur (yoksa) — tour_completed: false ile
+async function ensureProfileRecord(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<void> {
+  try {
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!existing?.id) {
+      await supabase
+        .from('profiles')
+        .insert({ user_id: userId, tour_completed: false });
+    }
+    // Kayıt zaten varsa dokunma — tour_completed değerini koru
+  } catch (err) {
+    console.warn('[ensureProfileRecord] Failed:', err);
+  }
+}
+
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
@@ -126,6 +149,9 @@ Deno.serve(async (req) => {
           .eq('organization_id', org.id);
       }
 
+      // Profiles kaydını kontrol et ve yoksa oluştur (tour_completed korunur)
+      await ensureProfileRecord(supabase, user.id);
+
       return new Response(JSON.stringify({
         organization: org,
         role: existingMembership.role ?? 'admin',
@@ -195,6 +221,7 @@ Deno.serve(async (req) => {
 
         if (retryMembership?.organizations) {
           const org = retryMembership.organizations as { id: string; name: string; invite_code: string };
+          await ensureProfileRecord(supabase, user.id);
           return new Response(JSON.stringify({
             organization: org,
             role: retryMembership.role ?? 'admin',
@@ -212,6 +239,9 @@ Deno.serve(async (req) => {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Profiles kaydını oluştur (yeni kullanıcı — tour_completed: false)
+    await ensureProfileRecord(supabase, user.id);
 
     // Initialize empty app_data for the new org
     await supabase

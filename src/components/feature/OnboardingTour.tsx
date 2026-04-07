@@ -283,17 +283,19 @@ export default function OnboardingTour() {
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) {
-          showTimer = setTimeout(() => { if (!cancelled) setVisible(true); }, 600);
+          // Hata varsa turu gösterme — kullanıcıyı rahatsız etme
           return;
         }
         if (data?.tour_completed === true) {
+          // Supabase'de tamamlanmış — localStorage'a da kaydet
           try { localStorage.setItem(localKey, '1'); } catch { /* ignore */ }
           return;
         }
+        // Supabase'de kayıt yok veya tour_completed false — turu göster
         showTimer = setTimeout(() => { if (!cancelled) setVisible(true); }, 600);
       })
       .catch(() => {
-        if (!cancelled) showTimer = setTimeout(() => { if (!cancelled) setVisible(true); }, 600);
+        // Network hatası — turu gösterme, kullanıcıyı rahatsız etme
       });
 
     return () => {
@@ -319,10 +321,25 @@ export default function OnboardingTour() {
     setVisible(false);
     try { localStorage.setItem(`${TOUR_STORAGE_KEY}_${user.id}`, '1'); } catch { /* ignore */ }
     try {
-      await supabase.from('profiles').upsert(
-        { user_id: user.id, tour_completed: true },
-        { onConflict: 'user_id', ignoreDuplicates: false }
-      );
+      // Önce mevcut kaydı kontrol et
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing?.id) {
+        // Kayıt varsa güncelle
+        await supabase
+          .from('profiles')
+          .update({ tour_completed: true })
+          .eq('user_id', user.id);
+      } else {
+        // Kayıt yoksa oluştur
+        await supabase
+          .from('profiles')
+          .insert({ user_id: user.id, tour_completed: true });
+      }
     } catch { /* ignore */ }
   }, [user?.id]);
 

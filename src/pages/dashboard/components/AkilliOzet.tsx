@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useApp } from '@/store/AppContext';
 
 interface InsightItem {
@@ -14,6 +14,15 @@ interface InsightItem {
   module?: string;
   count?: number;
   subItems?: { icon: string; text: string; count: number; color: string }[];
+}
+
+const SUPABASE_FUNC_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/openai-assistant';
+
+interface AiAnalysis {
+  genel_yorum: string;
+  en_acil: string;
+  oneriler: string[];
+  risk_seviyesi: 'Düşük' | 'Orta' | 'Yüksek' | 'Kritik';
 }
 
 function parseValidDate(dateStr: string | null | undefined): Date | null {
@@ -288,6 +297,55 @@ export default function AkilliOzet() {
     ok:       { label: 'Tamam',  color: '#34D399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)', icon: 'ri-checkbox-circle-fill' },
   };
 
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiVisible, setAiVisible] = useState(false);
+
+  const fetchAiAnalysis = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiVisible(true);
+
+    const sorunlar = insights
+      .filter(i => i.level !== 'ok')
+      .map(i => i.title);
+
+    try {
+      const res = await fetch(SUPABASE_FUNC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'dashboard-ozet',
+          data: {
+            saglikSkoru: healthScore,
+            kritikSayisi: criticalItems.length,
+            uyariSayisi: warningItems.length,
+            bilgiSayisi: infoItems.length,
+            sorunlar,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setAiAnalysis(json.data as AiAnalysis);
+      } else {
+        setAiError(json.error || 'Analiz alınamadı');
+      }
+    } catch (e) {
+      setAiError('Bağlantı hatası');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [insights, healthScore, criticalItems.length, warningItems.length, infoItems.length]);
+
+  const riskColor: Record<string, string> = {
+    'Düşük': '#34D399',
+    'Orta': '#F59E0B',
+    'Yüksek': '#F87171',
+    'Kritik': '#EF4444',
+  };
+
   return (
     <div className="rounded-xl overflow-hidden isg-card h-full flex flex-col">
       <div className="h-[2px]" style={{ background: `linear-gradient(90deg, ${scoreColor}, ${scoreColor}80)` }} />
@@ -346,6 +404,121 @@ export default function AkilliOzet() {
           ))}
         </div>
       </div>
+
+      {/* AI Analiz Butonu */}
+      <div className="px-4 pt-2.5 pb-0">
+        <button
+          onClick={fetchAiAnalysis}
+          disabled={aiLoading}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10.5px] font-bold cursor-pointer transition-all whitespace-nowrap"
+          style={{
+            background: aiLoading ? 'rgba(99,102,241,0.08)' : 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.12))',
+            border: '1px solid rgba(99,102,241,0.25)',
+            color: '#6366F1',
+          }}
+        >
+          {aiLoading ? (
+            <>
+              <i className="ri-loader-4-line animate-spin text-xs" />
+              Groq AI analiz ediyor...
+            </>
+          ) : (
+            <>
+              <i className="ri-sparkling-2-line text-xs" />
+              Groq AI ile Analiz Et
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* AI Analiz Sonucu */}
+      {aiVisible && (
+        <div className="mx-4 mt-2.5 rounded-lg overflow-hidden"
+          style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          {/* AI Panel Header */}
+          <div className="flex items-center justify-between px-2.5 py-1.5"
+            style={{ borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 flex items-center justify-center rounded-md"
+                style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
+                <i className="ri-sparkling-2-fill text-white" style={{ fontSize: '8px' }} />
+              </div>
+              <span className="text-[10px] font-bold" style={{ color: '#6366F1' }}>Groq AI Analizi</span>
+              {aiAnalysis && (
+                <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-md"
+                  style={{
+                    background: `${riskColor[aiAnalysis.risk_seviyesi] || '#F59E0B'}18`,
+                    color: riskColor[aiAnalysis.risk_seviyesi] || '#F59E0B',
+                    border: `1px solid ${riskColor[aiAnalysis.risk_seviyesi] || '#F59E0B'}30`,
+                  }}>
+                  Risk: {aiAnalysis.risk_seviyesi}
+                </span>
+              )}
+            </div>
+            <button onClick={() => setAiVisible(false)} className="cursor-pointer"
+              style={{ color: 'var(--text-muted)' }}>
+              <i className="ri-close-line text-xs" />
+            </button>
+          </div>
+
+          {/* AI İçerik */}
+          <div className="p-2.5 space-y-2">
+            {aiLoading && (
+              <div className="flex flex-col items-center gap-2 py-3">
+                <div className="flex gap-1">
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
+                      style={{ background: '#6366F1', animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+                <p className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>Llama 3.3 70B analiz ediyor...</p>
+              </div>
+            )}
+
+            {aiError && !aiLoading && (
+              <div className="flex items-center gap-1.5 py-2">
+                <i className="ri-error-warning-line text-xs" style={{ color: '#EF4444' }} />
+                <p className="text-[10px]" style={{ color: '#EF4444' }}>{aiError}</p>
+              </div>
+            )}
+
+            {aiAnalysis && !aiLoading && (
+              <>
+                {/* Genel Yorum */}
+                <p className="text-[10.5px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {aiAnalysis.genel_yorum}
+                </p>
+
+                {/* En Acil */}
+                <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-md"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <i className="ri-alarm-warning-line text-[10px] mt-0.5 flex-shrink-0" style={{ color: '#EF4444' }} />
+                  <div>
+                    <p className="text-[8.5px] font-bold mb-0.5" style={{ color: '#EF4444' }}>EN ACİL</p>
+                    <p className="text-[10px] leading-snug" style={{ color: 'var(--text-primary)' }}>{aiAnalysis.en_acil}</p>
+                  </div>
+                </div>
+
+                {/* Öneriler */}
+                {aiAnalysis.oneriler && aiAnalysis.oneriler.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[8.5px] font-bold" style={{ color: 'var(--text-muted)' }}>ÖNERİLER</p>
+                    {aiAnalysis.oneriler.map((oneri, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5">
+                        <div className="w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 mt-0.5"
+                          style={{ background: 'rgba(99,102,241,0.15)', minWidth: '14px' }}>
+                          <span className="text-[7px] font-black" style={{ color: '#6366F1' }}>{idx + 1}</span>
+                        </div>
+                        <p className="text-[10px] leading-snug" style={{ color: 'var(--text-secondary)' }}>{oneri}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filtre tab */}
       {activeFilter !== 'all' && (
