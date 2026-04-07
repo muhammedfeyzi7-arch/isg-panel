@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
@@ -20,7 +22,17 @@ import FirmaEvraklariPage from '../company-documents/page';
 import SahaPage from '../saha/page';
 
 function AppContent() {
-  const { activeModule, orgError, org, mustChangePassword } = useApp();
+  const { activeModule, orgError, org, mustChangePassword, setActiveModule } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL'den ?module=saha gibi parametreyi oku ve modülü aç
+  useEffect(() => {
+    const module = searchParams.get('module');
+    if (module) {
+      setActiveModule(module);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setActiveModule, setSearchParams]);
 
   if (mustChangePassword) {
     return <ForcePasswordChange />;

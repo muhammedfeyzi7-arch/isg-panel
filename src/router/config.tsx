@@ -6,6 +6,7 @@ import LoginPage from "../pages/login/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
+import QrRedirectPage from "../pages/equipment/QrRedirectPage";
 const routes: RouteObject[] = [
   {
     path: "/login",
@@ -28,6 +29,14 @@ const routes: RouteObject[] = [
     element: (
       <ProtectedRoute>
         <Home />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/equipment/qr/:id",
+    element: (
+      <ProtectedRoute>
+        <QrRedirectPage />
       </ProtectedRoute>
     ),
   },

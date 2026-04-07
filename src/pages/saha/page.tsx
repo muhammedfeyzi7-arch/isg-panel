@@ -1350,6 +1350,20 @@ export default function SahaPage() {
   const [selectedFirmaId, setSelectedFirmaId] = useState<string | null>(null);
   const [qrFoundEkipman, setQrFoundEkipman] = useState<Ekipman | null>(null);
 
+  // QR redirect'ten gelen ekipman ID'sini sessionStorage'dan oku
+  useEffect(() => {
+    const qrId = sessionStorage.getItem('qr_ekipman_id');
+    if (qrId) {
+      sessionStorage.removeItem('qr_ekipman_id');
+      const ekipman = ekipmanlar.find(e => e.id === qrId);
+      if (ekipman) {
+        setQrFoundEkipman(ekipman);
+        addToast(`Ekipman bulundu: ${ekipman.ad}`, 'success');
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ekipmanlar]);
+
   const applyQueueItem = useCallback(async (item: OfflineQueueItem) => {
     if (item.type === 'ekipman_kontrol') {
       const { ekipmanId, sonKontrolTarihi, sonrakiKontrolTarihi, durum } = item.payload as { ekipmanId: string; sonKontrolTarihi: string; sonrakiKontrolTarihi: string; durum: EkipmanStatus };
