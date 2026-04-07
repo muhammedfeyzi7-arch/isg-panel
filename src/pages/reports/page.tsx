@@ -1079,13 +1079,17 @@ export default function RaporlarPage() {
             const xE = exEvraklar.filter(e => e.firmaId === f.id && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
             const firmaEgitimler = exEgitimler.filter(e => e.firmaId === f.id);
             const egS = firmaEgitimler.length;
-            let firmaToplamKatilimci = 0; let firmaKatildi = 0;
+            // Katılım oranı: firmanın toplam personel sayısına göre hesaplanır
+            let firmaToplamKatilimci = 0;
+            let firmaKatildi = 0;
             firmaEgitimler.forEach(eg => {
               const kl = eg.katilimcilar ?? (eg.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
               firmaToplamKatilimci += kl.length;
               firmaKatildi += kl.filter(k => k.katildi).length;
             });
-            const firmaKatilimOrani = firmaToplamKatilimci > 0 ? `%${Math.round((firmaKatildi / firmaToplamKatilimci) * 100)}` : '—';
+            // Firma personel sayısına göre oran (eğitim sayısı × personel sayısı = beklenen toplam katılım)
+            const beklenenToplamKatilim = egS > 0 ? egS * pS : 0;
+            const firmaKatilimOrani = beklenenToplamKatilim > 0 ? `%${Math.round((firmaKatildi / beklenenToplamKatilim) * 100)}` : '—';
             const firmaMuayeneler = exMuayeneler.filter(m => exPersoneller.find(p => p.id === m.personelId)?.firmaId === f.id);
             const muS = firmaMuayeneler.length;
             const muGecmis = firmaMuayeneler.filter(m => (calcDays(m.sonrakiTarih) ?? 1) < 0).length;

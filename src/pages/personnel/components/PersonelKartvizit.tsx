@@ -132,20 +132,28 @@ export default function PersonelKartvizit({ personelId, onClose }: Props) {
         {/* ── 3D Card ── */}
         <div
           className="w-full cursor-pointer"
-          style={{ perspective: '1400px', height: 'clamp(220px, 45vw, 270px)' }}
+          style={{ perspective: '1400px', WebkitPerspective: '1400px', height: 'clamp(220px, 45vw, 270px)' }}
           onClick={() => setFlipped(f => !f)}
         >
           <div style={{
             width: '100%', height: '100%', position: 'relative',
             transformStyle: 'preserve-3d',
+            WebkitTransformStyle: 'preserve-3d',
             transition: 'transform 0.7s cubic-bezier(0.4,0,0.2,1)',
+            WebkitTransition: '-webkit-transform 0.7s cubic-bezier(0.4,0,0.2,1)',
             transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+            WebkitTransform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
           }}>
 
             {/* ══════════════ FRONT ══════════════ */}
             <div style={{
               position: 'absolute', inset: 0,
-              backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden',
+              MozBackfaceVisibility: 'hidden',
+              transform: 'rotateY(0deg)',
+              WebkitTransform: 'rotateY(0deg)',
+              willChange: 'transform',
               borderRadius: '22px', overflow: 'hidden',
               background: cardFrontBg, boxShadow: cardShadow,
             }}>
@@ -259,8 +267,12 @@ export default function PersonelKartvizit({ personelId, onClose }: Props) {
             {/* ══════════════ BACK ══════════════ */}
             <div style={{
               position: 'absolute', inset: 0,
-              backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden',
+              MozBackfaceVisibility: 'hidden',
               transform: 'rotateY(180deg)',
+              WebkitTransform: 'rotateY(180deg)',
+              willChange: 'transform',
               borderRadius: '22px', overflow: 'hidden',
               background: cardBackBg, boxShadow: cardShadow,
             }}>

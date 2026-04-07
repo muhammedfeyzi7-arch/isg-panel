@@ -2,14 +2,13 @@ import { useMemo } from 'react';
 import { useApp } from '../../../store/AppContext';
 
 export default function MonthlyStats() {
-  const { personeller, egitimler, gorevler, muayeneler, uygunsuzluklar, theme, setActiveModule } = useApp();
+  const { personeller, gorevler, muayeneler, uygunsuzluklar, theme, setActiveModule } = useApp();
   const isDark = theme === 'dark';
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const next30 = new Date(now.getTime() + 30 * 86400000);
-  const next7 = new Date(now.getTime() + 7 * 86400000);
+
 
   // ── Theme tokens ──
   const itemBg = isDark ? 'rgba(255,255,255,0.03)' : 'var(--bg-item)';
@@ -32,18 +31,6 @@ export default function MonthlyStats() {
     const topDepts = Object.entries(deptMap)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
-
-    const yaklaşanEgitimler = egitimler.filter(e => {
-      if (e.silinmis || e.durum === 'Tamamlandı') return false;
-      if (!e.tarih) return false;
-      const t = new Date(e.tarih);
-      return t >= now && t <= next30;
-    }).sort((a, b) => new Date(a.tarih!).getTime() - new Date(b.tarih!).getTime());
-
-    const acilEgitimler = yaklaşanEgitimler.filter(e => {
-      if (!e.tarih) return false;
-      return new Date(e.tarih) <= next7;
-    });
 
     const acikGorevler = gorevler.filter(g => {
       if (g.silinmis) return false;
@@ -77,8 +64,6 @@ export default function MonthlyStats() {
     return {
       buAyPersonel,
       topDepts,
-      yaklaşanEgitimler: yaklaşanEgitimler.slice(0, 5),
-      acilEgitimler: acilEgitimler.length,
       acikGorevler,
       gecikmisSayisi,
       buAyMuayene,
@@ -87,7 +72,7 @@ export default function MonthlyStats() {
       buAyAcilanUygunsuzluklar,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personeller, egitimler, gorevler, muayeneler, uygunsuzluklar]);
+  }, [personeller, gorevler, muayeneler, uygunsuzluklar]);
 
   const ayAdi = now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
 
@@ -183,107 +168,87 @@ export default function MonthlyStats() {
         )}
       </div>
 
-      {/* ── Yaklaşan Eğitimler ── */}
+      {/* ── Bu Ay Muayeneler ── */}
       <div className="rounded-2xl p-5 isg-card">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div
               className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-              style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' }}
+              style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)' }}
             >
-              <i className="ri-graduation-cap-line text-sm" style={{ color: '#F59E0B' }} />
+              <i className="ri-heart-pulse-line text-sm" style={{ color: '#60A5FA' }} />
             </div>
             <div>
-              <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Eğitimler</h3>
-              <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Sonraki 30 gün</p>
+              <h3 className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Muayeneler</h3>
+              <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{ayAdi}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            {stats.acilEgitimler > 0 && (
-              <span
-                className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}
-              >
-                {stats.acilEgitimler} acil
-              </span>
-            )}
-            <span className="text-xl font-extrabold" style={{ color: '#F59E0B' }}>
-              {stats.yaklaşanEgitimler.length}
-            </span>
-          </div>
+          <span className="text-xl font-extrabold" style={{ color: '#60A5FA' }}>
+            {stats.buAyMuayene.length}
+          </span>
         </div>
 
-        {stats.yaklaşanEgitimler.length === 0 ? (
+        {stats.buAyMuayene.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-5 gap-2">
-            <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.12)' }}>
-              <i className="ri-graduation-cap-line text-base" style={{ color: 'rgba(245,158,11,0.4)' }} />
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.12)' }}>
+              <i className="ri-heart-pulse-line text-base" style={{ color: 'rgba(96,165,250,0.4)' }} />
             </div>
             <p className="text-[11px] text-center" style={{ color: 'var(--text-muted)' }}>
-              Önümüzdeki 30 gün içinde eğitim yok
+              Bu ay henüz muayene kaydı yok
             </p>
           </div>
         ) : (
           <div className="space-y-1.5">
-            {stats.yaklaşanEgitimler.map(eg => {
-              const daysLeft = eg.tarih
-                ? Math.ceil((new Date(eg.tarih).getTime() - now.getTime()) / 86400000)
-                : null;
-              const isUrgent = daysLeft !== null && daysLeft <= 7;
-
+            {stats.buAyMuayene.slice(0, 4).map(m => {
+              const sonucColor = m.sonuc === 'Çalışabilir' ? '#34D399' : m.sonuc === 'Kısıtlı Çalışabilir' ? '#F59E0B' : '#EF4444';
+              const sonucBg = m.sonuc === 'Çalışabilir' ? 'rgba(52,211,153,0.12)' : m.sonuc === 'Kısıtlı Çalışabilir' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
               return (
                 <div
-                  key={eg.id}
-                  className="flex items-start gap-2 px-2.5 py-2 rounded-lg"
-                  style={{
-                    background: isUrgent ? urgentItemBg : itemBg,
-                    border: `1px solid ${isUrgent ? urgentItemBorder : itemBorder}`,
-                  }}
+                  key={m.id}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                  style={{ background: itemBg, border: `1px solid ${itemBorder}` }}
                 >
                   <div
-                    className="w-7 h-7 flex items-center justify-center rounded-md flex-shrink-0"
-                    style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)' }}
+                    className="w-5 h-5 flex items-center justify-center rounded flex-shrink-0"
+                    style={{ background: 'rgba(96,165,250,0.12)' }}
                   >
-                    <i
-                      className="ri-graduation-cap-line text-xs"
-                      style={{ color: isUrgent ? '#EF4444' : '#F59E0B' }}
-                    />
+                    <i className="ri-heart-pulse-line text-[10px]" style={{ color: '#60A5FA' }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                      {eg.ad}
+                      {m.muayeneTarihi ? new Date(m.muayeneTarihi).toLocaleDateString('tr-TR') : '—'}
                     </p>
-                    <p className="text-[9.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {eg.katilimciIds?.length ?? 0} katılımcı
+                    <p className="text-[9.5px] truncate" style={{ color: 'var(--text-muted)' }}>
+                      {m.hastane || m.doktor || '—'}
                     </p>
                   </div>
-                  {daysLeft !== null && (
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
-                      style={{
-                        background: isUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
-                        color: isUrgent ? '#F87171' : '#FCD34D',
-                      }}
-                    >
-                      {daysLeft === 0 ? 'Bugün!' : `${daysLeft}g`}
-                    </span>
-                  )}
+                  <span
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                    style={{ background: sonucBg, color: sonucColor }}
+                  >
+                    {m.sonuc === 'Çalışabilir' ? 'Uygun' : m.sonuc === 'Kısıtlı Çalışabilir' ? 'Kısıtlı' : 'Uygun Değil'}
+                  </span>
                 </div>
               );
             })}
-
+            {stats.buAyMuayene.length > 4 && (
+              <p className="text-[10.5px] text-center pt-0.5" style={{ color: 'var(--text-muted)' }}>
+                +{stats.buAyMuayene.length - 4} muayene daha
+              </p>
+            )}
             <button
-              onClick={() => setActiveModule('egitimler')}
+              onClick={() => setActiveModule('muayeneler')}
               className="w-full py-1.5 rounded-lg text-[10.5px] font-semibold cursor-pointer transition-all"
               style={{
-                background: 'rgba(245,158,11,0.08)',
-                border: '1px solid rgba(245,158,11,0.15)',
-                color: '#F59E0B',
+                background: 'rgba(96,165,250,0.08)',
+                border: '1px solid rgba(96,165,250,0.15)',
+                color: '#60A5FA',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.14)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.08)'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.14)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.08)'; }}
             >
               <i className="ri-arrow-right-line mr-1" />
-              Tüm Eğitimlere Git
+              Tüm Muayenelere Git
             </button>
           </div>
         )}

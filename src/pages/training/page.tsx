@@ -9,21 +9,50 @@ import AiKatilimAnaliz from './components/AiKatilimAnaliz';
 
 
 // ── Katılım istatistikleri hesapla ──
-function getKatilimStats(eg: Egitim) {
+// toplam: firmaya kayıtlı aktif personel sayısı (payda)
+// katildi: katılımcı listesinde katildi=true olanlar
+// katilmadi: katılımcı listesinde katildi=false olanlar
+// kayitliKatilimci: katılımcı listesine eklenen toplam kişi
+function getKatilimStats(
+  eg: Egitim,
+  personeller?: { id: string; firmaId: string; silinmis?: boolean }[],
+) {
   const katilimcilar = eg.katilimcilar ?? [];
-  // Legacy: eski kayıtlarda katilimciIds varsa onları da say
-  if (katilimcilar.length === 0 && (eg.katilimciIds ?? []).length > 0) {
-    return { toplam: eg.katilimciIds!.length, katildi: eg.katilimciIds!.length, katilmadi: 0 };
+  const legacyIds = eg.katilimciIds ?? [];
+
+  // Katılımcı listesi (yeni veya legacy)
+  const liste = katilimcilar.length > 0
+    ? katilimcilar
+    : legacyIds.map(id => ({ personelId: id, katildi: true }));
+
+  const kayitliKatilimci = liste.length;
+  const katildi = liste.filter(k => k.katildi).length;
+  const katilmadi = kayitliKatilimci - katildi;
+
+  // Payda: firmaya kayıtlı toplam aktif personel sayısı
+  let toplam = kayitliKatilimci; // fallback: personel listesi yoksa eski davranış
+  if (personeller && personeller.length > 0) {
+    const firmaIds = eg.firmaIds && eg.firmaIds.length > 0
+      ? eg.firmaIds
+      : eg.firmaId ? [eg.firmaId] : [];
+    if (firmaIds.length > 0) {
+      const firmaPersonelSayisi = personeller.filter(
+        p => !p.silinmis && firmaIds.includes(p.firmaId),
+      ).length;
+      // Firma personeli varsa onu kullan, yoksa kayıtlı katılımcı sayısını kullan
+      if (firmaPersonelSayisi > 0) {
+        toplam = firmaPersonelSayisi;
+      }
+    }
   }
-  const toplam = katilimcilar.length;
-  const katildi = katilimcilar.filter(k => k.katildi).length;
-  return { toplam, katildi, katilmadi: toplam - katildi };
+
+  return { toplam, katildi, katilmadi, kayitliKatilimci };
 }
 
 // ── Durum badge ──
-function DurumBadge({ eg }: { eg: Egitim }) {
-  const { toplam, katildi } = getKatilimStats(eg);
-  if (toplam === 0) {
+function DurumBadge({ eg, personeller }: { eg: Egitim; personeller?: { id: string; firmaId: string; silinmis?: boolean }[] }) {
+  const { toplam, katildi, kayitliKatilimci } = getKatilimStats(eg, personeller);
+  if (kayitliKatilimci === 0) {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap"
         style={{ background: 'rgba(100,116,139,0.12)', color: '#94A3B8', border: '1px solid rgba(100,116,139,0.2)' }}>
@@ -32,16 +61,16 @@ function DurumBadge({ eg }: { eg: Egitim }) {
       </span>
     );
   }
-  const oran = Math.round((katildi / toplam) * 100);
-  const color = oran === 100 ? '#10B981' : oran >= 50 ? '#F59E0B' : '#EF4444';
-  const bg = oran === 100 ? 'rgba(16,185,129,0.1)' : oran >= 50 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)';
-  const border = oran === 100 ? 'rgba(16,185,129,0.2)' : oran >= 50 ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)';
-  const icon = oran === 100 ? 'ri-checkbox-circle-line' : oran >= 50 ? 'ri-time-line' : 'ri-close-circle-line';
+  const oran = toplam > 0 ? Math.round((katildi / toplam) * 100) : 0;
+  const color = oran >= 80 ? '#10B981' : oran >= 50 ? '#F59E0B' : '#EF4444';
+  const bg = oran >= 80 ? 'rgba(16,185,129,0.1)' : oran >= 50 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)';
+  const border = oran >= 80 ? 'rgba(16,185,129,0.2)' : oran >= 50 ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)';
+  const icon = oran >= 80 ? 'ri-checkbox-circle-line' : oran >= 50 ? 'ri-time-line' : 'ri-close-circle-line';
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap"
       style={{ background: bg, color, border: `1px solid ${border}` }}>
       <i className={`${icon} text-[10px]`} />
-      {katildi}/{toplam} Katıldı
+      {katildi}/{toplam} (%{oran})
     </span>
   );
 }
@@ -50,7 +79,7 @@ function DurumBadge({ eg }: { eg: Egitim }) {
 async function exportEgitimlerToExcel(
   egitimler: Egitim[],
   firmalar: { id: string; ad: string }[],
-  personeller: { id: string; adSoyad: string; gorev?: string }[],
+  personeller: { id: string; adSoyad: string; gorev?: string; firmaId: string; silinmis?: boolean }[],
 ) {
   const { default: ExcelJS } = await import('exceljs');
     const wb = new ExcelJS.Workbook();
@@ -104,19 +133,20 @@ async function exportEgitimlerToExcel(
 
     // ── SAYFA 1: EĞİTİM LİSTESİ ──
     const ws1 = wb.addWorksheet('Eğitim Listesi');
-    const cols1 = ['#', 'Eğitim Adı', 'Firma', 'Tarih', 'Eğitmen', 'Toplam Katılımcı', 'Katıldı', 'Katılmadı', 'Katılım Oranı', 'Açıklama'];
-    ws1.columns = [4, 32, 26, 14, 22, 16, 12, 12, 14, 36].map(w => ({ width: w }));
+    const cols1 = ['#', 'Eğitim Adı', 'Firma', 'Tarih', 'Eğitmen', 'Firma Personeli', 'Katılımcı', 'Katıldı', 'Katılmadı', 'Katılım Oranı', 'Açıklama'];
+    ws1.columns = [4, 30, 24, 14, 22, 14, 14, 12, 12, 14, 34].map(w => ({ width: w }));
     applyHeader(ws1, 'EĞİTİM LİSTESİ', `Toplam ${aktif.length} eğitim  |  Rapor: ${tarih}`, cols1.length);
     applyColHeader(ws1, cols1);
 
     aktif.forEach((eg, i) => {
       const firma = firmalar.find(f => f.id === eg.firmaId);
-      const stats = getKatilimStats(eg);
+      const stats = getKatilimStats(eg, personeller);
+      // Katılım oranı: katılan / firma toplam personeli
       const oran = stats.toplam > 0 ? `%${Math.round((stats.katildi / stats.toplam) * 100)}` : '—';
       const exRow = ws1.getRow(5 + i);
       exRow.height = 18;
       const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
-      const vals = [i + 1, eg.ad, firma?.ad || '—', fmtDate(eg.tarih), eg.egitmen || '—', stats.toplam, stats.katildi, stats.katilmadi, oran, eg.aciklama || '—'];
+      const vals = [i + 1, eg.ad, firma?.ad || '—', fmtDate(eg.tarih), eg.egitmen || '—', stats.toplam, stats.kayitliKatilimci, stats.katildi, stats.katilmadi, oran, eg.aciklama || '—'];
       vals.forEach((val, ci) => {
         const cell = exRow.getCell(ci + 1);
         cell.value = val;
@@ -125,11 +155,11 @@ async function exportEgitimlerToExcel(
         cell.alignment = { vertical: 'middle', wrapText: false };
         cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, right: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
         if (ci === 0) { cell.font = { size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
-        if ([5, 6, 7].includes(ci)) { cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: 'FF1E3A5F' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
-        if (ci === 8 && stats.toplam > 0) {
+        if ([5, 6, 7, 8].includes(ci)) { cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: 'FF1E3A5F' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+        if (ci === 9 && stats.toplam > 0) {
           const pct = Math.round((stats.katildi / stats.toplam) * 100);
-          const color = pct === 100 ? 'FF16A34A' : pct >= 50 ? 'FFD97706' : 'FFDC2626';
-          const bgc = pct === 100 ? 'FFDCFCE7' : pct >= 50 ? 'FFFEF3C7' : 'FFFEE2E2';
+          const color = pct >= 80 ? 'FF16A34A' : pct >= 50 ? 'FFD97706' : 'FFDC2626';
+          const bgc = pct >= 80 ? 'FFDCFCE7' : pct >= 50 ? 'FFFEF3C7' : 'FFFEE2E2';
           cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: color } };
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgc } };
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -149,7 +179,6 @@ async function exportEgitimlerToExcel(
     aktif.forEach(eg => {
       const firma = firmalar.find(f => f.id === eg.firmaId);
       const katilimcilar = eg.katilimcilar ?? [];
-      // Legacy
       const legacyIds = eg.katilimciIds ?? [];
       const allIds = katilimcilar.length > 0
         ? katilimcilar.map(k => ({ personelId: k.personelId, katildi: k.katildi }))
@@ -183,25 +212,29 @@ async function exportEgitimlerToExcel(
 
     // ── SAYFA 3: FİRMA ÖZETİ ──
     const ws3 = wb.addWorksheet('Firma Özeti');
-    const cols3 = ['#', 'Firma Adı', 'Toplam Eğitim', 'Toplam Katılımcı', 'Katıldı', 'Katılmadı', 'Ort. Katılım Oranı'];
-    ws3.columns = [4, 30, 16, 18, 12, 12, 18].map(w => ({ width: w }));
+    const cols3 = ['#', 'Firma Adı', 'Toplam Eğitim', 'Firma Personeli', 'Katıldı', 'Katılmadı', 'Katılım Oranı'];
+    ws3.columns = [4, 30, 16, 16, 12, 12, 18].map(w => ({ width: w }));
     applyHeader(ws3, 'FİRMA BAZLI EĞİTİM ÖZETİ', `${firmalar.length} firma  |  Rapor: ${tarih}`, cols3.length);
     applyColHeader(ws3, cols3);
 
     firmalar.forEach((f, i) => {
-      const firmaEgitimler = aktif.filter(e => e.firmaId === f.id);
+      const firmaEgitimler = aktif.filter(e =>
+        (e.firmaIds && e.firmaIds.includes(f.id)) || e.firmaId === f.id,
+      );
       if (firmaEgitimler.length === 0) return;
-      let toplamKatilimci = 0; let toplamKatildi = 0;
+      const firmaPersonelSayisi = personeller.filter(p => !p.silinmis && p.firmaId === f.id).length;
+      let toplamKatildi = 0;
       firmaEgitimler.forEach(eg => {
-        const s = getKatilimStats(eg);
-        toplamKatilimci += s.toplam;
+        const s = getKatilimStats(eg, personeller);
         toplamKatildi += s.katildi;
       });
-      const oran = toplamKatilimci > 0 ? `%${Math.round((toplamKatildi / toplamKatilimci) * 100)}` : '—';
+      // Oran: toplam katılan / (firma personeli * eğitim sayısı)
+      const paydaMax = firmaPersonelSayisi * firmaEgitimler.length;
+      const oran = paydaMax > 0 ? `%${Math.round((toplamKatildi / paydaMax) * 100)}` : '—';
       const exRow = ws3.getRow(5 + i);
       exRow.height = 18;
       const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
-      const vals = [i + 1, f.ad, firmaEgitimler.length, toplamKatilimci, toplamKatildi, toplamKatilimci - toplamKatildi, oran];
+      const vals = [i + 1, f.ad, firmaEgitimler.length, firmaPersonelSayisi, toplamKatildi, firmaPersonelSayisi - toplamKatildi, oran];
       vals.forEach((val, ci) => {
         const cell = exRow.getCell(ci + 1);
         cell.value = val;
@@ -436,14 +469,20 @@ export default function EgitimlerPage() {
 
   const stats = useMemo(() => {
     const toplam = aktifEgitimler.length;
-    let toplamKatilimci = 0; let toplamKatildi = 0;
+    let toplamFirmaPersonel = 0; let toplamKatildi = 0; let toplamKayitli = 0;
     aktifEgitimler.forEach(eg => {
-      const s = getKatilimStats(eg);
-      toplamKatilimci += s.toplam;
+      const s = getKatilimStats(eg, personeller);
+      toplamFirmaPersonel += s.toplam;
       toplamKatildi += s.katildi;
+      toplamKayitli += s.kayitliKatilimci;
     });
-    return { toplam, toplamKatilimci, toplamKatildi, katilimOrani: toplamKatilimci > 0 ? Math.round((toplamKatildi / toplamKatilimci) * 100) : 0 };
-  }, [aktifEgitimler]);
+    return {
+      toplam,
+      toplamKatilimci: toplamKayitli,
+      toplamKatildi,
+      katilimOrani: toplamFirmaPersonel > 0 ? Math.round((toplamKatildi / toplamFirmaPersonel) * 100) : 0,
+    };
+  }, [aktifEgitimler, personeller]);
 
   const detailEgitim = egitimler.find(e => e.id === detailId);
 
@@ -576,7 +615,7 @@ export default function EgitimlerPage() {
           {/* Mobil */}
           <div className="md:hidden divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
             {filtered.map(eg => {
-              const stats2 = getKatilimStats(eg);
+              const stats2 = getKatilimStats(eg, personeller);
               return (
                 <div key={eg.id} className="p-4">
                   <div className="flex items-start gap-3">
@@ -588,14 +627,14 @@ export default function EgitimlerPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{eg.ad}</p>
-                        <DurumBadge eg={eg} />
+                        <DurumBadge eg={eg} personeller={personeller} />
                       </div>
                       <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{getFirmaAd(eg)}</p>
                       <div className="flex items-center gap-3 mt-1">
                         {eg.tarih && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{new Date(eg.tarih).toLocaleDateString('tr-TR')}</span>}
                         {eg.egitmen && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{eg.egitmen}</span>}
                         <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
-                          style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
+                          style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
                           {stats2.toplam} kişi
                         </span>
                       </div>
@@ -630,7 +669,7 @@ export default function EgitimlerPage() {
               </thead>
               <tbody>
                 {filtered.map(eg => {
-                  const stats2 = getKatilimStats(eg);
+                  const stats2 = getKatilimStats(eg, personeller);
                   return (
                     <tr key={eg.id} style={{ background: selectedIds.has(eg.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
                       {canEdit && (
@@ -673,7 +712,7 @@ export default function EgitimlerPage() {
                           {stats2.toplam} kişi
                         </span>
                       </td>
-                      <td><DurumBadge eg={eg} /></td>
+                      <td><DurumBadge eg={eg} personeller={personeller} /></td>
                       <td>
                         <div className="flex items-center gap-1 justify-end">
                           <ABtn icon="ri-eye-line" color="#60A5FA" onClick={() => setDetailId(eg.id)} title="Detay" />
@@ -803,7 +842,7 @@ export default function EgitimlerPage() {
                 </label>
                 {firmaPersoneller.length > 0 && (
                   <button onClick={toggleTumKatilimcilar}
-                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg cursor-pointer transition-all"
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold cursor-pointer transition-all whitespace-nowrap"
                     style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
                     {form.katilimcilar.length === firmaPersoneller.length ? 'Tümünü Kaldır' : 'Tümünü Seç'}
                   </button>
@@ -918,7 +957,7 @@ export default function EgitimlerPage() {
 
             {/* Katılım özeti */}
             {(() => {
-              const s = getKatilimStats(detailEgitim);
+              const s = getKatilimStats(detailEgitim, personeller);
               if (s.toplam === 0) return null;
               const oran = Math.round((s.katildi / s.toplam) * 100);
               const color = oran === 100 ? '#10B981' : oran >= 50 ? '#F59E0B' : '#EF4444';
