@@ -9,7 +9,7 @@ import { useOfflineQueue, type OfflineQueueItem } from '@/hooks/useOfflineQueue'
 import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHelper';
 import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
-// jsQR'ı modül seviyesinde bir kere yükle
+// jsQR modül yükleyici
 let jsQRModule: ((data: Uint8ClampedArray, width: number, height: number, opts?: { inversionAttempts?: string }) => { data: string } | null) | null = null;
 let jsQRLoading = false;
 const jsQRCallbacks: Array<() => void> = [];
@@ -317,7 +317,6 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
   const { evraklar, addToast } = useApp();
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  // Firmaya ait evraklar (cascade silinmemiş)
   const firmaEvraklari = useMemo(() => {
     return evraklar
       .filter(e => !e.silinmis && !e.cascadeSilindi && e.firmaId === ekipman.firmaId)
@@ -326,11 +325,8 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
 
   const handleView = async (evrak: Evrak) => {
     const url = evrak.dosyaUrl ? await getSignedUrlFromPath(evrak.dosyaUrl) : null;
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } else {
-      addToast('Belge erişim linki alınamadı.', 'error');
-    }
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    else addToast('Belge erişim linki alınamadı.', 'error');
   };
 
   const handleDownload = async (evrak: Evrak) => {
@@ -340,15 +336,10 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
       const url = await getSignedUrlFromPath(evrak.dosyaUrl);
       if (!url) { addToast('Dosya indirilemedi.', 'error'); return; }
       const a = document.createElement('a');
-      a.href = url;
-      a.download = evrak.dosyaAdi || evrak.ad;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = url; a.download = evrak.dosyaAdi || evrak.ad;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       addToast(`"${evrak.ad}" indiriliyor...`, 'success');
-    } finally {
-      setDownloading(null);
-    }
+    } finally { setDownloading(null); }
   };
 
   const getStatusColor = (durum: string) => {
@@ -367,58 +358,67 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
 
   return (
     <div className="space-y-4">
-      {/* Ekipmana ait belge */}
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#475569' }}>Ekipman Belgesi</p>
-        {ekipman.dosyaUrl ? (
+        {(ekipman.dosyaUrl || ekipman.dosyaVeri) ? (
           <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.15)' }}>
               <i className="ri-file-check-line text-base" style={{ color: '#34D399' }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                {ekipman.dosyaAdi || 'Ekipman Belgesi'}
-              </p>
-              {ekipman.dosyaBoyutu ? (
-                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>
-                  {(ekipman.dosyaBoyutu / 1024).toFixed(1)} KB
-                </p>
-              ) : null}
+              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ekipman.dosyaAdi || 'Ekipman Belgesi'}</p>
+              {ekipman.dosyaBoyutu ? <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{(ekipman.dosyaBoyutu / 1024).toFixed(1)} KB</p> : null}
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
                 onClick={async () => {
-                  const url = await getSignedUrlFromPath(ekipman.dosyaUrl!);
-                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
-                  else addToast('Belge açılamadı.', 'error');
+                  if (ekipman.dosyaUrl) {
+                    const url = await getSignedUrlFromPath(ekipman.dosyaUrl);
+                    if (url) { window.open(url, '_blank', 'noopener,noreferrer'); return; }
+                  }
+                  if (ekipman.dosyaVeri) {
+                    const a = document.createElement('a');
+                    a.href = ekipman.dosyaVeri; a.target = '_blank';
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    return;
+                  }
+                  addToast('Belge açılamadı.', 'error');
                 }}
-                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }}
-                title="Görüntüle"
+                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }} title="Görüntüle"
               >
                 <i className="ri-eye-line text-sm" />
               </button>
               <button
                 onClick={async () => {
-                  const url = await getSignedUrlFromPath(ekipman.dosyaUrl!);
-                  if (url) {
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = ekipman.dosyaAdi || 'belge';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    addToast('İndiriliyor...', 'success');
-                  } else {
-                    addToast('Dosya indirilemedi.', 'error');
+                  if (ekipman.dosyaUrl) {
+                    const url = await getSignedUrlFromPath(ekipman.dosyaUrl);
+                    if (url) {
+                      const a = document.createElement('a'); a.href = url; a.download = ekipman.dosyaAdi || 'belge';
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      addToast('İndiriliyor...', 'success'); return;
+                    }
                   }
+                  if (ekipman.dosyaVeri) {
+                    const a = document.createElement('a'); a.href = ekipman.dosyaVeri; a.download = ekipman.dosyaAdi || 'belge';
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    addToast('İndiriliyor...', 'success'); return;
+                  }
+                  addToast('Dosya indirilemedi.', 'error');
                 }}
-                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399' }}
-                title="İndir"
+                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399' }} title="İndir"
               >
                 <i className="ri-download-2-line text-sm" />
               </button>
+            </div>
+          </div>
+        ) : ekipman.belgeMevcut ? (
+          <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(251,191,36,0.06)', border: '1px dashed rgba(251,191,36,0.25)' }}>
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(251,191,36,0.12)' }}>
+              <i className="ri-file-warning-line text-base" style={{ color: '#FBBF24' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: '#FCD34D' }}>Belge mevcut ama dosya yüklenmemiş</p>
+              <p className="text-xs mt-0.5" style={{ color: '#92400E' }}>Ekipman sayfasından dosyayı yükleyebilirsiniz</p>
             </div>
           </div>
         ) : (
@@ -431,15 +431,11 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
         )}
       </div>
 
-      {/* Firma evrakları */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#475569' }}>Firma Evrakları</p>
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }}>
-            {firmaEvraklari.length} evrak
-          </span>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }}>{firmaEvraklari.length} evrak</span>
         </div>
-
         {firmaEvraklari.length === 0 ? (
           <div className="text-center py-6 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
             <i className="ri-folder-open-line text-2xl" style={{ color: '#334155' }} />
@@ -452,14 +448,7 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
               const isExpired = evrak.durum === 'Süre Dolmuş';
               const isNearing = evrak.durum === 'Süre Yaklaşıyor';
               return (
-                <div
-                  key={evrak.id}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isExpired ? 'rgba(248,113,113,0.2)' : isNearing ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.07)'}`,
-                  }}
-                >
+                <div key={evrak.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${isExpired ? 'rgba(248,113,113,0.2)' : isNearing ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.07)'}` }}>
                   <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: sc.bg }}>
                     <i className="ri-file-text-line text-sm" style={{ color: sc.color }} />
                   </div>
@@ -467,37 +456,15 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
                     <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{evrak.ad}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {evrak.tur && <span className="text-[10px]" style={{ color: '#475569' }}>{evrak.tur}</span>}
-                      {evrak.gecerlilikTarihi && (
-                        <span className="text-[10px]" style={{ color: isExpired ? '#F87171' : isNearing ? '#FCD34D' : '#475569' }}>
-                          <i className="ri-calendar-line mr-0.5" />
-                          {fmtDate(evrak.gecerlilikTarihi)}
-                        </span>
-                      )}
+                      {evrak.gecerlilikTarihi && <span className="text-[10px]" style={{ color: isExpired ? '#F87171' : isNearing ? '#FCD34D' : '#475569' }}><i className="ri-calendar-line mr-0.5" />{fmtDate(evrak.gecerlilikTarihi)}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap" style={{ background: sc.bg, color: sc.color }}>
-                      {evrak.durum}
-                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap" style={{ background: sc.bg, color: sc.color }}>{evrak.durum}</span>
                     {evrak.dosyaUrl && (
                       <>
-                        <button
-                          onClick={() => handleView(evrak)}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
-                          style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}
-                          title="Görüntüle"
-                        >
-                          <i className="ri-eye-line text-xs" />
-                        </button>
-                        <button
-                          onClick={() => handleDownload(evrak)}
-                          disabled={downloading === evrak.id}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
-                          style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}
-                          title="İndir"
-                        >
-                          <i className={`${downloading === evrak.id ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} text-xs`} />
-                        </button>
+                        <button onClick={() => handleView(evrak)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Görüntüle"><i className="ri-eye-line text-xs" /></button>
+                        <button onClick={() => handleDownload(evrak)} disabled={downloading === evrak.id} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} title="İndir"><i className={`${downloading === evrak.id ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} text-xs`} /></button>
                       </>
                     )}
                   </div>
@@ -512,7 +479,7 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Ekipman Detay Paneli (Modal içinde) — sekmeli
+// Ekipman Detay Paneli — sekmeli (Kontrol + Evraklar)
 // ─────────────────────────────────────────────────────────────────────────────
 function EkipmanDetayPanel({
   ekipman,
@@ -520,12 +487,14 @@ function EkipmanDetayPanel({
   onKontrolYapildi,
   onDurumDegistir,
   isOnline,
+  kontrolBasarili,
 }: {
   ekipman: Ekipman;
   onBack: () => void;
   onKontrolYapildi: (id: string) => void;
   onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
   isOnline: boolean;
+  kontrolBasarili?: boolean;
 }) {
   const { firmalar } = useApp();
   const [activeTab, setActiveTab] = useState<'detay' | 'evraklar'>('detay');
@@ -538,14 +507,25 @@ function EkipmanDetayPanel({
   return (
     <div className="space-y-4">
       {/* Geri butonu */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-sm font-semibold cursor-pointer"
-        style={{ color: '#64748B' }}
-      >
+      <button onClick={onBack} className="flex items-center gap-2 text-sm font-semibold cursor-pointer" style={{ color: '#64748B' }}>
         <i className="ri-arrow-left-line text-base" />
         Listeye Dön
       </button>
+
+      {/* Kontrol başarılı banner */}
+      {kontrolBasarili && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)' }}>
+          <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(52,211,153,0.2)' }}>
+            <i className="ri-checkbox-circle-fill text-base" style={{ color: '#34D399' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold" style={{ color: '#34D399' }}>Kontrol kaydedildi!</p>
+            <p className="text-xs mt-0.5" style={{ color: '#475569' }}>
+              {isOnline ? 'Durum "Uygun" olarak güncellendi.' : 'Bağlantı gelince sunucuya gönderilecek.'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Ekipman başlık */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -567,23 +547,20 @@ function EkipmanDetayPanel({
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap"
           style={{ background: activeTab === 'detay' ? 'rgba(52,211,153,0.2)' : 'transparent', color: activeTab === 'detay' ? '#34D399' : '#64748B' }}
         >
-          <i className="ri-tools-line text-xs" />
-          Kontrol
+          <i className="ri-tools-line text-xs" />Kontrol
         </button>
         <button
           onClick={() => setActiveTab('evraklar')}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap"
           style={{ background: activeTab === 'evraklar' ? 'rgba(99,102,241,0.2)' : 'transparent', color: activeTab === 'evraklar' ? '#818CF8' : '#64748B' }}
         >
-          <i className="ri-file-list-3-line text-xs" />
-          Evraklar
+          <i className="ri-file-list-3-line text-xs" />Evraklar
         </button>
       </div>
 
       {/* Sekme içerikleri */}
       {activeTab === 'detay' ? (
         <div className="space-y-3">
-          {/* Detay bilgiler */}
           <div className="grid grid-cols-2 gap-3">
             {ekipman.seriNo && (
               <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -611,7 +588,6 @@ function EkipmanDetayPanel({
             )}
           </div>
 
-          {/* Kontrol tarihi uyarısı */}
           {days !== null && (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: days < 0 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${days < 0 ? 'rgba(239,68,68,0.2)' : days <= 7 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
               <i className="ri-calendar-line text-sm" style={{ color: days < 0 ? '#EF4444' : days <= 7 ? '#FBBF24' : '#475569' }} />
@@ -621,7 +597,6 @@ function EkipmanDetayPanel({
             </div>
           )}
 
-          {/* Kontrol Yaptım */}
           <button
             onClick={() => onKontrolYapildi(ekipman.id)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200"
@@ -637,7 +612,6 @@ function EkipmanDetayPanel({
             </span>
           </button>
 
-          {/* Durum Değiştir */}
           <div>
             <p className="text-[10px] font-semibold mb-2 uppercase tracking-wide" style={{ color: '#475569' }}>Durum Değiştir</p>
             <div className="grid grid-cols-4 gap-1.5">
@@ -661,7 +635,7 @@ function EkipmanDetayPanel({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Ekipman Listesi Modal — tıklayınca detay açılır
+// Ekipman Listesi Modal — tıklayınca detay açılır, kontrol sonrası detayda kalır
 // ─────────────────────────────────────────────────────────────────────────────
 function EkipmanListeModal({
   open,
@@ -669,22 +643,31 @@ function EkipmanListeModal({
   onKontrolYapildi,
   onDurumDegistir,
   isOnline,
+  initialEkipmanId,
 }: {
   open: boolean;
   onClose: () => void;
   onKontrolYapildi: (id: string) => void;
   onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
   isOnline: boolean;
+  initialEkipmanId?: string | null;
 }) {
   const { ekipmanlar, firmalar } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [selectedEkipman, setSelectedEkipman] = useState<Ekipman | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [kontrolBasarili, setKontrolBasarili] = useState(false);
 
-  // Modal kapanınca seçimi sıfırla
+  // Modal açılınca initialEkipmanId varsa direkt detaya git
   useEffect(() => {
-    if (!open) setSelectedEkipman(null);
-  }, [open]);
+    if (open) {
+      setSelectedId(initialEkipmanId ?? null);
+      setKontrolBasarili(false);
+    } else {
+      setSelectedId(null);
+      setKontrolBasarili(false);
+    }
+  }, [open, initialEkipmanId]);
 
   const aktif = ekipmanlar.filter(e => !e.silinmis);
   const filtered = aktif.filter(e => {
@@ -700,39 +683,39 @@ function EkipmanListeModal({
     return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
   };
 
-  // Kontrol yapılınca seçili ekipmanı güncelle
+  // Kontrol yapılınca detayda kal, başarı banner'ı göster
   const handleKontrol = (id: string) => {
     onKontrolYapildi(id);
-    // Güncel ekipman verisini al (updateEkipman optimistic update yapıyor)
-    setSelectedEkipman(null);
+    setKontrolBasarili(true);
+    // 3 saniye sonra banner'ı kaldır
+    setTimeout(() => setKontrolBasarili(false), 3000);
   };
 
   const handleDurum = (id: string, durum: EkipmanStatus) => {
     onDurumDegistir(id, durum);
-    // Seçili ekipmanı güncelle
-    setSelectedEkipman(prev => prev?.id === id ? { ...prev, durum } : prev);
   };
 
-  // Güncel ekipman verisini al (store'dan)
-  const currentEkipman = selectedEkipman
-    ? (ekipmanlar.find(e => e.id === selectedEkipman.id) ?? selectedEkipman)
+  // Store'dan güncel ekipman verisini al
+  const currentEkipman = selectedId
+    ? (ekipmanlar.find(e => e.id === selectedId) ?? null)
     : null;
 
   return (
     <Modal
       isOpen={open}
-      onClose={() => { setSelectedEkipman(null); onClose(); }}
-      title={selectedEkipman ? 'Ekipman Detayı' : 'Ekipman Kontrolleri'}
+      onClose={() => { setSelectedId(null); onClose(); }}
+      title={currentEkipman ? currentEkipman.ad : 'Ekipman Kontrolleri'}
       size="lg"
-      icon={selectedEkipman ? 'ri-tools-line' : 'ri-tools-line'}
+      icon="ri-tools-line"
     >
-      {selectedEkipman && currentEkipman ? (
+      {currentEkipman ? (
         <EkipmanDetayPanel
           ekipman={currentEkipman}
-          onBack={() => setSelectedEkipman(null)}
+          onBack={() => { setSelectedId(null); setKontrolBasarili(false); }}
           onKontrolYapildi={handleKontrol}
           onDurumDegistir={handleDurum}
           isOnline={isOnline}
+          kontrolBasarili={kontrolBasarili}
         />
       ) : (
         <>
@@ -779,7 +762,7 @@ function EkipmanListeModal({
               return (
                 <button
                   key={ekipman.id}
-                  onClick={() => setSelectedEkipman(ekipman)}
+                  onClick={() => { setSelectedId(ekipman.id); setKontrolBasarili(false); }}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-150 text-left"
                   style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${isOverdue ? 'rgba(239,68,68,0.2)' : isUrgent ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.07)'}` }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
@@ -903,7 +886,7 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Uygunsuzluklar Bölümü — açık/kapalı liste + detay + kapatma
+// Uygunsuzluklar Bölümü — açık/kapalı liste + detay + kapatma (sekme geçişi yok)
 // ─────────────────────────────────────────────────────────────────────────────
 function UygunsuzlukBolumu() {
   const { uygunsuzluklar, firmalar } = useApp();
@@ -916,7 +899,6 @@ function UygunsuzlukBolumu() {
   const aktif = uygunsuzluklar.filter(u => !u.silinmis && !u.cascadeSilindi);
   const aciklar = aktif.filter(u => u.durum !== 'Kapandı').sort((a, b) => (b.olusturmaTarihi ?? b.tarih ?? '').localeCompare(a.olusturmaTarihi ?? a.tarih ?? ''));
   const kapalilar = aktif.filter(u => u.durum === 'Kapandı').sort((a, b) => (b.kapatmaTarihi ?? '').localeCompare(a.kapatmaTarihi ?? ''));
-
   const liste = tab === 'acik' ? aciklar : kapalilar;
 
   const fmtDate = (iso?: string) => {
@@ -933,7 +915,6 @@ function UygunsuzlukBolumu() {
 
   return (
     <>
-      {/* Başlık + Tab */}
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#475569' }}>UYGUNSUZLUKLAR</p>
         <div className="flex items-center gap-1 px-1 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -954,7 +935,6 @@ function UygunsuzlukBolumu() {
         </div>
       </div>
 
-      {/* Liste */}
       {liste.length === 0 ? (
         <div className="text-center py-8 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
           <i className={`${tab === 'acik' ? 'ri-error-warning-line' : 'ri-checkbox-circle-line'} text-3xl`} style={{ color: '#334155' }} />
@@ -1006,34 +986,27 @@ function UygunsuzlukBolumu() {
         </div>
       )}
 
-      {/* Detay Modal */}
+      {/* Detay Modal — sekme geçişi yok, modal içinde açılır */}
       <DetailModal
         record={detailRecord}
         onClose={() => setDetailRecord(null)}
         onKapat={(rec) => { setDetailRecord(null); setKapatmaRecord(rec); }}
         onEdit={(rec) => { setDetailRecord(null); setEditRecord(rec); setShowForm(true); }}
       />
-
-      {/* Kapatma Modal */}
-      <KapatmaModal
-        record={kapatmaRecord}
-        onClose={() => setKapatmaRecord(null)}
-      />
-
-      {/* Düzenleme Formu */}
-      <NonconformityForm
-        isOpen={showForm}
-        onClose={() => { setShowForm(false); setEditRecord(null); }}
-        editRecord={editRecord}
-      />
+      <KapatmaModal record={kapatmaRecord} onClose={() => setKapatmaRecord(null)} />
+      <NonconformityForm isOpen={showForm} onClose={() => { setShowForm(false); setEditRecord(null); }} editRecord={editRecord} />
     </>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Firma Özeti
+// Firma Özeti — firmaya tıklayınca o firmanın ekipmanları modal içinde açılır
 // ─────────────────────────────────────────────────────────────────────────────
-function FirmaOzeti() {
+function FirmaOzeti({
+  onFirmaEkipmanAc,
+}: {
+  onFirmaEkipmanAc: (firmaId: string) => void;
+}) {
   const { firmalar, ekipmanlar } = useApp();
 
   const firmaStats = useMemo(() => {
@@ -1060,8 +1033,15 @@ function FirmaOzeti() {
       </div>
       <div className="space-y-2">
         {firmaStats.slice(0, 6).map(firma => (
-          <div key={firma.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${firma.sorunlu > 0 ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.06)'}` }}>
-            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}>
+          <button
+            key={firma.id}
+            onClick={() => onFirmaEkipmanAc(firma.id)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 text-left"
+            style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${firma.sorunlu > 0 ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.06)'}` }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+          >
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #334155, #1e293b)' }}>
               {(firma.ad || 'F').charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
@@ -1073,11 +1053,151 @@ function FirmaOzeti() {
               {firma.uygunDegil > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: 'rgba(248,113,113,0.15)', color: '#F87171' }}>{firma.uygunDegil} uygun değil</span>}
               {firma.yaklasan > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: 'rgba(251,191,36,0.15)', color: '#FBBF24' }}>{firma.yaklasan} yaklaşan</span>}
               {firma.sorunlu === 0 && firma.yaklasan === 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}>Sorun yok</span>}
+              <i className="ri-arrow-right-s-line text-xs ml-0.5" style={{ color: '#475569' }} />
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Firma Ekipman Modal — o firmaya ait ekipmanları listeler
+// ─────────────────────────────────────────────────────────────────────────────
+function FirmaEkipmanModal({
+  open,
+  firmaId,
+  onClose,
+  onKontrolYapildi,
+  onDurumDegistir,
+  isOnline,
+}: {
+  open: boolean;
+  firmaId: string | null;
+  onClose: () => void;
+  onKontrolYapildi: (id: string) => void;
+  onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
+  isOnline: boolean;
+}) {
+  const { ekipmanlar, firmalar } = useApp();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [kontrolBasarili, setKontrolBasarili] = useState(false);
+
+  useEffect(() => {
+    if (!open) { setSelectedId(null); setKontrolBasarili(false); }
+  }, [open]);
+
+  const firma = firmalar.find(f => f.id === firmaId);
+  const firmaEkipmanlari = ekipmanlar.filter(e => e.firmaId === firmaId && !e.silinmis);
+
+  const getDays = (dateStr: string) => {
+    if (!dateStr) return null;
+    return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
+  };
+
+  const handleKontrol = (id: string) => {
+    onKontrolYapildi(id);
+    setKontrolBasarili(true);
+    setTimeout(() => setKontrolBasarili(false), 3000);
+  };
+
+  const currentEkipman = selectedId ? (ekipmanlar.find(e => e.id === selectedId) ?? null) : null;
+
+  return (
+    <Modal
+      isOpen={open}
+      onClose={() => { setSelectedId(null); onClose(); }}
+      title={currentEkipman ? currentEkipman.ad : (firma?.ad ?? 'Firma Ekipmanları')}
+      size="lg"
+      icon="ri-building-2-line"
+    >
+      {currentEkipman ? (
+        <EkipmanDetayPanel
+          ekipman={currentEkipman}
+          onBack={() => { setSelectedId(null); setKontrolBasarili(false); }}
+          onKontrolYapildi={handleKontrol}
+          onDurumDegistir={(id, durum) => onDurumDegistir(id, durum)}
+          isOnline={isOnline}
+          kontrolBasarili={kontrolBasarili}
+        />
+      ) : (
+        <>
+          {/* Firma başlık */}
+          {firma && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl mb-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0 text-sm font-bold text-white" style={{ background: 'linear-gradient(135deg, #334155, #1e293b)' }}>
+                {(firma.ad || 'F').charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{firma.ad}</p>
+                <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{firmaEkipmanlari.length} ekipman</p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                {firmaEkipmanlari.filter(e => e.durum === 'Uygun Değil').length > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(248,113,113,0.15)', color: '#F87171' }}>
+                    {firmaEkipmanlari.filter(e => e.durum === 'Uygun Değil').length} uygun değil
+                  </span>
+                )}
+                {firmaEkipmanlari.filter(e => e.durum === 'Uygun').length > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.15)', color: '#34D399' }}>
+                    {firmaEkipmanlari.filter(e => e.durum === 'Uygun').length} uygun
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Ekipman listesi */}
+          <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '440px' }}>
+            {firmaEkipmanlari.length === 0 ? (
+              <div className="text-center py-12">
+                <i className="ri-tools-line text-3xl" style={{ color: '#334155' }} />
+                <p className="text-sm mt-2" style={{ color: '#475569' }}>Bu firmaya ait ekipman yok</p>
+              </div>
+            ) : firmaEkipmanlari.map(ekipman => {
+              const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
+              const days = getDays(ekipman.sonrakiKontrolTarihi);
+              const isOverdue = days !== null && days < 0;
+              const isUrgent = days !== null && days >= 0 && days <= 7;
+              return (
+                <button
+                  key={ekipman.id}
+                  onClick={() => { setSelectedId(ekipman.id); setKontrolBasarili(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-150 text-left"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${isOverdue ? 'rgba(239,68,68,0.2)' : isUrgent ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.07)'}` }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                >
+                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: sc.bg }}>
+                    <i className={`${sc.icon} text-base`} style={{ color: sc.color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</p>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
+                    </div>
+                    {ekipman.tur && <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{ekipman.tur}</p>}
+                    {ekipman.sonrakiKontrolTarihi && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <i className="ri-calendar-line text-[10px]" style={{ color: isOverdue ? '#EF4444' : isUrgent ? '#FBBF24' : '#334155' }} />
+                        <span className="text-[10px] font-medium" style={{ color: isOverdue ? '#F87171' : isUrgent ? '#FCD34D' : '#475569' }}>
+                          {isOverdue ? `${Math.abs(days!)} gün gecikmiş` : isUrgent ? `${days} gün kaldı` : new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {ekipman.seriNo && <span className="text-[10px] font-mono" style={{ color: '#334155' }}>{ekipman.seriNo}</span>}
+                    <i className="ri-arrow-right-s-line text-sm" style={{ color: '#475569' }} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -1091,6 +1211,8 @@ export default function SahaPage() {
   const [showUygunsuzlukForm, setShowUygunsuzlukForm] = useState(false);
   const [showEkipmanModal, setShowEkipmanModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showFirmaModal, setShowFirmaModal] = useState(false);
+  const [selectedFirmaId, setSelectedFirmaId] = useState<string | null>(null);
   const [qrFoundEkipman, setQrFoundEkipman] = useState<Ekipman | null>(null);
 
   const applyQueueItem = useCallback(async (item: OfflineQueueItem) => {
@@ -1160,6 +1282,11 @@ export default function SahaPage() {
       addToast(`Durum "${yeniDurum}" olarak güncellendi.`, 'success');
     }
   }, [ekipmanlar, updateEkipman, isOnline, addToQueue, addToast]);
+
+  const handleFirmaEkipmanAc = useCallback((firmaId: string) => {
+    setSelectedFirmaId(firmaId);
+    setShowFirmaModal(true);
+  }, []);
 
   const aktifEkipmanlar = ekipmanlar.filter(e => !e.silinmis);
   const uygunDegil = aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length;
@@ -1283,7 +1410,7 @@ export default function SahaPage() {
       <UygunsuzlukBolumu />
 
       {/* Firma Özeti */}
-      <FirmaOzeti />
+      <FirmaOzeti onFirmaEkipmanAc={handleFirmaEkipmanAc} />
 
       {/* Modallar */}
       <EkipmanListeModal
@@ -1293,6 +1420,16 @@ export default function SahaPage() {
         onDurumDegistir={handleDurumDegistir}
         isOnline={isOnline}
       />
+
+      <FirmaEkipmanModal
+        open={showFirmaModal}
+        firmaId={selectedFirmaId}
+        onClose={() => { setShowFirmaModal(false); setSelectedFirmaId(null); }}
+        onKontrolYapildi={handleKontrolYapildi}
+        onDurumDegistir={handleDurumDegistir}
+        isOnline={isOnline}
+      />
+
       <NonconformityForm isOpen={showUygunsuzlukForm} onClose={() => setShowUygunsuzlukForm(false)} editRecord={null} />
       <PendingModal open={showPendingModal} onClose={() => setShowPendingModal(false)} items={pendingItems} isOnline={isOnline} isSyncing={isSyncing} onSyncNow={syncNow} onClear={clearQueue} />
     </div>

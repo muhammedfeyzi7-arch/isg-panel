@@ -15,7 +15,7 @@ export default function QrModal({ ekipman, onClose }: Props) {
   if (!ekipman) return null;
 
   const qrUrl = `${window.location.origin}/equipment/qr/${ekipman.id}`;
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qrUrl)}&bgcolor=ffffff&color=4F46E5&margin=3`;
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qrUrl)}&bgcolor=ffffff&color=0f172a&margin=3`;
 
   const handleCopy = async () => {
     try {
@@ -53,7 +53,7 @@ export default function QrModal({ ekipman, onClose }: Props) {
             <span class="logo-text">ISG Denetim</span>
           </div>
           <div class="qr-wrap">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl)}&bgcolor=ffffff&color=4F46E5&margin=3" width="220" height="220" />
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl)}&bgcolor=ffffff&color=0f172a&margin=3" width="220" height="220" />
           </div>
           <div class="title">${ekipman.ad}</div>
           <div class="sub">${ekipman.tur || ''}${ekipman.seriNo ? ' • ' + ekipman.seriNo : ''}</div>
@@ -72,7 +72,7 @@ export default function QrModal({ ekipman, onClose }: Props) {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const imgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrUrl)}&margin=4&bgcolor=ffffff&color=4F46E5`;
+      const imgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(qrUrl)}&margin=4&bgcolor=ffffff&color=0f172a`;
       const response = await fetch(imgUrl);
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
@@ -100,13 +100,13 @@ export default function QrModal({ ekipman, onClose }: Props) {
         className="relative w-full max-w-[340px] overflow-hidden"
         style={{
           background: '#FFFFFF',
-          border: '1px solid rgba(99,102,241,0.15)',
+          border: '1px solid rgba(15,23,42,0.1)',
           borderRadius: '24px',
-          boxShadow: '0 20px 60px rgba(15,23,42,0.15), 0 4px 16px rgba(99,102,241,0.08)',
+          boxShadow: '0 20px 60px rgba(15,23,42,0.15), 0 4px 16px rgba(15,23,42,0.06)',
         }}
       >
         {/* Top accent bar */}
-        <div className="h-[3px] w-full" style={{ background: 'linear-gradient(90deg, #6366F1, #818CF8, #A5B4FC)' }} />
+        <div className="h-[3px] w-full" style={{ background: 'linear-gradient(90deg, #0f172a, #334155, #64748b)' }} />
 
         {/* Header */}
         <div
@@ -116,7 +116,7 @@ export default function QrModal({ ekipman, onClose }: Props) {
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}
+              style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)', boxShadow: '0 4px 14px rgba(15,23,42,0.35)' }}
             >
               <i className="ri-qr-code-line text-white text-base" />
             </div>
@@ -146,23 +146,23 @@ export default function QrModal({ ekipman, onClose }: Props) {
             ref={canvasRef}
             className="relative flex flex-col items-center gap-3 w-full rounded-2xl p-5"
             style={{
-              background: 'linear-gradient(145deg, #F8F7FF 0%, #F5F3FF 100%)',
-              border: '1px solid rgba(99,102,241,0.15)',
+              background: 'linear-gradient(145deg, #F8FAFC 0%, #F1F5F9 100%)',
+              border: '1px solid rgba(15,23,42,0.1)',
             }}
           >
             {/* Corner accents */}
-            <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 rounded-tl-lg" style={{ borderColor: 'rgba(99,102,241,0.35)' }} />
-            <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 rounded-tr-lg" style={{ borderColor: 'rgba(99,102,241,0.35)' }} />
-            <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 rounded-bl-lg" style={{ borderColor: 'rgba(99,102,241,0.35)' }} />
-            <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 rounded-br-lg" style={{ borderColor: 'rgba(99,102,241,0.35)' }} />
+            <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 rounded-tl-lg" style={{ borderColor: 'rgba(15,23,42,0.25)' }} />
+            <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 rounded-tr-lg" style={{ borderColor: 'rgba(15,23,42,0.25)' }} />
+            <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 rounded-bl-lg" style={{ borderColor: 'rgba(15,23,42,0.25)' }} />
+            <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 rounded-br-lg" style={{ borderColor: 'rgba(15,23,42,0.25)' }} />
 
             {/* QR Image */}
             <div
               className="rounded-2xl overflow-hidden p-3 flex items-center justify-center"
               style={{
                 background: '#FFFFFF',
-                border: '1px solid rgba(99,102,241,0.12)',
-                boxShadow: '0 2px 16px rgba(99,102,241,0.08)',
+                border: '1px solid rgba(15,23,42,0.08)',
+                boxShadow: '0 2px 16px rgba(15,23,42,0.06)',
               }}
             >
               <img
@@ -178,10 +178,10 @@ export default function QrModal({ ekipman, onClose }: Props) {
             {/* ISG badge */}
             <div
               className="flex items-center gap-1.5 px-3 py-1 rounded-full"
-              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
+              style={{ background: 'rgba(15,23,42,0.06)', border: '1px solid rgba(15,23,42,0.12)' }}
             >
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#6366F1' }} />
-              <span className="text-[10px] font-bold" style={{ color: '#6366F1' }}>ISG Denetim Sistemi</span>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0f172a' }} />
+              <span className="text-[10px] font-bold" style={{ color: '#0f172a' }}>ISG Denetim Sistemi</span>
             </div>
           </div>
 
@@ -190,7 +190,7 @@ export default function QrModal({ ekipman, onClose }: Props) {
             className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl cursor-pointer transition-all duration-200"
             style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}
             onClick={handleCopy}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; e.currentTarget.style.background = '#F5F3FF'; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(15,23,42,0.2)'; e.currentTarget.style.background = '#F1F5F9'; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#F8FAFC'; }}
           >
             <i className="ri-link text-[11px] flex-shrink-0 text-slate-400" />
@@ -198,12 +198,12 @@ export default function QrModal({ ekipman, onClose }: Props) {
             <div
               className="flex items-center gap-1 flex-shrink-0 px-2 py-0.5 rounded-md transition-all"
               style={{
-                background: copied ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.08)',
-                border: `1px solid ${copied ? 'rgba(16,185,129,0.25)' : 'rgba(99,102,241,0.2)'}`,
+                background: copied ? 'rgba(16,185,129,0.1)' : 'rgba(15,23,42,0.06)',
+                border: `1px solid ${copied ? 'rgba(16,185,129,0.25)' : 'rgba(15,23,42,0.12)'}`,
               }}
             >
-              <i className={`${copied ? 'ri-check-line' : 'ri-clipboard-line'} text-[10px]`} style={{ color: copied ? '#10B981' : '#6366F1' }} />
-              <span className="text-[9.5px] font-bold" style={{ color: copied ? '#10B981' : '#6366F1' }}>
+              <i className={`${copied ? 'ri-check-line' : 'ri-clipboard-line'} text-[10px]`} style={{ color: copied ? '#10B981' : '#0f172a' }} />
+              <span className="text-[9.5px] font-bold" style={{ color: copied ? '#10B981' : '#0f172a' }}>
                 {copied ? 'Kopyalandı' : 'Kopyala'}
               </span>
             </div>
@@ -239,11 +239,11 @@ export default function QrModal({ ekipman, onClose }: Props) {
             onClick={handlePrint}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-semibold cursor-pointer transition-all whitespace-nowrap"
             style={{
-              background: 'linear-gradient(135deg, #6366F1, #4F46E5)',
-              border: '1px solid rgba(99,102,241,0.3)',
+              background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+              border: '1px solid rgba(15,23,42,0.3)',
               color: '#FFFFFF',
             }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.35)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(15,23,42,0.35)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}
           >
             <i className="ri-printer-line text-sm" />
