@@ -10,7 +10,7 @@ import type { Toast } from '../types';
 
 export interface Bildirim {
   id: string;
-  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek' | 'ekipman_kontrol_yapildi';
+  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek' | 'ekipman_kontrol_yapildi' | 'is_izni_onaylandi' | 'is_izni_reddedildi';
   mesaj: string;
   detay: string;
   tarih: string;
@@ -51,6 +51,7 @@ interface AppContextType extends StoreType {
   bildirimOku: (id: string) => void;
   tumunuOku: () => void;
   ekipmanKontrolBildirimi: (ekipmanAd: string, ekipmanId: string, durum: string, gecikmisDi: boolean) => void;
+  isIzniBildirimi: (izinNo: string, izinId: string, tip: 'onaylandi' | 'reddedildi', sahaNotu?: string) => void;
   org: OrgInfo | null;
   orgLoading: boolean;
   orgError: string | null;
@@ -196,6 +197,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   // Kontrol yapıldı bildirimleri — geçici, sadece session'da tutulur
   const [kontrolBildirimleri, setKontrolBildirimleri] = useState<Bildirim[]>([]);
+
+  const isIzniBildirimi = useCallback((
+    izinNo: string, izinId: string, tip: 'onaylandi' | 'reddedildi', sahaNotu?: string,
+  ) => {
+    const id = `is_izni_${tip}_${izinId}_${Date.now()}`;
+    const now = new Date().toISOString().split('T')[0];
+    const yeniBildirim: Bildirim = {
+      id,
+      tip: tip === 'onaylandi' ? 'is_izni_onaylandi' : 'is_izni_reddedildi',
+      mesaj: tip === 'onaylandi'
+        ? `İş izni onaylandı — ${izinNo}`
+        : `İş izni reddedildi — ${izinNo}`,
+      detay: sahaNotu
+        ? `Saha notu: ${sahaNotu}`
+        : tip === 'onaylandi' ? 'Sahada uygundur' : 'Uygun değil',
+      tarih: now,
+      okundu: false,
+      kalanGun: 0,
+      module: 'is-izinleri',
+      recordId: izinId,
+    };
+    setKontrolBildirimleri(prev => [yeniBildirim, ...prev].slice(0, 30));
+    setTimeout(() => {
+      setKontrolBildirimleri(prev => prev.map(b => b.id === id ? { ...b, okundu: true } : b));
+    }, 60000);
+  }, []);
 
   const ekipmanKontrolBildirimi = useCallback((
     ekipmanAd: string, ekipmanId: string, durum: string, gecikmisDi: boolean,
@@ -542,7 +569,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sidebarCollapsed, setSidebarCollapsed,
       quickCreate, setQuickCreate,
       theme, toggleTheme,
-      bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku, ekipmanKontrolBildirimi,
+      bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku, ekipmanKontrolBildirimi, isIzniBildirimi,
       org, orgLoading, orgError: loadError,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,

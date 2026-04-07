@@ -9,6 +9,7 @@ import { useOfflineQueue, type OfflineQueueItem } from '@/hooks/useOfflineQueue'
 import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHelper';
 import { getSignedUrlFromPath } from '@/utils/fileUpload';
 import { supabase } from '@/lib/supabase';
+import IsIzniSahaBolumu from './components/IsIzniSahaBolumu';
 
 // jsQR modül yükleyici
 let jsQRModule: ((data: Uint8ClampedArray, width: number, height: number, opts?: { inversionAttempts?: string }) => { data: string } | null) | null = null;
@@ -1557,6 +1558,11 @@ export default function SahaPage() {
 
       {/* Uygunsuzluklar Bölümü */}
       <UygunsuzlukBolumu />
+
+      {/* İş İzinleri Bölümü */}
+      <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <IsIzniSahaBolumu />
+      </div>
 
       {/* Firma Özeti */}
       <FirmaOzeti onFirmaEkipmanAc={handleFirmaEkipmanAc} />

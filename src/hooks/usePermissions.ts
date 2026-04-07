@@ -5,6 +5,7 @@ export interface Permissions {
   canEdit: boolean;
   canDelete: boolean;
   isReadOnly: boolean;
+  isDenetci: boolean;
   role: string;
   canAccessSettings: boolean;
   canAccessModule: (moduleId: string) => boolean;
@@ -14,7 +15,7 @@ export interface Permissions {
 // Saha Personeli (denetci) için izin verilen modüller
 const DENETCI_ALLOWED_MODULES = new Set([
   'dashboard', 'firmalar', 'personeller',
-  'ekipmanlar', 'uygunsuzluklar', 'saha',
+  'ekipmanlar', 'uygunsuzluklar', 'saha', 'is-izinleri',
 ]);
 
 // Evrak/Dökümantasyon Denetçi (member) için yasak modüller
@@ -52,12 +53,13 @@ export function usePermissions(): Permissions {
   };
 
   return {
-    // Tüm roller kendi sayfalarında tam yetki sahibi
-    canCreate: isAdmin || isMember || isDenetci,
-    canEdit:   isAdmin || isMember || isDenetci,
-    canDelete: isAdmin || isMember || isDenetci,
-    // Artık hiçbir rol salt okunur değil
-    isReadOnly: false,
+    // Denetçi sadece değerlendirme yapabilir, create/edit/delete yapamaz
+    canCreate: isAdmin || isMember,
+    canEdit:   isAdmin || isMember,
+    canDelete: isAdmin || isMember,
+    // Denetçi salt okunur (is-izni değerlendirme hariç)
+    isReadOnly: isDenetci,
+    isDenetci,
     role: org?.role ?? 'member',
     canAccessSettings: isAdmin,
     canAccessModule,

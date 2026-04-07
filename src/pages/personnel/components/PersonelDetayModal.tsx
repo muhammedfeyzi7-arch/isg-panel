@@ -72,7 +72,7 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
   const {
     personeller, firmalar, evraklar, egitimler, muayeneler, uygunsuzluklar, getPersonelFoto,
   } = useApp();
-  const { canViewSensitiveData } = usePermissions();
+  const { canViewSensitiveData, isDenetci } = usePermissions();
   const navigate = useNavigate();
 
   const [tab, setTab] = useState('bilgiler');
@@ -128,13 +128,16 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
   if (!personel) return null;
 
   /* ── Sekmeler ────────────────────────────────────────────────── */
-  const tabs = [
-    { id: 'bilgiler',     label: 'Bilgiler',    icon: 'ri-user-line',          count: undefined },
-    { id: 'evraklar',     label: 'Evraklar',    icon: 'ri-file-list-line',     count: pEvraklar.length },
-    { id: 'egitimler',    label: 'Eğitimler',   icon: 'ri-graduation-cap-line', count: pEgitimler.length },
-    { id: 'saglik',       label: 'Sağlık',      icon: 'ri-heart-pulse-line',   count: pMuayeneler.length + pSaglikEvraklar.length },
-    { id: 'uygunsuzluk',  label: 'Uygunsuzluk', icon: 'ri-alert-line',         count: pUygunsuzluklar.length },
-  ];
+  // Denetçi sadece temel bilgileri görebilir, evrak/eğitim/sağlık/uygunsuzluk gizli
+  const tabs = isDenetci
+    ? [{ id: 'bilgiler', label: 'Bilgiler', icon: 'ri-user-line', count: undefined }]
+    : [
+        { id: 'bilgiler',     label: 'Bilgiler',    icon: 'ri-user-line',          count: undefined },
+        { id: 'evraklar',     label: 'Evraklar',    icon: 'ri-file-list-line',     count: pEvraklar.length },
+        { id: 'egitimler',    label: 'Eğitimler',   icon: 'ri-graduation-cap-line', count: pEgitimler.length },
+        { id: 'saglik',       label: 'Sağlık',      icon: 'ri-heart-pulse-line',   count: pMuayeneler.length + pSaglikEvraklar.length },
+        { id: 'uygunsuzluk',  label: 'Uygunsuzluk', icon: 'ri-alert-line',         count: pUygunsuzluklar.length },
+      ];
 
   return (
     <>
@@ -248,7 +251,7 @@ export default function PersonelDetayModal({ personelId, onClose }: Props) {
           )}
 
           {/* ── Evraklar ── */}
-          {tab === 'evraklar' && (
+          {tab === 'evraklar' && !isDenetci && (
             <div className="space-y-3">
               <div className="flex justify-end">
                 <button

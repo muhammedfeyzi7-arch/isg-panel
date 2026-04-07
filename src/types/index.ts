@@ -276,6 +276,9 @@ export interface IsIzni {
   durum: IsIzniStatus;
   onaylayanKisi: string;
   onayTarihi?: string;
+  sahaNotu?: string;
+  reddedenKisi?: string;
+  reddetmeTarihi?: string;
   notlar: string;
   olusturanKisi: string;
   olusturmaTarihi: string;

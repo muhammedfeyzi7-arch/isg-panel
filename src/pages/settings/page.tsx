@@ -236,7 +236,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="flex gap-6 min-h-[calc(100vh-120px)]">
+    <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-120px)]">
 
       {/* ══════════════════════════════════════
           LEFT SIDEBAR NAV
@@ -337,7 +337,7 @@ export default function SettingsPage() {
       {/* ══════════════════════════════════════
           MOBILE TAB BAR
       ══════════════════════════════════════ */}
-      <div className="lg:hidden w-full mb-4 overflow-x-auto">
+      <div className="lg:hidden w-full overflow-x-auto -mb-2">
         <div className="flex gap-1 p-1 rounded-xl min-w-max" style={{ background: bg, border }}>
           {visibleNavItems.map(item => (
             <button
@@ -360,7 +360,7 @@ export default function SettingsPage() {
       {/* ══════════════════════════════════════
           MAIN CONTENT
       ══════════════════════════════════════ */}
-      <main className="flex-1 min-w-0 space-y-0">
+      <main className="flex-1 min-w-0 w-full space-y-0">
 
         {/* ── PROFIL TAB ── */}
         {activeTab === 'profil' && (

@@ -560,9 +560,11 @@ export default function FirmalarPage() {
               <Badge label={detailFirma.durum} color={getFirmaStatusColor(detailFirma.durum)} />
               <Badge label={detailFirma.tehlikeSinifi} color={getTehlikeColor(detailFirma.tehlikeSinifi)} />
               <div className="flex-1" />
-              <button onClick={() => { setDetailId(null); openEdit(detailFirma); }} className="btn-secondary">
-                <i className="ri-edit-line" /> Düzenle
-              </button>
+              {canEdit && (
+                <button onClick={() => { setDetailId(null); openEdit(detailFirma); }} className="btn-secondary">
+                  <i className="ri-edit-line" /> Düzenle
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <InfoRow label="Yetkili Kişi" value={detailFirma.yetkiliKisi} />
