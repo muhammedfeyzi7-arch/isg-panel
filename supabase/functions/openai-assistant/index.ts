@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const GROQ_API_KEY = "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";
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") ?? "";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const corsHeaders = {
@@ -11,6 +11,13 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  if (!GROQ_API_KEY) {
+    return new Response(JSON.stringify({ error: "GROQ_API_KEY secret ayarlanmamış." }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
