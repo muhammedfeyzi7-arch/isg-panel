@@ -26,11 +26,21 @@ Deno.serve(async (req) => {
     let userPrompt = "";
 
     if (mode === "tutanak") {
-      systemPrompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Kullanıcının verdiği kısa açıklamadan profesyonel bir denetim tutanağı oluşturuyorsun. Türkçe yaz. Resmi ve profesyonel dil kullan. SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
-{"baslik":"Tutanak başlığı max 80 karakter","aciklama":"200-400 karakter detaylı açıklama","notlar":"100-200 karakter ek notlar"}`;
-      userPrompt = `Firma: ${data?.firmaAdi || "Belirtilmemiş"}
-Açıklama: ${data?.kisaAciklama || ""}
-Tarih: ${data?.tarih || new Date().toLocaleDateString("tr-TR")}`;
+      systemPrompt = `Sen deneyimli bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Görevin: kullanıcının verdiği kısa nottan profesyonel, resmi ve kapsamlı bir denetim tutanağı metni üretmek.
+
+KURALLAR:
+1. "aciklama" alanı: Kullanıcının kısa notunu TAMAMEN GENİŞLET. Sadece firma adını başa ekleyip geçiştirme. Tespit edilen durumu, neden tehlikeli/önemli olduğunu, hangi mevzuat veya standartla çeliştiğini (İSG yönetmeliği, iş güvenliği standartları vb.) açıkla. En az 3-5 cümle, 300-500 karakter olsun. Resmi denetim dili kullan.
+2. "notlar" alanı: Kullanıcının notundan yola çıkarak YAPILMASI GEREKEN SOMUT AKSİYONLARI yaz. "Ne yapılmalı, kim sorumlu, ne zaman tamamlanmalı" formatında yaz. Aciliyet derecesini belirt. 150-250 karakter.
+3. "baslik" alanı: Konuyu özetleyen kısa resmi başlık, max 80 karakter.
+4. Türkçe yaz. Resmi ve profesyonel dil kullan.
+5. SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
+{"baslik":"...","aciklama":"...","notlar":"..."}`;
+
+      userPrompt = `Firma Adı: ${data?.firmaAdi || "Belirtilmemiş"}
+Denetim Tarihi: ${data?.tarih || new Date().toLocaleDateString("tr-TR")}
+Kullanıcının Kısa Notu: ${data?.kisaAciklama || ""}
+
+Bu kısa notu profesyonel bir denetim tutanağına dönüştür. Açıklamayı genişlet, notlar kısmına yapılması gerekenleri yaz.`;
 
     } else if (mode === "uygunsuzluk") {
       systemPrompt = `Sen bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Uygunsuzluk açıklamasına göre alınması gereken önlemleri öneriyorsun. Türkçe yaz. Pratik ve uygulanabilir önlemler ver. SADECE JSON formatında yanıt ver:
@@ -77,8 +87,8 @@ Bu verilere göre İSG yöneticisine kısa ve net bir analiz sun.`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.6,
-        max_tokens: 500,
+        temperature: 0.7,
+        max_tokens: 800,
         response_format: { type: "json_object" },
       }),
     });
