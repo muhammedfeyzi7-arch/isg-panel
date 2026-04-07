@@ -449,7 +449,13 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                   </div>
                   <div className="max-h-64 overflow-y-auto">
                     {displayBildirimler.map((b, idx) => {
-                      const cfg = TYPE_CONFIG[b.tip] ?? TYPE_CONFIG['evrak_surecek'];
+                      const cfg = TYPE_CONFIG[b.tip as keyof typeof TYPE_CONFIG] ?? {
+                        icon: 'ri-notification-3-line',
+                        color: '#64748B',
+                        bg: 'rgba(100,116,139,0.12)',
+                        badge: 'Bildirim',
+                        badgeBg: 'rgba(100,116,139,0.12)',
+                      };
                       return (
                         <div
                           key={b.id}

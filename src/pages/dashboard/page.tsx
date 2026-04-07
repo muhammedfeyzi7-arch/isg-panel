@@ -325,7 +325,7 @@ export default function DashboardPage() {
               >
                 <div className="flex-shrink-0 mt-0.5">
                   <div className="w-7 h-7 flex items-center justify-center rounded-lg"
-                    style={{ background: item.bg, border: `1px solid ${item.color}30` }}>
+                    style={{ background: `${item.color}18`, border: `1px solid ${item.color}30` }}>
                     <i className={`${item.icon} text-xs`} style={{ color: item.color }} />
                   </div>
                 </div>
@@ -470,7 +470,7 @@ export default function DashboardPage() {
                   { label: 'Görev', value: gorevStats.gecikmiş,         icon: 'ri-task-line',         color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.2)' },
                 ].map(item => (
                   <div key={item.label} className="rounded-xl p-2.5 text-center"
-                    style={{ background: item.value > 0 ? item.bg : 'var(--bg-item)', border: `1px solid ${item.value > 0 ? item.border : 'var(--bg-item-border)'}` }}>
+                    style={{ background: item.value > 0 ? `${item.color}18` : 'var(--bg-item)', border: `1px solid ${item.value > 0 ? `${item.color}30` : 'var(--bg-item-border)'}` }}>
                     <div className="w-7 h-7 flex items-center justify-center rounded-lg mx-auto mb-1.5"
                       style={{ background: item.value > 0 ? `${item.color}20` : 'var(--bg-item)' }}>
                       <i className={`${item.icon} text-xs`} style={{ color: item.value > 0 ? item.color : 'var(--text-muted)' }} />
