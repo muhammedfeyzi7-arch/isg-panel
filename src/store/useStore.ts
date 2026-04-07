@@ -75,7 +75,6 @@ async function dbUpsert(
   organizationId: string,
 ): Promise<void> {
   const now = new Date().toISOString();
-  // Eğer kayıt silinmişse deleted_at kolonunu da set et, geri yüklendiyse null yap
   const isSilinmis = item.silinmis === true;
   const silinmeTarihi = typeof item.silinmeTarihi === 'string' ? item.silinmeTarihi : (isSilinmis ? now : null);
   const payload: Record<string, unknown> = {
@@ -87,16 +86,27 @@ async function dbUpsert(
     deleted_at: isSilinmis ? silinmeTarihi : null,
   };
   console.log(`[ISG] Saving ${table}/${item.id}`, { organization_id: organizationId, user_id: userId, deleted_at: payload.deleted_at });
-  const { data, error } = await supabase.from(table).upsert(payload).select('id');
+  const { data, error } = await supabase.from(table).upsert(payload, { onConflict: 'id' }).select('id');
   if (error) {
     const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
     console.error(`[ISG] SAVE ERROR ${table}/${item.id}:`, errMsg, error);
+    // RLS hatasını daha anlaşılır göster
+    if (errMsg.includes('row-level security') || errMsg.includes('RLS') || errMsg.includes('policy')) {
+      throw new Error(`Yetki hatası: Bu işlem için yetkiniz yok. (${errMsg})`);
+    }
     throw new Error(errMsg);
   }
   if (!data || data.length === 0) {
-    const msg = `SAVE SILENT FAIL ${table}/${item.id}: upsert returned 0 rows. Possible RLS block.`;
-    console.error(`[ISG] ${msg}`);
-    throw new Error(msg);
+    // Önce kaydın var olup olmadığını kontrol et
+    const { data: existing } = await supabase.from(table).select('id').eq('id', item.id).maybeSingle();
+    if (!existing) {
+      const msg = `Kayıt veritabanına yazılamadı (${table}). RLS politikası engelliyor olabilir.`;
+      console.error(`[ISG] ${msg}`);
+      throw new Error(msg);
+    }
+    // Kayıt var ama select döndürmedi — bu normal olabilir (RLS select kısıtlaması)
+    console.log(`[ISG] SAVE OK ${table}/${item.id} ✓ (verified via select)`);
+    return;
   }
   console.log(`[ISG] SAVE OK ${table}/${item.id} ✓ (rows confirmed: ${data.length})`);
 }
@@ -232,12 +242,13 @@ export function useStore(
   }, []);
 
   // ── DB write helpers ──
-  const saveToDb = useCallback(async (table: string, item: { id: string } & Record<string, unknown>): Promise<void> => {
+  const saveToDb = useCallback(async (table: string, item: { id: string } & Record<string, unknown>, throwOnError = false): Promise<void> => {
     const orgId = orgIdRef.current;
     const uid = userIdRef.current;
     if (!orgId || !uid) {
       console.warn(`[ISG] SAVE QUEUED ${table}/${item.id}: orgId=${orgId} userId=${uid} not ready yet`);
       pendingSavesRef.current.push({ table, item });
+      if (throwOnError) throw new Error(`Organizasyon bilgisi henüz hazır değil. Lütfen tekrar deneyin.`);
       return;
     }
     try {
@@ -246,8 +257,7 @@ export function useStore(
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[ISG] SAVE FAILED ${table}/${item.id}:`, msg);
       onSaveErrorRef.current?.(`Kayıt hatası (${table}): ${msg}`);
-      // Don't re-throw — callers should not crash on save errors
-      // The optimistic UI update already happened, data is in local state
+      if (throwOnError) throw err;
     }
   }, []);
 
@@ -1120,21 +1130,31 @@ export function useStore(
     const izinNo = rpcNo ?? generateIsIzniNo(isIzRef.current);
     const newIz: IsIzni = { ...iz, id, izinNo, olusturmaTarihi: now, guncellemeTarihi: now };
     setIsIzinleri(prev => [newIz, ...prev]);
-    // DB'ye yazılmasını bekle — evrak yükleme bu tamamlanmadan yapılmamalı
-    await saveToDb('is_izinleri', newIz as unknown as { id: string } & Record<string, unknown>);
+    // DB'ye yazılmasını bekle ve hata fırlat — evrak yükleme bu tamamlanmadan yapılmamalı
+    await saveToDb('is_izinleri', newIz as unknown as { id: string } & Record<string, unknown>, true);
     logFnRef.current?.('is_izni_created', 'İş İzinleri', id, izinNo, `${izinNo} iş izni oluşturuldu.`);
     return newIz;
   }, [setIsIzinleri, saveToDb]);
 
   const updateIsIzni = useCallback(async (id: string, updates: Partial<IsIzni>): Promise<void> => {
     let updated: IsIzni | null = null;
+    let snapshot: IsIzni | null = null;
     setIsIzinleri(prev => prev.map(iz => {
       if (iz.id !== id) return iz;
+      snapshot = iz;
       updated = { ...iz, ...updates, guncellemeTarihi: new Date().toISOString() };
       return updated;
     }));
     if (updated) {
-      await saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
+      try {
+        await saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>, true);
+      } catch (err) {
+        // Rollback optimistic update on failure
+        if (snapshot) {
+          setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
+        }
+        throw err;
+      }
     }
     logFnRef.current?.('is_izni_updated', 'İş İzinleri', id, updates.izinNo, 'İş izni güncellendi.');
   }, [setIsIzinleri, saveToDb]);

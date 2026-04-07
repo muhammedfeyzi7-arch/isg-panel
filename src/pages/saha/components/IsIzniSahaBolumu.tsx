@@ -445,15 +445,20 @@ export default function IsIzniSahaBolumu() {
   };
 
   const handleUygun = async (izin: IsIzni) => {
-    await updateIsIzni(izin.id, {
-      durum: 'Onaylandı',
-      sahaNotu: 'Sahada uygundur',
-      onaylayanKisi: currentUser.ad,
-      onayTarihi: new Date().toISOString().split('T')[0],
-    } as Partial<IsIzni>);
-    isIzniBildirimi(izin.izinNo, izin.id, 'onaylandi', 'Sahada uygundur');
-    addToast(`${izin.izinNo} onaylandı.`, 'success');
-    setSeciliIzinId(null);
+    try {
+      await updateIsIzni(izin.id, {
+        durum: 'Onaylandı',
+        sahaNotu: 'Sahada uygundur',
+        onaylayanKisi: currentUser.ad,
+        onayTarihi: new Date().toISOString().split('T')[0],
+      } as Partial<IsIzni>);
+      isIzniBildirimi(izin.izinNo, izin.id, 'onaylandi', 'Sahada uygundur');
+      addToast(`${izin.izinNo} onaylandı.`, 'success');
+      setSeciliIzinId(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Onay kaydedilemedi: ${msg}`, 'error');
+    }
   };
 
   const normalizeSlug = (str: string) => str
@@ -471,22 +476,28 @@ export default function IsIzniSahaBolumu() {
     if (foto && orgId !== 'unknown') {
       const izinTuruSlug = normalizeSlug(izin.tip);
       const path = `${orgId}/is-izni-evrak/${izin.firmaId}/${izinTuruSlug}/${izin.id}_red_${Date.now()}_${foto.name}`;
-      const { data: uploadData } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
+      const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
+      if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr);
       if (uploadData?.path) {
         const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(uploadData.path);
         redFotoUrl = urlData?.publicUrl;
       }
     }
-    await updateIsIzni(izin.id, {
-      durum: 'Reddedildi',
-      sahaNotu: not,
-      reddedenKisi: currentUser.ad,
-      reddetmeTarihi: new Date().toISOString().split('T')[0],
-      ...(redFotoUrl ? { redFotoUrl } : {}),
-    } as Partial<IsIzni>);
-    isIzniBildirimi(izin.izinNo, izin.id, 'reddedildi', not);
-    addToast(`${izin.izinNo} reddedildi.`, 'error');
-    setSeciliIzinId(null);
+    try {
+      await updateIsIzni(izin.id, {
+        durum: 'Reddedildi',
+        sahaNotu: not,
+        reddedenKisi: currentUser.ad,
+        reddetmeTarihi: new Date().toISOString().split('T')[0],
+        ...(redFotoUrl ? { redFotoUrl } : {}),
+      } as Partial<IsIzni>);
+      isIzniBildirimi(izin.izinNo, izin.id, 'reddedildi', not);
+      addToast(`${izin.izinNo} reddedildi.`, 'error');
+      setSeciliIzinId(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Red kaydedilemedi: ${msg}`, 'error');
+    }
   };
 
   const TIP_ICON: Record<string, string> = {

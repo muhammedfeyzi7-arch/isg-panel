@@ -583,23 +583,36 @@ export default function IsIzniPage() {
 
     try {
       if (editId) {
-        await updateIsIzni(editId, {
-          tip: form.tip,
-          firmaId: form.firmaId,
-          aciklama: form.aciklama,
-          baslamaTarihi: form.baslamaTarihi,
-          bitisTarihi: form.bitisTarihi,
-          // Reddedilmişse tekrar onay bekleyene al
-          durum: 'Onay Bekliyor',
-        } as Partial<IsIzni>);
+        try {
+          await updateIsIzni(editId, {
+            tip: form.tip,
+            firmaId: form.firmaId,
+            aciklama: form.aciklama,
+            baslamaTarihi: form.baslamaTarihi,
+            bitisTarihi: form.bitisTarihi,
+            durum: 'Onay Bekliyor',
+          } as Partial<IsIzni>);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          addToast(`İş izni güncellenemedi: ${msg}`, 'error');
+          return;
+        }
         if (formEvraklar.length > 0) {
           const izinTuruSlug = normalizeSlug(form.tip);
           setUploadProgress({ done: 0, total: formEvraklar.length });
+          let uploadHata = 0;
           for (let i = 0; i < formEvraklar.length; i++) {
             const file = formEvraklar[i];
             const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${editId}_${Date.now()}_${file.name}`;
-            await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+            const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+            if (uploadErr) {
+              console.error('[ISG] Evrak upload error:', uploadErr);
+              uploadHata++;
+            }
             setUploadProgress({ done: i + 1, total: formEvraklar.length });
+          }
+          if (uploadHata > 0) {
+            addToast(`${uploadHata} evrak yüklenemedi. Lütfen tekrar deneyin.`, 'error');
           }
         }
         addToast('İş izni güncellendi ve tekrar onaya gönderildi.', 'success');
@@ -628,16 +641,31 @@ export default function IsIzniPage() {
           olusturanKisi: currentUser.ad,
           belgeMevcut: false,
         };
-        const newIz = await addIsIzni(saveData as Omit<IsIzni, 'id' | 'izinNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>);
+        let newIz;
+        try {
+          newIz = await addIsIzni(saveData as Omit<IsIzni, 'id' | 'izinNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          addToast(`İş izni oluşturulamadı: ${msg}`, 'error');
+          return;
+        }
         if (!newIz?.id) { addToast('İş izni oluşturulurken hata oluştu.', 'error'); return; }
         if (formEvraklar.length > 0) {
           const izinTuruSlug = normalizeSlug(form.tip);
           setUploadProgress({ done: 0, total: formEvraklar.length });
+          let uploadHata = 0;
           for (let i = 0; i < formEvraklar.length; i++) {
             const file = formEvraklar[i];
             const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${newIz.id}_${Date.now()}_${file.name}`;
-            await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+            const { error: uploadErr } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+            if (uploadErr) {
+              console.error('[ISG] Evrak upload error:', uploadErr);
+              uploadHata++;
+            }
             setUploadProgress({ done: i + 1, total: formEvraklar.length });
+          }
+          if (uploadHata > 0) {
+            addToast(`${uploadHata} evrak yüklenemedi. Lütfen tekrar deneyin.`, 'error');
           }
         }
         setFormEvraklar([]);
@@ -661,14 +689,19 @@ export default function IsIzniPage() {
 
   // Denetçi: UYGUN
   const handleUygun = async (iz: IsIzni) => {
-    await updateIsIzni(iz.id, {
-      durum: 'Onaylandı',
-      sahaNotu: 'Sahada uygundur',
-      onaylayanKisi: currentUser.ad,
-      onayTarihi: new Date().toISOString().split('T')[0],
-    } as Partial<IsIzni>);
-    addToast('İş izni onaylandı.', 'success');
-    setDenetciRecordId(null);
+    try {
+      await updateIsIzni(iz.id, {
+        durum: 'Onaylandı',
+        sahaNotu: 'Sahada uygundur',
+        onaylayanKisi: currentUser.ad,
+        onayTarihi: new Date().toISOString().split('T')[0],
+      } as Partial<IsIzni>);
+      addToast('İş izni onaylandı.', 'success');
+      setDenetciRecordId(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Onay kaydedilemedi: ${msg}`, 'error');
+    }
   };
 
   // Denetçi: UYGUN DEĞİL
@@ -678,22 +711,28 @@ export default function IsIzniPage() {
     if (foto && orgId !== 'unknown') {
       const izinTuruSlug = normalizeSlug(iz.tip);
       const path = `${orgId}/is-izni-evrak/${iz.firmaId}/${izinTuruSlug}/${iz.id}_red_${Date.now()}_${foto.name}`;
-      const { data: uploadData } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
+      const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
+      if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr);
       if (uploadData?.path) {
         const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(uploadData.path);
         redFotoUrl = urlData?.publicUrl;
       }
     }
-    await updateIsIzni(iz.id, {
-      durum: 'Reddedildi',
-      sahaNotu: not,
-      reddedenKisi: currentUser.ad,
-      reddetmeTarihi: new Date().toISOString().split('T')[0],
-      ...(redFotoUrl ? { redFotoUrl } : {}),
-    } as Partial<IsIzni>);
-    isIzniBildirimi(iz.izinNo, iz.id, 'reddedildi', not);
-    addToast('İş izni reddedildi.', 'error');
-    setDenetciRecordId(null);
+    try {
+      await updateIsIzni(iz.id, {
+        durum: 'Reddedildi',
+        sahaNotu: not,
+        reddedenKisi: currentUser.ad,
+        reddetmeTarihi: new Date().toISOString().split('T')[0],
+        ...(redFotoUrl ? { redFotoUrl } : {}),
+      } as Partial<IsIzni>);
+      isIzniBildirimi(iz.izinNo, iz.id, 'reddedildi', not);
+      addToast('İş izni reddedildi.', 'error');
+      setDenetciRecordId(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Red kaydedilemedi: ${msg}`, 'error');
+    }
   };
 
   const inp = 'isg-input w-full';
