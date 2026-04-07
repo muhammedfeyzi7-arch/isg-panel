@@ -170,7 +170,7 @@ interface DenetciModalProps {
   firma: string;
   orgId: string;
   onClose: () => void;
-  onUygun: () => void;
+  onUygun: () => Promise<void>;
   onUygunDegil: (not: string, foto?: File) => Promise<void>;
 }
 
@@ -447,8 +447,9 @@ export default function IsIzniPage() {
   const viewRecord = viewRecordId ? (isIzinleri.find(i => i.id === viewRecordId) ?? null) : null;
   const denetciRecord = denetciRecordId ? (isIzinleri.find(i => i.id === denetciRecordId) ?? null) : null;
   const [form, setForm] = useState({ ...emptyForm });
-  const [formEvrak, setFormEvrak] = useState<File | null>(null);
+  const [formEvraklar, setFormEvraklar] = useState<File[]>([]);
   const [formEvrakUploading, setFormEvrakUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [evrakRefresh, setEvrakRefresh] = useState(0);
   const submittingRef = useRef<boolean>(false);
@@ -460,7 +461,7 @@ export default function IsIzniPage() {
     if (quickCreate === 'is-izinleri') {
       setEditId(null);
       setForm({ ...emptyForm });
-      setFormEvrak(null);
+      setFormEvraklar([]);
       setShowModal(true);
       setQuickCreate(null);
     }
@@ -499,13 +500,13 @@ export default function IsIzniPage() {
   const openAdd = () => {
     setEditId(null);
     setForm({ ...emptyForm });
-    setFormEvrak(null);
+    setFormEvraklar([]);
     setShowModal(true);
   };
 
   const openEdit = (iz: IsIzni) => {
     setEditId(iz.id);
-    setFormEvrak(null);
+    setFormEvraklar([]);
     setForm({
       tip: iz.tip,
       firmaId: iz.firmaId,
@@ -516,11 +517,27 @@ export default function IsIzniPage() {
     setShowModal(true);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setFormEvraklar(prev => {
+      const existing = new Set(prev.map(f => f.name));
+      const newFiles = files.filter(f => !existing.has(f.name));
+      return [...prev, ...newFiles];
+    });
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  };
+
+  const removeEvrak = (index: number) => {
+    setFormEvraklar(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSave = async () => {
     if (!form.firmaId) { addToast('Firma seçimi zorunludur.', 'error'); return; }
     if (!form.baslamaTarihi) { addToast('Başlangıç tarihi zorunludur.', 'error'); return; }
     if (!form.bitisTarihi) { addToast('Bitiş tarihi zorunludur.', 'error'); return; }
-    if (!editId && !formEvrak) { addToast('En az bir evrak yüklemeniz zorunludur.', 'error'); return; }
+    if (!editId && formEvraklar.length === 0) { addToast('En az bir evrak yüklemeniz zorunludur.', 'error'); return; }
     if (submittingRef.current) return;
     submittingRef.current = true;
     setFormEvrakUploading(true);
@@ -529,7 +546,7 @@ export default function IsIzniPage() {
 
     try {
       if (editId) {
-        updateIsIzni(editId, {
+        await updateIsIzni(editId, {
           tip: form.tip,
           firmaId: form.firmaId,
           aciklama: form.aciklama,
@@ -538,14 +555,20 @@ export default function IsIzniPage() {
           // Reddedilmişse tekrar onay bekleyene al
           durum: 'Onay Bekliyor',
         } as Partial<IsIzni>);
-        if (formEvrak) {
+        if (formEvraklar.length > 0) {
           const izinTuruSlug = form.tip.replace(/\s+/g, '-');
-          const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${editId}_${Date.now()}_${formEvrak.name}`;
-          await supabase.storage.from('uploads').upload(path, formEvrak, { upsert: true });
+          setUploadProgress({ done: 0, total: formEvraklar.length });
+          for (let i = 0; i < formEvraklar.length; i++) {
+            const file = formEvraklar[i];
+            const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${editId}_${Date.now()}_${file.name}`;
+            await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+            setUploadProgress({ done: i + 1, total: formEvraklar.length });
+          }
         }
         addToast('İş izni güncellendi ve tekrar onaya gönderildi.', 'success');
         setShowModal(false);
-        setFormEvrak(null);
+        setFormEvraklar([]);
+        setUploadProgress(null);
         setEvrakRefresh(p => p + 1);
       } else {
         const saveData = {
@@ -570,18 +593,25 @@ export default function IsIzniPage() {
         };
         const newIz = await addIsIzni(saveData as Omit<IsIzni, 'id' | 'izinNo' | 'olusturmaTarihi' | 'guncellemeTarihi'>);
         if (!newIz?.id) { addToast('İş izni oluşturulurken hata oluştu.', 'error'); return; }
-        if (formEvrak) {
+        if (formEvraklar.length > 0) {
           const izinTuruSlug = form.tip.replace(/\s+/g, '-');
-          const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${newIz.id}_${Date.now()}_${formEvrak.name}`;
-          await supabase.storage.from('uploads').upload(path, formEvrak, { upsert: true });
+          setUploadProgress({ done: 0, total: formEvraklar.length });
+          for (let i = 0; i < formEvraklar.length; i++) {
+            const file = formEvraklar[i];
+            const path = `${orgId}/is-izni-evrak/${form.firmaId}/${izinTuruSlug}/${newIz.id}_${Date.now()}_${file.name}`;
+            await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+            setUploadProgress({ done: i + 1, total: formEvraklar.length });
+          }
         }
-        setFormEvrak(null);
+        setFormEvraklar([]);
+        setUploadProgress(null);
         setShowModal(false);
         addToast('İş izni oluşturuldu ve sahaya gönderildi.', 'success');
       }
     } finally {
       submittingRef.current = false;
       setFormEvrakUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -593,8 +623,8 @@ export default function IsIzniPage() {
   };
 
   // Denetçi: UYGUN
-  const handleUygun = (iz: IsIzni) => {
-    updateIsIzni(iz.id, {
+  const handleUygun = async (iz: IsIzni) => {
+    await updateIsIzni(iz.id, {
       durum: 'Onaylandı',
       sahaNotu: 'Sahada uygundur',
       onaylayanKisi: currentUser.ad,
@@ -617,7 +647,7 @@ export default function IsIzniPage() {
         redFotoUrl = urlData?.publicUrl;
       }
     }
-    updateIsIzni(iz.id, {
+    await updateIsIzni(iz.id, {
       durum: 'Reddedildi',
       sahaNotu: not,
       reddedenKisi: currentUser.ad,
@@ -891,7 +921,7 @@ export default function IsIzniPage() {
             <button onClick={() => setShowModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
             <button onClick={() => void handleSave()} disabled={formEvrakUploading} className="btn-primary whitespace-nowrap">
               {formEvrakUploading
-                ? <><i className="ri-loader-4-line animate-spin mr-1" />Kaydediliyor...</>
+                ? <><i className="ri-loader-4-line animate-spin mr-1" />{uploadProgress ? `Yükleniyor ${uploadProgress.done}/${uploadProgress.total}...` : 'Kaydediliyor...'}</>
                 : <><i className={editId ? 'ri-refresh-line' : 'ri-send-plane-line'} /> {editId ? 'Güncelle ve Tekrar Gönder' : 'Kaydet ve Sahaya Gönder'}</>
               }
             </button>
@@ -961,37 +991,102 @@ export default function IsIzniPage() {
             </div>
           </div>
 
-          {/* Evrak yükleme */}
+          {/* Çoklu Evrak Yükleme */}
           <div>
-            <label className="form-label">
-              Evrak Yükle {!editId && <span style={{ color: '#EF4444' }}>*</span>}
-              {editId && <span className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>(opsiyonel — yeni evrak eklemek için)</span>}
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="form-label mb-0">
+                Evrak Yükle {!editId && <span style={{ color: '#EF4444' }}>*</span>}
+                {editId && <span className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>(opsiyonel)</span>}
+              </label>
+              {formEvraklar.length > 0 && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(96,165,250,0.12)', color: '#60A5FA' }}>
+                  {formEvraklar.length} dosya seçildi
+                </span>
+              )}
+            </div>
+
             <input
               ref={evrakInputRef}
               type="file"
               accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+              multiple
               className="hidden"
-              onChange={e => setFormEvrak(e.target.files?.[0] ?? null)}
+              onChange={handleFileSelect}
             />
-            {formEvrak ? (
-              <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                <i className="ri-file-line text-sm" style={{ color: '#60A5FA' }} />
-                <span className="text-xs flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{formEvrak.name}</span>
-                <button onClick={() => setFormEvrak(null)} className="w-6 h-6 flex items-center justify-center rounded cursor-pointer" style={{ color: '#EF4444' }}>
-                  <i className="ri-close-line text-xs" />
-                </button>
+
+            {/* Seçili dosyalar listesi */}
+            {formEvraklar.length > 0 && (
+              <div className="space-y-1.5 mb-2">
+                {formEvraklar.map((file, index) => {
+                  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+                  const isPdf = ext === 'pdf';
+                  const isImg = ['jpg','jpeg','png','gif','webp'].includes(ext);
+                  const isWord = ['doc','docx'].includes(ext);
+                  const isExcel = ['xls','xlsx'].includes(ext);
+                  const iconColor = isPdf ? '#EF4444' : isImg ? '#F59E0B' : isWord ? '#60A5FA' : isExcel ? '#34D399' : '#94A3B8';
+                  const iconClass = isPdf ? 'ri-file-pdf-line' : isImg ? 'ri-image-line' : isWord ? 'ri-file-word-line' : isExcel ? 'ri-file-excel-line' : 'ri-file-line';
+                  const sizeKb = (file.size / 1024).toFixed(0);
+                  const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+                  const sizeStr = file.size > 1024 * 1024 ? `${sizeMb} MB` : `${sizeKb} KB`;
+                  return (
+                    <div key={index} className="flex items-center gap-3 px-3 py-2 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                      <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${iconColor}15` }}>
+                        <i className={`${iconClass} text-xs`} style={{ color: iconColor }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{file.name}</p>
+                        <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{sizeStr}</p>
+                      </div>
+                      <button
+                        onClick={() => removeEvrak(index)}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
+                        style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}
+                        title="Kaldır"
+                      >
+                        <i className="ri-close-line text-xs" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            ) : (
-              <button
-                onClick={() => evrakInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl cursor-pointer text-sm"
-                style={{ background: 'var(--bg-item)', border: '1px dashed var(--bg-item-border)', color: 'var(--text-muted)' }}
-              >
-                <i className="ri-upload-cloud-2-line text-base" />
-                <span>Dosya seçin veya sürükleyin</span>
-                <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>PDF, Word, Excel, Görsel — maks. 50MB</span>
-              </button>
+            )}
+
+            {/* Upload alanı */}
+            <button
+              onClick={() => evrakInputRef.current?.click()}
+              className="w-full flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl cursor-pointer transition-all duration-150"
+              style={{
+                background: formEvraklar.length > 0 ? 'rgba(96,165,250,0.04)' : 'var(--bg-item)',
+                border: `1px dashed ${formEvraklar.length > 0 ? 'rgba(96,165,250,0.3)' : 'var(--bg-item-border)'}`,
+                color: 'var(--text-muted)',
+              }}
+            >
+              <i className="ri-upload-cloud-2-line text-xl" style={{ color: formEvraklar.length > 0 ? '#60A5FA' : 'var(--text-muted)' }} />
+              <span className="text-xs font-medium" style={{ color: formEvraklar.length > 0 ? '#60A5FA' : 'var(--text-muted)' }}>
+                {formEvraklar.length > 0 ? 'Daha fazla dosya ekle' : 'Dosya seçin veya sürükleyin'}
+              </span>
+              <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>PDF, Word, Excel, Görsel — maks. 50MB · Çoklu seçim desteklenir</span>
+            </button>
+
+            {/* Upload progress */}
+            {uploadProgress && (
+              <div className="mt-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] font-semibold" style={{ color: '#60A5FA' }}>
+                    <i className="ri-loader-4-line animate-spin mr-1" />
+                    Yükleniyor... {uploadProgress.done}/{uploadProgress.total}
+                  </span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    {Math.round((uploadProgress.done / uploadProgress.total) * 100)}%
+                  </span>
+                </div>
+                <div className="w-full rounded-full overflow-hidden" style={{ height: '4px', background: 'rgba(96,165,250,0.15)' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${(uploadProgress.done / uploadProgress.total) * 100}%`, background: '#60A5FA' }}
+                  />
+                </div>
+              </div>
             )}
           </div>
         </div>

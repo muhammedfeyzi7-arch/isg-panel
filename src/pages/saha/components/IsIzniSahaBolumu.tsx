@@ -139,7 +139,7 @@ interface DegerlendirmeModalProps {
   firmaAd: string;
   orgId: string;
   onClose: () => void;
-  onUygun: () => void;
+  onUygun: () => Promise<void>;
   onUygunDegil: (not: string, foto?: File) => Promise<void>;
 }
 
@@ -152,9 +152,9 @@ function DegerlendirmeModal({ izin, firmaAd, orgId, onClose, onUygun, onUygunDeg
 
   const expired = izin.bitisTarihi ? new Date(izin.bitisTarihi) < new Date() : false;
 
-  const handleUygun = () => {
+  const handleUygun = async () => {
     setSubmitting(true);
-    onUygun();
+    await onUygun();
   };
 
   const handleUygunDegil = async () => {
@@ -429,8 +429,8 @@ export default function IsIzniSahaBolumu() {
     return end < new Date();
   };
 
-  const handleUygun = (izin: IsIzni) => {
-    updateIsIzni(izin.id, {
+  const handleUygun = async (izin: IsIzni) => {
+    await updateIsIzni(izin.id, {
       durum: 'Onaylandı',
       sahaNotu: 'Sahada uygundur',
       onaylayanKisi: currentUser.ad,
@@ -453,7 +453,7 @@ export default function IsIzniSahaBolumu() {
         redFotoUrl = urlData?.publicUrl;
       }
     }
-    updateIsIzni(izin.id, {
+    await updateIsIzni(izin.id, {
       durum: 'Reddedildi',
       sahaNotu: not,
       reddedenKisi: currentUser.ad,

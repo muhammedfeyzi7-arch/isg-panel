@@ -232,7 +232,7 @@ export function useStore(
   }, []);
 
   // ── DB write helpers ──
-  const saveToDb = useCallback(async (table: string, item: { id: string } & Record<string, unknown>) => {
+  const saveToDb = useCallback(async (table: string, item: { id: string } & Record<string, unknown>): Promise<void> => {
     const orgId = orgIdRef.current;
     const uid = userIdRef.current;
     if (!orgId || !uid) {
@@ -246,6 +246,7 @@ export function useStore(
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[ISG] SAVE FAILED ${table}/${item.id}:`, msg);
       onSaveErrorRef.current?.(`Kayıt hatası (${table}): ${msg}`);
+      throw err; // Re-throw so callers can handle
     }
   }, []);
 
@@ -1118,19 +1119,22 @@ export function useStore(
     const izinNo = rpcNo ?? generateIsIzniNo(isIzRef.current);
     const newIz: IsIzni = { ...iz, id, izinNo, olusturmaTarihi: now, guncellemeTarihi: now };
     setIsIzinleri(prev => [newIz, ...prev]);
-    saveToDb('is_izinleri', newIz as unknown as { id: string } & Record<string, unknown>);
+    // DB'ye yazılmasını bekle — evrak yükleme bu tamamlanmadan yapılmamalı
+    await saveToDb('is_izinleri', newIz as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('is_izni_created', 'İş İzinleri', id, izinNo, `${izinNo} iş izni oluşturuldu.`);
     return newIz;
   }, [setIsIzinleri, saveToDb]);
 
-  const updateIsIzni = useCallback((id: string, updates: Partial<IsIzni>) => {
+  const updateIsIzni = useCallback(async (id: string, updates: Partial<IsIzni>): Promise<void> => {
     let updated: IsIzni | null = null;
     setIsIzinleri(prev => prev.map(iz => {
       if (iz.id !== id) return iz;
       updated = { ...iz, ...updates, guncellemeTarihi: new Date().toISOString() };
       return updated;
     }));
-    if (updated) saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) {
+      await saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>);
+    }
     logFnRef.current?.('is_izni_updated', 'İş İzinleri', id, updates.izinNo, 'İş izni güncellendi.');
   }, [setIsIzinleri, saveToDb]);
 
