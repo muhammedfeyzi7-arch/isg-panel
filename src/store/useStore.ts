@@ -1146,10 +1146,26 @@ export function useStore(
       return updated;
     }));
     if (updated) {
+      const now = new Date().toISOString();
       try {
-        await saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>, true);
+        // Direkt UPDATE kullan — denetci INSERT yapamaz ama UPDATE yapabilir
+        const { error } = await supabase
+          .from('is_izinleri')
+          .update({ data: updated, updated_at: now })
+          .eq('id', id);
+        if (error) {
+          const errMsg = error.message || error.details || JSON.stringify(error);
+          console.error('[ISG] updateIsIzni DB error:', errMsg, error);
+          if (snapshot) {
+            setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
+          }
+          if (errMsg.includes('row-level security') || errMsg.includes('RLS') || errMsg.includes('policy')) {
+            throw new Error(`Yetki hatası: Bu işlem için yetkiniz yok. (${errMsg})`);
+          }
+          throw new Error(errMsg);
+        }
+        console.log(`[ISG] updateIsIzni OK: ${id}`);
       } catch (err) {
-        // Rollback optimistic update on failure
         if (snapshot) {
           setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
         }
@@ -1157,7 +1173,7 @@ export function useStore(
       }
     }
     logFnRef.current?.('is_izni_updated', 'İş İzinleri', id, updates.izinNo, 'İş izni güncellendi.');
-  }, [setIsIzinleri, saveToDb]);
+  }, [setIsIzinleri]);
 
   const deleteIsIzni = useCallback((id: string) => {
     const now = new Date().toISOString();

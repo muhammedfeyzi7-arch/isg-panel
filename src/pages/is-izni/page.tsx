@@ -579,7 +579,13 @@ export default function IsIzniPage() {
     submittingRef.current = true;
     setFormEvrakUploading(true);
 
-    const orgId = org?.id ?? 'unknown';
+    const orgId = org?.id;
+    if (!orgId) {
+      addToast('Organizasyon bilgisi yüklenemedi. Sayfayı yenileyip tekrar deneyin.', 'error');
+      submittingRef.current = false;
+      setFormEvrakUploading(false);
+      return;
+    }
 
     try {
       if (editId) {
