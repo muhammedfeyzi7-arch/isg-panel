@@ -271,6 +271,7 @@ async function handleRequest(
     }
 
     const normalizedEmail = newEmail.toLowerCase().trim();
+    const assignedRole = normalizeRole(role);
 
     const { data: existingMember } = await adminClient
       .from('user_organizations')
@@ -298,6 +299,21 @@ async function handleRequest(
 
     if (existingAuthUser) {
       newUserId = existingAuthUser.id;
+
+      // Mevcut kullanıcının metadata'sını güncelle (org ve rol bilgisi için)
+      try {
+        await adminClient.auth.admin.updateUserById(newUserId, {
+          user_metadata: {
+            ...(existingAuthUser.user_metadata ?? {}),
+            full_name: display_name,
+            organization_id: orgId,
+            role: assignedRole,
+            admin_created: true,
+          },
+        });
+      } catch (e) {
+        console.warn('[CREATE] Could not update existing user metadata:', e);
+      }
     } else {
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email: normalizedEmail,
@@ -306,7 +322,9 @@ async function handleRequest(
         user_metadata: {
           full_name: display_name,
           admin_created: true,
+          // Org ve rol bilgisini metadata'ya yaz — setup-organization bu bilgiyi kullanır
           organization_id: orgId,
+          role: assignedRole,
         },
       });
 
@@ -342,7 +360,7 @@ async function handleRequest(
       .insert({
         user_id: newUserId,
         organization_id: orgId,
-        role: normalizeRole(role),
+        role: assignedRole,
         display_name,
         email: normalizedEmail,
         is_active: true,
@@ -365,9 +383,9 @@ async function handleRequest(
     }
 
     // Profiles kaydını güvenli şekilde oluştur (tour_completed: false ile)
-    await ensureProfileRecord(adminClient, newUserId, normalizeRole(role));
+    await ensureProfileRecord(adminClient, newUserId, assignedRole);
 
-    const roleLabel = getRoleLabel(normalizeRole(role));
+    const roleLabel = getRoleLabel(assignedRole);
     await logActivity(
       'user_created',
       'Kullanıcı Yönetimi',
@@ -439,6 +457,23 @@ async function handleRequest(
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Rol değiştiğinde auth metadata'yı da güncelle
+    if (role !== undefined) {
+      try {
+        const { data: authUserData } = await adminClient.auth.admin.getUserById(target_user_id);
+        if (authUserData?.user) {
+          await adminClient.auth.admin.updateUserById(target_user_id, {
+            user_metadata: {
+              ...(authUserData.user.user_metadata ?? {}),
+              role: normalizeRole(role),
+            },
+          });
+        }
+      } catch (e) {
+        console.warn('[UPDATE] Could not update user metadata role:', e);
+      }
     }
 
     const memberName = targetCheck.display_name || targetCheck.email || target_user_id;

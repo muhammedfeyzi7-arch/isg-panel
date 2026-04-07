@@ -10,6 +10,8 @@ interface Props {
   disabled?: boolean;
   /** Storage path prefix, e.g. "dof" or "kapatma" */
   pathPrefix?: string;
+  /** Kamera çekimi desteği */
+  capture?: 'environment' | 'user' | boolean;
 }
 
 export default function ImageUpload({
@@ -19,6 +21,7 @@ export default function ImageUpload({
   accept = 'image/jpeg,image/jpg,image/png,image/webp',
   disabled,
   pathPrefix = 'dof',
+  capture = 'environment',
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -105,6 +108,9 @@ export default function ImageUpload({
   const hasImage = !!previewUrl;
   const isStoragePath = value && !value.startsWith('data:') && !value.startsWith('http');
 
+  // Kamera çekimi için capture attribute
+  const captureAttr = capture === true ? 'environment' : capture || undefined;
+
   return (
     <div className="space-y-2">
       <label className="form-label">{label}</label>
@@ -149,27 +155,53 @@ export default function ImageUpload({
           </div>
         </div>
       ) : (
-        <div
-          onClick={() => !disabled && inputRef.current?.click()}
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
-          className="flex flex-col items-center justify-center gap-2 rounded-xl transition-all"
-          style={{
-            border: '2px dashed rgba(100,116,139,0.3)',
-            minHeight: '120px',
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            opacity: disabled ? 0.5 : 1,
-            background: 'rgba(15,23,42,0.3)',
-          }}
-        >
+        <div className="grid grid-cols-2 gap-2">
+          {/* Dosya Seç */}
           <div
-            className="w-10 h-10 flex items-center justify-center rounded-xl"
-            style={{ background: 'rgba(100,116,139,0.1)' }}
+            onClick={() => !disabled && inputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            className="flex flex-col items-center justify-center gap-2 rounded-xl transition-all"
+            style={{
+              border: '2px dashed rgba(100,116,139,0.3)',
+              minHeight: '120px',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.5 : 1,
+              background: 'rgba(15,23,42,0.3)',
+            }}
           >
-            <i className="ri-upload-cloud-2-line text-xl" style={{ color: '#64748B' }} />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(100,116,139,0.1)' }}>
+              <i className="ri-upload-cloud-2-line text-xl" style={{ color: '#64748B' }} />
+            </div>
+            <p className="text-sm font-medium" style={{ color: '#94A3B8' }}>Galeriden Seç</p>
+            <p className="text-xs" style={{ color: '#475569' }}>JPG, PNG — Maks. 8MB</p>
           </div>
-          <p className="text-sm font-medium" style={{ color: '#94A3B8' }}>Fotoğraf yüklemek için tıklayın</p>
-          <p className="text-xs" style={{ color: '#475569' }}>JPG, PNG, WEBP — Maks. 8MB — Buluta yüklenir</p>
+
+          {/* Kamera */}
+          <label
+            className="flex flex-col items-center justify-center gap-2 rounded-xl transition-all"
+            style={{
+              border: '2px dashed rgba(52,211,153,0.3)',
+              minHeight: '120px',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.5 : 1,
+              background: 'rgba(52,211,153,0.06)',
+            }}
+          >
+            <input
+              type="file"
+              accept={accept}
+              capture={captureAttr}
+              onChange={handleChange}
+              disabled={disabled}
+              className="hidden"
+            />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(52,211,153,0.12)' }}>
+              <i className="ri-camera-line text-xl" style={{ color: '#34D399' }} />
+            </div>
+            <p className="text-sm font-medium" style={{ color: '#34D399' }}>Kamera Çek</p>
+            <p className="text-xs" style={{ color: '#475569' }}>Fotoğraf çek</p>
+          </label>
         </div>
       )}
       <input

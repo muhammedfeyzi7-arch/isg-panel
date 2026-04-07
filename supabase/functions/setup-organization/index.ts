@@ -15,23 +15,37 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
 async function ensureProfileRecord(
   supabase: ReturnType<typeof createClient>,
   userId: string,
+  role?: string,
 ): Promise<void> {
   try {
     const { data: existing } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, tour_completed')
       .eq('user_id', userId)
       .maybeSingle();
 
     if (!existing?.id) {
       await supabase
         .from('profiles')
-        .insert({ user_id: userId, tour_completed: false });
+        .insert({ user_id: userId, tour_completed: false, ...(role ? { role } : {}) });
+    } else if (role) {
+      // Rol güncelle ama tour_completed'a dokunma
+      await supabase
+        .from('profiles')
+        .update({ role })
+        .eq('user_id', userId);
     }
-    // Kayıt zaten varsa dokunma — tour_completed değerini koru
+    // Kayıt zaten varsa ve rol yoksa dokunma — tour_completed değerini koru
   } catch (err) {
     console.warn('[ensureProfileRecord] Failed:', err);
   }
+}
+
+const VALID_ROLES = ['admin', 'denetci', 'member'];
+
+function normalizeRole(role: unknown): string {
+  if (typeof role === 'string' && VALID_ROLES.includes(role)) return role;
+  return 'admin';
 }
 
 Deno.serve(async (req) => {
@@ -90,6 +104,8 @@ Deno.serve(async (req) => {
   // ── Fetch full auth user to get latest metadata (handles manually created users) ──
   let resolvedEmail = userEmail ?? '';
   let resolvedDisplayName = (userMetadata?.full_name as string | undefined) ?? '';
+  let metaOrgId = (userMetadata?.organization_id as string | undefined) ?? '';
+  let metaRole = (userMetadata?.role as string | undefined) ?? '';
 
   try {
     const { data: authUserData } = await supabase.auth.admin.getUserById(userId);
@@ -101,6 +117,13 @@ Deno.serve(async (req) => {
       }
       if (!resolvedDisplayName && meta.name) {
         resolvedDisplayName = String(meta.name);
+      }
+      // Metadata'dan org ve rol bilgisini al (admin tarafından oluşturulan kullanıcılar için)
+      if (!metaOrgId && meta.organization_id) {
+        metaOrgId = String(meta.organization_id);
+      }
+      if (!metaRole && meta.role) {
+        metaRole = String(meta.role);
       }
     }
   } catch (e) {
@@ -163,7 +186,89 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ── No active org found — create one automatically ──
+    // ── No active org found ──
+    // Eğer kullanıcı metadata'sında organization_id varsa (Supabase Dashboard'dan eklendi)
+    // o org'a belirtilen rolle ekle
+    if (metaOrgId) {
+      console.log(`[setup-org] User ${userId} has metadata org_id=${metaOrgId}, role=${metaRole} — joining existing org`);
+
+      // Org'un var olduğunu doğrula
+      const { data: targetOrg } = await supabase
+        .from('organizations')
+        .select('id, name, invite_code')
+        .eq('id', metaOrgId)
+        .maybeSingle();
+
+      if (targetOrg) {
+        const assignedRole = normalizeRole(metaRole || 'member');
+
+        // Pasif kayıt var mı kontrol et
+        const { data: inactiveMembership } = await supabase
+          .from('user_organizations')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('organization_id', metaOrgId)
+          .maybeSingle();
+
+        if (inactiveMembership) {
+          // Pasif kaydı aktif et ve rolü güncelle
+          await supabase
+            .from('user_organizations')
+            .update({
+              is_active: true,
+              role: assignedRole,
+              display_name: user.display_name,
+              email: user.email,
+            })
+            .eq('user_id', user.id)
+            .eq('organization_id', metaOrgId);
+        } else {
+          // Yeni kayıt ekle
+          const { error: memberError } = await supabase
+            .from('user_organizations')
+            .insert({
+              user_id: user.id,
+              organization_id: metaOrgId,
+              role: assignedRole,
+              display_name: user.display_name,
+              email: user.email,
+              is_active: true,
+              must_change_password: true,
+            });
+
+          if (memberError && memberError.code !== '23505') {
+            console.error('[setup-org] Member insert to existing org failed:', memberError.message);
+          }
+        }
+
+        await ensureProfileRecord(supabase, user.id, assignedRole);
+
+        // Metadata'dan organization_id ve role'ü temizle (güvenlik için)
+        try {
+          await supabase.auth.admin.updateUserById(user.id, {
+            user_metadata: {
+              ...((await supabase.auth.admin.getUserById(user.id)).data?.user?.user_metadata ?? {}),
+              organization_id: null,
+              role: null,
+            },
+          });
+        } catch (e) {
+          console.warn('[setup-org] Could not clear metadata:', e);
+        }
+
+        return new Response(JSON.stringify({
+          organization: targetOrg,
+          role: assignedRole,
+          is_active: true,
+          must_change_password: true,
+          display_name: user.display_name,
+          email: user.email,
+          created: false,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // ── No org found and no metadata org — create one automatically (self-registered user) ──
     console.log(`[setup-org] No org found for user ${userId} — creating new org automatically`);
 
     // Org name: prefer display name, fallback to email prefix

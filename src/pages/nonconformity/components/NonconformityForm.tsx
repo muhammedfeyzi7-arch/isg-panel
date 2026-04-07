@@ -269,6 +269,7 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
               label="Açılış Fotoğrafı"
               value={form.acilisFoto}
               onChange={v => setForm(p => ({ ...p, acilisFoto: v }))}
+              capture="environment"
             />
           </div>
         </div>
