@@ -48,6 +48,7 @@ interface EvrakDosya {
   id: string;
   updated_at: string;
   metadata?: { size?: number; mimetype?: string };
+  _slug?: string;
 }
 
 function IsIzniEvraklari({ izinId, orgId, firmaId, izinTuru, onRefresh }: {
@@ -91,8 +92,10 @@ function IsIzniEvraklari({ izinId, orgId, firmaId, izinTuru, onRefresh }: {
           .from('uploads')
           .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
         if (!error && data && data.length > 0) {
-          const filtered = data.filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'));
-          allFiles = [...allFiles, ...(filtered as EvrakDosya[])];
+          const filtered = data
+            .filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'))
+            .map(f => ({ ...f, _slug: slug } as EvrakDosya));
+          allFiles = [...allFiles, ...filtered];
         }
       }
       // Deduplicate by name
@@ -109,8 +112,8 @@ function IsIzniEvraklari({ izinId, orgId, firmaId, izinTuru, onRefresh }: {
 
   const handleAc = async (dosya: EvrakDosya) => {
     setAcikDosya(dosya.name);
-    const prefix = `${orgId}/is-izni-evrak/${firmaId}/${izinTuruSlug}`;
-    const filePath = `${prefix}/${dosya.name}`;
+    const slug = dosya._slug ?? izinTuruSlug;
+    const filePath = `${orgId}/is-izni-evrak/${firmaId}/${slug}/${dosya.name}`;
     const url = await getSignedUrl(filePath);
     if (url) window.open(url, '_blank');
     setAcikDosya(null);
@@ -783,8 +786,8 @@ export default function IsIzniPage() {
       const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true, contentType: redMime });
       if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr.message, uploadErr.statusCode, JSON.stringify(uploadErr));
       if (uploadData?.path) {
-        const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(uploadData.path);
-        redFotoUrl = urlData?.publicUrl;
+        const { data: signedData } = await supabase.storage.from('uploads').createSignedUrl(uploadData.path, 86400 * 365);
+        redFotoUrl = signedData?.signedUrl;
       }
     }
     try {

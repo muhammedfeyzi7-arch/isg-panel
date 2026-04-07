@@ -18,6 +18,7 @@ interface EvrakDosya {
   id: string;
   updated_at: string;
   metadata?: { size?: number };
+  _slug?: string;
 }
 
 function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
@@ -53,8 +54,10 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
           .from('uploads')
           .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
         if (!error && data && data.length > 0) {
-          const filtered = data.filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'));
-          allFiles = [...allFiles, ...(filtered as EvrakDosya[])];
+          const filtered = data
+            .filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'))
+            .map(f => ({ ...f, _slug: slug } as EvrakDosya));
+          allFiles = [...allFiles, ...filtered];
         }
       }
       const seen = new Set<string>();
@@ -68,12 +71,15 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
 
   useEffect(() => { void fetchDosyalar(); }, [fetchDosyalar]);
 
-  const handleAc = async (dosya: EvrakDosya) => {
+  const handleAc = async (dosya: EvrakDosya, usedSlug: string) => {
     setAcikDosya(dosya.name);
-    const prefix = `${orgId}/is-izni-evrak/${firmaId}/${izinTuruSlug}`;
-    const filePath = `${prefix}/${dosya.name}`;
+    const filePath = `${orgId}/is-izni-evrak/${firmaId}/${usedSlug}/${dosya.name}`;
     const url = await getSignedUrl(filePath);
-    if (url) window.open(url, '_blank');
+    if (url) {
+      window.open(url, '_blank');
+    } else {
+      console.error('[ISG] Signed URL alınamadı:', filePath);
+    }
     setAcikDosya(null);
   };
 
@@ -130,7 +136,7 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
               )}
             </div>
             <button
-              onClick={() => void handleAc(dosya)}
+              onClick={() => void handleAc(dosya, dosya._slug ?? izinTuruSlug)}
               disabled={isLoading}
               className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
               style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }}
@@ -499,8 +505,8 @@ export default function IsIzniSahaBolumu() {
       const { data: uploadData, error: uploadErr } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true, contentType: redMime });
       if (uploadErr) console.error('[ISG] Red foto upload error:', uploadErr.message, uploadErr.statusCode, JSON.stringify(uploadErr));
       if (uploadData?.path) {
-        const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(uploadData.path);
-        redFotoUrl = urlData?.publicUrl;
+        const { data: signedData } = await supabase.storage.from('uploads').createSignedUrl(uploadData.path, 86400 * 365);
+        redFotoUrl = signedData?.signedUrl;
       }
     }
     try {
