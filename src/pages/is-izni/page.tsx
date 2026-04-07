@@ -171,7 +171,7 @@ interface DenetciModalProps {
   orgId: string;
   onClose: () => void;
   onUygun: () => void;
-  onUygunDegil: (not: string, foto?: File) => void;
+  onUygunDegil: (not: string, foto?: File) => Promise<void>;
 }
 
 function DenetciDegerlendirmeModal({ izin, firma, orgId, onClose, onUygun, onUygunDegil }: DenetciModalProps) {
@@ -251,23 +251,62 @@ function DenetciDegerlendirmeModal({ izin, firma, orgId, onClose, onUygun, onUyg
         <div className="space-y-4">
           {/* Durum banner */}
           {izin.durum !== 'Onay Bekliyor' && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-              style={{
-                background: DURUM_CONFIG[izin.durum].bg,
-                border: `1px solid ${DURUM_CONFIG[izin.durum].border}`,
-              }}>
-              <i className={`${DURUM_CONFIG[izin.durum].icon} flex-shrink-0`} style={{ color: DURUM_CONFIG[izin.durum].color }} />
-              <div>
-                <p className="text-xs font-bold" style={{ color: DURUM_CONFIG[izin.durum].color }}>{izin.durum}</p>
-                {izin.durum === 'Onaylandı' && izin.onaylayanKisi && (
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {izin.onaylayanKisi} · {izin.onayTarihi ? new Date(izin.onayTarihi).toLocaleDateString('tr-TR') : ''}
-                  </p>
-                )}
-                {izin.durum === 'Reddedildi' && izin.sahaNotu && (
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{izin.sahaNotu}</p>
-                )}
+            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${DURUM_CONFIG[izin.durum].border}` }}>
+              <div className="flex items-center gap-3 px-4 py-3" style={{ background: DURUM_CONFIG[izin.durum].bg }}>
+                <i className={`${DURUM_CONFIG[izin.durum].icon} flex-shrink-0 text-base`} style={{ color: DURUM_CONFIG[izin.durum].color }} />
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: DURUM_CONFIG[izin.durum].color }}>{izin.durum}</p>
+                  {izin.durum === 'Onaylandı' && izin.onaylayanKisi && (
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                        <i className="ri-user-line text-[10px]" />{izin.onaylayanKisi}
+                      </span>
+                      {izin.onayTarihi && (
+                        <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                          <i className="ri-calendar-check-line text-[10px]" />{new Date(izin.onayTarihi).toLocaleDateString('tr-TR')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {izin.durum === 'Reddedildi' && (
+                    <div className="mt-1 space-y-0.5">
+                      {izin.reddedenKisi && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                            <i className="ri-user-line text-[10px]" />{izin.reddedenKisi}
+                          </span>
+                          {izin.reddetmeTarihi && (
+                            <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                              <i className="ri-calendar-close-line text-[10px]" />{new Date(izin.reddetmeTarihi).toLocaleDateString('tr-TR')}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {izin.sahaNotu && (
+                        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                          <i className="ri-chat-1-line mr-1 text-[10px]" />{izin.sahaNotu}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+              {/* Red fotoğrafı */}
+              {izin.durum === 'Reddedildi' && izin.redFotoUrl && (
+                <div className="px-4 py-3" style={{ borderTop: `1px solid ${DURUM_CONFIG[izin.durum].border}`, background: 'rgba(239,68,68,0.04)' }}>
+                  <p className="text-[10px] font-semibold mb-2" style={{ color: '#EF4444' }}>
+                    <i className="ri-camera-line mr-1" />Red Fotoğrafı
+                  </p>
+                  <a href={izin.redFotoUrl} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={izin.redFotoUrl}
+                      alt="Red fotoğrafı"
+                      className="rounded-lg max-h-40 object-cover cursor-pointer"
+                      style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+                    />
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
@@ -391,7 +430,7 @@ const emptyForm = {
 export default function IsIzniPage() {
   const {
     isIzinleri, firmalar, personeller, currentUser,
-    addIsIzni, updateIsIzni, deleteIsIzni, addToast, quickCreate, setQuickCreate, org, refreshData,
+    addIsIzni, updateIsIzni, deleteIsIzni, addToast, quickCreate, setQuickCreate, org, refreshData, isIzniBildirimi,
   } = useApp();
   const { canCreate, canEdit, canDelete, isDenetci } = usePermissions();
 
@@ -566,19 +605,26 @@ export default function IsIzniPage() {
   };
 
   // Denetçi: UYGUN DEĞİL
-  const handleUygunDegil = async (iz: IsIzni, not: string, foto?: File) => {
+  const handleUygunDegil = async (iz: IsIzni, not: string, foto?: File): Promise<void> => {
     const orgId = org?.id ?? 'unknown';
-    if (foto) {
+    let redFotoUrl: string | undefined;
+    if (foto && orgId !== 'unknown') {
       const izinTuruSlug = iz.tip.replace(/\s+/g, '-');
       const path = `${orgId}/is-izni-evrak/${iz.firmaId}/${izinTuruSlug}/${iz.id}_red_${Date.now()}_${foto.name}`;
-      await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
+      const { data: uploadData } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
+      if (uploadData?.path) {
+        const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(uploadData.path);
+        redFotoUrl = urlData?.publicUrl;
+      }
     }
     updateIsIzni(iz.id, {
       durum: 'Reddedildi',
       sahaNotu: not,
       reddedenKisi: currentUser.ad,
       reddetmeTarihi: new Date().toISOString().split('T')[0],
+      ...(redFotoUrl ? { redFotoUrl } : {}),
     } as Partial<IsIzni>);
+    isIzniBildirimi(iz.izinNo, iz.id, 'reddedildi', not);
     addToast('İş izni reddedildi.', 'error');
     setDenetciRecordId(null);
   };
@@ -746,8 +792,30 @@ export default function IsIzniPage() {
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}` }}>
                           <i className={`${dur.icon} text-xs`} />{dur.label}
                         </span>
-                        {iz.durum === 'Reddedildi' && iz.sahaNotu && (
-                          <p className="text-[10px] mt-0.5 truncate max-w-[160px]" style={{ color: '#EF4444' }}>{iz.sahaNotu}</p>
+                        {iz.durum === 'Reddedildi' && (
+                          <div className="mt-1 space-y-0.5">
+                            {iz.reddedenKisi && (
+                              <p className="text-[10px] truncate max-w-[180px]" style={{ color: '#EF4444' }}>
+                                <i className="ri-user-line mr-0.5" />{iz.reddedenKisi}
+                                {iz.reddetmeTarihi && <span style={{ color: '#64748B' }}> · {new Date(iz.reddetmeTarihi).toLocaleDateString('tr-TR')}</span>}
+                              </p>
+                            )}
+                            {iz.sahaNotu && (
+                              <p className="text-[10px] truncate max-w-[180px]" style={{ color: '#94A3B8' }}>
+                                <i className="ri-chat-1-line mr-0.5" />{iz.sahaNotu}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {iz.durum === 'Onaylandı' && (
+                          <div className="mt-1 space-y-0.5">
+                            {iz.onaylayanKisi && (
+                              <p className="text-[10px] truncate max-w-[180px]" style={{ color: '#34D399' }}>
+                                <i className="ri-user-line mr-0.5" />{iz.onaylayanKisi}
+                                {iz.onayTarihi && <span style={{ color: '#64748B' }}> · {new Date(iz.onayTarihi).toLocaleDateString('tr-TR')}</span>}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td>
@@ -954,30 +1022,70 @@ export default function IsIzniPage() {
             {(() => {
               const dur = DURUM_CONFIG[viewRecord.durum];
               return (
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: dur.bg, border: `1px solid ${dur.border}` }}>
-                  <i className={`${dur.icon} flex-shrink-0`} style={{ color: dur.color }} />
-                  <div className="flex-1">
-                    <p className="text-xs font-bold" style={{ color: dur.color }}>{dur.label}</p>
-                    {viewRecord.durum === 'Onaylandı' && viewRecord.onaylayanKisi && (
-                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {viewRecord.onaylayanKisi} · {viewRecord.onayTarihi ? new Date(viewRecord.onayTarihi).toLocaleDateString('tr-TR') : ''}
-                      </p>
-                    )}
-                    {viewRecord.durum === 'Reddedildi' && viewRecord.sahaNotu && (
-                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {viewRecord.sahaNotu}
-                        {viewRecord.reddedenKisi && ` — ${viewRecord.reddedenKisi}`}
-                      </p>
+                <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${dur.border}` }}>
+                  <div className="flex items-center gap-3 px-4 py-3" style={{ background: dur.bg }}>
+                    <i className={`${dur.icon} flex-shrink-0 text-base`} style={{ color: dur.color }} />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold" style={{ color: dur.color }}>{dur.label}</p>
+                      {viewRecord.durum === 'Onaylandı' && viewRecord.onaylayanKisi && (
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                            <i className="ri-user-line text-[10px]" />{viewRecord.onaylayanKisi}
+                          </span>
+                          {viewRecord.onayTarihi && (
+                            <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                              <i className="ri-calendar-check-line text-[10px]" />{new Date(viewRecord.onayTarihi).toLocaleDateString('tr-TR')}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {viewRecord.durum === 'Reddedildi' && (
+                        <div className="mt-1 space-y-0.5">
+                          {viewRecord.reddedenKisi && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                                <i className="ri-user-line text-[10px]" />{viewRecord.reddedenKisi}
+                              </span>
+                              {viewRecord.reddetmeTarihi && (
+                                <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                                  <i className="ri-calendar-close-line text-[10px]" />{new Date(viewRecord.reddetmeTarihi).toLocaleDateString('tr-TR')}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {viewRecord.sahaNotu && (
+                            <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                              <i className="ri-chat-1-line mr-1 text-[10px]" />{viewRecord.sahaNotu}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {viewRecord.durum === 'Reddedildi' && canEdit && (
+                      <button
+                        onClick={() => { setViewRecordId(null); openEdit(viewRecord); }}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap flex-shrink-0"
+                        style={{ background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }}
+                      >
+                        <i className="ri-edit-line mr-1" />Düzenle
+                      </button>
                     )}
                   </div>
-                  {viewRecord.durum === 'Reddedildi' && canEdit && (
-                    <button
-                      onClick={() => { setViewRecordId(null); openEdit(viewRecord); }}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
-                      style={{ background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }}
-                    >
-                      <i className="ri-edit-line mr-1" />Düzenle
-                    </button>
+                  {/* Red fotoğrafı */}
+                  {viewRecord.durum === 'Reddedildi' && viewRecord.redFotoUrl && (
+                    <div className="px-4 py-3" style={{ borderTop: `1px solid ${dur.border}`, background: 'rgba(239,68,68,0.04)' }}>
+                      <p className="text-[10px] font-semibold mb-2" style={{ color: '#EF4444' }}>
+                        <i className="ri-camera-line mr-1" />Red Fotoğrafı
+                      </p>
+                      <a href={viewRecord.redFotoUrl} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={viewRecord.redFotoUrl}
+                          alt="Red fotoğrafı"
+                          className="rounded-lg max-h-40 object-cover cursor-pointer"
+                          style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+                        />
+                      </a>
+                    </div>
                   )}
                 </div>
               );
@@ -1042,7 +1150,7 @@ export default function IsIzniPage() {
           orgId={org?.id ?? 'unknown'}
           onClose={() => setDenetciRecordId(null)}
           onUygun={() => handleUygun(denetciRecord)}
-          onUygunDegil={(not, foto) => void handleUygunDegil(denetciRecord, not, foto)}
+          onUygunDegil={(not, foto) => handleUygunDegil(denetciRecord, not, foto)}
         />
       )}
 

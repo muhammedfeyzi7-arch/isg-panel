@@ -33,6 +33,7 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
   const izinTuruSlug = izinTuru.replace(/\s+/g, '-');
 
   const fetchDosyalar = useCallback(async () => {
+    if (!orgId || orgId === 'unknown') { setDosyalar([]); setYukleniyor(false); return; }
     setYukleniyor(true);
     try {
       const prefix = `${orgId}/is-izni-evrak/${firmaId}/${izinTuruSlug}`;
@@ -40,7 +41,8 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
         .from('uploads')
         .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
       if (error || !data) { setDosyalar([]); return; }
-      const filtered = data.filter(f => f.name.startsWith(izinId));
+      // izinId ile başlayan dosyaları filtrele (red fotoğrafları hariç)
+      const filtered = data.filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'));
       setDosyalar(filtered as EvrakDosya[]);
     } catch {
       setDosyalar([]);
@@ -220,13 +222,62 @@ function DegerlendirmeModal({ izin, firmaAd, orgId, onClose, onUygun, onUygunDeg
         <div className="space-y-4">
           {/* Durum */}
           {izin.durum !== 'Onay Bekliyor' && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-              style={{ background: DURUM_CFG[izin.durum].bg, border: `1px solid ${DURUM_CFG[izin.durum].border}` }}>
-              <i className={`${DURUM_CFG[izin.durum].icon} flex-shrink-0`} style={{ color: DURUM_CFG[izin.durum].color }} />
-              <div>
-                <p className="text-xs font-bold" style={{ color: DURUM_CFG[izin.durum].color }}>{izin.durum}</p>
-                {izin.sahaNotu && <p className="text-[11px] mt-0.5" style={{ color: '#475569' }}>{izin.sahaNotu}</p>}
+            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${DURUM_CFG[izin.durum].border}` }}>
+              <div className="flex items-center gap-3 px-4 py-3" style={{ background: DURUM_CFG[izin.durum].bg }}>
+                <i className={`${DURUM_CFG[izin.durum].icon} flex-shrink-0 text-base`} style={{ color: DURUM_CFG[izin.durum].color }} />
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: DURUM_CFG[izin.durum].color }}>{izin.durum}</p>
+                  {izin.durum === 'Onaylandı' && izin.onaylayanKisi && (
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[11px] flex items-center gap-1" style={{ color: '#64748B' }}>
+                        <i className="ri-user-line text-[10px]" />{izin.onaylayanKisi}
+                      </span>
+                      {izin.onayTarihi && (
+                        <span className="text-[11px] flex items-center gap-1" style={{ color: '#64748B' }}>
+                          <i className="ri-calendar-check-line text-[10px]" />{new Date(izin.onayTarihi).toLocaleDateString('tr-TR')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {izin.durum === 'Reddedildi' && (
+                    <div className="mt-1 space-y-0.5">
+                      {izin.reddedenKisi && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] flex items-center gap-1" style={{ color: '#64748B' }}>
+                            <i className="ri-user-line text-[10px]" />{izin.reddedenKisi}
+                          </span>
+                          {izin.reddetmeTarihi && (
+                            <span className="text-[11px] flex items-center gap-1" style={{ color: '#64748B' }}>
+                              <i className="ri-calendar-close-line text-[10px]" />{new Date(izin.reddetmeTarihi).toLocaleDateString('tr-TR')}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {izin.sahaNotu && (
+                        <p className="text-[11px]" style={{ color: '#94A3B8' }}>
+                          <i className="ri-chat-1-line mr-1 text-[10px]" />{izin.sahaNotu}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+              {/* Red fotoğrafı */}
+              {izin.durum === 'Reddedildi' && izin.redFotoUrl && (
+                <div className="px-4 py-3" style={{ borderTop: `1px solid ${DURUM_CFG[izin.durum].border}`, background: 'rgba(239,68,68,0.04)' }}>
+                  <p className="text-[10px] font-semibold mb-2" style={{ color: '#EF4444' }}>
+                    <i className="ri-camera-line mr-1" />Red Fotoğrafı
+                  </p>
+                  <a href={izin.redFotoUrl} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={izin.redFotoUrl}
+                      alt="Red fotoğrafı"
+                      className="rounded-lg max-h-40 object-cover cursor-pointer"
+                      style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+                    />
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
@@ -271,7 +322,7 @@ function DegerlendirmeModal({ izin, firmaAd, orgId, onClose, onUygun, onUygunDeg
             <div className="p-3">
               <IsIzniEvraklariSaha
                 izinId={izin.id}
-                orgId={orgId}
+                orgId={orgId ?? ''}
                 firmaId={izin.firmaId}
                 izinTuru={izin.tip}
               />
@@ -390,18 +441,24 @@ export default function IsIzniSahaBolumu() {
     setSeciliIzinId(null);
   };
 
-  const handleUygunDegil = async (izin: IsIzni, not: string, foto?: File) => {
+  const handleUygunDegil = async (izin: IsIzni, not: string, foto?: File): Promise<void> => {
     const orgId = org?.id ?? 'unknown';
-    if (foto) {
+    let redFotoUrl: string | undefined;
+    if (foto && orgId !== 'unknown') {
       const izinTuruSlug = izin.tip.replace(/\s+/g, '-');
       const path = `${orgId}/is-izni-evrak/${izin.firmaId}/${izinTuruSlug}/${izin.id}_red_${Date.now()}_${foto.name}`;
-      await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
+      const { data: uploadData } = await supabase.storage.from('uploads').upload(path, foto, { upsert: true });
+      if (uploadData?.path) {
+        const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(uploadData.path);
+        redFotoUrl = urlData?.publicUrl;
+      }
     }
     updateIsIzni(izin.id, {
       durum: 'Reddedildi',
       sahaNotu: not,
       reddedenKisi: currentUser.ad,
       reddetmeTarihi: new Date().toISOString().split('T')[0],
+      ...(redFotoUrl ? { redFotoUrl } : {}),
     } as Partial<IsIzni>);
     isIzniBildirimi(izin.izinNo, izin.id, 'reddedildi', not);
     addToast(`${izin.izinNo} reddedildi.`, 'error');

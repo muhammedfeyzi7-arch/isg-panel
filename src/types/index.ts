@@ -279,6 +279,7 @@ export interface IsIzni {
   sahaNotu?: string;
   reddedenKisi?: string;
   reddetmeTarihi?: string;
+  redFotoUrl?: string;
   notlar: string;
   olusturanKisi: string;
   olusturmaTarihi: string;
