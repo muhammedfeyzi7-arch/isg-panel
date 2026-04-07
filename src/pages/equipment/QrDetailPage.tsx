@@ -920,8 +920,10 @@ export default function QrDetailPage() {
     setRefreshKey(k => k + 1);
   }, [fetchEkipmanFromDb]);
 
+  // Ekipman evraklarını filtrele — firmaId eşleşmesi + silinmemiş
+  const ekipmanFirmaId = localEkipman?.firmaId;
   const ekipmanEvraklari = evraklar.filter(
-    e => !e.silinmis && e.firmaId === localEkipman?.firmaId
+    e => !e.silinmis && !e.cascadeSilindi && ekipmanFirmaId && e.firmaId === ekipmanFirmaId
   );
 
   const sahaFotolar = localEkipman?.sahaFotolari ?? [];
@@ -1000,6 +1002,7 @@ export default function QrDetailPage() {
   const isOverdue = days < 0;
   const isUrgent = days >= 0 && days <= 3;
   const hasBelge = !!localEkipman.dosyaUrl;
+  const toplamBelge = (hasBelge ? 1 : 0) + ekipmanEvraklari.length;
 
   return (
     <div className="min-h-screen" style={{ background: '#F1F5F9' }}>
@@ -1228,15 +1231,22 @@ export default function QrDetailPage() {
               </div>
               <p className="text-sm font-bold" style={{ color: '#0F172A' }}>Belgeler</p>
             </div>
-            {(hasBelge || ekipmanEvraklari.length > 0) && (
+            {toplamBelge > 0 && (
               <span className="text-xs font-bold px-2 py-0.5 rounded-full"
                 style={{ background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE' }}>
-                {(hasBelge ? 1 : 0) + ekipmanEvraklari.length} belge
+                {toplamBelge} belge
               </span>
             )}
           </div>
           <div className="px-2 pb-2 pt-1">
-            {!hasBelge && ekipmanEvraklari.length === 0 ? (
+            {/* Veri yükleniyorsa loading göster */}
+            {dataLoading ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2">
+                <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                  style={{ borderColor: '#BFDBFE', borderTopColor: '#2563EB' }} />
+                <p className="text-xs" style={{ color: '#94A3B8' }}>Belgeler yükleniyor...</p>
+              </div>
+            ) : !hasBelge && ekipmanEvraklari.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
                 <div className="w-10 h-10 flex items-center justify-center rounded-xl"
                   style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>

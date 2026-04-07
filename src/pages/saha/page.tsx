@@ -609,7 +609,7 @@ function EkipmanListeModal({
   isOnline: boolean;
   initialEkipmanId?: string | null;
 }) {
-  const { ekipmanlar, firmalar } = useApp();
+  const { ekipmanlar, firmalar, dataLoading } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -644,7 +644,6 @@ function EkipmanListeModal({
   const handleKontrol = (id: string) => {
     onKontrolYapildi(id);
     setKontrolBasarili(true);
-    // 3 saniye sonra banner'ı kaldır
     setTimeout(() => setKontrolBasarili(false), 3000);
   };
 
@@ -704,56 +703,66 @@ function EkipmanListeModal({
           </div>
 
           {/* Liste */}
-          <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '400px' }}>
-            {filtered.length === 0 ? (
-              <div className="text-center py-12">
-                <i className="ri-tools-line text-3xl" style={{ color: '#334155' }} />
-                <p className="text-sm mt-2" style={{ color: '#475569' }}>Ekipman bulunamadı</p>
-              </div>
-            ) : filtered.map(ekipman => {
-              const firma = firmalar.find(f => f.id === ekipman.firmaId);
-              const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
-              const days = getDays(ekipman.sonrakiKontrolTarihi);
-              const isOverdue = days !== null && days < 0;
-              const isUrgent = days !== null && days >= 0 && days <= 7;
-              return (
-                <button
-                  key={ekipman.id}
-                  onClick={() => { setSelectedId(ekipman.id); setKontrolBasarili(false); }}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-150 text-left"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${isOverdue ? 'rgba(239,68,68,0.2)' : isUrgent ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.07)'}` }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
-                >
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: sc.bg }}>
-                    <i className={`${sc.icon} text-base`} style={{ color: sc.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</p>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
+          {dataLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: 'rgba(52,211,153,0.3)', borderTopColor: '#34D399' }} />
+              <p className="text-sm font-medium" style={{ color: '#475569' }}>Ekipmanlar yükleniyor...</p>
+            </div>
+          ) : (
+            <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '400px' }}>
+              {filtered.length === 0 ? (
+                <div className="text-center py-12">
+                  <i className="ri-tools-line text-3xl" style={{ color: '#334155' }} />
+                  <p className="text-sm mt-2" style={{ color: '#475569' }}>
+                    {aktif.length === 0 ? 'Henüz ekipman eklenmemiş' : 'Ekipman bulunamadı'}
+                  </p>
+                </div>
+              ) : filtered.map(ekipman => {
+                const firma = firmalar.find(f => f.id === ekipman.firmaId);
+                const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
+                const days = getDays(ekipman.sonrakiKontrolTarihi);
+                const isOverdue = days !== null && days < 0;
+                const isUrgent = days !== null && days >= 0 && days <= 7;
+                return (
+                  <button
+                    key={ekipman.id}
+                    onClick={() => { setSelectedId(ekipman.id); setKontrolBasarili(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-150 text-left"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${isOverdue ? 'rgba(239,68,68,0.2)' : isUrgent ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.07)'}` }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                  >
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: sc.bg }}>
+                      <i className={`${sc.icon} text-base`} style={{ color: sc.color }} />
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {firma && <span className="text-xs" style={{ color: '#475569' }}><i className="ri-building-2-line mr-0.5" />{firma.ad}</span>}
-                      {ekipman.tur && <span className="text-xs" style={{ color: '#334155' }}>· {ekipman.tur}</span>}
-                    </div>
-                    {ekipman.sonrakiKontrolTarihi && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <i className="ri-calendar-line text-[10px]" style={{ color: isOverdue ? '#EF4444' : isUrgent ? '#FBBF24' : '#334155' }} />
-                        <span className="text-[10px] font-medium" style={{ color: isOverdue ? '#F87171' : isUrgent ? '#FCD34D' : '#475569' }}>
-                          {isOverdue ? `${Math.abs(days!)} gün gecikmiş` : isUrgent ? `${days} gün kaldı` : new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')}
-                        </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</p>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {ekipman.seriNo && <span className="text-[10px] font-mono" style={{ color: '#334155' }}>{ekipman.seriNo}</span>}
-                    <i className="ri-arrow-right-s-line text-sm" style={{ color: '#475569' }} />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {firma && <span className="text-xs" style={{ color: '#475569' }}><i className="ri-building-2-line mr-0.5" />{firma.ad}</span>}
+                        {ekipman.tur && <span className="text-xs" style={{ color: '#334155' }}>· {ekipman.tur}</span>}
+                      </div>
+                      {ekipman.sonrakiKontrolTarihi && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <i className="ri-calendar-line text-[10px]" style={{ color: isOverdue ? '#EF4444' : isUrgent ? '#FBBF24' : '#334155' }} />
+                          <span className="text-[10px] font-medium" style={{ color: isOverdue ? '#F87171' : isUrgent ? '#FCD34D' : '#475569' }}>
+                            {isOverdue ? `${Math.abs(days!)} gün gecikmiş` : isUrgent ? `${days} gün kaldı` : new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {ekipman.seriNo && <span className="text-[10px] font-mono" style={{ color: '#334155' }}>{ekipman.seriNo}</span>}
+                      <i className="ri-arrow-right-s-line text-sm" style={{ color: '#475569' }} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
     </Modal>
