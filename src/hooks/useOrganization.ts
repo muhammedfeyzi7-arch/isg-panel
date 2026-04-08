@@ -137,7 +137,8 @@ export function useOrganization(user: User | null) {
             role: resData.role ?? 'admin',
             isActive: resData.is_active !== false,
             mustChangePassword: resData.must_change_password === true,
-              kvkkAccepted: resData.kvkk_accepted !== false,
+            // KVKK sadece admin rolündeki kullanıcıya gösterilir
+            kvkkAccepted: (resData.role ?? 'admin') !== 'admin' ? true : resData.kvkk_accepted !== false,
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
           });
@@ -184,7 +185,8 @@ export function useOrganization(user: User | null) {
           role: data.role ?? 'admin',
           isActive: data.is_active !== false,
           mustChangePassword: data.must_change_password === true,
-          kvkkAccepted: data.kvkk_accepted === true,
+          // KVKK sadece admin rolündeki kullanıcıya gösterilir — diğer roller için her zaman kabul edilmiş say
+          kvkkAccepted: (data.role ?? 'admin') !== 'admin' ? true : data.kvkk_accepted === true,
           displayName: data.display_name ?? undefined,
           email: data.email ?? undefined,
         });

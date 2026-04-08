@@ -364,9 +364,16 @@ export default function MuayenelerPage() {
     });
   };
 
-  const handleBulkDelete = () => {
-    selectedIds.forEach(id => deleteMuayene(id));
-    addToast(`${selectedIds.size} kayıt silindi.`, 'success');
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds];
+    const count = ids.length;
+    // Her birini sırayla sil — race condition önlemek için
+    for (const id of ids) {
+      deleteMuayene(id);
+      // Kısa bekleme — aynı anda çok sayıda DB yazımı önle
+      await new Promise(r => setTimeout(r, 30));
+    }
+    addToast(`${count} kayıt silindi.`, 'success');
     setSelectedIds(new Set());
     setShowBulkDeleteModal(false);
   };

@@ -173,6 +173,31 @@ export interface EkipmanSahaFoto {
   yukleyenKisi?: string;
 }
 
+// Ekipman kontrol geçmişi kaydı
+export interface EkipmanKontrolKaydi {
+  id: string;
+  tarih: string;           // ISO string
+  kontrolEden: string;     // Kullanıcı adı (Supabase)
+  kontrolEdenId: string;   // Supabase user id
+  durum: EkipmanStatus;    // Kontrol sonrası durum
+  notlar?: string;
+  kaynak: 'qr' | 'manuel'; // QR ile mi, manuel mi yapıldı
+}
+
+// Ekipman belgesi (geçerlilik tarihi + arşiv desteği)
+export interface EkipmanBelge {
+  id: string;
+  ad: string;              // Belge adı / türü (Kalibrasyon Sertifikası vb.)
+  dosyaAdi: string;
+  dosyaBoyutu: number;
+  dosyaTipi: string;
+  dosyaUrl: string;        // Storage path
+  gecerlilikTarihi: string; // ISO date — belge geçerlilik bitiş tarihi
+  yuklemeTarihi: string;   // ISO string
+  yukleyenKisi: string;    // Kullanıcı adı
+  arsiv: boolean;          // true = arşivde, false = aktif
+}
+
 export interface Ekipman {
   id: string;
   ad: string;
@@ -194,6 +219,9 @@ export interface Ekipman {
   dosyaUrl?: string;
   notlar: string;
   sahaFotolari?: EkipmanSahaFoto[];
+  // Yeni alanlar
+  kontrolGecmisi?: EkipmanKontrolKaydi[];  // Kontrol geçmişi
+  belgeler?: EkipmanBelge[];               // Çoklu belge (geçerlilik + arşiv)
   olusturmaTarihi: string;
   silinmis?: boolean;
   silinmeTarihi?: string;

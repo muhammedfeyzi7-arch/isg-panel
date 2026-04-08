@@ -123,6 +123,10 @@ async function dbUpsert(
 }
 
 async function dbDelete(table: string, id: string): Promise<void> {
+  // Silmeden önce device_id'yi kayda yaz — realtime event gelince kendi silmemizi skip ederiz
+  try {
+    await supabase.from(table).update({ device_id: getDeviceId() }).eq('id', id);
+  } catch { /* ignore — update başarısız olsa da silmeye devam et */ }
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) {
     console.error(`[ISG] DELETE ERROR ${table}/${id}:`, error);
@@ -133,6 +137,10 @@ async function dbDelete(table: string, id: string): Promise<void> {
 
 async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Silmeden önce device_id'yi kayıtlara yaz — realtime event gelince kendi silmemizi skip ederiz
+  try {
+    await supabase.from(table).update({ device_id: getDeviceId() }).in('id', ids);
+  } catch { /* ignore */ }
   const { error } = await supabase.from(table).delete().in('id', ids);
   if (error) {
     console.error(`[ISG] DELETE_MANY ERROR ${table}:`, error);
@@ -177,6 +185,9 @@ export function useStore(
   const userIdRef = useRef(userId);
   useEffect(() => { orgIdRef.current = organizationId; }, [organizationId]);
   useEffect(() => { userIdRef.current = userId; }, [userId]);
+
+    // ── Kendi silme işlemlerimizi takip et — realtime'da "başka kullanıcı" bildirimi çıkmasın ──
+  const ownDeletesRef = useRef<Set<string>>(new Set());
 
   // ── Pending saves queue ──
   const pendingSavesRef = useRef<{ table: string; item: { id: string } & Record<string, unknown> }[]>([]);
@@ -592,6 +603,13 @@ export function useStore(
             // DELETE: payload.new boş gelir, old.id'den sil
             const delId = (payload.old?.id) as string | undefined;
             if (delId) {
+              // Kendi kalıcı silmemizden geliyorsa bildirim gösterme
+              const isOwnDelete = ownDeletesRef.current.has(delId);
+              if (isOwnDelete) {
+                ownDeletesRef.current.delete(delId);
+                console.log(`[ISG] Realtime skip (own delete): ${table}/${delId}`);
+                return;
+              }
               applyPatch(table, null, 'DELETE', delId);
             } else {
               // id yoksa fallback reload
@@ -749,6 +767,7 @@ export function useStore(
   }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, saveToDb]);
 
   const permanentDeleteFirma = useCallback(async (id: string) => {
+    ownDeletesRef.current.add(id);
     // Snapshot all affected state for rollback
     let snapshotFirmalar: Firma[] = [];
     let snapshotPersoneller: Personel[] = [];
@@ -850,11 +869,13 @@ export function useStore(
 
   const permanentDeletePersonel = useCallback(async (id: string) => {
     const snapshot = personellerRef.current;
+    ownDeletesRef.current.add(id);
     _setPersoneller(prev => prev.filter(p => p.id !== id));
     try {
       await dbDelete('personeller', id);
     } catch (err) {
       console.error('[ISG] permanentDeletePersonel FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setPersoneller(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (personeller): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -913,11 +934,13 @@ export function useStore(
 
   const permanentDeleteEvrak = useCallback(async (id: string) => {
     const snapshot = evraklarRef.current;
+    ownDeletesRef.current.add(id);
     _setEvraklar(prev => prev.filter(e => e.id !== id));
     try {
       await dbDelete('evraklar', id);
     } catch (err) {
       console.error('[ISG] permanentDeleteEvrak FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setEvraklar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (evraklar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -972,11 +995,13 @@ export function useStore(
 
   const permanentDeleteEgitim = useCallback(async (id: string) => {
     const snapshot = egitimlerRef.current;
+    ownDeletesRef.current.add(id);
     _setEgitimler(prev => prev.filter(e => e.id !== id));
     try {
       await dbDelete('egitimler', id);
     } catch (err) {
       console.error('[ISG] permanentDeleteEgitim FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setEgitimler(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (egitimler): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -1002,24 +1027,81 @@ export function useStore(
   }, [setMuayeneler, saveToDb]);
 
   const deleteMuayene = useCallback((id: string) => {
+    const now = new Date().toISOString();
     let updated: Muayene | null = null;
     setMuayeneler(prev => prev.map(m => {
       if (m.id !== id) return m;
-      updated = { ...m, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      updated = { ...m, silinmis: true as const, silinmeTarihi: now };
       return updated;
     }));
-    if (updated) saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) {
+      // deleted_at kolonunu da açıkça set et — fetchAllRows .is('deleted_at', null) filtresi için kritik
+      const orgId = orgIdRef.current;
+      const uid = userIdRef.current;
+      if (orgId && uid) {
+        supabase
+          .from('muayeneler')
+          .update({
+            data: updated,
+            updated_at: now,
+            deleted_at: now,
+            device_id: getDeviceId(),
+          })
+          .eq('id', id)
+          .eq('organization_id', orgId)
+          .then(({ error }) => {
+            if (error) {
+              console.error('[ISG] deleteMuayene DB error:', error.message);
+              // Rollback — kaydı geri getir
+              setMuayeneler(prev => prev.map(m => m.id === id ? { ...m, silinmis: false as const, silinmeTarihi: undefined } : m));
+              onSaveErrorRef.current?.(`Muayene silinemedi: ${error.message}`);
+            } else {
+              console.log(`[ISG] deleteMuayene OK: ${id} deleted_at=${now}`);
+            }
+          });
+      } else {
+        // orgId henüz hazır değil — pending queue'ya ekle (silinmis=true ile upsert)
+        saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
+      }
+    }
     logFnRef.current?.('muayene_deleted', 'Sağlık', id, undefined, 'Sağlık evrakı silindi.');
   }, [setMuayeneler, saveToDb]);
 
   const restoreMuayene = useCallback((id: string) => {
+    const now = new Date().toISOString();
     let updated: Muayene | null = null;
     setMuayeneler(prev => prev.map(m => {
       if (m.id !== id) return m;
       updated = { ...m, silinmis: false as const, silinmeTarihi: undefined };
       return updated;
     }));
-    if (updated) saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) {
+      // deleted_at'i null'a çek — yoksa fetchAllRows geri getirmez
+      const orgId = orgIdRef.current;
+      const uid = userIdRef.current;
+      if (orgId && uid) {
+        supabase
+          .from('muayeneler')
+          .update({
+            data: updated,
+            updated_at: now,
+            deleted_at: null,
+            device_id: getDeviceId(),
+          })
+          .eq('id', id)
+          .eq('organization_id', orgId)
+          .then(({ error }) => {
+            if (error) {
+              console.error('[ISG] restoreMuayene DB error:', error.message);
+              setMuayeneler(prev => prev.map(m => m.id === id ? { ...m, silinmis: true as const } : m));
+            } else {
+              console.log(`[ISG] restoreMuayene OK: ${id} deleted_at=null`);
+            }
+          });
+      } else {
+        saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
+      }
+    }
   }, [setMuayeneler, saveToDb]);
 
   const muayenelerRef = useRef<Muayene[]>([]);
@@ -1027,11 +1109,13 @@ export function useStore(
 
   const permanentDeleteMuayene = useCallback(async (id: string) => {
     const snapshot = muayenelerRef.current;
+    ownDeletesRef.current.add(id);
     _setMuayeneler(prev => prev.filter(m => m.id !== id));
     try {
       await dbDelete('muayeneler', id);
     } catch (err) {
       console.error('[ISG] permanentDeleteMuayene FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setMuayeneler(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (muayeneler): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -1082,12 +1166,14 @@ export function useStore(
 
   const permanentDeleteUygunsuzluk = useCallback(async (id: string) => {
     const snapshot = uygunsuzluklarRef.current;
+    ownDeletesRef.current.add(id);
     _setUygunsuzluklar(prev => prev.filter(u => u.id !== id));
     try {
       await dbDelete('uygunsuzluklar', id);
       console.log(`[ISG] permanentDeleteUygunsuzluk OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteUygunsuzluk FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setUygunsuzluklar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (uygunsuzluklar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -1135,6 +1221,57 @@ export function useStore(
     setEkipmanlar(prev => [newE, ...prev]);
     saveToDb('ekipmanlar', newE as unknown as { id: string } & Record<string, unknown>);
     return newE;
+  }, [setEkipmanlar, saveToDb]);
+
+  // Kontrol geçmişine yeni kayıt ekle
+  const addEkipmanKontrolKaydi = useCallback((
+    ekipmanId: string,
+    kayit: Omit<import('@/types').EkipmanKontrolKaydi, 'id'>
+  ) => {
+    const yeniKayit: import('@/types').EkipmanKontrolKaydi = {
+      ...kayit,
+      id: genId(),
+    };
+    let updated: Ekipman | null = null;
+    setEkipmanlar(prev => prev.map(e => {
+      if (e.id !== ekipmanId) return e;
+      updated = {
+        ...e,
+        kontrolGecmisi: [yeniKayit, ...(e.kontrolGecmisi ?? [])],
+        sonKontrolTarihi: kayit.tarih.split('T')[0],
+      };
+      return updated;
+    }));
+    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+  }, [setEkipmanlar, saveToDb]);
+
+  // Ekipmana yeni belge ekle (aktif) — eskisini arşive al
+  const addEkipmanBelge = useCallback((
+    ekipmanId: string,
+    belge: Omit<import('@/types').EkipmanBelge, 'id' | 'arsiv'>
+  ) => {
+    const yeniBelge: import('@/types').EkipmanBelge = {
+      ...belge,
+      id: genId(),
+      arsiv: false,
+    };
+    let updated: Ekipman | null = null;
+    setEkipmanlar(prev => prev.map(e => {
+      if (e.id !== ekipmanId) return e;
+      // Mevcut aktif belgeleri arşive al
+      const eskiBelgeler = (e.belgeler ?? []).map(b =>
+        b.arsiv ? b : { ...b, arsiv: true }
+      );
+      updated = {
+        ...e,
+        belgeler: [yeniBelge, ...eskiBelgeler],
+        belgeMevcut: true,
+        dosyaAdi: yeniBelge.dosyaAdi,
+        dosyaUrl: yeniBelge.dosyaUrl,
+      };
+      return updated;
+    }));
+    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setEkipmanlar, saveToDb]);
 
   // Fields that denetci role is allowed to update (FIX 1: field-level restriction)
@@ -1207,12 +1344,14 @@ export function useStore(
 
   const permanentDeleteEkipman = useCallback(async (id: string) => {
     const snapshot = ekipmanlarRef.current;
+    ownDeletesRef.current.add(id);
     _setEkipmanlar(prev => prev.filter(e => e.id !== id));
     try {
       await dbDelete('ekipmanlar', id);
       console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipman FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setEkipmanlar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -1222,12 +1361,14 @@ export function useStore(
   const permanentDeleteEkipmanMany = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
     const snapshot = ekipmanlarRef.current;
+    ids.forEach(id => ownDeletesRef.current.add(id));
     _setEkipmanlar(prev => prev.filter(e => !ids.includes(e.id)));
     try {
       await dbDeleteMany('ekipmanlar', ids);
       console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipmanMany FAILED, rolling back:', err);
+      ids.forEach(id => ownDeletesRef.current.delete(id));
       _setEkipmanlar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -1323,11 +1464,13 @@ export function useStore(
 
   const permanentDeleteTutanak = useCallback(async (id: string) => {
     const snapshot = tutanaklarRef2.current;
+    ownDeletesRef.current.add(id);
     _setTutanaklar(prev => prev.filter(t => t.id !== id));
     try {
       await dbDelete('tutanaklar', id);
     } catch (err) {
       console.error('[ISG] permanentDeleteTutanak FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setTutanaklar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (tutanaklar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -1490,12 +1633,14 @@ export function useStore(
 
   const permanentDeleteIsIzni = useCallback(async (id: string) => {
     const snapshot = isIzinleriRef2.current;
+    ownDeletesRef.current.add(id);
     _setIsIzinleri(prev => prev.filter(iz => iz.id !== id));
     try {
       await dbDelete('is_izinleri', id);
       logFnRef.current?.('is_izni_perm_deleted', 'İş İzinleri', id, undefined, 'İş izni kalıcı silindi.');
     } catch (err) {
       console.error('[ISG] permanentDeleteIsIzni FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setIsIzinleri(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (is_izinleri): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -1571,6 +1716,7 @@ export function useStore(
     addMuayene, updateMuayene, deleteMuayene, restoreMuayene, permanentDeleteMuayene,
     addUygunsuzluk, updateUygunsuzluk, deleteUygunsuzluk, permanentDeleteUygunsuzluk, getUygunsuzlukPhoto, setUygunsuzlukPhoto,
     addEkipman, updateEkipman, deleteEkipman, restoreEkipman, permanentDeleteEkipman, permanentDeleteEkipmanMany,
+    addEkipmanKontrolKaydi, addEkipmanBelge,
     addGorev, updateGorev, deleteGorev,
     addTutanak, updateTutanak, deleteTutanak, restoreTutanak, permanentDeleteTutanak,
     addIsIzni, updateIsIzni, deleteIsIzni, restoreIsIzni, permanentDeleteIsIzni,

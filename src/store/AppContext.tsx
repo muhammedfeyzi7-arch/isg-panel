@@ -567,7 +567,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       org, orgLoading, orgError: loadError,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,
-      kvkkAccepted: org?.kvkkAccepted ?? true,
+      // KVKK sadece admin rolündeki kullanıcıya gösterilir — ekip üyeleri (evrakçı, sahacı vb.) görmez
+      kvkkAccepted: org?.role !== 'admin' ? true : (org?.kvkkAccepted ?? true),
       setKvkkAccepted,
       createOrg,
       joinOrg,

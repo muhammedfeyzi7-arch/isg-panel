@@ -92,68 +92,70 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
 
   useEffect(() => { void fetchDosyalar(); }, [fetchDosyalar]);
 
-  const openUrl = (url: string, fileName: string) => {
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    // Mobilde download attribute olmadan aç — görüntüleme için
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
+  // Mobil uyumlu açma: önce window.open ile pencere aç (kullanıcı tıklamasıyla senkron),
+  // sonra URL'yi o pencereye yükle — mobil Safari popup blocker'ı geçer
   const handleAc = async (dosya: EvrakDosya, usedSlug: string) => {
+    // Senkron olarak pencereyi hemen aç — kullanıcı tıklamasıyla aynı call stack'te
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="font-size:16px">Belge yükleniyor...</p></body></html>');
+    }
+
     setAcikDosya(dosya.name);
     try {
-      // _prefix varsa direkt kullan — en güvenilir yol
       const prefix = (dosya as EvrakDosya & { _prefix?: string })._prefix ?? `${orgId}/is-izni-evrak/${firmaId}/${usedSlug}`;
       const filePath = `${prefix}/${dosya.name}`;
-      console.log('[ISG] Opening file path:', filePath);
 
-      // Önce createSignedUrl ile dene
-      const { data: signData, error: signErr } = await supabase.storage
+      let finalUrl: string | null = null;
+
+      // 1. Direkt path ile dene
+      const { data: signData } = await supabase.storage
         .from('uploads')
         .createSignedUrl(filePath, 86400);
 
-      console.log('[ISG] createSignedUrl result:', { ok: !!signData?.signedUrl, error: signErr?.message });
-
       if (signData?.signedUrl) {
-        openUrl(signData.signedUrl, dosya.name);
-        return;
+        finalUrl = signData.signedUrl;
       }
 
-      // Fallback: tüm olası slug'larla dene
-      const slugs = [usedSlug, izinTuruSlug, izinTuruSlugOrig].filter((s, i, arr) => arr.indexOf(s) === i);
-      let opened = false;
-      for (const slug of slugs) {
-        const fp = `${orgId}/is-izni-evrak/${firmaId}/${slug}/${dosya.name}`;
-        console.log('[ISG] Fallback trying:', fp);
-        const { data: fd, error: fe } = await supabase.storage.from('uploads').createSignedUrl(fp, 86400);
-        console.log('[ISG] Fallback result:', { path: fp, ok: !!fd?.signedUrl, error: fe?.message });
-        if (fd?.signedUrl) { openUrl(fd.signedUrl, dosya.name); opened = true; break; }
+      // 2. Fallback: tüm olası slug'larla dene
+      if (!finalUrl) {
+        const slugs = [usedSlug, izinTuruSlug, izinTuruSlugOrig].filter((s, i, arr) => arr.indexOf(s) === i);
+        for (const slug of slugs) {
+          const fp = `${orgId}/is-izni-evrak/${firmaId}/${slug}/${dosya.name}`;
+          const { data: fd } = await supabase.storage.from('uploads').createSignedUrl(fp, 86400);
+          if (fd?.signedUrl) { finalUrl = fd.signedUrl; break; }
+        }
       }
 
-      // Son çare: storage list ile tam path bul
-      if (!opened) {
-        console.log('[ISG] Trying storage list fallback...');
+      // 3. Son çare: storage list ile tam path bul
+      if (!finalUrl) {
         const slugs2 = [izinTuruSlug, izinTuruSlugOrig].filter((s, i, arr) => arr.indexOf(s) === i);
         for (const slug of slugs2) {
           const pfx = `${orgId}/is-izni-evrak/${firmaId}/${slug}`;
           const { data: listData } = await supabase.storage.from('uploads').list(pfx, { limit: 200 });
-          console.log('[ISG] List fallback:', pfx, listData?.map(f => f.name));
           const found = listData?.find(f => f.name === dosya.name || f.name.includes(dosya.name.split('.')[0]));
           if (found) {
             const fp2 = `${pfx}/${found.name}`;
             const { data: fd2 } = await supabase.storage.from('uploads').createSignedUrl(fp2, 86400);
-            if (fd2?.signedUrl) { openUrl(fd2.signedUrl, dosya.name); opened = true; break; }
+            if (fd2?.signedUrl) { finalUrl = fd2.signedUrl; break; }
           }
         }
       }
 
-      if (!opened) {
+      if (finalUrl) {
+        if (win && !win.closed) {
+          win.location.href = finalUrl;
+        } else {
+          // Pencere kapatıldıysa yeni sekme aç
+          window.open(finalUrl, '_blank');
+        }
+      } else {
+        if (win && !win.closed) win.close();
         console.error('[ISG] Tüm yollar denendi, dosya açılamadı:', dosya.name);
       }
+    } catch (err) {
+      if (win && !win.closed) win.close();
+      console.error('[ISG] handleAc error:', err);
     } finally {
       setAcikDosya(null);
     }

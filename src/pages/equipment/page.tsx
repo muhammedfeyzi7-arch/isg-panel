@@ -3,6 +3,8 @@ import { useApp } from '../../store/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import Modal from '../../components/base/Modal';
 import QrModal from './components/QrModal';
+import KontrolGecmisiPanel from './components/KontrolGecmisiPanel';
+import EkipmanBelgePanel from './components/EkipmanBelgePanel';
 import type { Ekipman, EkipmanStatus } from '../../types';
 import XLSXStyle from 'xlsx-js-style';
 import { uploadFileToStorage, downloadFromUrl, validateFile, getSignedUrlFromPath } from '@/utils/fileUpload';
@@ -341,18 +343,23 @@ const defaultForm: Omit<Ekipman, 'id' | 'olusturmaTarihi'> = {
 
 function getDaysUntil(dateStr: string): number {
   if (!dateStr) return 999;
-  const diff = new Date(dateStr).getTime() - Date.now();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  // Her iki tarihi de gece yarısına normalize et — saat farkı (UTC+3 vb.) hesabı bozmasın
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export default function EkipmanlarPage() {
-  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, addToast, quickCreate, setQuickCreate, org, refreshData, dataLoading } = useApp();
+  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, addEkipmanKontrolKaydi, addEkipmanBelge, addToast, quickCreate, setQuickCreate, org, refreshData, dataLoading, currentUser } = useApp();
   const { canCreate, canEdit, canDelete } = usePermissions();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [modalTab, setModalTab] = useState<'bilgiler' | 'belgeler' | 'gecmis'>('bilgiler');
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Ekipman, 'id' | 'olusturmaTarihi'>>(defaultForm);
@@ -366,6 +373,14 @@ export default function EkipmanlarPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Manuel kontrol kaydı state
+  const [showKontrolModal, setShowKontrolModal] = useState(false);
+  const [kontrolEkipmanId, setKontrolEkipmanId] = useState<string | null>(null);
+  const [kontrolForm, setKontrolForm] = useState<{ durum: EkipmanStatus; notlar: string; sonrakiKontrolTarihi: string }>({
+    durum: 'Uygun', notlar: '', sonrakiKontrolTarihi: '',
+  });
+  const [kontrolSaving, setKontrolSaving] = useState(false);
 
   // Toplu silme state
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -449,24 +464,26 @@ export default function EkipmanlarPage() {
 
   const aktifEkipmanlar = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
 
-  // Bir ekipmanın gerçek efektif durumunu hesapla:
-  // Eğer kontrol tarihi geçmişse ve durum Uygun ise → otomatik Uygun Değil
+  // Bir ekipmanın görüntüleme durumunu hesapla:
+  // Kullanıcının seçtiği durum her zaman önceliklidir.
+  // Sadece istatistik kartlarında "kontrol tarihi geçmiş" bilgisi ayrıca gösterilir.
   const getEffectiveDurum = (ekipman: Ekipman): EkipmanStatus => {
-    if (ekipman.durum !== 'Uygun') return ekipman.durum;
-    if (!ekipman.sonrakiKontrolTarihi) return ekipman.durum;
-    const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
-    if (days < 0) return 'Uygun Değil';
+    // Kullanıcının kaydettiği durumu olduğu gibi döndür — override etme
     return ekipman.durum;
   };
 
   const stats = useMemo(() => {
     const total = aktifEkipmanlar.length;
-    const uygun = aktifEkipmanlar.filter(e => getEffectiveDurum(e) === 'Uygun').length;
-    const uygunDegil = aktifEkipmanlar.filter(e => getEffectiveDurum(e) === 'Uygun Değil').length;
+    const uygun = aktifEkipmanlar.filter(e => e.durum === 'Uygun').length;
+    // Uygun Değil: kullanıcının seçtiği + kontrol tarihi geçmiş olanlar (Uygun durumundakiler dahil)
+    const uygunDegil = aktifEkipmanlar.filter(e =>
+      e.durum === 'Uygun Değil' ||
+      (e.durum === 'Uygun' && e.sonrakiKontrolTarihi && getDaysUntil(e.sonrakiKontrolTarihi) < 0)
+    ).length;
     const yaklasan = aktifEkipmanlar.filter(e => {
-      if (getEffectiveDurum(e) === 'Uygun Değil') return false;
+      if (e.durum !== 'Uygun') return false;
       const days = getDaysUntil(e.sonrakiKontrolTarihi);
-      return days >= 0 && days <= 3;
+      return days >= 0 && days <= 30;
     }).length;
     return { total, uygun, uygunDegil, yaklasan };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -476,12 +493,14 @@ export default function EkipmanlarPage() {
     setEditId(null);
     setForm(defaultForm);
     setPendingFile(null);
+    setModalTab('bilgiler');
     setShowModal(true);
   };
 
-  const openEdit = (ekipman: Ekipman) => {
+  const openEdit = (ekipman: Ekipman, tab: 'bilgiler' | 'belgeler' | 'gecmis' = 'bilgiler') => {
     setEditId(ekipman.id);
     setPendingFile(null);
+    setModalTab(tab);
     setForm({
       ad: ekipman.ad, tur: ekipman.tur, firmaId: ekipman.firmaId,
       bulunduguAlan: ekipman.bulunduguAlan, seriNo: ekipman.seriNo,
@@ -490,8 +509,42 @@ export default function EkipmanlarPage() {
       durum: ekipman.durum, aciklama: ekipman.aciklama, belgeMevcut: ekipman.belgeMevcut,
       dosyaAdi: ekipman.dosyaAdi || '', dosyaBoyutu: ekipman.dosyaBoyutu || 0,
       dosyaTipi: ekipman.dosyaTipi || '', dosyaVeri: '', notlar: ekipman.notlar,
+      kontrolGecmisi: ekipman.kontrolGecmisi,
+      belgeler: ekipman.belgeler,
     });
     setShowModal(true);
+  };
+
+  const openKontrolModal = (ekipman: Ekipman) => {
+    setKontrolEkipmanId(ekipman.id);
+    setKontrolForm({ durum: ekipman.durum, notlar: '', sonrakiKontrolTarihi: ekipman.sonrakiKontrolTarihi || '' });
+    setShowKontrolModal(true);
+  };
+
+  const handleKontrolKaydet = async () => {
+    if (!kontrolEkipmanId) return;
+    setKontrolSaving(true);
+    try {
+      const now = new Date().toISOString();
+      addEkipmanKontrolKaydi(kontrolEkipmanId, {
+        tarih: now,
+        kontrolEden: currentUser.ad,
+        kontrolEdenId: currentUser.id,
+        durum: kontrolForm.durum,
+        notlar: kontrolForm.notlar || undefined,
+        kaynak: 'manuel',
+      });
+      updateEkipman(kontrolEkipmanId, {
+        durum: kontrolForm.durum,
+        sonKontrolTarihi: now.split('T')[0],
+        ...(kontrolForm.sonrakiKontrolTarihi ? { sonrakiKontrolTarihi: kontrolForm.sonrakiKontrolTarihi } : {}),
+      });
+      addToast('Kontrol kaydı oluşturuldu.', 'success');
+      setShowKontrolModal(false);
+      setKontrolEkipmanId(null);
+    } finally {
+      setKontrolSaving(false);
+    }
   };
 
   const handleFileChange = (file?: File) => {
@@ -875,7 +928,7 @@ export default function EkipmanlarPage() {
               const effectiveDurum = getEffectiveDurum(ekipman);
               const sc = STATUS_CONFIG[effectiveDurum] ?? { label: effectiveDurum, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
               const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
-              const isUrgent = days >= 0 && days <= 3;
+              const isUrgent = days >= 0 && days <= 30;
               const isOverdue = days < 0;
               return (
                 <div key={ekipman.id} className="p-4" style={{ background: selected.has(ekipman.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
@@ -942,7 +995,7 @@ export default function EkipmanlarPage() {
                   const effectiveDurum = getEffectiveDurum(ekipman);
                   const sc = STATUS_CONFIG[effectiveDurum] ?? { label: effectiveDurum, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
                   const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
-                  const isUrgent = days >= 0 && days <= 3;
+                  const isUrgent = days >= 0 && days <= 30;
                   const isOverdue = days < 0;
                   // Dosya durumu: dosyaAdi var ama dosyaUrl yoksa "yüklenemedi"
                   const hasFileError = ekipman.dosyaAdi && !ekipman.dosyaUrl;
@@ -977,30 +1030,13 @@ export default function EkipmanlarPage() {
                         </span>
                       </td>
                       <td>
-                        {effectiveDurum === 'Uygun Değil' ? (
-                          /* Uygun Değil: tarih hesaplama yapma, kritik uyarı göster */
-                          <div className="flex items-center gap-1.5">
-                            <div>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse whitespace-nowrap"
-                                style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}>
-                                <i className="ri-error-warning-fill mr-1" />KRİTİK
-                              </span>
-                              {isOverdue && ekipman.sonrakiKontrolTarihi && (
-                                <p className="text-[10px] text-red-500 mt-0.5">
-                                  {new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')} — {Math.abs(days)} gün gecikmiş
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <span className={`text-sm ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : 'text-slate-400'}`}>
-                              {ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : '—'}
-                            </span>
-                            {isOverdue && <p className="text-[10px] text-red-500 mt-0.5">Gecikmiş!</p>}
-                            {isUrgent && !isOverdue && <p className="text-[10px] text-yellow-500 mt-0.5">{days} gün kaldı</p>}
-                          </div>
-                        )}
+                        <div>
+                          <span className={`text-sm ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : 'text-slate-400'}`}>
+                            {ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : '—'}
+                          </span>
+                          {isOverdue && <p className="text-[10px] text-red-500 mt-0.5">{Math.abs(days)} gün gecikmiş</p>}
+                          {isUrgent && !isOverdue && <p className="text-[10px] text-yellow-500 mt-0.5">{days} gün kaldı</p>}
+                        </div>
                       </td>
                       <td>
                         <span
@@ -1027,22 +1063,29 @@ export default function EkipmanlarPage() {
                           )}
                           {ekipman.dosyaUrl && (
                             <button onClick={async () => {
+                              // Senkron olarak pencereyi hemen aç — mobil popup blocker geçmek için
+                              const win = window.open('', '_blank');
+                              if (win) {
+                                win.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="font-size:16px">Belge yükleniyor...</p></body></html>');
+                              }
                               const url = await getSignedUrlFromPath(ekipman.dosyaUrl!);
                               if (url) {
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.target = '_blank';
-                                a.rel = 'noopener noreferrer';
-                                document.body.appendChild(a);
-                                a.click();
-                                document.body.removeChild(a);
+                                if (win && !win.closed) {
+                                  win.location.href = url;
+                                } else {
+                                  window.open(url, '_blank');
+                                }
                               } else {
+                                if (win && !win.closed) win.close();
                                 addToast('Belge erişim linki alınamadı.', 'error');
                               }
                             }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Belgeyi Görüntüle"><i className="ri-eye-line text-sm" /></button>
                           )}
                           {ekipman.dosyaUrl && (
                             <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Belgeyi İndir"><i className="ri-download-2-line text-sm" /></button>
+                          )}
+                          {canEdit && (
+                            <button onClick={() => openKontrolModal(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Kontrol Kaydı Ekle"><i className="ri-checkbox-circle-line text-sm" /></button>
                           )}
                           <button onClick={() => setQrEkipman(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(168,85,247,0.1)', color: '#A855F7' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.1)'; }} title="QR Kod"><i className="ri-qr-code-line text-sm" /></button>
                           {canEdit && (
@@ -1063,6 +1106,59 @@ export default function EkipmanlarPage() {
         )}
       </div>
 
+      {/* Manuel Kontrol Kaydı Modal */}
+      <Modal
+        isOpen={showKontrolModal}
+        onClose={() => { setShowKontrolModal(false); setKontrolEkipmanId(null); }}
+        title="Kontrol Kaydı Oluştur"
+        size="sm"
+        icon="ri-checkbox-circle-line"
+        footer={
+          <>
+            <button onClick={() => setShowKontrolModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={() => void handleKontrolKaydet()} disabled={kontrolSaving} className="btn-primary whitespace-nowrap disabled:opacity-50">
+              {kontrolSaving ? <><i className="ri-loader-4-line animate-spin mr-1" />Kaydediliyor...</> : <><i className="ri-save-line mr-1" />Kaydet</>}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Kontrol Sonucu</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'] as EkipmanStatus[]).map(d => {
+                const cfg = STATUS_CONFIG[d];
+                const isSelected = kontrolForm.durum === d;
+                return (
+                  <button key={d} onClick={() => setKontrolForm(p => ({ ...p, durum: d }))}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer text-xs font-semibold whitespace-nowrap transition-all"
+                    style={{
+                      background: isSelected ? cfg.bg : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${isSelected ? cfg.color + '50' : 'rgba(255,255,255,0.08)'}`,
+                      color: isSelected ? cfg.color : '#64748B',
+                    }}>
+                    <i className={cfg.icon} />{d}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Sonraki Kontrol Tarihi</label>
+            <input type="date" value={kontrolForm.sonrakiKontrolTarihi}
+              onChange={e => setKontrolForm(p => ({ ...p, sonrakiKontrolTarihi: e.target.value }))}
+              className="isg-input" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Notlar</label>
+            <textarea value={kontrolForm.notlar}
+              onChange={e => setKontrolForm(p => ({ ...p, notlar: e.target.value }))}
+              placeholder="Kontrol notu (opsiyonel)..."
+              rows={3} maxLength={500} className="isg-input resize-none" />
+          </div>
+        </div>
+      </Modal>
+
       {/* Add/Edit Modal */}
       <Modal
         isOpen={showModal}
@@ -1073,16 +1169,57 @@ export default function EkipmanlarPage() {
         footer={
           <>
             <button onClick={() => { if (!uploading) setShowModal(false); }} disabled={uploading} className="btn-secondary whitespace-nowrap disabled:opacity-50">İptal</button>
-            <button onClick={handleSave} disabled={uploading} className="btn-primary whitespace-nowrap disabled:opacity-50">
-              {uploading ? (
-                <><i className="ri-loader-4-line animate-spin" /> Yükleniyor...</>
-              ) : (
-                <><i className={editId ? 'ri-save-line' : 'ri-add-line'} />{editId ? 'Güncelle' : 'Ekle'}</>
-              )}
-            </button>
+            {modalTab === 'bilgiler' && (
+              <button onClick={handleSave} disabled={uploading} className="btn-primary whitespace-nowrap disabled:opacity-50">
+                {uploading ? (
+                  <><i className="ri-loader-4-line animate-spin" /> Yükleniyor...</>
+                ) : (
+                  <><i className={editId ? 'ri-save-line' : 'ri-add-line'} />{editId ? 'Güncelle' : 'Ekle'}</>
+                )}
+              </button>
+            )}
           </>
         }
       >
+        {/* Sekme Navigasyonu — sadece düzenleme modunda */}
+        {editId && (
+          <div className="flex items-center gap-1 p-1 rounded-xl mb-4"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            {([
+              { key: 'bilgiler', label: 'Bilgiler', icon: 'ri-information-line' },
+              { key: 'belgeler', label: 'Belgeler', icon: 'ri-file-list-3-line' },
+              { key: 'gecmis',  label: 'Kontrol Geçmişi', icon: 'ri-history-line' },
+            ] as const).map(tab => (
+              <button key={tab.key} onClick={() => setModalTab(tab.key)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                style={{
+                  background: modalTab === tab.key ? 'rgba(99,102,241,0.2)' : 'transparent',
+                  color: modalTab === tab.key ? '#818CF8' : '#64748B',
+                }}>
+                <i className={tab.icon} />{tab.label}
+                {tab.key === 'belgeler' && (() => {
+                  const ekipman = ekipmanlar.find(e => e.id === editId);
+                  const aktif = (ekipman?.belgeler ?? []).filter(b => !b.arsiv).length;
+                  return aktif > 0 ? (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full"
+                      style={{ background: 'rgba(52,211,153,0.2)', color: '#34D399' }}>{aktif}</span>
+                  ) : null;
+                })()}
+                {tab.key === 'gecmis' && (() => {
+                  const ekipman = ekipmanlar.find(e => e.id === editId);
+                  const cnt = (ekipman?.kontrolGecmisi ?? []).length;
+                  return cnt > 0 ? (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full"
+                      style={{ background: 'rgba(251,191,36,0.2)', color: '#FBBF24' }}>{cnt}</span>
+                  ) : null;
+                })()}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Bilgiler sekmesi */}
+        {modalTab === 'bilgiler' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Ekipman Adı */}
           <div className="sm:col-span-2">
@@ -1279,6 +1416,50 @@ export default function EkipmanlarPage() {
             />
           </div>
         </div>
+        )}
+
+        {/* Belgeler sekmesi */}
+        {modalTab === 'belgeler' && editId && (() => {
+          const ekipman = ekipmanlar.find(e => e.id === editId);
+          return (
+            <EkipmanBelgePanel
+              ekipmanId={editId}
+              orgId={org?.id ?? 'unknown'}
+              belgeler={ekipman?.belgeler ?? []}
+              yukleyenKisi={currentUser.ad}
+              canEdit={canEdit}
+              onBelgeEkle={(belge) => {
+                addEkipmanBelge(editId, belge);
+                addToast('Belge yüklendi, eskisi arşive alındı.', 'success');
+              }}
+            />
+          );
+        })()}
+
+        {/* Kontrol Geçmişi sekmesi */}
+        {modalTab === 'gecmis' && editId && (() => {
+          const ekipman = ekipmanlar.find(e => e.id === editId);
+          return (
+            <div className="space-y-3">
+              {canEdit && (
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    const ek = ekipmanlar.find(e => e.id === editId);
+                    if (ek) openKontrolModal(ek);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl cursor-pointer text-sm font-semibold transition-all whitespace-nowrap"
+                  style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', color: '#34D399' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.18)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }}>
+                  <i className="ri-add-circle-line" />
+                  Manuel Kontrol Kaydı Ekle
+                </button>
+              )}
+              <KontrolGecmisiPanel gecmis={ekipman?.kontrolGecmisi ?? []} />
+            </div>
+          );
+        })()}
 
       </Modal>
 
