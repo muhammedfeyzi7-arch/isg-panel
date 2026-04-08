@@ -77,12 +77,15 @@ interface AiKatilimAnalizProps {
   tumPersoneller: Personel[];
   /** Kullanıcı "Seçilenleri Eğitime Ekle" dediğinde çağrılır */
   onEkle: (personelIds: string[]) => void;
+  /** Görsel seçildiğinde base64 veriyi üst bileşene iletir */
+  onGorselSecildi?: (base64: string, mimeType: string) => void;
 }
 
 export default function AiKatilimAnaliz({
   firmaPersoneller,
   tumPersoneller,
   onEkle,
+  onGorselSecildi,
 }: AiKatilimAnalizProps) {
   const [state, setState] = useState<AnalyzState>('idle');
   const [hata, setHata] = useState('');
@@ -142,6 +145,7 @@ export default function AiKatilimAnaliz({
       });
 
       setPreview(`data:${file.type};base64,${base64}`);
+      onGorselSecildi?.(base64, file.type);
       setState('analyzing');
 
       const { data: sessionData } = await supabase.auth.getSession();

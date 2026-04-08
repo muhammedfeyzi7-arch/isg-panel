@@ -716,8 +716,8 @@ export default function RaporlarPage() {
           c3.alignment = { horizontal: 'left', vertical: 'middle' };
         };
 
-        const applyHeaderCols = (ws: ExcelJS.Worksheet, cols: string[], useBlue = false) => {
-          const hdrRow = ws.getRow(4); hdrRow.height = 22;
+        const applyHeaderCols = (ws: ExcelJS.Worksheet, cols: string[], useBlue = false, rowNum = 5) => {
+          const hdrRow = ws.getRow(rowNum); hdrRow.height = 22;
           cols.forEach((h, ci) => {
             const cell = hdrRow.getCell(ci + 1);
             cell.value = h;
@@ -1071,7 +1071,7 @@ export default function RaporlarPage() {
         const saglikCols = ['#', 'Ad Soyad', 'Görev', 'Firma', 'Muayene Tarihi', 'Sonraki Muayene', 'Kalan Gün', 'Durum', 'Sağlık Durumu'];
         saglikWs.columns = [4, 26, 20, 24, 16, 18, 12, 16, 20].map(w => ({ width: w }));
         applyHeaderRows(saglikWs, 'SAĞLIK TAKİBİ', `Toplam ${exMuayeneler.length} kayıt  |  Geçmiş: ${exMuayeneler.filter(m => (calcDays(m.sonrakiTarih) ?? 1) < 0).length}  |  ${firmaAdi}  |  Rapor: ${tarih}`, saglikCols.length);
-        applyHeaderCols(saglikWs, saglikCols);
+        applyHeaderCols(saglikWs, saglikCols, false, 4);
 
         exMuayeneler
           .sort((a, b) => (calcDays(a.sonrakiTarih) ?? 9999) - (calcDays(b.sonrakiTarih) ?? 9999))
@@ -1140,7 +1140,7 @@ export default function RaporlarPage() {
         const uygCols = ['#', 'DÖF No', 'Başlık', 'Firma', 'Durum', 'Seviye', 'Açılış Tarihi', 'Kapanış Tarihi', 'Sorumlu', 'Açılış Fotosu', 'Kapanış Fotosu'];
         wsUyg.columns = [5, 14, 36, 26, 13, 14, 16, 16, 22, 28, 28].map(w => ({ width: w }));
         applyHeaderRows(wsUyg, 'UYGUNSUZLUKLAR LİSTESİ', `Açık: ${uygunsuzlukStats.acik}  |  Kapandı: ${uygunsuzlukStats.kapandi}  |  Kritik: ${uygunsuzlukStats.kritik}  |  ${firmaAdi}  |  Rapor: ${tarih}`, uygCols.length);
-        applyHeaderCols(wsUyg, uygCols, true);
+        applyHeaderCols(wsUyg, uygCols, true, 4);
 
         for (let i = 0; i < exUygunsuzluklar.length; i++) {
           const u = exUygunsuzluklar[i];

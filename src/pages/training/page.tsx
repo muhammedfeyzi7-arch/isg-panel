@@ -298,6 +298,7 @@ export default function EgitimlerPage() {
     egitmen: '',
     aciklama: '',
     katilimcilar: [] as EgitimKatilimci[],
+    katilimGorseli: '' as string,
   };
   const [form, setForm] = useState({ ...emptyForm });
 
@@ -424,6 +425,7 @@ export default function EgitimlerPage() {
       egitmen: eg.egitmen || '',
       aciklama: eg.aciklama || '',
       katilimcilar,
+      katilimGorseli: eg.katilimGorseli || '',
     });
     setEditingId(eg.id);
     setFormOpen(true);
@@ -442,6 +444,7 @@ export default function EgitimlerPage() {
       egitmen: form.egitmen,
       aciklama: form.aciklama,
       katilimcilar: form.katilimcilar,
+      katilimGorseli: form.katilimGorseli || undefined,
       // Legacy uyumluluk
       katilimciIds: form.katilimcilar.map(k => k.personelId),
       durum: form.katilimcilar.length > 0 ? 'Tamamlandı' : 'Planlandı',
@@ -815,6 +818,9 @@ export default function EgitimlerPage() {
           <AiKatilimAnaliz
             firmaPersoneller={firmaPersoneller}
             tumPersoneller={personeller.filter(p => !p.silinmis)}
+            onGorselSecildi={(base64, mimeType) => {
+              setForm(prev => ({ ...prev, katilimGorseli: `data:${mimeType};base64,${base64}` }));
+            }}
             onEkle={(personelIds) => {
               setForm(prev => {
                 // Zaten listede olmayanları ekle, katildi=true
@@ -985,6 +991,37 @@ export default function EgitimlerPage() {
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
                 <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Açıklama</p>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{detailEgitim.aciklama}</p>
+              </div>
+            )}
+
+            {/* Katılım Listesi Görseli */}
+            {detailEgitim.katilimGorseli && (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-main)' }}>
+                <div className="flex items-center justify-between px-3 py-2"
+                  style={{ background: 'var(--bg-item)', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div className="flex items-center gap-2">
+                    <i className="ri-image-line text-sm" style={{ color: '#818CF8' }} />
+                    <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                      Katılım Listesi Görseli
+                    </p>
+                  </div>
+                  <a
+                    href={detailEgitim.katilimGorseli}
+                    download="katilim-listesi.jpg"
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg cursor-pointer whitespace-nowrap"
+                    style={{ background: 'rgba(129,140,248,0.1)', color: '#818CF8', border: '1px solid rgba(129,140,248,0.2)' }}
+                  >
+                    <i className="ri-download-line" /> İndir
+                  </a>
+                </div>
+                <div className="p-2" style={{ background: 'var(--bg-input)' }}>
+                  <img
+                    src={detailEgitim.katilimGorseli}
+                    alt="Katılım listesi görseli"
+                    className="w-full rounded-lg object-contain max-h-80"
+                    style={{ border: '1px solid var(--border-subtle)' }}
+                  />
+                </div>
               </div>
             )}
 

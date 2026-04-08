@@ -106,6 +106,7 @@ export interface Egitim {
   belgeDosyaTipi?: string;
   belgeDosyaVeri?: string;
   belgeDosyaUrl?: string;
+  katilimGorseli?: string; // base64 katılım listesi görseli
   notlar?: string;
   olusturmaTarihi: string;
   silinmis?: boolean;
