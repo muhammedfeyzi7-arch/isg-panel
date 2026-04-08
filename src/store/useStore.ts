@@ -478,8 +478,31 @@ export function useStore(
   }, [fetchWithCache, setUygunsuzluklar]);
 
   const fetchEkipmanlar = useCallback(async (orgId: string) => {
-    await fetchWithCache<Ekipman>('ekipmanlar', orgId, setEkipmanlar);
-  }, [fetchWithCache, setEkipmanlar]);
+    const cacheKey = `ekipmanlar_${orgId}`;
+    const PAGE_SIZE = 500;
+    let allRows: Ekipman[] = [];
+    let from = 0;
+    let hasMore = true;
+    let pageNum = 0;
+    // Tüm kayıtları çek (aktif + silinmiş) — deleted_at filtresi YOK
+    // Ekipmanlar sayfası !silinmis ile filtreler, çöp kutusu silinmis===true ile filtreler
+    while (hasMore) {
+      pageNum++;
+      const { data } = await supabase
+        .from('ekipmanlar')
+        .select('id, data, created_at')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+      const rows = data ?? [];
+      allRows = allRows.concat(rows.map(r => r.data as Ekipman));
+      if (rows.length < PAGE_SIZE || pageNum >= 20) hasMore = false;
+      else from += PAGE_SIZE;
+    }
+    setEkipmanlar(allRows);
+    void writeCache(cacheKey, allRows);
+    console.log(`[ISG] fetchEkipmanlar ✓ total=${allRows.length}`);
+  }, [setEkipmanlar]);
 
   const fetchGorevler = useCallback(async (orgId: string) => {
     await fetchWithCache<Gorev>('gorevler', orgId, setGorevler);
@@ -1510,24 +1533,72 @@ export function useStore(
   }, [setEkipmanlar]);
 
   const deleteEkipman = useCallback((id: string) => {
+    const now = new Date().toISOString();
     let updated: Ekipman | null = null;
+    let snapshot: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
-      updated = { ...e, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      snapshot = e;
+      updated = { ...e, silinmis: true as const, silinmeTarihi: now };
       return updated;
     }));
-    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) {
+      const orgId = orgIdRef.current;
+      if (orgId) {
+        // deleted_at'i açıkça set et — fetchAllRows .is('deleted_at', null) filtresi için kritik
+        supabase
+          .from('ekipmanlar')
+          .update({ data: updated, updated_at: now, deleted_at: now, device_id: getDeviceId() })
+          .eq('id', id)
+          .eq('organization_id', orgId)
+          .then(({ error }) => {
+            if (error) {
+              console.error('[ISG] deleteEkipman DB error:', error.message);
+              if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
+              onSaveErrorRef.current?.(`Ekipman silinemedi: ${error.message}`);
+            } else {
+              console.log(`[ISG] deleteEkipman OK: ${id} deleted_at=${now}`);
+            }
+          });
+      } else {
+        saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+      }
+    }
     logFnRef.current?.('ekipman_deleted', 'Ekipmanlar', id, undefined, 'Ekipman silindi.');
   }, [setEkipmanlar, saveToDb]);
 
   const restoreEkipman = useCallback((id: string) => {
+    const now = new Date().toISOString();
     let updated: Ekipman | null = null;
+    let snapshot: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
+      snapshot = e;
       updated = { ...e, silinmis: false as const, silinmeTarihi: undefined };
       return updated;
     }));
-    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) {
+      const orgId = orgIdRef.current;
+      if (orgId) {
+        // deleted_at'i null'a çek — fetchAllRows geri getirsin
+        supabase
+          .from('ekipmanlar')
+          .update({ data: updated, updated_at: now, deleted_at: null, device_id: getDeviceId() })
+          .eq('id', id)
+          .eq('organization_id', orgId)
+          .then(({ error }) => {
+            if (error) {
+              console.error('[ISG] restoreEkipman DB error:', error.message);
+              if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
+              onSaveErrorRef.current?.(`Ekipman geri yüklenemedi: ${error.message}`);
+            } else {
+              console.log(`[ISG] restoreEkipman OK: ${id} deleted_at=null`);
+            }
+          });
+      } else {
+        saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+      }
+    }
   }, [setEkipmanlar, saveToDb]);
 
   const ekipmanlarRef = useRef<Ekipman[]>([]);
