@@ -1,10 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../store/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import type { Firma, TehlikeSinifi, FirmaStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getFirmaStatusColor, getTehlikeColor, getPersonelStatusColor } from '../../components/base/Badge';
 import PersonelDetayModal from '../personnel/components/PersonelDetayModal';
+import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
 const emptyFirma: Omit<Firma, 'id' | 'olusturmaTarihi' | 'guncellemeTarihi'> = {
   ad: '', yetkiliKisi: '', telefon: '', email: '', vergiNo: '', sgkSicil: '',
@@ -51,6 +52,57 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
     <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
       <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{label}</p>
       <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{value || '—'}</p>
+    </div>
+  );
+}
+
+/**
+ * Firma logo resmi — path veya URL olabilir, ikisini de handle eder.
+ * Path ise signed URL üretir, kırık olursa fallback gösterir.
+ */
+function FirmaLogoImg({ logoUrl, firmaAd, size = 'md' }: { logoUrl: string; firmaAd: string; size?: 'sm' | 'md' }) {
+  const [src, setSrc] = useState<string>(logoUrl);
+  const [error, setError] = useState(false);
+  const wh = size === 'sm' ? 'w-8 h-8' : 'w-10 h-10';
+
+  useEffect(() => {
+    setError(false);
+    // Path mi yoksa URL mi?
+    if (
+      logoUrl &&
+      !logoUrl.startsWith('http://') &&
+      !logoUrl.startsWith('https://') &&
+      !logoUrl.startsWith('data:') &&
+      !logoUrl.startsWith('blob:')
+    ) {
+      // Storage path — signed URL üret
+      getSignedUrlFromPath(logoUrl).then(url => {
+        if (url) setSrc(url);
+        else setError(true);
+      });
+    } else {
+      setSrc(logoUrl);
+    }
+  }, [logoUrl]);
+
+  if (error || !src) {
+    return (
+      <div className={`${wh} flex items-center justify-center rounded-lg flex-shrink-0 text-[11px] font-bold text-white`}
+        style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
+        {firmaAd.charAt(0).toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${wh} rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center`}
+      style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+      <img
+        src={src}
+        alt={firmaAd}
+        className="w-full h-full object-contain p-0.5"
+        onError={() => setError(true)}
+      />
     </div>
   );
 }
@@ -119,12 +171,28 @@ export default function FirmalarPage() {
     setBulkDeleteConfirm(false);
   };
 
-  const openAdd = () => { setForm({ ...emptyFirma }); setEditingId(null); setLogoVeri(''); setFormOpen(true); };
-  const openEdit = (f: Firma) => {
+  const openAdd = () => { setForm({ ...emptyFirma }); setEditingId(null); setLogoVeri(''); setPendingLogoFile(null); setFormOpen(true); };
+  const openEdit = async (f: Firma) => {
     setForm({ ...f });
     setEditingId(f.id);
-    // logoUrl doğrudan firma objesinden okunur
-    setLogoVeri((f as Firma & { logoUrl?: string }).logoUrl || '');
+    setPendingLogoFile(null);
+    const rawLogoUrl = (f as Firma & { logoUrl?: string }).logoUrl || '';
+    if (rawLogoUrl) {
+      // Path ise signed URL çevir, URL ise direkt kullan
+      if (
+        !rawLogoUrl.startsWith('http://') &&
+        !rawLogoUrl.startsWith('https://') &&
+        !rawLogoUrl.startsWith('data:') &&
+        !rawLogoUrl.startsWith('blob:')
+      ) {
+        const signed = await getSignedUrlFromPath(rawLogoUrl);
+        setLogoVeri(signed ?? rawLogoUrl);
+      } else {
+        setLogoVeri(rawLogoUrl);
+      }
+    } else {
+      setLogoVeri('');
+    }
     setFormOpen(true);
   };
 
@@ -142,13 +210,15 @@ export default function FirmalarPage() {
     if (editingId) {
       updateFirma(editingId, form);
       if (pendingLogoFile) {
-        await setFirmaLogo(editingId, pendingLogoFile);
+        const newUrl = await setFirmaLogo(editingId, pendingLogoFile);
+        if (newUrl) setLogoVeri(newUrl);
       }
       addToast('Firma başarıyla güncellendi.', 'success');
     } else {
       const yeniFirma = addFirma(form);
       if (pendingLogoFile) {
-        await setFirmaLogo(yeniFirma.id, pendingLogoFile);
+        const newUrl = await setFirmaLogo(yeniFirma.id, pendingLogoFile);
+        if (newUrl) setLogoVeri(newUrl);
       }
       addToast('Firma başarıyla eklendi.', 'success');
     }
@@ -314,9 +384,7 @@ export default function FirmalarPage() {
                     )}
                     <button onClick={() => setDetailId(firma.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer">
                       {logoUrl ? (
-                        <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          <img src={logoUrl} alt={firma.ad} className="w-full h-full object-contain p-0.5" />
-                        </div>
+                        <FirmaLogoImg logoUrl={logoUrl} firmaAd={firma.ad} size="md" />
                       ) : (
                         <div className="w-10 h-10 flex items-center justify-center rounded-lg flex-shrink-0 text-sm font-bold text-white"
                           style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
@@ -367,63 +435,61 @@ export default function FirmalarPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((firma) => (
-                    <tr key={firma.id} style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
-                      {canDelete && (
-                        <td className="text-center">
-                          <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer" />
-                        </td>
-                      )}
-                      <td>
-                        <button onClick={() => setDetailId(firma.id)} className="group cursor-pointer text-left">
-                          <div className="flex items-center gap-2.5">
-                            {(() => {
-                              const logoUrl = (firma as Firma & { logoUrl?: string }).logoUrl;
-                              return logoUrl ? (
-                                <div className="w-8 h-8 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                  <img src={logoUrl} alt={firma.ad} className="w-full h-full object-contain p-0.5" />
-                                </div>
+                  {filtered.map((firma) => {
+                    const logoUrl = (firma as Firma & { logoUrl?: string }).logoUrl;
+                    return (
+                      <tr key={firma.id} style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
+                        {canDelete && (
+                          <td className="text-center">
+                            <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer" />
+                          </td>
+                        )}
+                        <td>
+                          <button onClick={() => setDetailId(firma.id)} className="group cursor-pointer text-left">
+                            <div className="flex items-center gap-2.5">
+                              {logoUrl ? (
+                                <FirmaLogoImg logoUrl={logoUrl} firmaAd={firma.ad} size="sm" />
                               ) : (
                                 <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-[11px] font-bold text-white"
                                   style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
                                   {firma.ad.charAt(0).toUpperCase()}
                                 </div>
-                              );
-                            })()}
-                            <div>
-                              <p className="text-[12.5px] font-semibold group-hover:text-blue-400 transition-colors" style={{ color: 'var(--text-primary)' }}>{firma.ad}</p>
-                              {firma.sgkSicil && <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>SGK: {firma.sgkSicil}</p>}
+                              )}
+                              <div>
+                                <p className="text-[12.5px] font-semibold group-hover:text-blue-400 transition-colors" style={{ color: 'var(--text-primary)' }}>{firma.ad}</p>
+                                {firma.sgkSicil && <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>SGK: {firma.sgkSicil}</p>}
+                              </div>
                             </div>
+                          </button>
+                        </td>
+                        <td className="hidden md:table-cell">
+                          <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{firma.yetkiliKisi || '—'}</p>
+                        </td>
+                        <td className="hidden lg:table-cell">
+                          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{firma.telefon || '—'}</p>
+                          <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{firma.email || ''}</p>
+                        </td>
+                        <td className="hidden md:table-cell">
+                          <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
+                        </td>
+                        <td>
+                          <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
+                        </td>
+                        <td className="hidden lg:table-cell">
+                          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                            {firma.sozlesmeBit ? new Date(firma.sozlesmeBit).toLocaleDateString('tr-TR') : '—'}
+                          </p>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-1 justify-end">
+                            <ActionBtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(firma.id)} title="Detay" />
+                            {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
+                            {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
                           </div>
-                        </button>
-                      </td>
-                      <td className="hidden md:table-cell">
-                        <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{firma.yetkiliKisi || '—'}</p>
-                      </td>
-                      <td className="hidden lg:table-cell">
-                        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{firma.telefon || '—'}</p>
-                        <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{firma.email || ''}</p>
-                      </td>
-                      <td className="hidden md:table-cell">
-                        <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
-                      </td>
-                      <td>
-                        <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
-                      </td>
-                      <td className="hidden lg:table-cell">
-                        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                          {firma.sozlesmeBit ? new Date(firma.sozlesmeBit).toLocaleDateString('tr-TR') : '—'}
-                        </p>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1 justify-end">
-                          <ActionBtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(firma.id)} title="Detay" />
-                          {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
-                          {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -514,7 +580,7 @@ export default function FirmalarPage() {
                 >
                   {logoVeri ? (
                     <>
-                      <img src={logoVeri} alt="Logo önizleme" className="w-12 h-12 object-contain rounded-lg" style={{ background: 'white', padding: '4px' }} />
+                      <img src={logoVeri} alt="Logo önizleme" className="w-12 h-12 object-contain rounded-lg" style={{ background: 'white', padding: '4px' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       <div>
                         <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Logo yüklendi</p>
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Değiştirmek için tıklayın</p>

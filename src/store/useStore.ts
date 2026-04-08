@@ -289,6 +289,59 @@ export function useStore(
     }
   }, []);
 
+  // ── Paginated fetch — bypasses Supabase's 1000-row default limit ──
+  const fetchAllRows = useCallback(async (
+    table: string,
+    orgId: string,
+  ): Promise<{ data: { data: unknown }[] | null; error: unknown }> => {
+    const PAGE_SIZE = 500; // Smaller page size for reliability
+    let allRows: { data: unknown }[] = [];
+    let from = 0;
+    let hasMore = true;
+    let pageNum = 0;
+
+    while (hasMore) {
+      pageNum++;
+      const to = from + PAGE_SIZE - 1;
+      console.log(`[ISG] fetchAllRows ${table} page=${pageNum} range=${from}-${to}`);
+
+      const { data, error } = await supabase
+        .from(table)
+        .select('id, data, created_at', { count: 'exact' })
+        .eq('organization_id', orgId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        console.error(`[ISG] fetchAllRows error (${table}) page=${pageNum}:`, error);
+        // Return what we have so far rather than nothing
+        return { data: allRows.length > 0 ? allRows as { data: unknown }[] : null, error };
+      }
+
+      const rows = data ?? [];
+      allRows = allRows.concat(rows as { data: unknown }[]);
+
+      console.log(`[ISG] fetchAllRows ${table} page=${pageNum} got=${rows.length} total_so_far=${allRows.length}`);
+
+      // Stop if we got fewer rows than requested (last page)
+      if (rows.length < PAGE_SIZE) {
+        hasMore = false;
+      } else {
+        from += PAGE_SIZE;
+      }
+
+      // Safety: max 20 pages (10,000 rows) to prevent infinite loops
+      if (pageNum >= 20) {
+        console.warn(`[ISG] fetchAllRows ${table}: reached max pages (20), stopping`);
+        hasMore = false;
+      }
+    }
+
+    console.log(`[ISG] fetchAllRows DONE: ${table} total=${allRows.length} pages=${pageNum}`);
+    return { data: allRows as { data: unknown }[], error: null };
+  }, []);
+
   // ── Core data loader (reusable) ──
   const loadAllData = useCallback(async (orgId: string) => {
     const TABLES = [
@@ -296,18 +349,9 @@ export function useStore(
       'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar', 'is_izinleri',
     ] as const;
 
-    // FIX 7: Use Promise.allSettled instead of Promise.all
-    // This ensures partial failures don't wipe all data — each table loads independently
-    // deleted_at IS NULL filtresi: silinmiş kayıtları yükleme (soft-delete pattern)
+    // Use paginated fetch to bypass Supabase's 1000-row default limit
     const results = await Promise.allSettled(
-      TABLES.map(table =>
-        supabase
-          .from(table)
-          .select('id, data, created_at')
-          .eq('organization_id', orgId)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false }),
-      ),
+      TABLES.map(table => fetchAllRows(table, orgId)),
     );
 
     // Helper: extract rows from settled result — returns empty array on failure
@@ -355,7 +399,7 @@ export function useStore(
     setIsIzinleri(getRows<IsIzni>(isIzRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
 
     console.log(`[ISG] Data loaded ✓ firms=${firmaRes.status === 'fulfilled' ? (firmaRes.value.data?.length ?? 0) : 'ERR'} personnel=${personelRes.status === 'fulfilled' ? (personelRes.value.data?.length ?? 0) : 'ERR'}`);
-  }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, setTutanaklar, setIsIzinleri]);
+  }, [fetchAllRows, setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, setTutanaklar, setIsIzinleri]);
 
   // ── Public refresh function — called by UI refresh buttons ──
   const refreshAllData = useCallback(async () => {
@@ -484,14 +528,10 @@ export function useStore(
     // Fallback: tüm tabloyu yeniden çek (patch başarısız olursa veya data yoksa)
     const reloadTable = async (table: string) => {
       try {
-        const { data, error } = await supabase
-          .from(table)
-          .select('id, data, created_at')
-          .eq('organization_id', activeOrgId)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
+        // Use paginated fetch to bypass 1000-row limit
+        const { data, error } = await fetchAllRows(table, activeOrgId);
         if (error) {
-          console.error(`[ISG] reloadTable error (${table}):`, error.message);
+          console.error(`[ISG] reloadTable error (${table}):`, error);
           return;
         }
         if (!data) return;
@@ -1475,11 +1515,17 @@ export function useStore(
       return fileOrUrl;
     }
     const orgId = orgIdRef.current ?? 'unknown';
-    const url = await uploadFileToStorage(fileOrUrl, orgId, 'firma-logo', firmaId);
-    if (url) {
-      updateFirma(firmaId, { logoUrl: url } as Partial<Firma>);
+    // uploadFileToStorage → filePath döner (path, URL değil)
+    const filePath = await uploadFileToStorage(fileOrUrl, orgId, 'firma-logo', firmaId);
+    if (filePath) {
+      // filePath'i signed URL'ye çevir (24 saat geçerli) — böylece <img src> direkt çalışır
+      const { getSignedUrl } = await import('../utils/fileUpload');
+      const signedUrl = await getSignedUrl(filePath);
+      const urlToSave = signedUrl ?? filePath;
+      updateFirma(firmaId, { logoUrl: urlToSave } as Partial<Firma>);
+      return urlToSave;
     }
-    return url;
+    return null;
   }, [updateFirma]);
 
 
