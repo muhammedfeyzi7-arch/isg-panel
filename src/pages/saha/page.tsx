@@ -8,7 +8,6 @@ import type { Ekipman, EkipmanStatus, Uygunsuzluk, Evrak } from '@/types';
 import { useOfflineQueue, type OfflineQueueItem } from '@/hooks/useOfflineQueue';
 import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHelper';
 import { getSignedUrlFromPath } from '@/utils/fileUpload';
-import { supabase } from '@/lib/supabase';
 import IsIzniSahaBolumu from './components/IsIzniSahaBolumu';
 
 // jsQR modül yükleyici
@@ -780,44 +779,22 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
   onDurumDegistir: (ekipmanId: string, durum: EkipmanStatus) => void;
   isOnline: boolean;
 }) {
-  const { firmalar, addToast, org } = useApp();
+  const { firmalar, addToast, evraklar: tumEvraklar } = useApp();
   const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
   const firma = firmalar.find(f => f.id === ekipman.firmaId);
   const days = ekipman.sonrakiKontrolTarihi
     ? Math.ceil((new Date(ekipman.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000)
     : null;
 
-  // Evraklar — direkt Supabase'den çek
-  const [evraklar, setEvraklar] = useState<Evrak[]>([]);
-  const [evraklarLoading, setEvraklarLoading] = useState(true);
+  // Evraklar — store'dan filtrele, DB çağrısı yok
+  const evraklar = useMemo(() =>
+    tumEvraklar
+      .filter(e => !e.silinmis && !e.cascadeSilindi && e.firmaId === ekipman.firmaId)
+      .sort((a, b) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? '')),
+    [tumEvraklar, ekipman.firmaId]
+  );
+  const evraklarLoading = false;
   const [downloading, setDownloading] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!ekipman.firmaId || !org?.id) {
-      setEvraklar([]);
-      setEvraklarLoading(false);
-      return;
-    }
-    setEvraklarLoading(true);
-    supabase
-      .from('evraklar')
-      .select('id, data')
-      .eq('organization_id', org.id)
-      .is('deleted_at', null)
-      .then(({ data, error }) => {
-        if (error || !data) { setEvraklar([]); setEvraklarLoading(false); return; }
-        const parsed: Evrak[] = data
-          .map((row: { id: string; data: Evrak }) => ({ ...row.data, id: row.id }))
-          .filter((e: Evrak) =>
-            !e.silinmis &&
-            !e.cascadeSilindi &&
-            e.firmaId === ekipman.firmaId
-          )
-          .sort((a: Evrak, b: Evrak) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? ''));
-        setEvraklar(parsed);
-        setEvraklarLoading(false);
-      });
-  }, [ekipman.firmaId, org?.id]);
 
   const fmtDate = (iso?: string) => {
     if (!iso) return '—';
