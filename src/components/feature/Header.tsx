@@ -15,7 +15,6 @@ const moduleTitles: Record<string, { label: string; icon: string }> = {
   uygunsuzluklar: { label: 'Saha Denetimleri',   icon: 'ri-map-pin-user-line' },
   ekipmanlar:     { label: 'Ekipman',             icon: 'ri-tools-line' },
   'is-izinleri':  { label: 'İş İzinleri',         icon: 'ri-shield-keyhole-line' },
-  gorevler:       { label: 'Görevler',            icon: 'ri-task-line' },
   raporlar:       { label: 'Raporlar',            icon: 'ri-bar-chart-2-line' },
   ayarlar:        { label: 'Ayarlar',             icon: 'ri-settings-4-line' },
   copkutusu:      { label: 'Çöp Kutusu',          icon: 'ri-delete-bin-2-line' },

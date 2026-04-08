@@ -22,11 +22,9 @@ function parseValidDate(dateStr: string | null | undefined): Date | null {
 export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
-    uygunsuzluklar, bildirimler, ekipmanlar, gorevler, isIzinleri,
+    uygunsuzluklar, bildirimler, ekipmanlar, isIzinleri,
     setActiveModule,
   } = useApp();
-
-
 
   const aktifFirmalar      = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
   const aktifPersoneller   = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);
@@ -46,21 +44,7 @@ export default function DashboardPage() {
   const aktifMuayeneler    = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
   const aktifUygunsuzluklar= useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
   const aktifEkipmanlar    = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
-  const aktifGorevler      = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);
   const aktifIsIzinleri    = useMemo(() => isIzinleri.filter(iz => !iz.silinmis), [isIzinleri]);
-
-  // Görev istatistikleri
-  const gorevStats = useMemo(() => {
-    const now = new Date();
-    const acik = aktifGorevler.filter(g => g.durum !== 'Tamamlandı').length;
-    const tamamlanan = aktifGorevler.filter(g => g.durum === 'Tamamlandı').length;
-    const gecikmiş = aktifGorevler.filter(g => {
-      if (g.durum === 'Tamamlandı') return false;
-      if (!g.bitisTarihi) return false;
-      return new Date(g.bitisTarihi) < now;
-    }).length;
-    return { acik, tamamlanan, gecikmiş };
-  }, [aktifGorevler]);
 
   // İş izni istatistikleri
   const isIzniStats = useMemo(() => {
@@ -180,10 +164,9 @@ export default function DashboardPage() {
       ...aktifFirmalar.map(f => ({ tip: 'Firma', ad: f.ad, tarih: f.olusturmaTarihi, icon: 'ri-building-2-line', color: '#3B82F6', badge: 'eklendi', badgeColor: '#10B981', badgeBg: 'rgba(16,185,129,0.12)' })),
       ...aktifPersoneller.map(p => ({ tip: 'Personel', ad: p.adSoyad, tarih: p.olusturmaTarihi, icon: 'ri-user-line', color: '#10B981', badge: 'eklendi', badgeColor: '#10B981', badgeBg: 'rgba(16,185,129,0.12)' })),
       ...aktifEgitimler.map(e => ({ tip: 'Eğitim', ad: e.ad, tarih: e.olusturmaTarihi, icon: 'ri-graduation-cap-line', color: '#F59E0B', badge: 'planlandı', badgeColor: '#F59E0B', badgeBg: 'rgba(245,158,11,0.12)' })),
-      ...aktifGorevler.slice(0, 5).map(g => ({ tip: 'Görev', ad: g.baslik || 'Görev', tarih: g.olusturmaTarihi, icon: 'ri-task-line', color: '#6366F1', badge: g.durum === 'Tamamlandı' ? 'tamamlandı' : 'açık', badgeColor: g.durum === 'Tamamlandı' ? '#10B981' : '#F59E0B', badgeBg: g.durum === 'Tamamlandı' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)' })),
     ];
     return all.sort((a, b) => new Date(b.tarih).getTime() - new Date(a.tarih).getTime()).slice(0, 8);
-  }, [aktifFirmalar, aktifPersoneller, aktifEgitimler, aktifGorevler]);
+  }, [aktifFirmalar, aktifPersoneller, aktifEgitimler]);
 
   const yaklaşanEvraklar = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -230,21 +213,8 @@ export default function DashboardPage() {
     { label: 'Açık Uygunsuzluk',      value: stats.acikU,             icon: 'ri-alert-line',       sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, trend: null,                trendLabel: null,                                gradient: stats.acikU > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)', border: stats.acikU > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.15)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #6EE7B7, #34D399)', accentColor: stats.acikU > 0 ? '#EF4444' : '#10B981' },
   ];
 
-  // Görev + İş İzni ek stat kartları
+  // İş İzni ek stat kartı
   const extraStatCards = [
-    {
-      label: 'Açık Görevler',
-      value: gorevStats.acik,
-      icon: 'ri-task-line',
-      sub: `${gorevStats.gecikmiş} gecikmiş · ${gorevStats.tamamlanan} tamamlandı`,
-      trend: null,
-      trendLabel: null,
-      gradient: gorevStats.gecikmiş > 0 ? 'linear-gradient(145deg, rgba(245,158,11,0.1) 0%, rgba(217,119,6,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)',
-      border: gorevStats.gecikmiş > 0 ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.15)',
-      iconBg: gorevStats.gecikmiş > 0 ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'linear-gradient(135deg, #10B981, #059669)',
-      valueColor: gorevStats.gecikmiş > 0 ? 'linear-gradient(135deg, #FCD34D, #FBBF24)' : 'linear-gradient(135deg, #6EE7B7, #34D399)',
-      accentColor: gorevStats.gecikmiş > 0 ? '#F59E0B' : '#10B981',
-    },
     {
       label: 'İş İzinleri',
       value: isIzniStats.toplam,
@@ -291,15 +261,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Uyarı badge'leri — sadece varsa göster */}
-          {(gorevStats.gecikmiş > 0 || (riskStats.toplamGecikme + riskStats.uygunDegil) > 0) && (
+          {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
-              {gorevStats.gecikmiş > 0 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold"
-                  style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}>
-                  <i className="ri-task-line text-[10px]" />
-                  {gorevStats.gecikmiş} gecikmiş görev
-                </div>
-              )}
               {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold"
                   style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
@@ -388,7 +351,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Görev + İş İzni Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
         {extraStatCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -460,12 +423,12 @@ export default function DashboardPage() {
                   {uygunDegılEkipmanlar.map(ek => {
                     const firma = aktifFirmalar.find(f => f.id === ek.firmaId);
                     return (
-                      <div key={ek.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg"
+                      <div key={ek.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg"
                         style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)' }}>
                         <i className="ri-tools-line text-[10px]" style={{ color: '#F87171' }} />
                         <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</span>
                         {firma && <span className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{firma.ad}</span>}
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                           style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>KRİTİK</span>
                       </div>
                     );
@@ -486,7 +449,7 @@ export default function DashboardPage() {
                   { label: 'Evrak', value: riskStats.gecikmisBelge,   icon: 'ri-file-damage-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
                   { label: 'Ekipman', value: riskStats.gecikmisEkipman, icon: 'ri-tools-line',        color: '#FB923C', bg: 'rgba(251,146,60,0.1)',   border: 'rgba(251,146,60,0.2)' },
                   { label: 'Muayene', value: riskStats.gecikmisMuayene, icon: 'ri-heart-pulse-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
-                  { label: 'Görev', value: gorevStats.gecikmiş,         icon: 'ri-task-line',         color: '#FBBF24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.2)' },
+                  { label: 'İş İzni', value: isIzniStats.bekleyen,      icon: 'ri-shield-check-line', color: '#A78BFA', bg: 'rgba(167,139,250,0.1)',  border: 'rgba(167,139,250,0.2)' },
                 ].map(item => (
                   <div key={item.label} className="rounded-xl p-2.5 text-center"
                     style={{ background: item.value > 0 ? `${item.color}18` : 'var(--bg-item)', border: `1px solid ${item.value > 0 ? `${item.color}30` : 'var(--bg-item-border)'}` }}>
@@ -611,140 +574,18 @@ export default function DashboardPage() {
                       {riskStats.gecikmisMuayene} muayene tarihi geçti
                     </p>
                   )}
-                  {gorevStats.gecikmiş > 0 && (
-                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      <i className="ri-circle-fill text-[6px] mr-1.5" style={{ color: '#FBBF24' }} />
-                      {gorevStats.gecikmiş} görev gecikmiş
-                    </p>
-                  )}
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* ── Açık Uygunsuzluklar ── */}
-      {acikUygunsuzluklar.length > 0 && (
-        <div className="rounded-xl overflow-hidden isg-card" style={{ borderLeft: '3px solid #EF4444' }}>
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(239,68,68,0.12)' }}>
-                  <i className="ri-alert-fill text-xs" style={{ color: '#EF4444' }} />
-                </div>
-                <div>
-                  <h3 className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>Açık Uygunsuzluklar</h3>
-                  <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>Kapatılmayı bekleyen kayıtlar</p>
-                </div>
-              </div>
-              <button onClick={() => setActiveModule('uygunsuzluklar')} className="text-[10.5px] font-semibold px-2 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
-                style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.15)' }}>
-                Modüle Git
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
-              {acikUygunsuzluklar.map(u => {
-                const firma = aktifFirmalar.find(f => f.id === u.firmaId);
-                return (
-                  <div key={u.id} className="rounded-lg p-2.5" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171' }}>{u.acilisNo ?? 'DÖF'}</span>
-                      <span className="text-[9px] ml-auto" style={{ color: 'var(--text-muted)' }}>{new Date(u.olusturmaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}</span>
-                    </div>
-                    <p className="text-[11px] font-semibold line-clamp-2 mb-1" style={{ color: 'var(--text-primary)' }}>{u.baslik || u.aciklama?.slice(0, 40) || '—'}</p>
-                    {firma && <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}><i className="ri-building-2-line mr-1" />{firma.ad}</p>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Yaklaşan Süreler + Son Aktiviteler ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="rounded-xl overflow-hidden isg-card">
-          <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #F59E0B, #FBBF24)' }} />
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}>
-                  <i className="ri-time-line text-white text-xs" />
-                </div>
-                <div>
-                  <h3 className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>Yaklaşan Süreler</h3>
-                  <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Önümüzdeki 60 gün</p>
-                </div>
-              </div>
-              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <i className="ri-time-line text-[10px]" />{yaklaşanEvraklar.length + yaklaşanEkipmanlar.length} kayıt
-              </span>
-            </div>
-            {(yaklaşanEvraklar.length > 0 || yaklaşanEkipmanlar.length > 0) ? (
-              <UpcomingTabs evraklar={yaklaşanEvraklar} ekipmanlar={yaklaşanEkipmanlar} firmalar={aktifFirmalar} />
-            ) : (
-              <InsightEmptyState />
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-xl overflow-hidden isg-card">
-          <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                  <i className="ri-history-line text-white text-xs" />
-                </div>
-                <div>
-                  <h3 className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>Son Aktiviteler</h3>
-                  <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>En son eklenen kayıtlar</p>
-                </div>
-              </div>
-            </div>
-            {recentItems.length === 0 ? (
-              <DashEmptyState icon="ri-time-line" text="Henüz aktivite yok" subtext="Kayıt ekledikçe burada görünecek" />
-            ) : (
-              <div className="space-y-1">
-                {recentItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2 rounded-lg px-2.5 py-2"
-                    style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                    <div className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0"
-                      style={{ background: `${item.color}15`, border: `1px solid ${item.color}20` }}>
-                      <i className={`${item.icon} text-[10px]`} style={{ color: item.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11.5px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{item.ad}</p>
-                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{new Date(item.tarih).toLocaleDateString('tr-TR')}</p>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${item.color}12`, color: item.color }}>{item.tip}</span>
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: item.badgeBg, color: item.badgeColor }}>{item.badge}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── İş İzni Uyarı Widget ── */}
-      <IsIzniUyariWidget />
-
-      {/* ── Firma Evrakları Widget ── */}
-      <CompanyDocumentsWidget />
 
       {/* ── Progress Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {[
           { label: 'Aktif Firmalar',        value: aktifFirmalar.filter(f => f.durum === 'Aktif').length,         total: aktifFirmalar.length,    color: '#3B82F6', icon: 'ri-building-2-line',     accent: 'linear-gradient(135deg, #3B82F6, #6366F1)' },
           { label: 'Aktif Personeller',     value: aktifPersoneller.filter(p => p.durum === 'Aktif').length,      total: aktifPersoneller.length, color: '#10B981', icon: 'ri-team-line',           accent: 'linear-gradient(135deg, #10B981, #059669)' },
-          { label: 'Tamamlanan Görevler',   value: gorevStats.tamamlanan,                                          total: aktifGorevler.length,    color: '#6366F1', icon: 'ri-task-line',           accent: 'linear-gradient(135deg, #6366F1, #4F46E5)' },
           { label: 'Çalışabilir Muayene',   value: aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length, total: aktifMuayeneler.length,  color: '#34D399', icon: 'ri-heart-pulse-line',    accent: 'linear-gradient(135deg, #34D399, #10B981)' },
         ].map(item => {
           const pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;

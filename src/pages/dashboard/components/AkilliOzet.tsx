@@ -36,7 +36,7 @@ function parseValidDate(dateStr: string | null | undefined): Date | null {
 export default function AkilliOzet() {
   const {
     firmalar, personeller, evraklar, muayeneler,
-    uygunsuzluklar, ekipmanlar, gorevler, isIzinleri,
+    uygunsuzluklar, ekipmanlar, isIzinleri,
     setActiveModule,
   } = useApp();
 
@@ -49,7 +49,6 @@ export default function AkilliOzet() {
   const aktifMuayeneler    = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
   const aktifUygunsuzluklar= useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
   const aktifEkipmanlar    = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
-  const aktifGorevler      = useMemo(() => gorevler.filter(g => !g.silinmis), [gorevler]);
   const aktifIsIzinleri    = useMemo(() => isIzinleri.filter(iz => !iz.silinmis), [isIzinleri]);
 
   const insights = useMemo((): InsightItem[] => {
@@ -121,22 +120,6 @@ export default function AkilliOzet() {
     }
 
     // ── UYARI ──
-    const gecikmisgGorev = aktifGorevler.filter(g => {
-      if (g.durum === 'Tamamlandı') return false;
-      if (!g.bitisTarihi) return false;
-      return new Date(g.bitisTarihi) < today;
-    });
-    if (gecikmisgGorev.length > 0) {
-      list.push({
-        id: 'gorev-gecikti',
-        icon: 'ri-task-line',
-        title: `${gecikmisgGorev.length} Görev Gecikmiş`,
-        detail: gecikmisgGorev.slice(0, 3).map(g => g.baslik || 'Görev').join(', ') + (gecikmisgGorev.length > 3 ? ` +${gecikmisgGorev.length - 3} daha` : ''),
-        color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)',
-        priority: 85, level: 'warning', module: 'gorevler', count: gecikmisgGorev.length,
-      });
-    }
-
     const acikUygunsuzluk = aktifUygunsuzluklar.filter(u => u.durum === 'Açık');
     if (acikUygunsuzluk.length > 0) {
       list.push({
@@ -246,7 +229,7 @@ export default function AkilliOzet() {
 
     return list.sort((a, b) => b.priority - a.priority);
   }, [
-    aktifEkipmanlar, aktifEvraklar, aktifMuayeneler, aktifGorevler,
+    aktifEkipmanlar, aktifEvraklar, aktifMuayeneler,
     aktifUygunsuzluklar, aktifIsIzinleri, aktifPersoneller,
   ]);
 
@@ -254,12 +237,12 @@ export default function AkilliOzet() {
   const healthScore = useMemo(() => {
     const criticalCount = insights.filter(i => i.level === 'critical').reduce((s, i) => s + (i.count || 1), 0);
     const warningCount  = insights.filter(i => i.level === 'warning').reduce((s, i) => s + (i.count || 1), 0);
-    const total = aktifEvraklar.length + aktifEkipmanlar.length + aktifMuayeneler.length + aktifGorevler.length;
+    const total = aktifEvraklar.length + aktifEkipmanlar.length + aktifMuayeneler.length;
     if (total === 0) return 100;
     const penalty = (criticalCount * 3 + warningCount * 1.5);
     const score = Math.max(0, Math.min(100, Math.round(100 - (penalty / Math.max(total, 1)) * 100)));
     return score;
-  }, [insights, aktifEvraklar, aktifEkipmanlar, aktifMuayeneler, aktifGorevler]);
+  }, [insights, aktifEvraklar, aktifEkipmanlar, aktifMuayeneler]);
 
   const scoreColor = healthScore >= 80 ? '#34D399' : healthScore >= 50 ? '#F59E0B' : '#EF4444';
   const scoreLabel = healthScore >= 80 ? 'İyi' : healthScore >= 50 ? 'Dikkat' : 'Kritik';
