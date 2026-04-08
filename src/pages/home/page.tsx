@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import AppLoadingScreen from '../../components/feature/AppLoadingScreen';
 import { useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
@@ -22,18 +23,60 @@ import IsIzniPage from '../is-izni/page';
 import FirmaEvraklariPage from '../company-documents/page';
 import SahaPage from '../saha/page';
 
-function AppContent() {
-  const { activeModule, orgError, org, mustChangePassword, setActiveModule, kvkkAccepted, setKvkkAccepted } = useApp();
-  const [searchParams, setSearchParams] = useSearchParams();
+// URL path → modül adı eşlemesi
+const PATH_TO_MODULE: Record<string, string> = {
+  '/dashboard':       'dashboard',
+  '/firmalar':        'firmalar',
+  '/personeller':     'personeller',
+  '/evraklar':        'evraklar',
+  '/firma-evraklari': 'firma-evraklari',
+  '/egitimler':       'egitimler',
+  '/muayeneler':      'muayeneler',
+  '/tutanaklar':      'tutanaklar',
+  '/uygunsuzluklar':  'uygunsuzluklar',
+  '/ekipmanlar':      'ekipmanlar',
+  '/is-izinleri':     'is-izinleri',
+  '/saha':            'saha',
+  '/raporlar':        'raporlar',
+  '/copkutusu':       'copkutusu',
+  '/ayarlar':         'ayarlar',
+};
 
-  // URL'den ?module=saha gibi parametreyi oku ve modülü aç
+function AppContent() {
+  const { activeModule, orgError, org, mustChangePassword, setActiveModule, kvkkAccepted, setKvkkAccepted, pageLoading } = useApp();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [loadingDone, setLoadingDone] = useState(false);
+
+  // pageLoading bitince loading screen'i kapat
   useEffect(() => {
-    const module = searchParams.get('module');
-    if (module) {
-      setActiveModule(module);
-      setSearchParams({}, { replace: true });
+    if (!pageLoading) {
+      // Kısa bir gecikme — animasyon tamamlansın
+      const t = setTimeout(() => setLoadingDone(true), 300);
+      return () => clearTimeout(t);
     }
-  }, [searchParams, setActiveModule, setSearchParams]);
+  }, [pageLoading]);
+
+  // URL değişince activeModule'ü güncelle
+  useEffect(() => {
+    const module = PATH_TO_MODULE[location.pathname];
+    if (module && module !== activeModule) {
+      setActiveModule(module);
+    }
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // activeModule değişince URL'yi güncelle (sidebar tıklamaları için)
+  useEffect(() => {
+    const expectedPath = `/${activeModule}`;
+    if (location.pathname !== expectedPath && PATH_TO_MODULE[expectedPath] !== undefined) {
+      navigate(expectedPath, { replace: true });
+    }
+  }, [activeModule]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // İlk yükleme — loading screen göster (cache varsa çok kısa sürer)
+  if (!loadingDone) {
+    return <AppLoadingScreen onDone={() => setLoadingDone(true)} />;
+  }
 
   if (mustChangePassword) {
     return <ForcePasswordChange />;

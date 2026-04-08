@@ -1,6 +1,34 @@
 import { supabase } from '@/lib/supabase';
 
 /**
+ * Signed URL in-memory cache
+ * Key: `${bucket}::${filePath}`
+ * Value: { url, expiresAt } — 5 dakika TTL
+ */
+interface CacheEntry {
+  url: string;
+  expiresAt: number;
+}
+const urlCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 dakika
+
+function getCachedUrl(bucket: string, filePath: string): string | null {
+  const key = `${bucket}::${filePath}`;
+  const entry = urlCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    urlCache.delete(key);
+    return null;
+  }
+  return entry.url;
+}
+
+function setCachedUrl(bucket: string, filePath: string, url: string): void {
+  const key = `${bucket}::${filePath}`;
+  urlCache.set(key, { url, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+/**
  * Dosya doğrulama — boyut ve tip kontrolü
  * @returns null if valid, error message string if invalid
  */
@@ -18,6 +46,7 @@ export function validateFile(file: File, maxMB = 50): string | null {
 
 /**
  * Signed URL üret — private bucket için güvenli erişim
+ * Cache: aynı filePath için 5 dakika boyunca Supabase'e tekrar istek atmaz.
  * FIX 6: URL 24 saat geçerli (was 1 hour — caused broken images)
  */
 export async function getSignedUrl(
@@ -25,6 +54,13 @@ export async function getSignedUrl(
   bucket = 'uploads',
   expiresIn = 86400,
 ): Promise<string | null> {
+  // Boş/null path kontrolü — hiç request atma
+  if (!filePath) return null;
+
+  // Cache hit → direkt dön, Supabase'e istek yok
+  const cached = getCachedUrl(bucket, filePath);
+  if (cached) return cached;
+
   try {
     const { data, error } = await supabase.storage
       .from(bucket)
@@ -33,6 +69,8 @@ export async function getSignedUrl(
       console.error('[fileUpload] getSignedUrl error:', error);
       return null;
     }
+    // Cache'e yaz
+    setCachedUrl(bucket, filePath, data.signedUrl);
     return data.signedUrl;
   } catch (err) {
     console.error('[fileUpload] getSignedUrl exception:', err);
@@ -53,6 +91,99 @@ export async function getSignedUrlFromPath(
   const pathMatch = storedPath.match(/\/storage\/v1\/object\/(?:public|sign)\/[^/]+\/(.+?)(?:\?|$)/);
   const cleanPath = pathMatch ? pathMatch[1] : storedPath;
   return getSignedUrl(cleanPath, bucket);
+}
+
+/**
+ * BULK Signed URL üret — N path için tek Supabase request
+ *
+ * Akış:
+ *  1. Boş / data: / http path'leri ayır (request atılmaz)
+ *  2. Cache'te olanları ayır (request atılmaz)
+ *  3. Sadece cache miss olanları createSignedUrls ile TEK request'te al
+ *  4. Gelenleri cache'e yaz
+ *  5. Tüm sonuçları birleştir → Record<originalPath, signedUrl> döner
+ *
+ * @param paths   - Orijinal filePath listesi (null/undefined güvenli)
+ * @param bucket  - Storage bucket adı (default: 'uploads')
+ * @param expiresIn - Saniye cinsinden URL geçerlilik süresi (default: 86400 = 24 saat)
+ */
+export async function getSignedUrlsBulk(
+  paths: (string | null | undefined)[],
+  bucket = 'uploads',
+  expiresIn = 86400,
+): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+
+  // 1. Geçerli path'leri filtrele + normalize et
+  const validPaths: string[] = [];
+  const directMap: Record<string, string> = {}; // data: veya http URL'ler
+
+  for (const raw of paths) {
+    if (!raw) continue;
+
+    // Tam URL veya base64 → direkt kullan
+    if (raw.startsWith('data:') || raw.startsWith('http://') || raw.startsWith('https://')) {
+      directMap[raw] = raw;
+      continue;
+    }
+
+    // Supabase storage URL'inden path çıkar
+    const pathMatch = raw.match(/\/storage\/v1\/object\/(?:public|sign)\/[^/]+\/(.+?)(?:\?|$)/);
+    const cleanPath = pathMatch ? pathMatch[1] : raw;
+    validPaths.push(cleanPath);
+  }
+
+  // Direkt URL'leri sonuca ekle
+  Object.assign(result, directMap);
+
+  if (validPaths.length === 0) return result;
+
+  // 2. Cache kontrolü — hit olanları ayır
+  const cacheMisses: string[] = [];
+
+  for (const p of validPaths) {
+    const cached = getCachedUrl(bucket, p);
+    if (cached) {
+      result[p] = cached;
+    } else {
+      cacheMisses.push(p);
+    }
+  }
+
+  if (cacheMisses.length === 0) return result; // Hepsi cache'teydi
+
+  // 3. Cache miss olanları TEK request ile al
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrls(cacheMisses, expiresIn);
+
+    if (error) {
+      console.error('[fileUpload] getSignedUrlsBulk error:', error);
+      // Hata durumunda tek tek fallback
+      await Promise.all(
+        cacheMisses.map(async (p) => {
+          const url = await getSignedUrl(p, bucket, expiresIn);
+          if (url) result[p] = url;
+        }),
+      );
+      return result;
+    }
+
+    // 4. Gelenleri cache'e yaz + sonuca ekle
+    if (data) {
+      for (const item of data) {
+        if (item.signedUrl && item.path) {
+          setCachedUrl(bucket, item.path, item.signedUrl);
+          result[item.path] = item.signedUrl;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[fileUpload] getSignedUrlsBulk exception:', err);
+  }
+
+  return result;
 }
 
 /**

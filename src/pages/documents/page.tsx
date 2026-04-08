@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../../store/AppContext';
+import { EvrakListSkeleton } from '../../components/base/Skeleton';
 import type { Evrak, EvrakStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
@@ -37,7 +38,7 @@ const statusConfig = {
 };
 
 export default function EvraklarPage() {
-  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, addToast, quickCreate, setQuickCreate, org, refreshData } = useApp();
+  const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, addToast, quickCreate, setQuickCreate, org, refreshData, pageLoading } = useApp();
   const location = useLocation();
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -249,6 +250,8 @@ export default function EvraklarPage() {
     'Süre Yaklaşıyor': evraklarWithDurum.filter(e => e.durum === 'Süre Yaklaşıyor').length,
     'Süre Dolmuş': evraklarWithDurum.filter(e => e.durum === 'Süre Dolmuş').length,
   }), [evraklarWithDurum]);
+
+  if (pageLoading) return <EvrakListSkeleton rows={7} />;
 
   return (
     <div className="space-y-4">

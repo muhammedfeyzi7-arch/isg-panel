@@ -155,6 +155,248 @@ export function DashboardSkeleton() {
   );
 }
 
+/**
+ * Personel listesi tablo skeleton — masaüstü + mobil
+ */
+export function PersonelListSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="skeleton-shimmer w-36 h-6 rounded-lg" />
+          <div className="skeleton-shimmer w-52 h-3.5 rounded-md" />
+        </div>
+        <div className="flex gap-2">
+          <div className="skeleton-shimmer w-20 h-9 rounded-lg hidden sm:block" />
+          <div className="skeleton-shimmer w-28 h-9 rounded-lg hidden sm:block" />
+          <div className="skeleton-shimmer w-32 h-9 rounded-lg" />
+        </div>
+      </div>
+
+      {/* Filter bar */}
+      <div className="rounded-xl p-3 flex gap-2.5"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+        <div className="skeleton-shimmer flex-1 h-9 rounded-lg" />
+        <div className="skeleton-shimmer w-36 h-9 rounded-lg hidden sm:block" />
+        <div className="skeleton-shimmer w-32 h-9 rounded-lg hidden sm:block" />
+      </div>
+
+      {/* Desktop table */}
+      <div className="rounded-xl overflow-hidden hidden md:block"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+        <div className="px-4 py-3 border-b flex gap-6"
+          style={{ borderColor: 'var(--border-main)' }}>
+          {[100, 80, 90, 70, 60].map((w, i) => (
+            <div key={i} className="skeleton-shimmer h-3 rounded-md" style={{ width: w }} />
+          ))}
+        </div>
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3 border-b last:border-0"
+            style={{ borderColor: 'var(--border-main)' }}>
+            <div className="skeleton-shimmer w-8 h-8 rounded-full flex-shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="skeleton-shimmer h-3.5 rounded-md" style={{ width: `${110 + (i % 4) * 25}px` }} />
+              <div className="skeleton-shimmer h-2.5 rounded-md" style={{ width: `${60 + (i % 3) * 15}px` }} />
+            </div>
+            <div className="skeleton-shimmer w-28 h-3 rounded-md hidden md:block" />
+            <div className="skeleton-shimmer w-24 h-3 rounded-md hidden lg:block" />
+            <div className="skeleton-shimmer w-16 h-5 rounded-full" />
+            <div className="flex gap-1.5">
+              <div className="skeleton-shimmer w-8 h-8 rounded-lg" />
+              <div className="skeleton-shimmer w-8 h-8 rounded-lg" />
+              <div className="skeleton-shimmer w-8 h-8 rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="grid grid-cols-1 gap-3 md:hidden">
+        {Array.from({ length: Math.min(rows, 4) }).map((_, i) => (
+          <div key={i} className="rounded-xl p-4"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+            <div className="flex items-center gap-3">
+              <div className="skeleton-shimmer w-10 h-10 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton-shimmer h-3.5 rounded-md" style={{ width: `${120 + (i % 3) * 20}px` }} />
+                <div className="skeleton-shimmer h-2.5 rounded-md" style={{ width: '80px' }} />
+              </div>
+              <div className="skeleton-shimmer w-14 h-5 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Firma listesi tablo skeleton
+ */
+export function FirmaListSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="skeleton-shimmer w-28 h-6 rounded-lg" />
+          <div className="skeleton-shimmer w-48 h-3.5 rounded-md" />
+        </div>
+        <div className="flex gap-2">
+          <div className="skeleton-shimmer w-20 h-9 rounded-lg hidden sm:block" />
+          <div className="skeleton-shimmer w-36 h-9 rounded-lg" />
+        </div>
+      </div>
+
+      {/* Filter bar */}
+      <div className="rounded-xl p-3 flex gap-2.5"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+        <div className="skeleton-shimmer flex-1 h-9 rounded-lg" />
+        <div className="skeleton-shimmer w-36 h-9 rounded-lg hidden sm:block" />
+        <div className="skeleton-shimmer w-40 h-9 rounded-lg hidden sm:block" />
+      </div>
+
+      {/* Desktop table */}
+      <div className="rounded-xl overflow-hidden hidden md:block"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+        <div className="px-4 py-3 border-b flex gap-6"
+          style={{ borderColor: 'var(--border-main)' }}>
+          {[110, 90, 80, 90, 70, 60].map((w, i) => (
+            <div key={i} className="skeleton-shimmer h-3 rounded-md" style={{ width: w }} />
+          ))}
+        </div>
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3 border-b last:border-0"
+            style={{ borderColor: 'var(--border-main)' }}>
+            <div className="skeleton-shimmer w-8 h-8 rounded-lg flex-shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="skeleton-shimmer h-3.5 rounded-md" style={{ width: `${100 + (i % 3) * 30}px` }} />
+              <div className="skeleton-shimmer h-2.5 rounded-md" style={{ width: `${50 + (i % 2) * 15}px` }} />
+            </div>
+            <div className="skeleton-shimmer w-24 h-3 rounded-md hidden md:block" />
+            <div className="skeleton-shimmer w-20 h-3 rounded-md hidden lg:block" />
+            <div className="skeleton-shimmer w-20 h-5 rounded-full hidden md:block" />
+            <div className="skeleton-shimmer w-16 h-5 rounded-full" />
+            <div className="flex gap-1.5">
+              <div className="skeleton-shimmer w-8 h-8 rounded-lg" />
+              <div className="skeleton-shimmer w-8 h-8 rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="grid grid-cols-1 gap-3 md:hidden">
+        {Array.from({ length: Math.min(rows, 4) }).map((_, i) => (
+          <div key={i} className="rounded-xl p-4"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+            <div className="flex items-center gap-3">
+              <div className="skeleton-shimmer w-10 h-10 rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton-shimmer h-3.5 rounded-md" style={{ width: `${100 + (i % 3) * 25}px` }} />
+                <div className="skeleton-shimmer h-2.5 rounded-md" style={{ width: '70px' }} />
+              </div>
+              <div className="skeleton-shimmer w-14 h-5 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Evrak / Belge listesi skeleton
+ */
+export function EvrakListSkeleton({ rows = 7 }: { rows?: number }) {
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="skeleton-shimmer w-40 h-6 rounded-lg" />
+          <div className="skeleton-shimmer w-60 h-3.5 rounded-md" />
+        </div>
+        <div className="flex gap-2">
+          <div className="skeleton-shimmer w-20 h-9 rounded-lg hidden sm:block" />
+          <div className="skeleton-shimmer w-28 h-9 rounded-lg" />
+          <div className="skeleton-shimmer w-28 h-9 rounded-lg" />
+        </div>
+      </div>
+
+      {/* Status stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-xl p-3.5 flex items-center gap-3"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+            <div className="skeleton-shimmer w-8 h-8 rounded-lg flex-shrink-0" />
+            <div className="space-y-1.5">
+              <div className="skeleton-shimmer w-8 h-6 rounded-md" />
+              <div className="skeleton-shimmer w-20 h-2.5 rounded-md" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter bar */}
+      <div className="rounded-xl p-3 flex gap-2.5"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+        <div className="skeleton-shimmer flex-1 h-9 rounded-lg" />
+        <div className="skeleton-shimmer w-36 h-9 rounded-lg hidden sm:block" />
+        <div className="skeleton-shimmer w-36 h-9 rounded-lg hidden sm:block" />
+      </div>
+
+      {/* Desktop table */}
+      <div className="rounded-xl overflow-hidden hidden md:block"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+        <div className="px-4 py-3 border-b flex gap-6"
+          style={{ borderColor: 'var(--border-main)' }}>
+          {[120, 90, 80, 70, 80, 60].map((w, i) => (
+            <div key={i} className="skeleton-shimmer h-3 rounded-md" style={{ width: w }} />
+          ))}
+        </div>
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3 border-b last:border-0"
+            style={{ borderColor: 'var(--border-main)' }}>
+            <div className="skeleton-shimmer w-8 h-8 rounded-lg flex-shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="skeleton-shimmer h-3.5 rounded-md" style={{ width: `${120 + (i % 4) * 20}px` }} />
+              <div className="skeleton-shimmer h-2.5 rounded-md" style={{ width: `${55 + (i % 3) * 12}px` }} />
+            </div>
+            <div className="skeleton-shimmer w-24 h-3 rounded-md hidden md:block" />
+            <div className="skeleton-shimmer w-20 h-3 rounded-md hidden lg:block" />
+            <div className="skeleton-shimmer w-20 h-5 rounded-full" />
+            <div className="skeleton-shimmer w-20 h-3 rounded-md hidden lg:block" />
+            <div className="flex gap-1.5">
+              <div className="skeleton-shimmer w-8 h-8 rounded-lg" />
+              <div className="skeleton-shimmer w-8 h-8 rounded-lg" />
+              <div className="skeleton-shimmer w-8 h-8 rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="grid grid-cols-1 gap-3 md:hidden">
+        {Array.from({ length: Math.min(rows, 4) }).map((_, i) => (
+          <div key={i} className="rounded-xl p-4"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
+            <div className="flex items-center gap-3">
+              <div className="skeleton-shimmer w-9 h-9 rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton-shimmer h-3.5 rounded-md" style={{ width: `${110 + (i % 3) * 20}px` }} />
+                <div className="skeleton-shimmer h-2.5 rounded-md" style={{ width: '90px' }} />
+              </div>
+              <div className="skeleton-shimmer w-16 h-5 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function PageSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div className="space-y-5 animate-fade-in">

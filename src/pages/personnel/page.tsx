@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { PersonelListSkeleton } from '../../components/base/Skeleton';
 import type { Personel, PersonelStatus } from '../../types';
 import Modal from '../../components/base/Modal';
 import Badge, { getPersonelStatusColor } from '../../components/base/Badge';
@@ -94,7 +95,7 @@ interface ImportResult {
 }
 
 export default function PersonellerPage() {
-  const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto, refreshData, dataLoading } = useApp();
+  const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto, refreshData, dataLoading, pageLoading, partialLoading } = useApp();
   const { canCreate, canEdit, canDelete, isReadOnly, canViewSensitiveData } = usePermissions();
 
   const [search, setSearch] = useState('');
@@ -606,6 +607,9 @@ export default function PersonellerPage() {
     if (s === 'duplicate') return { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', icon: 'ri-error-warning-line' };
     return { color: '#EF4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)', icon: 'ri-close-circle-line' };
   };
+
+  // İlk yükleme — skeleton göster
+  if (pageLoading) return <PersonelListSkeleton rows={8} />;
 
   return (
     <div className="space-y-4">

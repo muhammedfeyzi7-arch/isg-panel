@@ -4,10 +4,17 @@ import Header from './Header';
 import { useApp } from '../../store/AppContext';
 import { DashboardSkeleton, PageSkeleton } from '../base/Skeleton';
 
-function OfflineBanner() {
+function ConnectionBanner() {
+  const { realtimeStatus } = useApp();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showBackOnline, setShowBackOnline] = useState(false);
+  const [showRealtimeReconnected, setShowRealtimeReconnected] = useState(false);
+  const prevRealtimeRef = useRef(realtimeStatus);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Delay realtime disconnect banner — avoid flicker on initial connect
+  const [realtimeDisconnectVisible, setRealtimeDisconnectVisible] = useState(false);
+  const realtimeDisconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handleOffline = () => {
@@ -29,14 +36,42 @@ function OfflineBanner() {
     };
   }, []);
 
-  if (isOnline && !showBackOnline) return null;
+  // Realtime status change tracking
+  useEffect(() => {
+    const prev = prevRealtimeRef.current;
+    prevRealtimeRef.current = realtimeStatus;
 
+    if (realtimeStatus === 'disconnected') {
+      // Show disconnect banner after 2s delay to avoid flicker
+      if (realtimeDisconnectTimerRef.current) clearTimeout(realtimeDisconnectTimerRef.current);
+      realtimeDisconnectTimerRef.current = setTimeout(() => {
+        setRealtimeDisconnectVisible(true);
+      }, 2000);
+    } else {
+      if (realtimeDisconnectTimerRef.current) clearTimeout(realtimeDisconnectTimerRef.current);
+      setRealtimeDisconnectVisible(false);
+    }
+
+    // Was disconnected, now connected → show "reconnected" message
+    if (prev === 'disconnected' && realtimeStatus === 'connected') {
+      setShowRealtimeReconnected(true);
+      if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
+      realtimeTimerRef.current = setTimeout(() => setShowRealtimeReconnected(false), 3500);
+    }
+
+    return () => {
+      if (realtimeDisconnectTimerRef.current) clearTimeout(realtimeDisconnectTimerRef.current);
+      if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
+    };
+  }, [realtimeStatus]);
+
+  // Priority: internet offline > realtime disconnected > back online > realtime reconnected
   if (!isOnline) {
     return (
       <div
         className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2.5 py-2.5 px-4"
         style={{
-          background: 'linear-gradient(90deg, rgba(239,68,68,0.95), rgba(220,38,38,0.95))',
+          background: 'linear-gradient(90deg, rgba(239,68,68,0.97), rgba(220,38,38,0.97))',
           backdropFilter: 'blur(8px)',
         }}
       >
@@ -55,20 +90,65 @@ function OfflineBanner() {
     );
   }
 
-  return (
-    <div
-      className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2.5 px-4"
-      style={{
-        background: 'linear-gradient(90deg, rgba(16,185,129,0.95), rgba(5,150,105,0.95))',
-        backdropFilter: 'blur(8px)',
-      }}
-    >
-      <i className="ri-checkbox-circle-fill text-sm text-white" />
-      <p className="text-xs font-semibold text-white">
-        Bağlantı yeniden kuruldu — bekleyen değişiklikler kaydediliyor...
-      </p>
-    </div>
-  );
+  if (realtimeDisconnectVisible && realtimeStatus === 'disconnected') {
+    return (
+      <div
+        className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2.5 py-2 px-4"
+        style={{
+          background: 'linear-gradient(90deg, rgba(245,158,11,0.97), rgba(217,119,6,0.97))',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <div className="w-5 h-5 flex items-center justify-center rounded-full flex-shrink-0" style={{ background: 'rgba(255,255,255,0.2)' }}>
+          <i className="ri-refresh-line text-xs text-white animate-spin" />
+        </div>
+        <p className="text-xs font-semibold text-white">
+          Canlı bağlantı kesildi, yeniden bağlanıyor...
+        </p>
+        <div className="flex items-center gap-1 ml-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-white opacity-70 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-white opacity-70 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-white opacity-70 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (showBackOnline) {
+    return (
+      <div
+        className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2.5 px-4"
+        style={{
+          background: 'linear-gradient(90deg, rgba(16,185,129,0.97), rgba(5,150,105,0.97))',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <i className="ri-checkbox-circle-fill text-sm text-white" />
+        <p className="text-xs font-semibold text-white">
+          İnternet bağlantısı yeniden kuruldu — bekleyen değişiklikler kaydediliyor...
+        </p>
+      </div>
+    );
+  }
+
+  if (showRealtimeReconnected) {
+    return (
+      <div
+        className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2 px-4"
+        style={{
+          background: 'linear-gradient(90deg, rgba(16,185,129,0.97), rgba(5,150,105,0.97))',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <i className="ri-signal-wifi-fill text-sm text-white" />
+        <p className="text-xs font-semibold text-white">
+          Canlı bağlantı yeniden kuruldu — veriler anlık güncelleniyor
+        </p>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -123,7 +203,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-app)', transition: 'background 0.3s ease' }}>
-      <OfflineBanner />
+      <ConnectionBanner />
 
       {/* Mobile overlay */}
       <div

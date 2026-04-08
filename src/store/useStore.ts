@@ -149,6 +149,50 @@ async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
   console.log(`[ISG] DELETE_MANY OK ${table} (${ids.length} rows) ✓`);
 }
 
+// ──────── IndexedDB Cache ────────
+// localStorage 5MB limitini aşmamak için IndexedDB kullanıyoruz
+const DB_NAME = 'isg_cache';
+const DB_VERSION = 1;
+const STORE_NAME = 'tables';
+// Cache sadece sayfa yenileme anında kullanılır — realtime zaten anlık günceller
+// 30 saniye: yenileme sonrası hızlı açılış için yeterli, stale veri riski yok
+const CACHE_TTL_MS = 30 * 1000; // 30 saniye
+
+function openCacheDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(STORE_NAME);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function readCache<T>(key: string): Promise<{ data: T; ts: number } | null> {
+  try {
+    const db = await openCacheDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get(key);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => resolve(null);
+    });
+  } catch { return null; }
+}
+
+async function writeCache<T>(key: string, data: T): Promise<void> {
+  try {
+    const db = await openCacheDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put({ data, ts: Date.now() }, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  } catch { /* ignore */ }
+}
+
 // ──────── Main hook ────────
 export function useStore(
   organizationId: string | null,
@@ -170,6 +214,12 @@ export function useStore(
   const [isIzinleri, _setIsIzinleri] = useState<IsIzni[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser>(defaultUser);
   const [dataLoading, setDataLoading] = useState(true);
+  // pageLoading: ilk açılış — henüz hiç veri yok, tüm sayfa skeleton gösterilir
+  const [pageLoading, setPageLoading] = useState(true);
+  // partialLoading: veri var ama arka planda güncelleniyor (yenile butonu, refresh)
+  const [partialLoading, setPartialLoading] = useState(false);
+  // realtimeStatus: Supabase realtime channel bağlantı durumu
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
 
   const uygRef = useRef<Uygunsuzluk[]>([]);
   const tutRef = useRef<Tutanak[]>([]);
@@ -368,103 +418,147 @@ export function useStore(
     return (res.data ?? []).map(row => row.data as T);
   }, []);
 
-  // ── Per-table fetch functions (lazy load) ──
+  // ── Generic cache-first fetch helper ──
+  const fetchWithCache = useCallback(async <T>(
+    table: string,
+    orgId: string,
+    setter: (rows: T[]) => void,
+    transform?: (row: T) => T,
+  ): Promise<void> => {
+    const cacheKey = `${table}_${orgId}`;
+
+    // 1. Cache'ten anında yükle
+    const cached = await readCache<T[]>(cacheKey);
+    if (cached) {
+      setter(cached.data);
+      console.log(`[ISG] fetch ${table} cache HIT (${cached.data.length} rows)`);
+      // Fresh ise DB'ye gitme
+      if ((Date.now() - cached.ts) < CACHE_TTL_MS) {
+        console.log(`[ISG] fetch ${table} cache FRESH — skipping DB`);
+        return;
+      }
+    }
+
+    // 2. DB'den çek
+    const res = await fetchAllRows(table, orgId);
+    if (!res.data) return;
+    let rows = res.data.map(r => r.data as T);
+    if (transform) rows = rows.map(transform);
+    setter(rows);
+    void writeCache(cacheKey, rows);
+    console.log(`[ISG] fetch ${table} DB ✓ (${rows.length} rows) → cache updated`);
+  }, [fetchAllRows]);
+
+  // ── Per-table fetch functions (lazy load, cache-first) ──
   const fetchFirmalar = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('firmalar', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Firma);
-    setFirmalar(rows);
-    console.log(`[ISG] fetchFirmalar ✓ count=${rows.length}`);
-  }, [fetchAllRows, setFirmalar]);
+    await fetchWithCache<Firma>('firmalar', orgId, setFirmalar);
+  }, [fetchWithCache, setFirmalar]);
 
   const fetchPersoneller = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('personeller', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Personel).map(p => ({
+    await fetchWithCache<Personel>('personeller', orgId, setPersoneller, p => ({
       ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
     }));
-    setPersoneller(rows);
-    console.log(`[ISG] fetchPersoneller ✓ count=${rows.length}`);
-  }, [fetchAllRows, setPersoneller]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchWithCache, setPersoneller]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchEvraklar = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('evraklar', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Evrak).map(e => ({
+    await fetchWithCache<Evrak>('evraklar', orgId, setEvraklar, e => ({
       ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
     }));
-    setEvraklar(rows);
-    console.log(`[ISG] fetchEvraklar ✓ count=${rows.length}`);
-  }, [fetchAllRows, setEvraklar]);
+  }, [fetchWithCache, setEvraklar]);
 
   const fetchEgitimler = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('egitimler', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Egitim);
-    setEgitimler(rows);
-    console.log(`[ISG] fetchEgitimler ✓ count=${rows.length}`);
-  }, [fetchAllRows, setEgitimler]);
+    await fetchWithCache<Egitim>('egitimler', orgId, setEgitimler);
+  }, [fetchWithCache, setEgitimler]);
 
   const fetchMuayeneler = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('muayeneler', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Muayene);
-    setMuayeneler(rows);
-    console.log(`[ISG] fetchMuayeneler ✓ count=${rows.length}`);
-  }, [fetchAllRows, setMuayeneler]);
+    await fetchWithCache<Muayene>('muayeneler', orgId, setMuayeneler);
+  }, [fetchWithCache, setMuayeneler]);
 
   const fetchUygunsuzluklar = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('uygunsuzluklar', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Uygunsuzluk).map(u => {
+    await fetchWithCache<Uygunsuzluk>('uygunsuzluklar', orgId, setUygunsuzluklar, u => {
       let durum = u.durum as string;
       if (durum === 'Kapatıldı') durum = 'Kapandı';
       if (durum === 'İncelemede') durum = 'Açık';
       return { ...u, durum: durum as UygunsuzlukStatus };
     });
-    setUygunsuzluklar(rows);
-    console.log(`[ISG] fetchUygunsuzluklar ✓ count=${rows.length}`);
-  }, [fetchAllRows, setUygunsuzluklar]);
+  }, [fetchWithCache, setUygunsuzluklar]);
 
   const fetchEkipmanlar = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('ekipmanlar', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Ekipman);
-    setEkipmanlar(rows);
-    console.log(`[ISG] fetchEkipmanlar ✓ count=${rows.length}`);
-  }, [fetchAllRows, setEkipmanlar]);
+    await fetchWithCache<Ekipman>('ekipmanlar', orgId, setEkipmanlar);
+  }, [fetchWithCache, setEkipmanlar]);
 
   const fetchGorevler = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('gorevler', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Gorev);
-    setGorevler(rows);
-    console.log(`[ISG] fetchGorevler ✓ count=${rows.length}`);
-  }, [fetchAllRows, setGorevler]);
+    await fetchWithCache<Gorev>('gorevler', orgId, setGorevler);
+  }, [fetchWithCache, setGorevler]);
 
   const fetchTutanaklar = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('tutanaklar', orgId);
-    const rows = (res.data ?? []).map(r => r.data as Tutanak);
-    setTutanaklar(rows);
-    console.log(`[ISG] fetchTutanaklar ✓ count=${rows.length}`);
-  }, [fetchAllRows, setTutanaklar]);
+    await fetchWithCache<Tutanak>('tutanaklar', orgId, setTutanaklar);
+  }, [fetchWithCache, setTutanaklar]);
 
   const fetchIsIzinleri = useCallback(async (orgId: string) => {
-    const res = await fetchAllRows('is_izinleri', orgId);
-    const rows = (res.data ?? []).map(r => r.data as IsIzni);
-    setIsIzinleri(rows);
-    console.log(`[ISG] fetchIsIzinleri ✓ count=${rows.length}`);
-  }, [fetchAllRows, setIsIzinleri]);
+    await fetchWithCache<IsIzni>('is_izinleri', orgId, setIsIzinleri);
+  }, [fetchWithCache, setIsIzinleri]);
 
-  // ── Core data loader — sadece firmalar + personeller (hızlı açılış) ──
-  // Diğer tablolar sayfa bazlı lazy fetch ile yüklenir
+  // ── Core data loader — cache-first, sonra arka planda güncelle ──
   const loadAllData = useCallback(async (orgId: string) => {
+    const firmaKey = `firmalar_${orgId}`;
+    const personelKey = `personeller_${orgId}`;
+
+    // 1. Cache'ten anında yükle (varsa)
+    const [cachedFirmalar, cachedPersoneller] = await Promise.all([
+      readCache<Firma[]>(firmaKey),
+      readCache<Personel[]>(personelKey),
+    ]);
+
+    const now = Date.now();
+    const firmaFresh = cachedFirmalar && (now - cachedFirmalar.ts) < CACHE_TTL_MS;
+    const personelFresh = cachedPersoneller && (now - cachedPersoneller.ts) < CACHE_TTL_MS;
+
+    if (cachedFirmalar) {
+      setFirmalar(cachedFirmalar.data);
+      console.log(`[ISG] loadAllData cache HIT firmalar (${cachedFirmalar.data.length} rows, ${firmaFresh ? 'fresh' : 'stale'})`);
+    }
+    if (cachedPersoneller) {
+      setPersoneller(cachedPersoneller.data);
+      console.log(`[ISG] loadAllData cache HIT personeller (${cachedPersoneller.data.length} rows, ${personelFresh ? 'fresh' : 'stale'})`);
+    }
+
+    // Cache varsa ve fresh ise → pageLoading'i hemen kapat (kullanıcı anında görür)
+    if (cachedFirmalar && cachedPersoneller) {
+      setPageLoading(false);
+      setDataLoading(false);
+    }
+
+    // 2. Stale veya cache yok → DB'den çek
+    const needsFirma = !firmaFresh;
+    const needsPersonel = !personelFresh;
+
+    if (!needsFirma && !needsPersonel) {
+      console.log('[ISG] loadAllData: both fresh from cache, skipping DB fetch');
+      return;
+    }
+
     const results = await Promise.allSettled([
-      fetchAllRows('firmalar', orgId),
-      fetchAllRows('personeller', orgId),
+      needsFirma ? fetchAllRows('firmalar', orgId) : Promise.resolve({ data: null, error: null }),
+      needsPersonel ? fetchAllRows('personeller', orgId) : Promise.resolve({ data: null, error: null }),
     ]);
 
     const [firmaRes, personelRes] = results;
 
-    setFirmalar(extractRows<Firma>(firmaRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
-    setPersoneller(
-      extractRows<Personel>(personelRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>)
-        .map(p => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') })),
-    );
+    if (needsFirma && firmaRes.status === 'fulfilled' && firmaRes.value.data) {
+      const rows = extractRows<Firma>(firmaRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>);
+      setFirmalar(rows);
+      void writeCache(firmaKey, rows);
+      console.log(`[ISG] loadAllData DB firmalar ✓ (${rows.length} rows) → cache updated`);
+    }
 
-    console.log(`[ISG] loadAllData ✓ firms=${firmaRes.status === 'fulfilled' ? (firmaRes.value.data?.length ?? 0) : 'ERR'} personnel=${personelRes.status === 'fulfilled' ? (personelRes.value.data?.length ?? 0) : 'ERR'}`);
+    if (needsPersonel && personelRes.status === 'fulfilled' && personelRes.value.data) {
+      const rows = extractRows<Personel>(personelRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>)
+        .map(p => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') }));
+      setPersoneller(rows);
+      void writeCache(personelKey, rows);
+      console.log(`[ISG] loadAllData DB personeller ✓ (${rows.length} rows) → cache updated`);
+    }
   }, [fetchAllRows, setFirmalar, setPersoneller, extractRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Public refresh function — called by UI refresh buttons ──
@@ -472,10 +566,13 @@ export function useStore(
     const orgId = orgIdRef.current;
     if (!orgId) return;
     setDataLoading(true);
+    // partialLoading: veri zaten var, sadece arka planda yenileniyor
+    setPartialLoading(true);
     try {
       await loadAllData(orgId);
     } finally {
       setDataLoading(false);
+      setPartialLoading(false);
     }
   }, [loadAllData]);
 
@@ -491,10 +588,12 @@ export function useStore(
     }
 
     setDataLoading(true);
+    setPageLoading(true);  // ilk yükleme — tüm sayfa skeleton
     console.log(`[ISG] Loading data for org=${organizationId} user=${userId}`);
 
     loadAllData(organizationId).then(() => {
       setDataLoading(false);
+      setPageLoading(false); // veri geldi — skeleton kaldır
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, userId, orgLoading]);
@@ -512,18 +611,28 @@ export function useStore(
     // Bu sayede karşı cihazdan gelen değişiklikler ANINDA yansır (iş izinleri gibi)
     const applyPatch = (table: string, rawRecord: unknown, eventType: string, recordId: string) => {
       if (eventType === 'DELETE') {
-        // Silinen kaydı state'den çıkar — tüm tabloyu yeniden çekmeye gerek yok
+        // Silinen kaydı state'den çıkar + cache'i güncelle
+        const filterAndCache = <T extends { id: string }>(
+          setter: (fn: (prev: T[]) => T[]) => void,
+          cacheTable: string,
+        ) => {
+          setter(prev => {
+            const next = prev.filter(r => r.id !== recordId);
+            void writeCache(`${cacheTable}_${activeOrgId}`, next);
+            return next;
+          });
+        };
         switch (table) {
-          case 'firmalar':       setFirmalar(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'personeller':    setPersoneller(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'evraklar':       setEvraklar(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'egitimler':      setEgitimler(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'muayeneler':     setMuayeneler(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'uygunsuzluklar': setUygunsuzluklar(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'ekipmanlar':     setEkipmanlar(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'gorevler':       setGorevler(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'tutanaklar':     setTutanaklar(prev => prev.filter(r => r.id !== recordId)); break;
-          case 'is_izinleri':    setIsIzinleri(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'firmalar':       filterAndCache<Firma>(setFirmalar, 'firmalar'); break;
+          case 'personeller':    filterAndCache<Personel>(setPersoneller, 'personeller'); break;
+          case 'evraklar':       filterAndCache<Evrak>(setEvraklar, 'evraklar'); break;
+          case 'egitimler':      filterAndCache<Egitim>(setEgitimler, 'egitimler'); break;
+          case 'muayeneler':     filterAndCache<Muayene>(setMuayeneler, 'muayeneler'); break;
+          case 'uygunsuzluklar': filterAndCache<Uygunsuzluk>(setUygunsuzluklar, 'uygunsuzluklar'); break;
+          case 'ekipmanlar':     filterAndCache<Ekipman>(setEkipmanlar, 'ekipmanlar'); break;
+          case 'gorevler':       filterAndCache<Gorev>(setGorevler, 'gorevler'); break;
+          case 'tutanaklar':     filterAndCache<Tutanak>(setTutanaklar, 'tutanaklar'); break;
+          case 'is_izinleri':    filterAndCache<IsIzni>(setIsIzinleri, 'is_izinleri'); break;
         }
         return;
       }
@@ -535,58 +644,63 @@ export function useStore(
       const upsertRecord = <T extends { id: string }>(
         setter: (fn: (prev: T[]) => T[]) => void,
         transform?: (r: T) => T,
+        cacheTable?: string,
       ) => {
         const record = (transform ? transform(data as unknown as T) : data) as T;
         setter(prev => {
           const idx = prev.findIndex(r => r.id === recordId);
+          let next: T[];
           if (idx === -1) {
-            // Yeni kayıt — başa ekle
-            return [record, ...prev];
+            next = [record, ...prev];
+          } else {
+            next = [...prev];
+            next[idx] = record;
           }
-          // Mevcut kaydı güncelle
-          const next = [...prev];
-          next[idx] = record;
+          // Cache'i de güncelle (arka planda)
+          if (cacheTable) {
+            void writeCache(`${cacheTable}_${activeOrgId}`, next);
+          }
           return next;
         });
       };
 
       switch (table) {
         case 'firmalar':
-          upsertRecord<Firma>(setFirmalar);
+          upsertRecord<Firma>(setFirmalar, undefined, 'firmalar');
           break;
         case 'personeller':
           upsertRecord<Personel>(setPersoneller, p => ({
             ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
-          }));
+          }), 'personeller');
           break;
         case 'evraklar':
           upsertRecord<Evrak>(setEvraklar, e => ({
             ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
-          }));
+          }), 'evraklar');
           break;
         case 'egitimler':
-          upsertRecord<Egitim>(setEgitimler);
+          upsertRecord<Egitim>(setEgitimler, undefined, 'egitimler');
           break;
         case 'muayeneler':
-          upsertRecord<Muayene>(setMuayeneler);
+          upsertRecord<Muayene>(setMuayeneler, undefined, 'muayeneler');
           break;
         case 'uygunsuzluklar':
           upsertRecord<Uygunsuzluk>(setUygunsuzluklar, u => ({
             ...u,
             durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus,
-          }));
+          }), 'uygunsuzluklar');
           break;
         case 'ekipmanlar':
-          upsertRecord<Ekipman>(setEkipmanlar);
+          upsertRecord<Ekipman>(setEkipmanlar, undefined, 'ekipmanlar');
           break;
         case 'gorevler':
-          upsertRecord<Gorev>(setGorevler);
+          upsertRecord<Gorev>(setGorevler, undefined, 'gorevler');
           break;
         case 'tutanaklar':
-          upsertRecord<Tutanak>(setTutanaklar);
+          upsertRecord<Tutanak>(setTutanaklar, undefined, 'tutanaklar');
           break;
         case 'is_izinleri':
-          upsertRecord<IsIzni>(setIsIzinleri);
+          upsertRecord<IsIzni>(setIsIzinleri, undefined, 'is_izinleri');
           break;
       }
     };
@@ -696,8 +810,14 @@ export function useStore(
       } else {
         console.log(`[ISG] Realtime ${status} for org=${activeOrgId} channel=${channelName}`);
       }
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      if (status === 'SUBSCRIBED') {
+        setRealtimeStatus('connected');
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         console.warn(`[ISG] Realtime connection issue (${status}) — Supabase will auto-reconnect`);
+        setRealtimeStatus('disconnected');
+      } else {
+        // JOINING, etc.
+        setRealtimeStatus('connecting');
       }
     });
 
@@ -1771,6 +1891,9 @@ export function useStore(
     firmalar, personeller, evraklar, egitimler, muayeneler,
     uygunsuzluklar, ekipmanlar, gorevler, tutanaklar, isIzinleri, currentUser,
     dataLoading,
+    pageLoading,
+    partialLoading,
+    realtimeStatus,
     isSaving: false,
     refreshAllData,
     fetchFirmalar, fetchPersoneller, fetchEvraklar, fetchEgitimler,

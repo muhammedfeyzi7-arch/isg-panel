@@ -102,7 +102,7 @@ export default function Modal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '16px',
+        padding: '8px',
         animation: exiting ? 'modal-backdrop-out 0.22s ease forwards' : 'modal-backdrop-in 0.2s ease both',
       }}
     >

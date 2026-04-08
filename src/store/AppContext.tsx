@@ -37,6 +37,12 @@ export interface OrgInfo {
 // StoreType zaten restoreEgitim, permanentDeleteEgitim, restoreMuayene, permanentDeleteMuayene içeriyor
 interface AppContextType extends StoreType {
   fetchTable: (table: string) => Promise<void>;
+  /** İlk açılış — henüz hiç veri yok, tüm sayfa skeleton göster */
+  pageLoading: boolean;
+  /** Arka planda yenileniyor — veri var ama güncelleniyor (spinner/subtle) */
+  partialLoading: boolean;
+  /** Supabase realtime channel bağlantı durumu */
+  realtimeStatus: 'connected' | 'connecting' | 'disconnected';
   toasts: Toast[];
   addToast: (message: string, type?: Toast['type']) => void;
   removeToast: (id: string) => void;
@@ -599,6 +605,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       logAction,
       fetchTable,
       refreshData: store.refreshAllData,
+      pageLoading: store.pageLoading,
+      partialLoading: store.partialLoading,
+      realtimeStatus: store.realtimeStatus,
     }}>
       {children}
     </AppContext.Provider>

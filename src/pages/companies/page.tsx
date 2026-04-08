@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../store/AppContext';
+import { FirmaListSkeleton } from '../../components/base/Skeleton';
 import { usePermissions } from '../../hooks/usePermissions';
 import type { Firma, TehlikeSinifi, FirmaStatus } from '../../types';
 import Modal from '../../components/base/Modal';
@@ -257,7 +258,7 @@ export default function FirmalarPage() {
   const aktifCount = firmalar.filter(f => !f.silinmis && f.durum === 'Aktif').length;
   const cokTehlikeliCount = firmalar.filter(f => !f.silinmis && f.tehlikeSinifi === 'Çok Tehlikeli').length;
 
-  const { refreshData, dataLoading } = useApp();
+  const { refreshData, dataLoading, pageLoading } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => {
     if (refreshing || dataLoading) return;
@@ -267,6 +268,8 @@ export default function FirmalarPage() {
   };
 
 
+
+  if (pageLoading) return <FirmaListSkeleton rows={6} />;
 
   return (
     <div className="space-y-4">
