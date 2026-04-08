@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import MonthlyStats from './components/MonthlyStats';
 import StatCard from './components/StatCard';
@@ -23,8 +23,20 @@ export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
     uygunsuzluklar, bildirimler, ekipmanlar, isIzinleri,
-    setActiveModule,
+    setActiveModule, fetchTable, org,
   } = useApp();
+
+  // Dashboard açılınca eksik tabloları lazy fetch et
+  const fetchedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!org?.id || fetchedRef.current === org.id) return;
+    fetchedRef.current = org.id;
+    const DASHBOARD_TABLES = [
+      'evraklar', 'egitimler', 'muayeneler',
+      'uygunsuzluklar', 'ekipmanlar', 'is_izinleri',
+    ];
+    DASHBOARD_TABLES.forEach(t => { void fetchTable(t); });
+  }, [org?.id, fetchTable]);
 
   const aktifFirmalar      = useMemo(() => firmalar.filter(f => !f.silinmis), [firmalar]);
   const aktifPersoneller   = useMemo(() => personeller.filter(p => !p.silinmis), [personeller]);

@@ -36,6 +36,7 @@ export interface OrgInfo {
 
 // StoreType zaten restoreEgitim, permanentDeleteEgitim, restoreMuayene, permanentDeleteMuayene içeriyor
 interface AppContextType extends StoreType {
+  fetchTable: (table: string) => Promise<void>;
   toasts: Toast[];
   addToast: (message: string, type?: Toast['type']) => void;
   removeToast: (id: string) => void;
@@ -201,6 +202,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     orgLoading,
     onRemoteChangeCb,
   );
+
+  // ── fetchTable — sayfa bazlı lazy load için ──
+  const fetchTable = useCallback(async (table: string) => {
+    const orgId = org?.id;
+    if (!orgId) return;
+    const map: Record<string, (id: string) => Promise<void>> = {
+      firmalar:       store.fetchFirmalar,
+      personeller:    store.fetchPersoneller,
+      evraklar:       store.fetchEvraklar,
+      egitimler:      store.fetchEgitimler,
+      muayeneler:     store.fetchMuayeneler,
+      uygunsuzluklar: store.fetchUygunsuzluklar,
+      ekipmanlar:     store.fetchEkipmanlar,
+      gorevler:       store.fetchGorevler,
+      tutanaklar:     store.fetchTutanaklar,
+      is_izinleri:    store.fetchIsIzinleri,
+    };
+    const fn = map[table];
+    if (fn) await fn(orgId);
+    else console.warn(`[ISG] fetchTable: unknown table "${table}"`);
+  }, [org?.id, store.fetchFirmalar, store.fetchPersoneller, store.fetchEvraklar, store.fetchEgitimler, store.fetchMuayeneler, store.fetchUygunsuzluklar, store.fetchEkipmanlar, store.fetchGorevler, store.fetchTutanaklar, store.fetchIsIzinleri]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist active module across page refreshes
   const [activeModule, setActiveModuleState] = useState<string>(() => {
@@ -575,6 +597,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       regenerateInviteCode,
       refetchOrg,
       logAction,
+      fetchTable,
       refreshData: store.refreshAllData,
     }}>
       {children}

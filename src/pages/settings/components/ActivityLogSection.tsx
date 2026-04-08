@@ -153,27 +153,29 @@ export default function ActivityLogSection() {
     setLoading(true);
     setError(null);
     try {
-      let countQ = supabase
-        .from('activity_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', opts.orgId);
+      // Bir sayfa fazla çek — sonraki sayfa var mı anlamak için (count sorgusu olmadan)
+      const FETCH_SIZE = PAGE_SIZE + 1;
       let dataQ = supabase
         .from('activity_logs')
         .select('*')
         .eq('organization_id', opts.orgId)
         .order('created_at', { ascending: false })
-        .range(opts.page * PAGE_SIZE, (opts.page + 1) * PAGE_SIZE - 1);
+        .range(opts.page * PAGE_SIZE, opts.page * PAGE_SIZE + FETCH_SIZE - 1);
 
-      if (opts.actionFilter !== 'all') { countQ = countQ.eq('action_type', opts.actionFilter); dataQ = dataQ.eq('action_type', opts.actionFilter); }
-      if (opts.userFilter !== 'all')   { countQ = countQ.eq('user_email', opts.userFilter);    dataQ = dataQ.eq('user_email', opts.userFilter); }
-      if (opts.dateFrom) { countQ = countQ.gte('created_at', opts.dateFrom + 'T00:00:00'); dataQ = dataQ.gte('created_at', opts.dateFrom + 'T00:00:00'); }
-      if (opts.dateTo)   { countQ = countQ.lte('created_at', opts.dateTo + 'T23:59:59');   dataQ = dataQ.lte('created_at', opts.dateTo + 'T23:59:59'); }
+      if (opts.actionFilter !== 'all') { dataQ = dataQ.eq('action_type', opts.actionFilter); }
+      if (opts.userFilter !== 'all')   { dataQ = dataQ.eq('user_email', opts.userFilter); }
+      if (opts.dateFrom) { dataQ = dataQ.gte('created_at', opts.dateFrom + 'T00:00:00'); }
+      if (opts.dateTo)   { dataQ = dataQ.lte('created_at', opts.dateTo + 'T23:59:59'); }
 
-      const [countRes, dataRes] = await Promise.all([countQ, dataQ]);
+      const dataRes = await dataQ;
       if (!mountedRef.current) return;
       if (dataRes.error) { setError('Kayıtlar yüklenirken bir hata oluştu.'); setLogs([]); setTotalCount(0); return; }
-      setLogs(dataRes.data ?? []);
-      setTotalCount(countRes.count ?? 0);
+      const rows = dataRes.data ?? [];
+      const hasMore = rows.length > PAGE_SIZE;
+      const pageRows = rows.slice(0, PAGE_SIZE);
+      setLogs(pageRows);
+      // Toplam sayıyı tahmin et: mevcut offset + bu sayfadaki kayıt + (sonraki sayfa varsa 1 fazla)
+      setTotalCount(opts.page * PAGE_SIZE + pageRows.length + (hasMore ? 1 : 0));
       setNewCount(0);
     } catch (err: unknown) {
       if (!mountedRef.current) return;

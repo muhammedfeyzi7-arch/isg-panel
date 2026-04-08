@@ -318,7 +318,7 @@ export function useStore(
 
       const { data, error } = await supabase
         .from(table)
-        .select('id, data, created_at', { count: 'exact' })
+        .select('id, data, created_at')
         .eq('organization_id', orgId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
@@ -353,64 +353,119 @@ export function useStore(
     return { data: allRows as { data: unknown }[], error: null };
   }, []);
 
-  // ── Core data loader (reusable) ──
-  const loadAllData = useCallback(async (orgId: string) => {
-    const TABLES = [
-      'firmalar', 'personeller', 'evraklar', 'egitimler',
-      'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar', 'is_izinleri',
-    ] as const;
+  // ── Shared helpers ──
+  const KAN: Record<string, string> = {
+    'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-',
+    'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-',
+  };
 
-    // Use paginated fetch to bypass Supabase's 1000-row default limit
-    const results = await Promise.allSettled(
-      TABLES.map(table => fetchAllRows(table, orgId)),
-    );
+  const extractRows = useCallback(<T>(
+    settled: PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>,
+  ): T[] => {
+    if (settled.status === 'rejected') { console.error('[ISG] Table load rejected:', settled.reason); return []; }
+    const res = settled.value;
+    if (res.error) { console.error('[ISG] Load error:', res.error); return []; }
+    return (res.data ?? []).map(row => row.data as T);
+  }, []);
 
-    // Helper: extract rows from settled result — returns empty array on failure
-    const getRows = <T>(settled: PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>): T[] => {
-      if (settled.status === 'rejected') {
-        console.error('[ISG] Table load rejected:', settled.reason);
-        return [];
-      }
-      const res = settled.value;
-      if (res.error) {
-        console.error('[ISG] Load error:', res.error);
-        return [];
-      }
-      return (res.data ?? []).map(row => row.data as T);
-    };
+  // ── Per-table fetch functions (lazy load) ──
+  const fetchFirmalar = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('firmalar', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Firma);
+    setFirmalar(rows);
+    console.log(`[ISG] fetchFirmalar ✓ count=${rows.length}`);
+  }, [fetchAllRows, setFirmalar]);
 
-    const [
-      firmaRes, personelRes, evrakRes, egitimRes,
-      muayeneRes, uygRes, ekipmanRes, gorevRes, tutanakRes, isIzRes,
-    ] = results;
-
-    const KAN: Record<string, string> = {
-      'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-',
-      'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-',
-    };
-
-    setFirmalar(getRows<Firma>(firmaRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
-    setPersoneller(getRows<Personel>(personelRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>).map(p => ({
+  const fetchPersoneller = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('personeller', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Personel).map(p => ({
       ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
-    })));
-    setEvraklar(getRows<Evrak>(evrakRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>).map(e => ({
+    }));
+    setPersoneller(rows);
+    console.log(`[ISG] fetchPersoneller ✓ count=${rows.length}`);
+  }, [fetchAllRows, setPersoneller]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchEvraklar = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('evraklar', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Evrak).map(e => ({
       ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
-    })));
-    setEgitimler(getRows<Egitim>(egitimRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
-    setMuayeneler(getRows<Muayene>(muayeneRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
-    setUygunsuzluklar(getRows<Uygunsuzluk>(uygRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>).map(u => {
+    }));
+    setEvraklar(rows);
+    console.log(`[ISG] fetchEvraklar ✓ count=${rows.length}`);
+  }, [fetchAllRows, setEvraklar]);
+
+  const fetchEgitimler = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('egitimler', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Egitim);
+    setEgitimler(rows);
+    console.log(`[ISG] fetchEgitimler ✓ count=${rows.length}`);
+  }, [fetchAllRows, setEgitimler]);
+
+  const fetchMuayeneler = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('muayeneler', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Muayene);
+    setMuayeneler(rows);
+    console.log(`[ISG] fetchMuayeneler ✓ count=${rows.length}`);
+  }, [fetchAllRows, setMuayeneler]);
+
+  const fetchUygunsuzluklar = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('uygunsuzluklar', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Uygunsuzluk).map(u => {
       let durum = u.durum as string;
       if (durum === 'Kapatıldı') durum = 'Kapandı';
       if (durum === 'İncelemede') durum = 'Açık';
       return { ...u, durum: durum as UygunsuzlukStatus };
-    }));
-    setEkipmanlar(getRows<Ekipman>(ekipmanRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
-    setGorevler(getRows<Gorev>(gorevRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
-    setTutanaklar(getRows<Tutanak>(tutanakRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
-    setIsIzinleri(getRows<IsIzni>(isIzRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
+    });
+    setUygunsuzluklar(rows);
+    console.log(`[ISG] fetchUygunsuzluklar ✓ count=${rows.length}`);
+  }, [fetchAllRows, setUygunsuzluklar]);
 
-    console.log(`[ISG] Data loaded ✓ firms=${firmaRes.status === 'fulfilled' ? (firmaRes.value.data?.length ?? 0) : 'ERR'} personnel=${personelRes.status === 'fulfilled' ? (personelRes.value.data?.length ?? 0) : 'ERR'}`);
-  }, [fetchAllRows, setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, setTutanaklar, setIsIzinleri]);
+  const fetchEkipmanlar = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('ekipmanlar', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Ekipman);
+    setEkipmanlar(rows);
+    console.log(`[ISG] fetchEkipmanlar ✓ count=${rows.length}`);
+  }, [fetchAllRows, setEkipmanlar]);
+
+  const fetchGorevler = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('gorevler', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Gorev);
+    setGorevler(rows);
+    console.log(`[ISG] fetchGorevler ✓ count=${rows.length}`);
+  }, [fetchAllRows, setGorevler]);
+
+  const fetchTutanaklar = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('tutanaklar', orgId);
+    const rows = (res.data ?? []).map(r => r.data as Tutanak);
+    setTutanaklar(rows);
+    console.log(`[ISG] fetchTutanaklar ✓ count=${rows.length}`);
+  }, [fetchAllRows, setTutanaklar]);
+
+  const fetchIsIzinleri = useCallback(async (orgId: string) => {
+    const res = await fetchAllRows('is_izinleri', orgId);
+    const rows = (res.data ?? []).map(r => r.data as IsIzni);
+    setIsIzinleri(rows);
+    console.log(`[ISG] fetchIsIzinleri ✓ count=${rows.length}`);
+  }, [fetchAllRows, setIsIzinleri]);
+
+  // ── Core data loader — sadece firmalar + personeller (hızlı açılış) ──
+  // Diğer tablolar sayfa bazlı lazy fetch ile yüklenir
+  const loadAllData = useCallback(async (orgId: string) => {
+    const results = await Promise.allSettled([
+      fetchAllRows('firmalar', orgId),
+      fetchAllRows('personeller', orgId),
+    ]);
+
+    const [firmaRes, personelRes] = results;
+
+    setFirmalar(extractRows<Firma>(firmaRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>));
+    setPersoneller(
+      extractRows<Personel>(personelRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>)
+        .map(p => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') })),
+    );
+
+    console.log(`[ISG] loadAllData ✓ firms=${firmaRes.status === 'fulfilled' ? (firmaRes.value.data?.length ?? 0) : 'ERR'} personnel=${personelRes.status === 'fulfilled' ? (personelRes.value.data?.length ?? 0) : 'ERR'}`);
+  }, [fetchAllRows, setFirmalar, setPersoneller, extractRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Public refresh function — called by UI refresh buttons ──
   const refreshAllData = useCallback(async () => {
@@ -1718,6 +1773,9 @@ export function useStore(
     dataLoading,
     isSaving: false,
     refreshAllData,
+    fetchFirmalar, fetchPersoneller, fetchEvraklar, fetchEgitimler,
+    fetchMuayeneler, fetchUygunsuzluklar, fetchEkipmanlar,
+    fetchGorevler, fetchTutanaklar, fetchIsIzinleri,
     addFirma, updateFirma, deleteFirma, restoreFirma, permanentDeleteFirma,
     addPersonel, updatePersonel, deletePersonel, restorePersonel, permanentDeletePersonel,
     addEvrak, updateEvrak, deleteEvrak, restoreEvrak, permanentDeleteEvrak,
