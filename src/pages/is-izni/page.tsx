@@ -5,7 +5,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { generateIsIzniNo } from '@/store/useStore';
 import Modal from '@/components/base/Modal';
 import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
-import { uploadFileToStorage, getSignedUrl, getSignedUrlFromPath } from '@/utils/fileUpload';
+import { getSignedUrl } from '@/utils/fileUpload';
 import { supabase } from '@/lib/supabase';
 
 // ─── Tip renk/ikon config ───────────────────────────────────────────────────
@@ -45,31 +45,59 @@ function getDaysLeft(bitisTarihi: string): number | null {
 // ─── Red fotoğrafı bileşeni — path veya URL'den signed URL üretir ──────────
 function RedFotoImg({ src, className, style }: { src: string; className?: string; style?: React.CSSProperties }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!src) return;
-    // Zaten tam URL ise direkt kullan
-    if (src.startsWith('http')) {
-      // Eski signed URL — yenile
-      if (src.includes('/sign/') || src.includes('token=')) {
-        // Signed URL'den path çıkar ve yeniden üret
-        const match = src.match(/\/object\/(?:sign|public)\/uploads\/(.+?)(?:\?|$)/);
+    setError(false);
+    setSignedUrl(null);
+
+    const load = async () => {
+      // Zaten tam HTTP URL ise — signed URL'den path çıkar ve yenile
+      if (src.startsWith('http')) {
+        // Supabase storage URL'inden path çıkar
+        const match = src.match(/\/storage\/v1\/object\/(?:sign|public)\/uploads\/(.+?)(?:\?|$)/);
         if (match) {
-          getSignedUrlFromPath(match[1]).then(url => setSignedUrl(url));
+          const url = await getSignedUrl(match[1]);
+          setSignedUrl(url);
         } else {
+          // Tanımlanamayan HTTP URL — direkt kullan
           setSignedUrl(src);
         }
-      } else {
-        setSignedUrl(src);
+        return;
       }
-      return;
-    }
-    // Storage path ise signed URL üret
-    getSignedUrlFromPath(src).then(url => setSignedUrl(url));
+      // Storage path ise direkt signed URL üret (getSignedUrl kullan, getSignedUrlFromPath değil)
+      const url = await getSignedUrl(src);
+      setSignedUrl(url);
+    };
+
+    void load();
   }, [src]);
 
-  if (!signedUrl) return <div className="rounded-lg h-20 animate-pulse" style={{ background: 'rgba(239,68,68,0.1)' }} />;
-  return <img src={signedUrl} alt="Red fotoğrafı" className={className} style={style} />;
+  if (error) {
+    return (
+      <div className="rounded-lg h-20 flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+        <div className="text-center">
+          <i className="ri-image-line text-xl" style={{ color: '#EF4444' }} />
+          <p className="text-[10px] mt-1" style={{ color: '#EF4444' }}>Fotoğraf yüklenemedi</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!signedUrl) {
+    return <div className="rounded-lg h-20 animate-pulse" style={{ background: 'rgba(239,68,68,0.1)' }} />;
+  }
+
+  return (
+    <img
+      src={signedUrl}
+      alt="Red fotoğrafı"
+      className={className}
+      style={style}
+      onError={() => setError(true)}
+    />
+  );
 }
 
 // ─── Evrak listesi bileşeni ─────────────────────────────────────────────────
