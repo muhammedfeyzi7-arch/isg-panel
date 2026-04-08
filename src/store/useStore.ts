@@ -1503,13 +1503,37 @@ export function useStore(
   }, [setEkipmanlar]);
 
   const deleteEkipman = useCallback((id: string) => {
+    const now = new Date().toISOString();
     let updated: Ekipman | null = null;
+    let snapshot: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
-      updated = { ...e, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
+      snapshot = e;
+      updated = { ...e, silinmis: true as const, silinmeTarihi: now };
       return updated;
     }));
-    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) {
+      const orgId = orgIdRef.current;
+      const uid = userIdRef.current;
+      if (orgId && uid) {
+        supabase
+          .from('ekipmanlar')
+          .update({ data: updated, updated_at: now, deleted_at: now, device_id: getDeviceId() })
+          .eq('id', id)
+          .eq('organization_id', orgId)
+          .then(({ error }) => {
+            if (error) {
+              console.error('[ISG] deleteEkipman DB error:', error.message);
+              if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
+              onSaveErrorRef.current?.(`Ekipman silinemedi: ${error.message}`);
+            } else {
+              console.log(`[ISG] deleteEkipman OK: ${id}`);
+            }
+          });
+      } else {
+        saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+      }
+    }
     logFnRef.current?.('ekipman_deleted', 'Ekipmanlar', id, undefined, 'Ekipman silindi.');
   }, [setEkipmanlar, saveToDb]);
 

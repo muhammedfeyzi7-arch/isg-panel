@@ -473,9 +473,12 @@ export default function EkipmanlarPage() {
     return n;
   });
 
-  const handleBulkDelete = () => {
-    selected.forEach(id => deleteEkipman(id));
-    addToast(`${selected.size} ekipman silindi.`, 'info');
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selected);
+    const count = ids.length;
+    // Önce tüm seçilenleri tek tek soft-delete et (her biri için direkt DB update)
+    ids.forEach(id => deleteEkipman(id));
+    addToast(`${count} ekipman silindi.`, 'info');
     setSelected(new Set());
     setBulkDeleteConfirm(false);
   };
@@ -1525,7 +1528,7 @@ export default function EkipmanlarPage() {
         footer={
           <>
             <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
+            <button onClick={() => void handleBulkDelete()} className="btn-danger whitespace-nowrap">
               <i className="ri-delete-bin-line" /> {selected.size} Ekipmanı Sil
             </button>
           </>

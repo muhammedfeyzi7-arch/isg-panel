@@ -149,24 +149,35 @@ function parseCsvToRows(text: string): string[][] {
 }
 
 /**
- * Excel serial date'i YYYY-MM-DD formatına çevirir
+ * Excel serial date'i YYYY-MM-DD formatına çevirir.
+ * Desteklenen formatlar:
+ *  - Sayısal serial (44927 gibi) — hem number hem string olabilir
+ *  - GG.AA.YYYY
+ *  - GG/AA/YYYY
+ *  - YYYY-MM-DD (ISO)
  */
 export function parseExcelDate(val: unknown): string {
-  if (!val) return '';
-  if (typeof val === 'number') {
+  if (val === null || val === undefined || val === '') return '';
+
+  // Sayısal serial — hem gerçek number hem "44927" gibi string olabilir
+  const asNum = typeof val === 'number' ? val : (typeof val === 'string' && /^\d{4,6}$/.test(val.trim()) ? Number(val.trim()) : NaN);
+  if (!isNaN(asNum) && asNum > 1000) {
     try {
-      const d = XLSXStyle.SSF.parse_date_code(val);
-      if (d) {
+      const d = XLSXStyle.SSF.parse_date_code(asNum);
+      if (d && d.y > 1900 && d.y < 2100) {
         return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
       }
     } catch { /* ignore */ }
   }
+
   const str = String(val).trim();
+  // ISO: YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  // DD.MM.YYYY
   const m = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   // DD/MM/YYYY
   const m2 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m2) return `${m2[3]}-${m2[2].padStart(2, '0')}-${m2[1].padStart(2, '0')}`;
-  return str;
+  return '';
 }
