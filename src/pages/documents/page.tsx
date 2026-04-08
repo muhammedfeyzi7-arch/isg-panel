@@ -255,7 +255,7 @@ export default function EvraklarPage() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Evrak Takibi</h1>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Belge Takibi</h1>
           <p className="text-[12px] mt-1" style={{ color: 'var(--text-muted)' }}>{evraklar.length} toplam evrak — durum otomatik hesaplanır</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

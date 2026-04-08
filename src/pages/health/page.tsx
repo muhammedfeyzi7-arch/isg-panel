@@ -366,7 +366,7 @@ export default function MuayenelerPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Sağlık Takibi</h1>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Sağlık Durumu</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Personel periyodik muayene tarihlerini takip edin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">

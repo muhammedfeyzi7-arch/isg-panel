@@ -19,35 +19,35 @@ interface TourStep {
 const ADMIN_STEPS: TourStep[] = [
   {
     title: 'ISG Denetim\'e Hoş Geldiniz!',
-    description: 'İş Sağlığı & Güvenliği yönetim platformuna hoş geldiniz. Birkaç adımda sistemi tanıyalım.',
+    description: 'Türkiye\'nin en kapsamlı İş Sağlığı & Güvenliği yönetim platformuna hoş geldiniz. Tüm modülleri birkaç adımda tanıyalım.',
     icon: 'ri-shield-star-fill',
     iconColor: '#818CF8',
     iconBg: 'rgba(99,102,241,0.15)',
     gradient: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
     features: [
       { icon: 'ri-building-2-line', text: 'Firma & personel yönetimi' },
-      { icon: 'ri-file-list-3-line', text: 'Evrak takibi & bildirimler' },
+      { icon: 'ri-graduation-cap-line', text: 'Eğitim & sağlık takibi' },
       { icon: 'ri-map-pin-user-line', text: 'Saha denetim & DÖF' },
     ],
   },
   {
     title: 'Kontrol Paneli',
-    description: 'Tüm kritik verileri tek ekranda görün. Süresi dolmak üzere evraklar, bekleyen görevler ve anlık istatistikler burada.',
+    description: 'Tüm kritik verileri tek ekranda görün. Süresi dolmak üzere evraklar, bekleyen görevler, anlık istatistikler ve akıllı özetler burada.',
     icon: 'ri-dashboard-3-fill',
     iconColor: '#10B981',
     iconBg: 'rgba(16,185,129,0.15)',
     gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
     targetId: 'sidebar-dashboard',
-    tip: 'Otomatik risk analizi ile günlük durumunuzu hızlıca görün',
+    tip: 'Yapay zeka destekli risk analizi ile günlük durumunuzu saniyeler içinde görün',
     features: [
       { icon: 'ri-bar-chart-2-line', text: 'Anlık istatistikler' },
+      { icon: 'ri-robot-line', text: 'AI destekli özet' },
       { icon: 'ri-notification-3-line', text: 'Akıllı bildirimler' },
-      { icon: 'ri-bar-chart-box-line', text: 'Otomatik risk analizi' },
     ],
   },
   {
     title: 'Firma & Personel Yönetimi',
-    description: 'Denetlediğiniz firmaları ve personelleri kolayca yönetin. Evrak sürelerini takip edin, otomatik uyarılar alın.',
+    description: 'Denetlediğiniz firmaları ve personelleri kolayca yönetin. Evrak sürelerini takip edin, kartvizit görüntüleyin, otomatik uyarılar alın.',
     icon: 'ri-building-2-fill',
     iconColor: '#F59E0B',
     iconBg: 'rgba(245,158,11,0.15)',
@@ -56,28 +56,73 @@ const ADMIN_STEPS: TourStep[] = [
     tip: 'Evrak süresi dolmadan 30 gün önce otomatik bildirim alırsınız',
     features: [
       { icon: 'ri-building-line', text: 'Sınırsız firma kaydı' },
-      { icon: 'ri-team-line', text: 'Personel evrak takibi' },
+      { icon: 'ri-id-card-line', text: 'Dijital kartvizit' },
       { icon: 'ri-alarm-warning-line', text: 'Otomatik uyarı sistemi' },
     ],
   },
   {
+    title: 'Eğitim & Sağlık Takibi',
+    description: 'Personel eğitimlerini planlayın, katılım oranlarını takip edin. Periyodik muayene tarihlerini yönetin, süresi yaklaşanlar için uyarı alın.',
+    icon: 'ri-graduation-cap-fill',
+    iconColor: '#6366F1',
+    iconBg: 'rgba(99,102,241,0.15)',
+    gradient: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+    targetId: 'sidebar-egitimler',
+    tip: 'Eğitim katılım oranı firma toplam personel sayısına göre hesaplanır',
+    features: [
+      { icon: 'ri-team-line', text: 'Katılım takibi' },
+      { icon: 'ri-heart-pulse-line', text: 'Muayene yönetimi' },
+      { icon: 'ri-file-excel-2-line', text: 'Excel raporu' },
+    ],
+  },
+  {
+    title: 'Ekipman & İş İzni',
+    description: 'Ekipmanların periyodik kontrollerini kaydedin, QR kod ile hızlı erişim sağlayın. Sıcak çalışma, yüksekte çalışma gibi iş izinlerini dijital olarak yönetin.',
+    icon: 'ri-tools-fill',
+    iconColor: '#F97316',
+    iconBg: 'rgba(249,115,22,0.15)',
+    gradient: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+    targetId: 'sidebar-ekipmanlar',
+    tip: 'QR kod ile ekipmana telefon kamerasıyla anında erişebilirsiniz',
+    features: [
+      { icon: 'ri-qr-code-line', text: 'QR kod desteği' },
+      { icon: 'ri-file-text-line', text: 'İş izni PDF' },
+      { icon: 'ri-calendar-check-line', text: 'Periyodik kontrol' },
+    ],
+  },
+  {
     title: 'Saha Denetim & DÖF',
-    description: 'Sahada tespit ettiğiniz uygunsuzlukları kaydedin, DÖF açın ve kapatma süreçlerini takip edin.',
+    description: 'Sahada tespit ettiğiniz uygunsuzlukları fotoğrafla kaydedin, DÖF açın ve kapatma süreçlerini takip edin. Tutanak oluşturun.',
     icon: 'ri-map-pin-user-fill',
     iconColor: '#EF4444',
     iconBg: 'rgba(239,68,68,0.15)',
     gradient: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
     targetId: 'sidebar-uygunsuzluklar',
-    tip: 'PDF rapor oluşturma ve fotoğraf ekleme özelliği mevcuttur',
+    tip: 'Fotoğraflı DÖF kaydı ve otomatik PDF rapor oluşturma özelliği mevcuttur',
     features: [
       { icon: 'ri-camera-line', text: 'Fotoğraflı kayıt' },
       { icon: 'ri-file-pdf-line', text: 'Otomatik PDF rapor' },
-      { icon: 'ri-time-line', text: 'Süreç takibi' },
+      { icon: 'ri-article-line', text: 'Tutanak yönetimi' },
+    ],
+  },
+  {
+    title: 'Raporlar & Analiz',
+    description: 'Tüm verileri kapsamlı grafikler ve tablolarla analiz edin. Firma bazlı filtreleme, tarih aralığı seçimi ve tek tıkla Excel raporu indirin.',
+    icon: 'ri-bar-chart-box-fill',
+    iconColor: '#EC4899',
+    iconBg: 'rgba(236,72,153,0.15)',
+    gradient: 'linear-gradient(135deg, #EC4899 0%, #DB2777 100%)',
+    targetId: 'sidebar-raporlar',
+    tip: 'Excel raporu; firmalar, personeller, eğitimler, muayeneler ve uygunsuzlukları tek dosyada sunar',
+    features: [
+      { icon: 'ri-pie-chart-line', text: 'Görsel analizler' },
+      { icon: 'ri-file-excel-2-line', text: 'Toplu Excel export' },
+      { icon: 'ri-filter-3-line', text: 'Firma & tarih filtresi' },
     ],
   },
   {
     title: 'Ekip Yönetimi',
-    description: 'Ayarlar menüsünden ekibinizi yönetin. Farklı roller atayın, yetkileri özelleştirin.',
+    description: 'Ayarlar menüsünden ekibinizi yönetin. Farklı roller atayın, yetkileri özelleştirin ve aktivite geçmişini takip edin.',
     icon: 'ri-group-fill',
     iconColor: '#06B6D4',
     iconBg: 'rgba(6,182,212,0.15)',
@@ -116,18 +161,18 @@ const MEMBER_STEPS: TourStep[] = [
     features: [
       { icon: 'ri-file-list-3-line', text: 'Evrak yönetimi' },
       { icon: 'ri-graduation-cap-line', text: 'Eğitim takibi' },
-      { icon: 'ri-article-line', text: 'Tutanak oluşturma' },
+      { icon: 'ri-heart-pulse-line', text: 'Sağlık takibi' },
     ],
   },
   {
     title: 'Evrak Takibi',
-    description: 'Personel evraklarını yönetin. Süresi dolmak üzere olan evraklar için otomatik bildirim alırsınız.',
+    description: 'Personel evraklarını yönetin. Süresi dolmak üzere olan evraklar için otomatik bildirim alırsınız. Toplu yükleme ile zamandan tasarruf edin.',
     icon: 'ri-file-list-3-fill',
     iconColor: '#C084FC',
     iconBg: 'rgba(192,132,252,0.15)',
     gradient: 'linear-gradient(135deg, #C084FC 0%, #A855F7 100%)',
     targetId: 'sidebar-evraklar',
-    tip: 'Toplu evrak yükleme özelliği ile zamandan tasarruf edin',
+    tip: 'Toplu evrak yükleme özelliği ile tüm personel evraklarını tek seferde yükleyin',
     features: [
       { icon: 'ri-upload-cloud-line', text: 'Toplu yükleme' },
       { icon: 'ri-alarm-warning-line', text: 'Süre uyarıları' },
@@ -136,7 +181,7 @@ const MEMBER_STEPS: TourStep[] = [
   },
   {
     title: 'Eğitim Takibi',
-    description: 'Personel eğitim belgelerini ve geçerlilik sürelerini takip edin.',
+    description: 'Personel eğitimlerini planlayın, katılım listelerini yönetin. Katılım oranı firma toplam personel sayısına göre otomatik hesaplanır.',
     icon: 'ri-graduation-cap-fill',
     iconColor: '#2DD4BF',
     iconBg: 'rgba(45,212,191,0.15)',
@@ -145,8 +190,23 @@ const MEMBER_STEPS: TourStep[] = [
     tip: 'Eğitim sertifikalarını sisteme yükleyerek dijital arşiv oluşturun',
     features: [
       { icon: 'ri-calendar-check-line', text: 'Eğitim takvimi' },
-      { icon: 'ri-award-line', text: 'Sertifika arşivi' },
-      { icon: 'ri-notification-line', text: 'Yenileme hatırlatıcı' },
+      { icon: 'ri-team-line', text: 'Katılım takibi' },
+      { icon: 'ri-file-excel-2-line', text: 'Excel raporu' },
+    ],
+  },
+  {
+    title: 'Sağlık Takibi',
+    description: 'Personellerin periyodik muayene tarihlerini takip edin. Süresi yaklaşan veya geçmiş muayeneler için otomatik uyarı alın.',
+    icon: 'ri-heart-pulse-fill',
+    iconColor: '#EC4899',
+    iconBg: 'rgba(236,72,153,0.15)',
+    gradient: 'linear-gradient(135deg, #EC4899 0%, #DB2777 100%)',
+    targetId: 'sidebar-saglik',
+    tip: 'Muayene sonuçlarını (Çalışabilir / Kısıtlı / Çalışamaz) kaydedin',
+    features: [
+      { icon: 'ri-alarm-warning-line', text: 'Süre uyarıları' },
+      { icon: 'ri-file-text-line', text: 'Muayene belgesi' },
+      { icon: 'ri-bar-chart-2-line', text: 'Durum analizi' },
     ],
   },
   {
@@ -175,27 +235,27 @@ const DENETCI_STEPS: TourStep[] = [
     features: [
       { icon: 'ri-map-pin-user-line', text: 'Saha denetim' },
       { icon: 'ri-tools-line', text: 'Ekipman kontrol' },
-      { icon: 'ri-file-pdf-line', text: 'Rapor oluşturma' },
+      { icon: 'ri-file-text-line', text: 'İş izni yönetimi' },
     ],
   },
   {
-    title: 'Saha Denetim',
-    description: 'Sahada tespit ettiğiniz uygunsuzlukları fotoğrafla kaydedin, DÖF açın ve takip edin.',
+    title: 'Saha Denetim & DÖF',
+    description: 'Sahada tespit ettiğiniz uygunsuzlukları fotoğrafla kaydedin, DÖF açın ve takip edin. Tutanak oluşturun.',
     icon: 'ri-map-pin-user-fill',
     iconColor: '#FB923C',
     iconBg: 'rgba(251,146,60,0.15)',
     gradient: 'linear-gradient(135deg, #FB923C 0%, #EA580C 100%)',
     targetId: 'sidebar-uygunsuzluklar',
-    tip: 'QR kod ile ekipman kaydı yapabilirsiniz',
+    tip: 'Fotoğraflı DÖF kaydı ve otomatik PDF rapor oluşturma özelliği mevcuttur',
     features: [
       { icon: 'ri-camera-line', text: 'Fotoğraflı kayıt' },
-      { icon: 'ri-qr-code-line', text: 'QR kod desteği' },
       { icon: 'ri-file-pdf-line', text: 'PDF rapor' },
+      { icon: 'ri-article-line', text: 'Tutanak oluştur' },
     ],
   },
   {
     title: 'Ekipman Kontrolleri',
-    description: 'Ekipmanların periyodik kontrollerini kaydedin, QR kod ile hızlı erişim sağlayın.',
+    description: 'Ekipmanların periyodik kontrollerini kaydedin, QR kod ile hızlı erişim sağlayın. Bakım tarihlerini takip edin.',
     icon: 'ri-tools-fill',
     iconColor: '#34D399',
     iconBg: 'rgba(52,211,153,0.15)',
@@ -206,6 +266,21 @@ const DENETCI_STEPS: TourStep[] = [
       { icon: 'ri-qr-code-line', text: 'QR kod oluştur' },
       { icon: 'ri-calendar-check-line', text: 'Periyodik kontrol' },
       { icon: 'ri-alarm-warning-line', text: 'Bakım uyarıları' },
+    ],
+  },
+  {
+    title: 'İş İzni Yönetimi',
+    description: 'Sıcak çalışma, yüksekte çalışma, kapalı alan gibi tehlikeli işler için dijital iş izni oluşturun ve onay süreçlerini takip edin.',
+    icon: 'ri-file-text-fill',
+    iconColor: '#818CF8',
+    iconBg: 'rgba(129,140,248,0.15)',
+    gradient: 'linear-gradient(135deg, #818CF8 0%, #6366F1 100%)',
+    targetId: 'sidebar-is-izni',
+    tip: 'İş izni PDF olarak indirilebilir ve sahada imzalatılabilir',
+    features: [
+      { icon: 'ri-fire-line', text: 'Sıcak çalışma izni' },
+      { icon: 'ri-arrow-up-line', text: 'Yüksekte çalışma' },
+      { icon: 'ri-file-pdf-line', text: 'PDF çıktı' },
     ],
   },
   {
@@ -266,13 +341,16 @@ export default function OnboardingTour() {
     if (checkedUserIdRef.current === user.id) return;
     checkedUserIdRef.current = user.id;
 
-    const localKey = `${TOUR_STORAGE_KEY}_${user.id}`;
+    // sessionStorage: sadece mevcut oturumda cache'le.
+    // Yeni cihaz / yeni oturum açıldığında sessionStorage boş olur → Supabase'e sorar.
+    // Böylece cihaz değiştiğinde tur tekrar gösterilmez (Supabase'den true gelir).
+    const sessionKey = `${TOUR_STORAGE_KEY}_${user.id}`;
     let cancelled = false;
     let showTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const localDone = localStorage.getItem(localKey);
-      if (localDone === '1') return;
+      const sessionDone = sessionStorage.getItem(sessionKey);
+      if (sessionDone === '1') return;
     } catch { /* ignore */ }
 
     supabase
@@ -287,8 +365,8 @@ export default function OnboardingTour() {
           return;
         }
         if (data?.tour_completed === true) {
-          // Supabase'de tamamlanmış — localStorage'a da kaydet
-          try { localStorage.setItem(localKey, '1'); } catch { /* ignore */ }
+          // Supabase'de tamamlanmış — sessionStorage'a da kaydet
+          try { sessionStorage.setItem(sessionKey, '1'); } catch { /* ignore */ }
           return;
         }
         // Supabase'de kayıt yok veya tour_completed false — turu göster
@@ -319,27 +397,18 @@ export default function OnboardingTour() {
   const completeTour = useCallback(async () => {
     if (!user?.id) return;
     setVisible(false);
-    try { localStorage.setItem(`${TOUR_STORAGE_KEY}_${user.id}`, '1'); } catch { /* ignore */ }
+    // sessionStorage'a kaydet (mevcut oturumda tekrar gösterme)
+    try { sessionStorage.setItem(`${TOUR_STORAGE_KEY}_${user.id}`, '1'); } catch { /* ignore */ }
+    // Eski localStorage kaydını da temizle (migration)
+    try { localStorage.removeItem(`${TOUR_STORAGE_KEY}_${user.id}`); } catch { /* ignore */ }
     try {
-      // Önce mevcut kaydı kontrol et
-      const { data: existing } = await supabase
+      // upsert: kayıt varsa güncelle, yoksa oluştur — tek seferde güvenli
+      await supabase
         .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (existing?.id) {
-        // Kayıt varsa güncelle
-        await supabase
-          .from('profiles')
-          .update({ tour_completed: true })
-          .eq('user_id', user.id);
-      } else {
-        // Kayıt yoksa oluştur
-        await supabase
-          .from('profiles')
-          .insert({ user_id: user.id, tour_completed: true });
-      }
+        .upsert(
+          { user_id: user.id, tour_completed: true },
+          { onConflict: 'user_id' }
+        );
     } catch { /* ignore */ }
   }, [user?.id]);
 

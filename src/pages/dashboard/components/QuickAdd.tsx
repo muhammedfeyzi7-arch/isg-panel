@@ -65,8 +65,8 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
   {
     id: 'uygunsuzluk',
-    label: 'Uygunsuzluk',
-    icon: 'ri-alert-line',
+    label: 'Saha Denetim',
+    icon: 'ri-map-pin-user-line',
     description: 'DÖF aç',
     accentColor: '#EF4444',
     gradientFrom: '#EF4444',

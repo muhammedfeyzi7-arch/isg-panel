@@ -4,6 +4,12 @@ import Badge, { getFirmaStatusColor, getTehlikeColor } from '../../components/ba
 import { urlToBase64 } from '@/utils/fileUpload';
 import type ExcelJS from 'exceljs';
 import {
+  setWorkbookMetadata,
+  addWatermark,
+  addFooter,
+  protectSheet,
+} from '@/utils/excelProtection';
+import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   RadialBarChart, RadialBar,
@@ -561,7 +567,7 @@ export default function RaporlarPage() {
     { id: 'evrak', label: 'Evrak Analizi', icon: 'ri-file-chart-line', color: '#F59E0B' },
     { id: 'uygunsuzluk', label: 'Uygunsuzluklar', icon: 'ri-alert-line', color: '#EF4444' },
     { id: 'egitim', label: 'Eğitimler', icon: 'ri-graduation-cap-line', color: '#6366F1' },
-    { id: 'saglik', label: 'Sağlık Takibi', icon: 'ri-heart-pulse-line', color: '#EC4899' },
+    { id: 'saglik', label: 'Sağlık Durumu', icon: 'ri-heart-pulse-line', color: '#EC4899' },
   ] as const;
 
   // ── Sağlık Takibi İstatistikleri ──
@@ -654,8 +660,7 @@ export default function RaporlarPage() {
         const exEkipmanlar = aktifEkipmanlar;
 
         const wb = new ExcelJS.Workbook();
-        wb.creator = 'ISG Denetim Sistemi';
-        wb.created = now;
+        setWorkbookMetadata(wb);
 
         // ── ExcelJS Stil Yardımcıları ──
         const STATUS_COLORS: Record<string, { fg: string; bg: string }> = {
@@ -781,18 +786,82 @@ export default function RaporlarPage() {
         ) => {
           const ws = wb.addWorksheet(sheetName);
           ws.columns = colWidths.map(w => ({ width: w }));
-          applyHeaderRows(ws, title, subtitle, cols.length);
+          
+          // Marka koruması: Watermark
+          addWatermark(ws, cols.length);
+          
+          // Header satırları (watermark sonrası 2. satırdan başlar)
+          ws.mergeCells(2, 1, 2, cols.length);
+          ws.mergeCells(3, 1, 3, cols.length);
+          ws.mergeCells(4, 1, 4, cols.length);
+          const r2 = ws.getRow(2); r2.height = 32;
+          const r3 = ws.getRow(3); r3.height = 26;
+          const r4 = ws.getRow(4); r4.height = 18;
+          const c2 = ws.getCell(2, 1);
+          c2.value = 'ISG DENETİM YÖNETİM SİSTEMİ';
+          c2.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+          c2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF020817' } };
+          c2.alignment = { horizontal: 'left', vertical: 'middle' };
+          const c3 = ws.getCell(3, 1);
+          c3.value = title;
+          c3.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+          c3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A0F1E' } };
+          c3.alignment = { horizontal: 'left', vertical: 'middle' };
+          const c4 = ws.getCell(4, 1);
+          c4.value = `${subtitle}  |  Dönem: ${tarihAralikLabel}`;
+          c4.font = { italic: true, size: 10, color: { argb: 'FF94A3B8' }, name: 'Calibri' };
+          c4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+          c4.alignment = { horizontal: 'left', vertical: 'middle' };
+          
+          // Kolon header'ı (5. satır)
           applyHeaderCols(ws, cols, useBlue);
-          applyDataRows(ws, rows.map(r => r.map(v => [v])), cols);
-          ws.views = [{ state: 'frozen', ySplit: 4 }];
+          
+          // Veri satırları (6. satırdan başlar)
+          applyDataRows(ws, rows.map(r => r.map(v => [v])), cols, 6);
+          
+          // Freeze pane
+          ws.views = [{ state: 'frozen', ySplit: 5 }];
+          
+          // Marka koruması: Footer
+          addFooter(ws, rows.length + 5, cols.length);
+          
+          // Marka koruması: Sheet protection
+          protectSheet(ws);
+          
           return ws;
         };
 
         // ── SAYFA 1: ÖZET ──
         const ozetWs = wb.addWorksheet('Genel Özet');
         ozetWs.columns = [{ width: 30 }, { width: 16 }, { width: 30 }, { width: 16 }];
-        applyHeaderRows(ozetWs, `GENEL ÖZET RAPORU — ${firmaAdi}`, `Rapor Tarihi: ${tarih}  |  Firma: ${firmaAdi}`, 4);
-        applyHeaderCols(ozetWs, ['Kategori', 'Toplam', 'Alt Kategori', 'Değer']);
+        
+        // Marka koruması: Watermark
+        addWatermark(ozetWs, 4);
+        
+        // Header satırları (watermark sonrası)
+        ozetWs.mergeCells(2, 1, 2, 4);
+        ozetWs.mergeCells(3, 1, 3, 4);
+        ozetWs.mergeCells(4, 1, 4, 4);
+        const r2 = ozetWs.getRow(2); r2.height = 32;
+        const r3 = ozetWs.getRow(3); r3.height = 26;
+        const r4 = ozetWs.getRow(4); r4.height = 18;
+        const c2 = ozetWs.getCell(2, 1);
+        c2.value = 'ISG DENETİM YÖNETİM SİSTEMİ';
+        c2.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        c2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF020817' } };
+        c2.alignment = { horizontal: 'left', vertical: 'middle' };
+        const c3 = ozetWs.getCell(3, 1);
+        c3.value = `GENEL ÖZET RAPORU — ${firmaAdi}`;
+        c3.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        c3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A0F1E' } };
+        c3.alignment = { horizontal: 'left', vertical: 'middle' };
+        const c4 = ozetWs.getCell(4, 1);
+        c4.value = `Rapor Tarihi: ${tarih}  |  Firma: ${firmaAdi}`;
+        c4.font = { italic: true, size: 10, color: { argb: 'FF94A3B8' }, name: 'Calibri' };
+        c4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+        c4.alignment = { horizontal: 'left', vertical: 'middle' };
+        
+        applyHeaderCols(ozetWs, ['Kategori', 'Toplam', 'Alt Kategori', 'Değer'], false);
         const ozetRows = [
           ['Toplam Firma', exFirmalar.length, 'Aktif Firma', exFirmalar.filter(f => f.durum === 'Aktif').length],
           ['Toplam Personel', exPersoneller.length, 'Aktif Personel', exPersoneller.filter(p => p.durum === 'Aktif').length],
@@ -804,7 +873,7 @@ export default function RaporlarPage() {
           ['Sistem Sağlık Skoru', `${healthScore}/100`, 'Durum', healthLabel],
         ];
         ozetRows.forEach((row, ri) => {
-          const exRow = ozetWs.getRow(5 + ri);
+          const exRow = ozetWs.getRow(6 + ri);
           exRow.height = 20;
           const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
           row.forEach((val, ci) => {
@@ -821,7 +890,11 @@ export default function RaporlarPage() {
             }
           });
         });
-        ozetWs.views = [{ state: 'frozen', ySplit: 4 }];
+        ozetWs.views = [{ state: 'frozen', ySplit: 5 }];
+        
+        // Marka koruması: Footer ve Protection
+        addFooter(ozetWs, ozetRows.length + 5, 4);
+        protectSheet(ozetWs);
 
         // ── SAYFA 2: FİRMALAR ──
         buildSheet('Firmalar', 'FİRMALAR LİSTESİ', `Toplam ${exFirmalar.length} firma  |  ${firmaAdi}  |  Rapor: ${tarih}`,
@@ -862,7 +935,33 @@ export default function RaporlarPage() {
         const egitimListeWs = wb.addWorksheet('Eğitimler');
         const egitimListeCols = ['#', 'Eğitim Adı', 'Firma', 'Eğitmen', 'Tarih', 'Açıklama', 'Toplam Katılımcı', 'Katıldı', 'Katılmadı', 'Katılım Oranı'];
         egitimListeWs.columns = [4, 32, 26, 22, 14, 30, 16, 12, 12, 14].map(w => ({ width: w }));
-        applyHeaderRows(egitimListeWs, 'EĞİTİMLER LİSTESİ', `Toplam ${exEgitimler.length} eğitim  |  ${firmaAdi}  |  Rapor: ${tarih}`, egitimListeCols.length);
+        
+        // Marka koruması
+        addWatermark(egitimListeWs, egitimListeCols.length);
+        
+        // Header (watermark sonrası 2. satırdan)
+        egitimListeWs.mergeCells(2, 1, 2, egitimListeCols.length);
+        egitimListeWs.mergeCells(3, 1, 3, egitimListeCols.length);
+        egitimListeWs.mergeCells(4, 1, 4, egitimListeCols.length);
+        const eR2 = egitimListeWs.getRow(2); eR2.height = 32;
+        const eR3 = egitimListeWs.getRow(3); eR3.height = 26;
+        const eR4 = egitimListeWs.getRow(4); eR4.height = 18;
+        const eC2 = egitimListeWs.getCell(2, 1);
+        eC2.value = 'ISG DENETİM YÖNETİM SİSTEMİ';
+        eC2.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        eC2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF020817' } };
+        eC2.alignment = { horizontal: 'left', vertical: 'middle' };
+        const eC3 = egitimListeWs.getCell(3, 1);
+        eC3.value = 'EĞİTİMLER LİSTESİ';
+        eC3.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        eC3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A0F1E' } };
+        eC3.alignment = { horizontal: 'left', vertical: 'middle' };
+        const eC4 = egitimListeWs.getCell(4, 1);
+        eC4.value = `Toplam ${exEgitimler.length} eğitim  |  ${firmaAdi}  |  Rapor: ${tarih}`;
+        eC4.font = { italic: true, size: 10, color: { argb: 'FF94A3B8' }, name: 'Calibri' };
+        eC4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+        eC4.alignment = { horizontal: 'left', vertical: 'middle' };
+        
         applyHeaderCols(egitimListeWs, egitimListeCols);
         exEgitimler
           .sort((a, b) => new Date(b.tarih || b.olusturmaTarihi).getTime() - new Date(a.tarih || a.olusturmaTarihi).getTime())
@@ -872,7 +971,7 @@ export default function RaporlarPage() {
             const katildi = katilimcilar.filter(k => k.katildi).length;
             const katilmadi = katilimcilar.filter(k => !k.katildi).length;
             const oran = katilimcilar.length > 0 ? `%${Math.round((katildi / katilimcilar.length) * 100)}` : '—';
-            const exRow = egitimListeWs.getRow(5 + i);
+            const exRow = egitimListeWs.getRow(6 + i);
             exRow.height = 20;
             const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
             const vals = [i+1, e.ad, firma?.ad||'—', e.egitmen||'—', fmtDate(e.tarih), e.aciklama||'—', katilimcilar.length, katildi, katilmadi, oran];
@@ -896,13 +995,41 @@ export default function RaporlarPage() {
               }
             });
           });
-        egitimListeWs.views = [{ state: 'frozen', ySplit: 4 }];
+        egitimListeWs.views = [{ state: 'frozen', ySplit: 5 }];
+        addFooter(egitimListeWs, exEgitimler.length + 5, egitimListeCols.length);
+        protectSheet(egitimListeWs);
 
         // ── SAYFA 5b: EĞİTİM KATILIMCI DETAY ──
         const katilimWs = wb.addWorksheet('Eğitim Katılım Detay');
         const katilimCols = ['#', 'Eğitim Adı', 'Firma', 'Tarih', 'Personel Adı', 'Görev', 'Katılım Durumu'];
         katilimWs.columns = [4, 30, 24, 14, 26, 20, 16].map(w => ({ width: w }));
-        applyHeaderRows(katilimWs, 'EĞİTİM KATILIM DETAY', `Tüm eğitimlerin katılımcı detayı  |  ${firmaAdi}  |  Rapor: ${tarih}`, katilimCols.length);
+        
+        // Marka koruması
+        addWatermark(katilimWs, katilimCols.length);
+        
+        // Header (watermark sonrası)
+        katilimWs.mergeCells(2, 1, 2, katilimCols.length);
+        katilimWs.mergeCells(3, 1, 3, katilimCols.length);
+        katilimWs.mergeCells(4, 1, 4, katilimCols.length);
+        const kR2 = katilimWs.getRow(2); kR2.height = 32;
+        const kR3 = katilimWs.getRow(3); kR3.height = 26;
+        const kR4 = katilimWs.getRow(4); kR4.height = 18;
+        const kC2 = katilimWs.getCell(2, 1);
+        kC2.value = 'ISG DENETİM YÖNETİM SİSTEMİ';
+        kC2.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        kC2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF020817' } };
+        kC2.alignment = { horizontal: 'left', vertical: 'middle' };
+        const kC3 = katilimWs.getCell(3, 1);
+        kC3.value = 'EĞİTİM KATILIM DETAY';
+        kC3.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+        kC3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A0F1E' } };
+        kC3.alignment = { horizontal: 'left', vertical: 'middle' };
+        const kC4 = katilimWs.getCell(4, 1);
+        kC4.value = `Tüm eğitimlerin katılımcı detayı  |  ${firmaAdi}  |  Rapor: ${tarih}`;
+        kC4.font = { italic: true, size: 10, color: { argb: 'FF94A3B8' }, name: 'Calibri' };
+        kC4.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+        kC4.alignment = { horizontal: 'left', vertical: 'middle' };
+        
         applyHeaderCols(katilimWs, katilimCols);
         let katilimRowIdx = 0;
         exEgitimler
@@ -912,7 +1039,7 @@ export default function RaporlarPage() {
             const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
             katilimcilar.forEach(k => {
               const personel = exPersoneller.find(p => p.id === k.personelId);
-              const exRow = katilimWs.getRow(5 + katilimRowIdx);
+              const exRow = katilimWs.getRow(6 + katilimRowIdx);
               exRow.height = 18;
               const bg = katilimRowIdx % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
               const durumLabel = k.katildi ? 'Katıldı' : 'Katılmadı';
@@ -935,7 +1062,9 @@ export default function RaporlarPage() {
               katilimRowIdx++;
             });
           });
-        katilimWs.views = [{ state: 'frozen', ySplit: 4 }];
+        katilimWs.views = [{ state: 'frozen', ySplit: 5 }];
+        addFooter(katilimWs, katilimRowIdx + 5, katilimCols.length);
+        protectSheet(katilimWs);
 
         // ── SAYFA 6: SAĞLIK TAKİBİ ──
         const saglikWs = wb.addWorksheet('Sağlık Takibi');
@@ -992,7 +1121,9 @@ export default function RaporlarPage() {
               }
             });
           });
-        saglikWs.views = [{ state: 'frozen', ySplit: 4 }];
+        saglikWs.views = [{ state: 'frozen', ySplit: 5 }];
+        addFooter(saglikWs, exMuayeneler.length + 5, saglikCols.length);
+        protectSheet(saglikWs);
 
         // ── SAYFA 7: UYGUNSUZLUKLAR — fotoğraf embed ──
         // urlToBase64: filePath ise signed URL üretir, http URL ise direkt fetch eder
@@ -1055,7 +1186,9 @@ export default function RaporlarPage() {
           await embedPhoto(photos?.acilis, 10, u.acilisFotoMevcut);
           await embedPhoto(photos?.kapanis, 11, u.kapatmaFotoMevcut);
         }
-        wsUyg.views = [{ state: 'frozen', ySplit: 4 }];
+        wsUyg.views = [{ state: 'frozen', ySplit: 5 }];
+        addFooter(wsUyg, exUygunsuzluklar.length + 5, uygCols.length);
+        protectSheet(wsUyg);
 
         // ── SAYFA 8: EKİPMANLAR ──
         buildSheet('Ekipmanlar', 'EKİPMANLAR LİSTESİ', `Toplam ${exEkipmanlar.length} ekipman  |  Uygun Değil: ${exEkipmanlar.filter(e => e.durum === 'Uygun Değil').length}  |  ${firmaAdi}  |  Rapor: ${tarih}`,
@@ -1177,7 +1310,7 @@ export default function RaporlarPage() {
                     <button
                       key={preset.id}
                       onClick={() => applyPreset(preset.id)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-medium transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-lg text-left text-xs font-medium transition-colors cursor-pointer"
                       style={{
                         background: datePreset === preset.id ? 'rgba(16,185,129,0.08)' : 'transparent',
                         color: datePreset === preset.id ? '#10B981' : 'var(--text-secondary)',
