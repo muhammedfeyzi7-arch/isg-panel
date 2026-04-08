@@ -731,6 +731,11 @@ export function useStore(
     // Fallback: tüm tabloyu yeniden çek (patch başarısız olursa veya data yoksa)
     const reloadTable = async (table: string) => {
       try {
+        // Ekipmanlar için özel fetch — deleted_at filtresi YOK (aktif + silinmiş hepsi lazım)
+        if (table === 'ekipmanlar') {
+          await fetchEkipmanlar(activeOrgId);
+          return;
+        }
         // Use paginated fetch to bypass 1000-row limit
         const { data, error } = await fetchAllRows(table, activeOrgId);
         if (error) {
@@ -1606,15 +1611,13 @@ export function useStore(
 
   const permanentDeleteEkipman = useCallback(async (id: string) => {
     const snapshot = ekipmanlarRef.current;
+    // ownDeletesRef'e ekle — realtime DELETE event gelince "başka kullanıcı" sanmasın
+    ownDeletesRef.current.add(id);
     _setEkipmanlar(prev => prev.filter(e => e.id !== id));
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/delete-ekipman', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: [id] }),
       });
       const result = await res.json();
@@ -1622,6 +1625,7 @@ export function useStore(
       console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipman FAILED, rolling back:', err);
+      ownDeletesRef.current.delete(id);
       _setEkipmanlar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
@@ -1631,15 +1635,13 @@ export function useStore(
   const permanentDeleteEkipmanMany = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
     const snapshot = ekipmanlarRef.current;
+    // ownDeletesRef'e hepsini ekle — realtime event'leri skip et
+    ids.forEach(id => ownDeletesRef.current.add(id));
     _setEkipmanlar(prev => prev.filter(e => !ids.includes(e.id)));
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/delete-ekipman', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
       });
       const result = await res.json();
@@ -1647,6 +1649,7 @@ export function useStore(
       console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipmanMany FAILED, rolling back:', err);
+      ids.forEach(id => ownDeletesRef.current.delete(id));
       _setEkipmanlar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
