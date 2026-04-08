@@ -1644,9 +1644,9 @@ export function useStore(
     try {
       // Direkt kalıcı sil — organization_id filtresi de ekle (RLS için kritik)
       console.log(`[ISG] permanentDeleteEkipman START: id=${id} org=${orgId}`);
-      let query = supabase.from('ekipmanlar').delete().eq('id', id);
-      if (orgId) query = query.eq('organization_id', orgId);
-      const { error, count } = await query;
+      const { error, count } = orgId
+        ? await supabase.from('ekipmanlar').delete().eq('id', id).eq('organization_id', orgId)
+        : await supabase.from('ekipmanlar').delete().eq('id', id);
       if (error) {
         const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
         console.error(`[ISG] permanentDeleteEkipman DB ERROR: ${errMsg}`, error);
@@ -1677,9 +1677,9 @@ export function useStore(
     if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
       console.log(`[ISG] permanentDeleteEkipmanMany START: ${ids.length} items org=${orgId}`);
-      let query = supabase.from('ekipmanlar').delete().in('id', ids);
-      if (orgId) query = query.eq('organization_id', orgId);
-      const { error, count } = await query;
+      const { error, count } = orgId
+        ? await supabase.from('ekipmanlar').delete().in('id', ids).eq('organization_id', orgId)
+        : await supabase.from('ekipmanlar').delete().in('id', ids);
       if (error) {
         const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
         console.error(`[ISG] permanentDeleteEkipmanMany DB ERROR: ${errMsg}`, error);
