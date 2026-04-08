@@ -1642,15 +1642,17 @@ export function useStore(
     _setEkipmanlar(next);
     if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
-      // Direkt kalıcı sil
+      // Direkt kalıcı sil — organization_id filtresi de ekle (RLS için kritik)
       console.log(`[ISG] permanentDeleteEkipman START: id=${id} org=${orgId}`);
-      const { error } = await supabase.from('ekipmanlar').delete().eq('id', id);
+      let query = supabase.from('ekipmanlar').delete().eq('id', id);
+      if (orgId) query = query.eq('organization_id', orgId);
+      const { error, count } = await query;
       if (error) {
         const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
         console.error(`[ISG] permanentDeleteEkipman DB ERROR: ${errMsg}`, error);
         throw new Error(errMsg);
       }
-      console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
+      console.log(`[ISG] permanentDeleteEkipman OK: ${id} (count=${count})`);
       // 5 saniye sonra ownDeletesRef'ten temizle
       setTimeout(() => ownDeletesRef.current.delete(id), 5000);
     } catch (err) {
@@ -1675,13 +1677,15 @@ export function useStore(
     if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
       console.log(`[ISG] permanentDeleteEkipmanMany START: ${ids.length} items org=${orgId}`);
-      const { error } = await supabase.from('ekipmanlar').delete().in('id', ids);
+      let query = supabase.from('ekipmanlar').delete().in('id', ids);
+      if (orgId) query = query.eq('organization_id', orgId);
+      const { error, count } = await query;
       if (error) {
         const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
         console.error(`[ISG] permanentDeleteEkipmanMany DB ERROR: ${errMsg}`, error);
         throw new Error(errMsg);
       }
-      console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
+      console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items (count=${count})`);
       // 5 saniye sonra temizle
       setTimeout(() => ids.forEach(id => ownDeletesRef.current.delete(id)), 5000);
     } catch (err) {
