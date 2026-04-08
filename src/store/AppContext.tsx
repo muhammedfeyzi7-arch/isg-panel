@@ -180,15 +180,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addToastRef = useRef(addToast);
   useEffect(() => { addToastRef.current = addToast; }, [addToast]);
 
+  // onSaveError ve onRemoteChange callback'leri — ref pattern ile stale closure önlenir
+  // ve useStore'un realtime useEffect'i gereksiz yere yeniden bağlanmaz
+  const onSaveErrorCb = useCallback((msg: string) => {
+    addToastRef.current(msg, 'error');
+  }, []); // deps yok — addToastRef her zaman güncel
+
+  const onRemoteChangeCb = useCallback((module: string) => {
+    addToastRef.current(
+      `${module} modülünde başka bir kullanıcı değişiklik yaptı — veriler güncellendi.`,
+      'info',
+    );
+  }, []); // deps yok — addToastRef her zaman güncel
+
   const store = useStore(
     org?.id ?? null,
     logAction,
-    useCallback((msg: string) => { addToastRef.current(msg, 'error'); }, []),
+    onSaveErrorCb,
     user?.id,
     orgLoading,
-    useCallback((module: string) => {
-      addToastRef.current(`${module} modülünde başka bir kullanıcı değişiklik yaptı — veriler güncellendi.`, 'info');
-    }, []),
+    onRemoteChangeCb,
   );
 
   // Persist active module across page refreshes

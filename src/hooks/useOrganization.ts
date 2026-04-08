@@ -124,6 +124,7 @@ export function useOrganization(user: User | null) {
           role?: string;
           is_active?: boolean;
           must_change_password?: boolean;
+          kvkk_accepted?: boolean;
           display_name?: string;
           email?: string;
           created?: boolean;
@@ -136,8 +137,7 @@ export function useOrganization(user: User | null) {
             role: resData.role ?? 'admin',
             isActive: resData.is_active !== false,
             mustChangePassword: resData.must_change_password === true,
-            // Edge function üzerinden gelen yeni org'lar genellikle admin → KVKK popup gösterme
-            kvkkAccepted: true,
+              kvkkAccepted: resData.kvkk_accepted !== false,
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
           });

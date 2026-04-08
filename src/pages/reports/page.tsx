@@ -733,11 +733,16 @@ export default function RaporlarPage() {
           rows: (string | number | null)[][][],
           cols: string[],
           startRow = 5,
-          rowHeight = 18,
+          rowHeight = 20,
         ) => {
           rows.forEach((rowVals, ri) => {
             const exRow = ws.getRow(startRow + ri);
-            exRow.height = rowHeight;
+            // Satırdaki en uzun metin içeriğine göre yüksekliği dinamik hesapla
+            const maxLen = rowVals.reduce((mx, v) => {
+              const s = String(v[0] ?? '');
+              return Math.max(mx, s.length);
+            }, 0);
+            exRow.height = Math.max(rowHeight, Math.min(80, Math.ceil(maxLen / 40) * 15 + 8));
             const isEven = ri % 2 === 0;
             const bg = isEven ? 'FFFFFFFF' : 'FFF0F4FF';
             rowVals.forEach((val, ci) => {
@@ -905,7 +910,7 @@ export default function RaporlarPage() {
             const uS = exUygunsuzluklar.filter(u => u.firmaId === f.id && u.durum === 'Açık').length;
             return [i+1, f.ad, f.yetkiliKisi||'—', f.telefon||'—', f.email||'—', f.tehlikeSinifi, f.durum, pS, eS, uS, fmtDate(f.sozlesmeBas), fmtDate(f.sozlesmeBit)];
           }),
-          [4, 28, 22, 16, 28, 16, 12, 10, 10, 12, 14, 14],
+          [4, 32, 24, 16, 30, 18, 13, 11, 11, 13, 15, 15],
         );
 
         // ── SAYFA 3: PERSONELLER ──
@@ -915,7 +920,7 @@ export default function RaporlarPage() {
             const firma = aktifFirmalar.find(f => f.id === p.firmaId);
             return [i+1, p.adSoyad, p.tc||'—', p.telefon||'—', p.email||'—', firma?.ad||'—', p.gorev||'—', p.departman||'—', p.durum, p.kanGrubu||'—', fmtDate(p.dogumTarihi), fmtDate(p.iseGirisTarihi)];
           }),
-          [4, 26, 14, 16, 28, 24, 20, 18, 12, 10, 14, 14],
+          [4, 28, 15, 17, 30, 26, 22, 20, 13, 11, 15, 15],
         );
 
         // ── SAYFA 4: EVRAKLAR ──
@@ -928,13 +933,13 @@ export default function RaporlarPage() {
             const kg = e.gecerlilikTarihi ? Math.ceil((new Date(e.gecerlilikTarihi).getTime() - t2.getTime()) / 86400000) : null;
             return [i+1, e.ad, e.tur||'—', firma?.ad||'—', personel?.adSoyad||'—', e.durum, fmtDate(e.gecerlilikTarihi), kg !== null ? (kg < 0 ? `${Math.abs(kg)}g önce doldu` : `${kg}g kaldı`) : '—'];
           }),
-          [4, 30, 20, 24, 24, 16, 16, 14],
+          [4, 34, 22, 26, 26, 17, 17, 15],
         );
 
         // ── SAYFA 5: EĞİTİMLER ──
         const egitimListeWs = wb.addWorksheet('Eğitimler');
         const egitimListeCols = ['#', 'Eğitim Adı', 'Firma', 'Eğitmen', 'Tarih', 'Açıklama', 'Toplam Katılımcı', 'Katıldı', 'Katılmadı', 'Katılım Oranı'];
-        egitimListeWs.columns = [4, 32, 26, 22, 14, 30, 16, 12, 12, 14].map(w => ({ width: w }));
+        egitimListeWs.columns = [4, 36, 28, 24, 14, 42, 16, 12, 12, 14].map(w => ({ width: w }));
         
         // Marka koruması
         addWatermark(egitimListeWs, egitimListeCols.length);
@@ -971,8 +976,11 @@ export default function RaporlarPage() {
             const katildi = katilimcilar.filter(k => k.katildi).length;
             const katilmadi = katilimcilar.filter(k => !k.katildi).length;
             const oran = katilimcilar.length > 0 ? `%${Math.round((katildi / katilimcilar.length) * 100)}` : '—';
+            // Açıklama uzunluğuna göre satır yüksekliğini dinamik hesapla
+            const aciklamaLen = (e.aciklama || '').length;
+            const dinamikHeight = Math.max(20, Math.min(80, Math.ceil(aciklamaLen / 35) * 15 + 10));
             const exRow = egitimListeWs.getRow(6 + i);
-            exRow.height = 20;
+            exRow.height = dinamikHeight;
             const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
             const vals = [i+1, e.ad, firma?.ad||'—', e.egitmen||'—', fmtDate(e.tarih), e.aciklama||'—', katilimcilar.length, katildi, katilmadi, oran];
             vals.forEach((val, ci) => {
@@ -980,7 +988,7 @@ export default function RaporlarPage() {
               cell.value = val;
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
               cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF1E293B' } };
-              cell.alignment = { vertical: 'middle', wrapText: ci === 5 };
+              cell.alignment = { vertical: ci === 5 ? 'top' : 'middle', horizontal: ci === 5 ? 'left' : undefined, wrapText: ci === 5 };
               cell.border = { bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, right: { style: 'thin', color: { argb: 'FFCBD5E1' } } };
               if (ci === 0) { cell.font = { size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
               if (ci === 7) { cell.font = { bold: true, size: 10, name: 'Calibri', color: { argb: 'FF16A34A' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
@@ -1138,7 +1146,7 @@ export default function RaporlarPage() {
 
         const wsUyg = wb.addWorksheet('Uygunsuzluklar');
         const uygCols = ['#', 'DÖF No', 'Başlık', 'Firma', 'Durum', 'Seviye', 'Açılış Tarihi', 'Kapanış Tarihi', 'Sorumlu', 'Açılış Fotosu', 'Kapanış Fotosu'];
-        wsUyg.columns = [5, 14, 36, 26, 13, 14, 16, 16, 22, 28, 28].map(w => ({ width: w }));
+        wsUyg.columns = [5, 15, 42, 28, 14, 15, 17, 17, 24, 28, 28].map(w => ({ width: w }));
         applyHeaderRows(wsUyg, 'UYGUNSUZLUKLAR LİSTESİ', `Açık: ${uygunsuzlukStats.acik}  |  Kapandı: ${uygunsuzlukStats.kapandi}  |  Kritik: ${uygunsuzlukStats.kritik}  |  ${firmaAdi}  |  Rapor: ${tarih}`, uygCols.length);
         applyHeaderCols(wsUyg, uygCols, true, 4);
 

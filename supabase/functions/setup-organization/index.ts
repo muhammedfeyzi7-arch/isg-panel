@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { jwtVerify } from 'https://esm.sh/jose@5';
 
 // CORS — tüm origin'lere izin ver (preview URL'leri için)
 function getCorsHeaders(origin: string | null): Record<string, string> {
@@ -29,13 +28,11 @@ async function ensureProfileRecord(
         .from('profiles')
         .insert({ user_id: userId, tour_completed: false, ...(role ? { role } : {}) });
     } else if (role) {
-      // Rol güncelle ama tour_completed'a dokunma
       await supabase
         .from('profiles')
         .update({ role })
         .eq('user_id', userId);
     }
-    // Kayıt zaten varsa ve rol yoksa dokunma — tour_completed değerini koru
   } catch (err) {
     console.warn('[ensureProfileRecord] Failed:', err);
   }
@@ -66,71 +63,52 @@ Deno.serve(async (req) => {
   const token = authHeader.replace('Bearer ', '');
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-  let userId: string | null = null;
-  let userEmail: string | null = null;
-  let userMetadata: Record<string, unknown> = {};
-
-  try {
-    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
-    if (!jwtSecret) {
-      console.error('SUPABASE_JWT_SECRET is not set - rejecting for security');
-      return new Response(JSON.stringify({ error: 'Server misconfiguration' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    const encoder = new TextEncoder();
-    const secretKey = encoder.encode(jwtSecret);
-    const { payload } = await jwtVerify(token, secretKey);
-    if (!payload.sub) throw new Error('No sub in JWT');
-    userId = payload.sub as string;
-    userEmail = payload.email as string;
-    userMetadata = (payload.user_metadata as Record<string, unknown>) || {};
-  } catch (e) {
-    console.error('JWT verification failed:', e);
-    return new Response(JSON.stringify({ error: 'Invalid JWT', details: String(e) }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  if (!userId) {
-    return new Response(JSON.stringify({ error: 'Invalid token - no user id' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
+  // Service role client (bypasses RLS)
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // ── Fetch full auth user to get latest metadata (handles manually created users) ──
-  let resolvedEmail = userEmail ?? '';
-  let resolvedDisplayName = (userMetadata?.full_name as string | undefined) ?? '';
-  let metaOrgId = (userMetadata?.organization_id as string | undefined) ?? '';
-  let metaRole = (userMetadata?.role as string | undefined) ?? '';
+  // Verify user token using Supabase auth (no JWT secret needed)
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  const { data: { user: authUser }, error: authError } = await userClient.auth.getUser();
+
+  if (authError || !authUser) {
+    console.error('[setup-org] Auth verification failed:', authError?.message);
+    return new Response(JSON.stringify({ error: 'Invalid token', details: authError?.message }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const userId = authUser.id;
+
+  // Get full user info from admin API (latest metadata)
+  let resolvedEmail = authUser.email ?? '';
+  let resolvedDisplayName = '';
+  let metaOrgId = '';
+  let metaRole = '';
 
   try {
-    const { data: authUserData } = await supabase.auth.admin.getUserById(userId);
-    if (authUserData?.user) {
-      resolvedEmail = authUserData.user.email ?? resolvedEmail;
-      const meta = authUserData.user.user_metadata ?? {};
-      if (!resolvedDisplayName && meta.full_name) {
-        resolvedDisplayName = String(meta.full_name);
-      }
-      if (!resolvedDisplayName && meta.name) {
-        resolvedDisplayName = String(meta.name);
-      }
-      // Metadata'dan org ve rol bilgisini al (admin tarafından oluşturulan kullanıcılar için)
-      if (!metaOrgId && meta.organization_id) {
-        metaOrgId = String(meta.organization_id);
-      }
-      if (!metaRole && meta.role) {
-        metaRole = String(meta.role);
-      }
+    const { data: adminUserData } = await supabase.auth.admin.getUserById(userId);
+    if (adminUserData?.user) {
+      resolvedEmail = adminUserData.user.email ?? resolvedEmail;
+      const meta = adminUserData.user.user_metadata ?? {};
+      resolvedDisplayName = (meta.full_name as string) || (meta.name as string) || '';
+      metaOrgId = (meta.organization_id as string) || '';
+      metaRole = (meta.role as string) || '';
     }
   } catch (e) {
     console.warn('[setup-org] Could not fetch full auth user:', e);
+    // Use data from token
+    const meta = authUser.user_metadata ?? {};
+    resolvedDisplayName = (meta.full_name as string) || (meta.name as string) || '';
+    metaOrgId = (meta.organization_id as string) || '';
+    metaRole = (meta.role as string) || '';
   }
 
-  // Derive a display name from email if still empty
+  // Derive display name from email if still empty
   if (!resolvedDisplayName && resolvedEmail) {
     resolvedDisplayName = resolvedEmail
       .split('@')[0]
@@ -146,7 +124,7 @@ Deno.serve(async (req) => {
     // ── Check for existing active membership ──
     const { data: existingMembership } = await supabase
       .from('user_organizations')
-      .select('organization_id, role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
+      .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, organizations(id, name, invite_code)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('joined_at', { ascending: true })
@@ -156,7 +134,7 @@ Deno.serve(async (req) => {
     if (existingMembership?.organizations) {
       const org = existingMembership.organizations as { id: string; name: string; invite_code: string };
 
-      // Back-fill display_name / email if they were empty (handles legacy records)
+      // Back-fill display_name / email if they were empty
       const needsUpdate =
         (!existingMembership.display_name && user.display_name) ||
         (!existingMembership.email && user.email);
@@ -172,7 +150,6 @@ Deno.serve(async (req) => {
           .eq('organization_id', org.id);
       }
 
-      // Profiles kaydını kontrol et ve yoksa oluştur (tour_completed korunur)
       await ensureProfileRecord(supabase, user.id);
 
       return new Response(JSON.stringify({
@@ -180,19 +157,17 @@ Deno.serve(async (req) => {
         role: existingMembership.role ?? 'admin',
         is_active: existingMembership.is_active,
         must_change_password: existingMembership.must_change_password,
+        kvkk_accepted: existingMembership.kvkk_accepted === true,
         display_name: existingMembership.display_name || user.display_name,
         email: existingMembership.email || user.email,
         created: false,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ── No active org found ──
-    // Eğer kullanıcı metadata'sında organization_id varsa (Supabase Dashboard'dan eklendi)
-    // o org'a belirtilen rolle ekle
+    // ── No active org found — check metadata for pre-assigned org ──
     if (metaOrgId) {
-      console.log(`[setup-org] User ${userId} has metadata org_id=${metaOrgId}, role=${metaRole} — joining existing org`);
+      console.log(`[setup-org] User ${userId} has metadata org_id=${metaOrgId}, role=${metaRole}`);
 
-      // Org'un var olduğunu doğrula
       const { data: targetOrg } = await supabase
         .from('organizations')
         .select('id, name, invite_code')
@@ -202,7 +177,6 @@ Deno.serve(async (req) => {
       if (targetOrg) {
         const assignedRole = normalizeRole(metaRole || 'member');
 
-        // Pasif kayıt var mı kontrol et
         const { data: inactiveMembership } = await supabase
           .from('user_organizations')
           .select('id')
@@ -211,7 +185,6 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (inactiveMembership) {
-          // Pasif kaydı aktif et ve rolü güncelle
           await supabase
             .from('user_organizations')
             .update({
@@ -223,7 +196,6 @@ Deno.serve(async (req) => {
             .eq('user_id', user.id)
             .eq('organization_id', metaOrgId);
         } else {
-          // Yeni kayıt ekle
           const { error: memberError } = await supabase
             .from('user_organizations')
             .insert({
@@ -234,6 +206,7 @@ Deno.serve(async (req) => {
               email: user.email,
               is_active: true,
               must_change_password: true,
+              kvkk_accepted: false,
             });
 
           if (memberError && memberError.code !== '23505') {
@@ -243,11 +216,13 @@ Deno.serve(async (req) => {
 
         await ensureProfileRecord(supabase, user.id, assignedRole);
 
-        // Metadata'dan organization_id ve role'ü temizle (güvenlik için)
+        // Clear metadata for security
         try {
+          const { data: currentUser } = await supabase.auth.admin.getUserById(user.id);
+          const currentMeta = currentUser?.user?.user_metadata ?? {};
           await supabase.auth.admin.updateUserById(user.id, {
             user_metadata: {
-              ...((await supabase.auth.admin.getUserById(user.id)).data?.user?.user_metadata ?? {}),
+              ...currentMeta,
               organization_id: null,
               role: null,
             },
@@ -261,6 +236,7 @@ Deno.serve(async (req) => {
           role: assignedRole,
           is_active: true,
           must_change_password: true,
+          kvkk_accepted: false,
           display_name: user.display_name,
           email: user.email,
           created: false,
@@ -268,17 +244,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── No org found and no metadata org — create one automatically (self-registered user) ──
+    // ── No org found — create one automatically ──
     console.log(`[setup-org] No org found for user ${userId} — creating new org automatically`);
 
-    // Org name: prefer display name, fallback to email prefix
     const orgName = user.display_name !== 'Kullanıcı'
       ? user.display_name
       : user.email
         ? user.email.split('@')[0].replace(/[^a-zA-Z0-9\s]/g, ' ').trim() || 'ISG Firması'
         : 'ISG Firması';
 
-    // Generate unique invite code
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const inviteCode = Array.from(
       { length: 6 },
@@ -298,7 +272,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Insert user_organizations record with admin role
     const { error: memberError } = await supabase
       .from('user_organizations')
       .insert({
@@ -309,15 +282,14 @@ Deno.serve(async (req) => {
         email: user.email,
         is_active: true,
         must_change_password: false,
+        kvkk_accepted: true,
       });
 
     if (memberError) {
-      // Handle race condition: another request may have already inserted
       if (memberError.code === '23505') {
-        console.warn('[setup-org] Duplicate insert detected, fetching existing record');
         const { data: retryMembership } = await supabase
           .from('user_organizations')
-          .select('organization_id, role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
+          .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, organizations(id, name, invite_code)')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .order('joined_at', { ascending: true })
@@ -332,6 +304,7 @@ Deno.serve(async (req) => {
             role: retryMembership.role ?? 'admin',
             is_active: retryMembership.is_active,
             must_change_password: retryMembership.must_change_password,
+            kvkk_accepted: retryMembership.kvkk_accepted === true,
             display_name: retryMembership.display_name || user.display_name,
             email: retryMembership.email || user.email,
             created: false,
@@ -345,10 +318,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Profiles kaydını oluştur (yeni kullanıcı — tour_completed: false)
     await ensureProfileRecord(supabase, user.id);
 
-    // Initialize empty app_data for the new org
     await supabase
       .from('app_data')
       .upsert(
@@ -356,7 +327,6 @@ Deno.serve(async (req) => {
         { onConflict: 'organization_id' }
       );
 
-    // Log the auto-creation event
     await supabase.from('activity_logs').insert({
       organization_id: newOrg.id,
       user_id: user.id,
@@ -370,13 +340,12 @@ Deno.serve(async (req) => {
       description: `Organizasyon otomatik oluşturuldu: ${orgName}`,
     }).catch(() => { /* silent */ });
 
-    console.log(`[setup-org] New org created: ${newOrg.id} for user ${userId}`);
-
     return new Response(JSON.stringify({
       organization: newOrg,
       role: 'admin',
       is_active: true,
       must_change_password: false,
+      kvkk_accepted: true,
       display_name: user.display_name,
       email: user.email,
       created: true,

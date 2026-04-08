@@ -68,6 +68,16 @@ export type LogFn = (
 ) => void;
 
 // ──────── Supabase DB helpers ────────
+// Device ID helper — her sekme/cihaz için unique
+function getDeviceId(): string {
+  let id = sessionStorage.getItem('isg_device_id');
+  if (!id) {
+    id = `dev_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
+    sessionStorage.setItem('isg_device_id', id);
+  }
+  return id;
+}
+
 async function dbUpsert(
   table: string,
   item: { id: string } & Record<string, unknown>,
@@ -81,6 +91,7 @@ async function dbUpsert(
     id: item.id,
     user_id: userId,
     organization_id: organizationId,
+    device_id: getDeviceId(),
     data: item,
     updated_at: now,
     deleted_at: isSilinmis ? silinmeTarihi : null,
@@ -382,12 +393,16 @@ export function useStore(
   useEffect(() => {
     if (!organizationId || !userId || orgLoading) return;
 
+    // Bu closure içinde her zaman güncel orgId'yi kullanmak için ref al
+    const activeOrgId = organizationId;
+
+    const KAN: Record<string, string> = { 'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-', 'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-' };
+
     const TABLE_MAP: Record<string, (rows: unknown[]) => void> = {
       firmalar:       (rows) => setFirmalar(rows as Firma[]),
-      personeller:    (rows) => setPersoneller((rows as Personel[]).map(p => {
-        const KAN: Record<string, string> = { 'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-', 'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-' };
-        return { ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') };
-      })),
+      personeller:    (rows) => setPersoneller((rows as Personel[]).map(p => ({
+        ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
+      }))),
       evraklar:       (rows) => setEvraklar((rows as Evrak[]).map(e => ({ ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? '') }))),
       egitimler:      (rows) => setEgitimler(rows as Egitim[]),
       muayeneler:     (rows) => setMuayeneler(rows as Muayene[]),
@@ -400,43 +415,84 @@ export function useStore(
 
     const TABLES = Object.keys(TABLE_MAP);
 
+    // reloadTable: activeOrgId closure'ını kullanır — stale ref sorunu yok
     const reloadTable = async (table: string) => {
-      const { data, error } = await supabase
-        .from(table)
-        .select('id, data, created_at')
-        .eq('organization_id', organizationId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
-      if (error || !data) return;
-      const rows = data.map(r => r.data as unknown);
-      TABLE_MAP[table]?.(rows);
+      try {
+        const { data, error } = await supabase
+          .from(table)
+          .select('id, data, created_at')
+          .eq('organization_id', activeOrgId)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false });
+        if (error) {
+          console.error(`[ISG] reloadTable error (${table}):`, error.message);
+          return;
+        }
+        if (!data) return;
+        const rows = data.map(r => r.data as unknown);
+        TABLE_MAP[table]?.(rows);
+        console.log(`[ISG] Realtime reload OK: ${table} (${rows.length} rows) org=${activeOrgId}`);
+      } catch (err) {
+        console.error(`[ISG] reloadTable exception (${table}):`, err);
+      }
     };
 
-    let channel = supabase.channel(`isg_realtime_${organizationId}`);
+    // Device ID: her sekme/cihaz için unique, session boyunca sabit
+    const deviceId = getDeviceId();
+
+    const MODULE_NAMES: Record<string, string> = {
+      firmalar: 'Firmalar', personeller: 'Personeller', evraklar: 'Evraklar',
+      egitimler: 'Eğitimler', muayeneler: 'Muayeneler', uygunsuzluklar: 'Saha Denetim',
+      ekipmanlar: 'Ekipmanlar', gorevler: 'Görevler', tutanaklar: 'Tutanaklar', is_izinleri: 'İş İzinleri',
+    };
+
+    // Unique channel ismi — her org+user kombinasyonu için ayrı channel
+    // Timestamp ekleyerek eski stale channel çakışmasını önle
+    const channelName = `isg_rt_${activeOrgId}_${userId}_${Date.now()}`;
+    let channel = supabase.channel(channelName);
 
     TABLES.forEach(table => {
       channel = channel.on(
         'postgres_changes' as Parameters<typeof channel.on>[0],
-        { event: '*', schema: 'public', table, filter: `organization_id=eq.${organizationId}` } as Parameters<typeof channel.on>[1],
-        (payload: { eventType: string; new: { user_id?: string } }) => {
-          const remoteUserId = (payload.new as { user_id?: string })?.user_id;
-          if (remoteUserId && remoteUserId === userId) return;
-          reloadTable(table);
-          const MODULE_NAMES: Record<string, string> = {
-            firmalar: 'Firmalar', personeller: 'Personeller', evraklar: 'Evraklar',
-            egitimler: 'Eğitimler', muayeneler: 'Muayeneler', uygunsuzluklar: 'Saha Denetim',
-            ekipmanlar: 'Ekipmanlar', gorevler: 'Görevler', tutanaklar: 'Tutanaklar', is_izinleri: 'İş İzinleri',
-          };
+        { event: '*', schema: 'public', table, filter: `organization_id=eq.${activeOrgId}` } as Parameters<typeof channel.on>[1],
+        (payload: { eventType: string; new: Record<string, unknown>; old?: Record<string, unknown> }) => {
+          // DELETE event'larında payload.new boş gelir — doğrudan reload yap
+          if (payload.eventType === 'DELETE') {
+            void reloadTable(table);
+            onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
+            return;
+          }
+
+          // REPLICA IDENTITY FULL sayesinde payload.new'de device_id artık geliyor
+          // Sadece AYNI cihazdan gelen kendi değişikliklerini skip et
+          // Farklı cihazdan (mobil saha → PC) aynı user_id gelse bile reload yap
+          const remoteDeviceId = payload.new?.device_id as string | undefined;
+          if (remoteDeviceId && remoteDeviceId === deviceId) {
+            console.log(`[ISG] Realtime skip (own device): ${table}`);
+            return;
+          }
+
+          console.log(`[ISG] Realtime incoming: ${table} event=${payload.eventType} from device=${remoteDeviceId ?? 'unknown'}`);
+          void reloadTable(table);
           onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
         },
       ) as typeof channel;
     });
 
-    channel.subscribe((status) => {
-      console.log(`[ISG] Realtime ${status} for org=${organizationId}`);
+    channel.subscribe((status, err) => {
+      if (err) {
+        console.error(`[ISG] Realtime subscribe error for org=${activeOrgId}:`, err);
+      } else {
+        console.log(`[ISG] Realtime ${status} for org=${activeOrgId} channel=${channelName}`);
+      }
+      // CHANNEL_ERROR veya TIMED_OUT olursa logla — otomatik reconnect Supabase tarafından yapılır
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn(`[ISG] Realtime connection issue (${status}) — Supabase will auto-reconnect`);
+      }
     });
 
     return () => {
+      console.log(`[ISG] Realtime cleanup: removing channel=${channelName}`);
       supabase.removeChannel(channel);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -975,7 +1031,7 @@ export function useStore(
       // Denetçi için direkt UPDATE — upsert with_check'i bypass eder
       supabase
         .from('ekipmanlar')
-        .update({ data: updated, updated_at: now, organization_id: orgId, user_id: uid })
+        .update({ data: updated, updated_at: now, organization_id: orgId, user_id: uid, device_id: getDeviceId() })
         .eq('id', id)
         .eq('organization_id', orgId)
         .then(({ error }) => {
@@ -1167,15 +1223,35 @@ export function useStore(
     if (updated) {
       const now = new Date().toISOString();
       try {
-        // Direkt UPDATE kullan — denetci INSERT yapamaz ama UPDATE yapabilir
-        // organization_id'yi de ekle — with_check politikası bunu kontrol ediyor
         const orgId = orgIdRef.current;
         const uid = userIdRef.current;
-        const { error } = await supabase
+        const deviceId = getDeviceId();
+
+        // orgId null ise güncelleme yapma — RLS bypass eder ve veri kaybı olur
+        if (!orgId) {
+          console.error('[ISG] updateIsIzni ABORT: orgId is null!');
+          if (snapshot) setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
+          throw new Error('Organizasyon bilgisi hazır değil. Sayfayı yenileyip tekrar deneyin.');
+        }
+
+        console.log(`[ISG] updateIsIzni: id=${id} org=${orgId} device=${deviceId} durum=${(updated as IsIzni).durum}`);
+
+        // Direkt UPDATE kullan — device_id mutlaka yazılsın (realtime sync için kritik)
+        const { data: updatedRows, error } = await supabase
           .from('is_izinleri')
-          .update({ data: updated, updated_at: now, organization_id: orgId, user_id: uid })
+          .update({
+            data: updated,
+            updated_at: now,
+            organization_id: orgId,
+            user_id: uid,
+            device_id: deviceId,
+          })
           .eq('id', id)
-          .eq('organization_id', orgId);
+          .eq('organization_id', orgId)
+          .select('id');
+
+        console.log(`[ISG] updateIsIzni result: rows=${updatedRows?.length ?? 0} error=${error?.message}`);
+
         if (error) {
           const errMsg = error.message || error.details || JSON.stringify(error);
           console.error('[ISG] updateIsIzni DB error:', errMsg, error);
@@ -1187,7 +1263,35 @@ export function useStore(
           }
           throw new Error(errMsg);
         }
-        console.log(`[ISG] updateIsIzni OK: ${id}`);
+
+        // Eğer update hiçbir satırı etkilememişse — RLS veya yanlış orgId
+        if (!updatedRows || updatedRows.length === 0) {
+          console.warn(`[ISG] updateIsIzni: 0 rows updated for id=${id} org=${orgId} — trying without org filter`);
+          // OrgId filtresi olmadan tekrar dene (bazı RLS politikalarında gerekebilir)
+          const { data: fallbackRows, error: err2 } = await supabase
+            .from('is_izinleri')
+            .update({
+              data: updated,
+              updated_at: now,
+              device_id: deviceId,
+            })
+            .eq('id', id)
+            .select('id');
+
+          if (err2) {
+            console.error('[ISG] updateIsIzni fallback error:', err2.message);
+            if (snapshot) setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
+            throw new Error(err2.message);
+          }
+          if (!fallbackRows || fallbackRows.length === 0) {
+            console.error(`[ISG] updateIsIzni: STILL 0 rows — record may not exist or RLS blocking`);
+            if (snapshot) setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
+            throw new Error('İş izni güncellenemedi. Kayıt bulunamadı veya yetki hatası.');
+          }
+          console.log(`[ISG] updateIsIzni fallback OK: ${id}`);
+        } else {
+          console.log(`[ISG] updateIsIzni OK: ${id} (${updatedRows.length} rows updated)`);
+        }
       } catch (err) {
         if (snapshot) {
           setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
@@ -1208,7 +1312,7 @@ export function useStore(
     // is_izinleri tablosu deleted_at kolonunu kullanıyor — direkt update
     supabase
       .from('is_izinleri')
-      .update({ deleted_at: now, data: updated, updated_at: now })
+      .update({ deleted_at: now, data: updated, updated_at: now, device_id: getDeviceId() })
       .eq('id', id)
       .then(({ error }) => {
         if (error) {
@@ -1232,7 +1336,7 @@ export function useStore(
     // is_izinleri tablosu deleted_at kolonunu kullanıyor — null'a çek
     supabase
       .from('is_izinleri')
-      .update({ deleted_at: null, data: updated, updated_at: now })
+      .update({ deleted_at: null, data: updated, updated_at: now, device_id: getDeviceId() })
       .eq('id', id)
       .then(({ error }) => {
         if (error) {

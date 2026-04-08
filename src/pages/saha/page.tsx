@@ -1409,13 +1409,25 @@ export default function SahaPage() {
     sonraki.setMonth(sonraki.getMonth() + 1);
     const sonrakiStr = sonraki.toISOString().split('T')[0];
     const gecikmisDi = ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi) < new Date() : false;
-    updateEkipman(ekipmanId, { sonKontrolTarihi: today, sonrakiKontrolTarihi: sonrakiStr, durum: 'Uygun' });
-    ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
-    setQrFoundEkipman(null);
+    const updates = { sonKontrolTarihi: today, sonrakiKontrolTarihi: sonrakiStr, durum: 'Uygun' as const };
+
     if (!isOnline) {
-      await addToQueue({ type: 'ekipman_kontrol', label: `${ekipman.ad} — Kontrol kaydı`, payload: { ekipmanId, sonKontrolTarihi: today, sonrakiKontrolTarihi: sonrakiStr, durum: 'Uygun' } });
+      // Çevrimdışı: sadece offline queue'ya ekle — updateEkipman DB'ye yazmaya çalışır, başarısız olur
+      // Önce UI'yi optimistik güncelle
+      updateEkipman(ekipmanId, updates);
+      ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
+      setQrFoundEkipman(null);
+      await addToQueue({
+        type: 'ekipman_kontrol',
+        label: `${ekipman.ad} — Kontrol kaydı`,
+        payload: { ekipmanId, sonKontrolTarihi: today, sonrakiKontrolTarihi: sonrakiStr, durum: 'Uygun' },
+      });
       addToast('Kontrol kaydedildi! Bağlantı gelince sunucuya gönderilecek.', 'success');
     } else {
+      // Çevrimiçi: direkt updateEkipman — hem state'i hem DB'yi günceller, realtime karşı tarafı tetikler
+      updateEkipman(ekipmanId, updates);
+      ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
+      setQrFoundEkipman(null);
       addToast('Kontrol kaydedildi! Durum "Uygun" olarak güncellendi.', 'success');
     }
   }, [ekipmanlar, updateEkipman, ekipmanKontrolBildirimi, isOnline, addToQueue, addToast]);
@@ -1423,12 +1435,21 @@ export default function SahaPage() {
   const handleDurumDegistir = useCallback(async (ekipmanId: string, yeniDurum: EkipmanStatus) => {
     const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
     if (!ekipman || ekipman.durum === yeniDurum) return;
-    updateEkipman(ekipmanId, { durum: yeniDurum });
-    setQrFoundEkipman(prev => prev?.id === ekipmanId ? { ...prev, durum: yeniDurum } : prev);
+
     if (!isOnline) {
-      await addToQueue({ type: 'ekipman_durum', label: `${ekipman.ad} — Durum: ${yeniDurum}`, payload: { ekipmanId, durum: yeniDurum } });
+      // Çevrimdışı: UI güncelle + queue'ya ekle
+      updateEkipman(ekipmanId, { durum: yeniDurum });
+      setQrFoundEkipman(prev => prev?.id === ekipmanId ? { ...prev, durum: yeniDurum } : prev);
+      await addToQueue({
+        type: 'ekipman_durum',
+        label: `${ekipman.ad} — Durum: ${yeniDurum}`,
+        payload: { ekipmanId, durum: yeniDurum },
+      });
       addToast(`Durum "${yeniDurum}" olarak kaydedildi. Bağlantı gelince gönderilecek.`, 'success');
     } else {
+      // Çevrimiçi: direkt DB'ye yaz
+      updateEkipman(ekipmanId, { durum: yeniDurum });
+      setQrFoundEkipman(prev => prev?.id === ekipmanId ? { ...prev, durum: yeniDurum } : prev);
       addToast(`Durum "${yeniDurum}" olarak güncellendi.`, 'success');
     }
   }, [ekipmanlar, updateEkipman, isOnline, addToQueue, addToast]);
