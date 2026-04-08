@@ -478,42 +478,35 @@ export function useStore(
   }, [fetchWithCache, setUygunsuzluklar]);
 
   const fetchEkipmanlar = useCallback(async (orgId: string) => {
-    // Aktif kayıtlar: deleted_at IS NULL (fetchAllRows zaten bu filtreyi uyguluyor)
-    // Silinmiş kayıtlar: deleted_at IS NOT NULL (çöp kutusu için ayrı sorgu)
     const cacheKey = `ekipmanlar_${orgId}`;
 
-    // 1. Aktif kayıtları çek (deleted_at IS NULL)
-    const activeRes = await fetchAllRows('ekipmanlar', orgId);
-    const activeRows = activeRes.data ? activeRes.data.map(r => r.data as Ekipman) : [];
-
-    // 2. Silinmiş kayıtları çek (deleted_at IS NOT NULL) — çöp kutusu için
+    // Aktif kayıtlar (deleted_at IS NULL) + silinmiş kayıtlar (silinmis: true) birlikte çek
+    // Çöp kutusu silinmis:true olanları gösterir, ekipmanlar sayfası !silinmis olanları gösterir
     const PAGE_SIZE = 500;
-    let deletedRows: Ekipman[] = [];
+    let allRows: Ekipman[] = [];
     let from = 0;
     let hasMore = true;
     let pageNum = 0;
+
     while (hasMore) {
       pageNum++;
       const to = from + PAGE_SIZE - 1;
-      const { data: delData } = await supabase
+      const { data } = await supabase
         .from('ekipmanlar')
         .select('id, data, created_at')
         .eq('organization_id', orgId)
-        .not('deleted_at', 'is', null)
         .order('created_at', { ascending: false })
         .range(from, to);
-      const rows = delData ?? [];
-      deletedRows = deletedRows.concat(rows.map(r => r.data as Ekipman));
-      if (rows.length < PAGE_SIZE || pageNum >= 10) hasMore = false;
+      const rows = data ?? [];
+      allRows = allRows.concat(rows.map(r => r.data as Ekipman));
+      if (rows.length < PAGE_SIZE || pageNum >= 20) hasMore = false;
       else from += PAGE_SIZE;
     }
 
-    // 3. Birleştir — aktif + silinmiş (duplicate yok çünkü ayrı sorgular)
-    const combined = [...activeRows, ...deletedRows];
-    setEkipmanlar(combined);
-    void writeCache(cacheKey, combined);
-    console.log(`[ISG] fetchEkipmanlar DB ✓ (active=${activeRows.length}, deleted=${deletedRows.length}) → cache updated`);
-  }, [fetchAllRows, setEkipmanlar]);
+    setEkipmanlar(allRows);
+    void writeCache(cacheKey, allRows);
+    console.log(`[ISG] fetchEkipmanlar DB ✓ (total=${allRows.length}) → cache updated`);
+  }, [setEkipmanlar]);
 
   const fetchGorevler = useCallback(async (orgId: string) => {
     await fetchWithCache<Gorev>('gorevler', orgId, setGorevler);
@@ -1642,17 +1635,9 @@ export function useStore(
     _setEkipmanlar(next);
     if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
-      // Direkt kalıcı sil — organization_id filtresi de ekle (RLS için kritik)
       console.log(`[ISG] permanentDeleteEkipman START: id=${id} org=${orgId}`);
-      const { error, count } = orgId
-        ? await supabase.from('ekipmanlar').delete().eq('id', id).eq('organization_id', orgId)
-        : await supabase.from('ekipmanlar').delete().eq('id', id);
-      if (error) {
-        const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
-        console.error(`[ISG] permanentDeleteEkipman DB ERROR: ${errMsg}`, error);
-        throw new Error(errMsg);
-      }
-      console.log(`[ISG] permanentDeleteEkipman OK: ${id} (count=${count})`);
+      await dbDelete('ekipmanlar', id);
+      console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
       // 5 saniye sonra ownDeletesRef'ten temizle
       setTimeout(() => ownDeletesRef.current.delete(id), 5000);
     } catch (err) {
@@ -1677,15 +1662,8 @@ export function useStore(
     if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
       console.log(`[ISG] permanentDeleteEkipmanMany START: ${ids.length} items org=${orgId}`);
-      const { error, count } = orgId
-        ? await supabase.from('ekipmanlar').delete().in('id', ids).eq('organization_id', orgId)
-        : await supabase.from('ekipmanlar').delete().in('id', ids);
-      if (error) {
-        const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
-        console.error(`[ISG] permanentDeleteEkipmanMany DB ERROR: ${errMsg}`, error);
-        throw new Error(errMsg);
-      }
-      console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items (count=${count})`);
+      await dbDeleteMany('ekipmanlar', ids);
+      console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
       // 5 saniye sonra temizle
       setTimeout(() => ids.forEach(id => ownDeletesRef.current.delete(id)), 5000);
     } catch (err) {
