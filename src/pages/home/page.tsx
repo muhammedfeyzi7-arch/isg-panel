@@ -4,6 +4,7 @@ import { useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import OnboardingTour from '../../components/feature/OnboardingTour';
+import KvkkPopup from '../../components/feature/KvkkPopup';
 import ToastContainer from '../../components/base/ToastContainer';
 import DashboardPage from '../dashboard/page';
 import FirmalarPage from '../companies/page';
@@ -22,7 +23,7 @@ import FirmaEvraklariPage from '../company-documents/page';
 import SahaPage from '../saha/page';
 
 function AppContent() {
-  const { activeModule, orgError, org, mustChangePassword, setActiveModule } = useApp();
+  const { activeModule, orgError, org, mustChangePassword, setActiveModule, kvkkAccepted, setKvkkAccepted } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL'den ?module=saha gibi parametreyi oku ve modülü aç
@@ -36,6 +37,11 @@ function AppContent() {
 
   if (mustChangePassword) {
     return <ForcePasswordChange />;
+  }
+
+  // KVKK: sadece kvkk_accepted=false olan kullanıcılara göster
+  if (org && !kvkkAccepted) {
+    return <KvkkPopup onAccepted={setKvkkAccepted} />;
   }
 
   if (orgError && !org) {

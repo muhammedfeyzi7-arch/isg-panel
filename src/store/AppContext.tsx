@@ -29,6 +29,7 @@ export interface OrgInfo {
   role: string;
   isActive: boolean;
   mustChangePassword: boolean;
+  kvkkAccepted: boolean;
   displayName?: string;
   email?: string;
 }
@@ -57,6 +58,8 @@ interface AppContextType extends StoreType {
   orgError: string | null;
   mustChangePassword: boolean;
   clearMustChangePassword: () => Promise<void>;
+  kvkkAccepted: boolean;
+  setKvkkAccepted: () => void;
   createOrg: (name: string, userId: string) => Promise<{ error: string | null }>;
   joinOrg: (code: string) => Promise<{ error: string | null }>;
   regenerateInviteCode: () => Promise<{ error: string | null; newCode?: string }>;
@@ -99,14 +102,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Auto-create org is now handled inside useOrganization.loadOrg() via the edge function.
   // No separate autoCreateOrg effect needed here.
 
+  const [kvkkAcceptedLocal, setKvkkAcceptedLocal] = useState(false);
+
   const org = useMemo<OrgInfo | null>(() => {
     if (!rawOrg) return null;
     return {
       ...rawOrg,
+      kvkkAccepted: rawOrg.kvkkAccepted || kvkkAcceptedLocal,
       displayName: rawOrg.displayName || getUserDisplayName(user),
       email: rawOrg.email || user?.email,
     };
-  }, [rawOrg, user]);
+  }, [rawOrg, user, kvkkAcceptedLocal]);
+
+  const setKvkkAccepted = useCallback(() => {
+    setKvkkAcceptedLocal(true);
+  }, []);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -546,6 +556,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       org, orgLoading, orgError: loadError,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,
+      kvkkAccepted: org?.kvkkAccepted ?? true,
+      setKvkkAccepted,
       createOrg,
       joinOrg,
       regenerateInviteCode,

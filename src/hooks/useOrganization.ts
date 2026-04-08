@@ -10,6 +10,7 @@ export interface OrgInfo {
   role: string;
   isActive: boolean;
   mustChangePassword: boolean;
+  kvkkAccepted: boolean;
   displayName?: string;
   email?: string;
 }
@@ -88,6 +89,7 @@ export function useOrganization(user: User | null) {
           role: 'admin',
           isActive: true,
           mustChangePassword: false,
+          kvkkAccepted: true,
           displayName: emailPrefix,
           email: user.email ?? undefined,
         });
@@ -134,6 +136,8 @@ export function useOrganization(user: User | null) {
             role: resData.role ?? 'admin',
             isActive: resData.is_active !== false,
             mustChangePassword: resData.must_change_password === true,
+            // Edge function üzerinden gelen yeni org'lar genellikle admin → KVKK popup gösterme
+            kvkkAccepted: true,
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
           });
@@ -150,7 +154,7 @@ export function useOrganization(user: User | null) {
       // PRIMARY: Try direct Supabase query first (fast path)
       const { data, error } = await supabase
         .from('user_organizations')
-        .select('role, is_active, must_change_password, display_name, email, organizations(id, name, invite_code)')
+        .select('role, is_active, must_change_password, display_name, email, kvkk_accepted, organizations(id, name, invite_code)')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -180,6 +184,7 @@ export function useOrganization(user: User | null) {
           role: data.role ?? 'admin',
           isActive: data.is_active !== false,
           mustChangePassword: data.must_change_password === true,
+          kvkkAccepted: data.kvkk_accepted === true,
           displayName: data.display_name ?? undefined,
           email: data.email ?? undefined,
         });
