@@ -187,18 +187,96 @@ function downloadTemplate() {
 }
 
 // ─── Excel Import ─────────────────────────────────────────────────────────────
+function excelSerialToDate(serial: number): string {
+  // Excel serial date → YYYY-MM-DD
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400;
+  const date = new Date(utc_value * 1000);
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseDateValue(val: unknown): string {
+  if (!val) return '';
+  // Excel serial number (tarih hücresi sayı olarak gelir)
+  if (typeof val === 'number') return excelSerialToDate(val);
+  const s = String(val).trim();
+  if (!s) return '';
+  // DD.MM.YYYY
+  if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(s)) {
+    const [d, m, y] = s.split('.');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // DD/MM/YYYY
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const [d, m, y] = s.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return s;
+}
+
 async function parseImportFile(file: File): Promise<{ adSoyad: string; muayeneTarihi: string; sonrakiTarih: string }[]> {
   const XLSXLib = await import('xlsx-js-style');
   const buf = await file.arrayBuffer();
-  const wb = XLSXLib.read(buf, { type: 'array' });
+  const wb = XLSXLib.read(buf, { type: 'array', cellDates: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSXLib.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
-  return rows.map(r => {
-    const adSoyad = String(r['Ad Soyad'] || r['ad soyad'] || r['ADI SOYADI'] || '').trim();
-    const muayeneTarihi = String(r['Muayene Tarihi'] || r['muayene_tarihi'] || '').trim();
-    const sonrakiTarih = String(r['Sonraki Muayene Tarihi'] || r['sonraki_muayene_tarihi'] || '').trim();
-    return { adSoyad, muayeneTarihi, sonrakiTarih };
-  }).filter(r => r.adSoyad);
+
+  // raw array olarak oku — header satırlarını kendimiz tespit edelim
+  const allRows = XLSXLib.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][];
+
+  // Kolon başlığı satırını bul: "Ad Soyad" veya "ADI SOYADI" içeren satır
+  let headerRowIdx = -1;
+  for (let i = 0; i < Math.min(allRows.length, 10); i++) {
+    const row = allRows[i];
+    const rowStr = row.map(c => String(c).toLowerCase()).join('|');
+    if (rowStr.includes('ad soyad') || rowStr.includes('adı soyadı') || rowStr.includes('adi soyadi') || rowStr.includes('isim')) {
+      headerRowIdx = i;
+      break;
+    }
+  }
+
+  if (headerRowIdx === -1) {
+    // Header bulunamadı — ilk satırı header say
+    headerRowIdx = 0;
+  }
+
+  const headerRow = allRows[headerRowIdx].map(c => String(c).toLowerCase().trim());
+
+  // Kolon indekslerini bul
+  const adIdx = headerRow.findIndex(h =>
+    h.includes('ad soyad') || h.includes('adı soyadı') || h.includes('adi soyadi') || h === 'isim' || h === 'ad'
+  );
+  const muayeneIdx = headerRow.findIndex(h =>
+    h.includes('muayene tarihi') && !h.includes('sonraki')
+  );
+  const sonrakiIdx = headerRow.findIndex(h =>
+    h.includes('sonraki') || h.includes('sonraki muayene')
+  );
+
+  // Veri satırlarını işle (header'dan sonraki satırlar)
+  const results: { adSoyad: string; muayeneTarihi: string; sonrakiTarih: string }[] = [];
+
+  for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+    const row = allRows[i];
+    if (!row || row.length === 0) continue;
+
+    const adSoyad = adIdx >= 0 ? String(row[adIdx] ?? '').trim() : String(row[0] ?? '').trim();
+    const muayeneTarihi = muayeneIdx >= 0 ? parseDateValue(row[muayeneIdx]) : parseDateValue(row[1]);
+    const sonrakiTarih = sonrakiIdx >= 0 ? parseDateValue(row[sonrakiIdx]) : parseDateValue(row[2]);
+
+    // Boş satır veya örnek veri satırı atla
+    if (!adSoyad || adSoyad.toLowerCase().includes('örnek') || adSoyad.toLowerCase().includes('ornek')) continue;
+    // Başlık tekrarı atla
+    if (adSoyad.toLowerCase().includes('ad soyad') || adSoyad.toLowerCase().includes('isim')) continue;
+
+    results.push({ adSoyad, muayeneTarihi, sonrakiTarih });
+  }
+
+  return results;
 }
 
 // ─── Form tipi ────────────────────────────────────────────────────────────────
@@ -310,6 +388,12 @@ export default function MuayenelerPage() {
   };
 
   // ── Excel Import ──
+  const normalize = (s: string) =>
+    s.toLowerCase()
+      .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
+      .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+      .replace(/\s+/g, ' ').trim();
+
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -318,13 +402,22 @@ export default function MuayenelerPage() {
     try {
       const rows = await parseImportFile(file);
       const preview = rows.map(r => {
-        const matched = aktifPersoneller.find(p =>
-          p.adSoyad.toLowerCase().trim() === r.adSoyad.toLowerCase().trim()
+        const normR = normalize(r.adSoyad);
+        // Önce tam eşleşme dene
+        let matched = aktifPersoneller.find(p =>
+          normalize(p.adSoyad) === normR
         );
+        // Tam eşleşme yoksa içerme dene (kısmi ad)
+        if (!matched) {
+          matched = aktifPersoneller.find(p =>
+            normalize(p.adSoyad).includes(normR) || normR.includes(normalize(p.adSoyad))
+          );
+        }
         return { ...r, matched: matched?.id };
       });
       setImportPreview(preview);
-    } catch {
+    } catch (err) {
+      console.error('Import error:', err);
       addToast('Dosya okunamadı. Excel formatını kontrol edin.', 'error');
     } finally {
       setImporting(false);
