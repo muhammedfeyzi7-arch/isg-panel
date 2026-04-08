@@ -1537,7 +1537,17 @@ export function useStore(
     const snapshot = ekipmanlarRef.current;
     _setEkipmanlar(prev => prev.filter(e => e.id !== id));
     try {
-      await dbDelete('ekipmanlar', id);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/delete-ekipman', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Silme başarısız');
       console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipman FAILED, rolling back:', err);
@@ -1552,7 +1562,17 @@ export function useStore(
     const snapshot = ekipmanlarRef.current;
     _setEkipmanlar(prev => prev.filter(e => !ids.includes(e.id)));
     try {
-      await dbDeleteMany('ekipmanlar', ids);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/delete-ekipman', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ ids }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Silme başarısız');
       console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipmanMany FAILED, rolling back:', err);
