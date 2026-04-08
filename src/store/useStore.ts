@@ -1589,13 +1589,45 @@ export function useStore(
   }, [setEkipmanlar, saveToDb]);
 
   const restoreEkipman = useCallback((id: string) => {
+    const now = new Date().toISOString();
     let updated: Ekipman | null = null;
+    let snapshot: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
+      snapshot = e;
       updated = { ...e, silinmis: false as const, silinmeTarihi: undefined };
       return updated;
     }));
-    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) {
+      const orgId = orgIdRef.current;
+      const uid = userIdRef.current;
+      if (orgId && uid) {
+        // deleted_at'i null'a çek — yoksa fetchAllRows geri getirmez
+        supabase
+          .from('ekipmanlar')
+          .update({
+            data: updated,
+            updated_at: now,
+            deleted_at: null,
+            device_id: getDeviceId(),
+          })
+          .eq('id', id)
+          .eq('organization_id', orgId)
+          .then(({ error }) => {
+            if (error) {
+              console.error('[ISG] restoreEkipman DB error:', error.message);
+              if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
+              onSaveErrorRef.current?.(`Ekipman geri yüklenemedi: ${error.message}`);
+            } else {
+              console.log(`[ISG] restoreEkipman OK: ${id} deleted_at=null`);
+              // Cache'i güncelle
+              void writeCache(`ekipmanlar_${orgId}`, ekipmanlarRef.current);
+            }
+          });
+      } else {
+        saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+      }
+    }
   }, [setEkipmanlar, saveToDb]);
 
   const ekipmanlarRef = useRef<Ekipman[]>([]);
@@ -1610,8 +1642,14 @@ export function useStore(
     _setEkipmanlar(next);
     if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
-      // Direkt kalıcı sil — deleted_at update ayrı adımda yapılmıyor (RLS sorunu yaratıyor)
-      await dbDeleteMany('ekipmanlar', [id]);
+      // Direkt kalıcı sil
+      console.log(`[ISG] permanentDeleteEkipman START: id=${id} org=${orgId}`);
+      const { error } = await supabase.from('ekipmanlar').delete().eq('id', id);
+      if (error) {
+        const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
+        console.error(`[ISG] permanentDeleteEkipman DB ERROR: ${errMsg}`, error);
+        throw new Error(errMsg);
+      }
       console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
       // 5 saniye sonra ownDeletesRef'ten temizle
       setTimeout(() => ownDeletesRef.current.delete(id), 5000);
@@ -1636,8 +1674,13 @@ export function useStore(
     _setEkipmanlar(next);
     if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
-      // Direkt kalıcı sil — önceki deleted_at update adımını kaldırdık (RLS sorunu yaratıyordu)
-      await dbDeleteMany('ekipmanlar', ids);
+      console.log(`[ISG] permanentDeleteEkipmanMany START: ${ids.length} items org=${orgId}`);
+      const { error } = await supabase.from('ekipmanlar').delete().in('id', ids);
+      if (error) {
+        const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
+        console.error(`[ISG] permanentDeleteEkipmanMany DB ERROR: ${errMsg}`, error);
+        throw new Error(errMsg);
+      }
       console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
       // 5 saniye sonra temizle
       setTimeout(() => ids.forEach(id => ownDeletesRef.current.delete(id)), 5000);
