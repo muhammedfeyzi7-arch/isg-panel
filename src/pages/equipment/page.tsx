@@ -343,9 +343,15 @@ const defaultForm: Omit<Ekipman, 'id' | 'olusturmaTarihi'> = {
 
 function getDaysUntil(dateStr: string): number {
   if (!dateStr) return 999;
-  // Her iki tarihi de gece yarısına normalize et — saat farkı (UTC+3 vb.) hesabı bozmasın
-  const target = new Date(dateStr);
-  target.setHours(0, 0, 0, 0);
+  // ISO date string'i (YYYY-MM-DD) yerel saat dilimine göre parse et
+  // new Date('2025-04-08') UTC gece yarısı oluşturur — UTC+3'te bu 03:00 yerel saat olur
+  // Bu yüzden string'i manuel parse edip yerel tarih olarak oluşturuyoruz
+  const parseLocalDate = (s: string): Date => {
+    const iso = s.split('T')[0]; // sadece tarih kısmı
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d, 0, 0, 0, 0); // yerel gece yarısı
+  };
+  const target = parseLocalDate(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -526,17 +532,24 @@ export default function EkipmanlarPage() {
     setKontrolSaving(true);
     try {
       const now = new Date().toISOString();
+      const todayStr = now.split('T')[0];
+      // addEkipmanKontrolKaydi zaten sonKontrolTarihi'ni güncelliyor (store içinde)
+      // updateEkipman'ı AYRI çağırıyoruz — sadece durum + sonrakiKontrolTarihi için
+      // ÖNEMLİ: addEkipmanKontrolKaydi'yi önce çağır, sonra updateEkipman
+      // updateEkipman kontrolGecmisi'ni override etmemeli — sadece belirtilen alanları günceller
       addEkipmanKontrolKaydi(kontrolEkipmanId, {
         tarih: now,
-        kontrolEden: currentUser.ad,
+        kontrolEden: currentUser.ad || 'Kullanıcı',
         kontrolEdenId: currentUser.id,
         durum: kontrolForm.durum,
         notlar: kontrolForm.notlar || undefined,
         kaynak: 'manuel',
       });
+      // Sadece durum ve tarih alanlarını güncelle — kontrolGecmisi'ne dokunma
+      // updateEkipman spread ile merge ediyor, kontrolGecmisi undefined gelirse mevcut değer korunur
       updateEkipman(kontrolEkipmanId, {
         durum: kontrolForm.durum,
-        sonKontrolTarihi: now.split('T')[0],
+        sonKontrolTarihi: todayStr,
         ...(kontrolForm.sonrakiKontrolTarihi ? { sonrakiKontrolTarihi: kontrolForm.sonrakiKontrolTarihi } : {}),
       });
       addToast('Kontrol kaydı oluşturuldu.', 'success');
@@ -1428,6 +1441,7 @@ export default function EkipmanlarPage() {
               belgeler={ekipman?.belgeler ?? []}
               yukleyenKisi={currentUser.ad}
               canEdit={canEdit}
+              onError={(msg) => addToast(msg, 'error')}
               onBelgeEkle={(belge) => {
                 addEkipmanBelge(editId, belge);
                 addToast('Belge yüklendi, eskisi arşive alındı.', 'success');

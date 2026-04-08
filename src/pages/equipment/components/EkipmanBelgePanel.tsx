@@ -7,14 +7,20 @@ interface Props {
   orgId: string;
   belgeler: EkipmanBelge[];
   onBelgeEkle: (belge: Omit<EkipmanBelge, 'id' | 'arsiv'>) => void;
+  onError?: (msg: string) => void;
   yukleyenKisi: string;
   canEdit: boolean;
 }
 
+// Yerel saat dilimine göre gün farkı hesapla (UTC offset sorununu önler)
 function getDaysUntil(dateStr: string): number {
   if (!dateStr) return 999;
-  const target = new Date(dateStr);
-  target.setHours(0, 0, 0, 0);
+  const parseLocal = (s: string): Date => {
+    const iso = s.split('T')[0];
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+  };
+  const target = parseLocal(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -58,7 +64,7 @@ function getFileIcon(name: string) {
   return { icon: 'ri-file-line', color: '#94A3B8' };
 }
 
-export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeEkle, yukleyenKisi, canEdit }: Props) {
+export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeEkle, onError, yukleyenKisi, canEdit }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [showArsiv, setShowArsiv] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -73,17 +79,23 @@ export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeE
   const handleFileChange = (file?: File) => {
     if (!file) return;
     const err = validateFile(file, 20);
-    if (err) { alert(err); return; }
+    if (err) { onError?.(err); return; }
     setPendingFile(file);
   };
 
   const handleKaydet = async () => {
     if (!pendingFile) return;
-    if (!form.gecerlilikTarihi) { alert('Geçerlilik tarihi zorunludur.'); return; }
+    if (!form.gecerlilikTarihi) {
+      onError?.('Geçerlilik tarihi zorunludur.');
+      return;
+    }
     setUploading(true);
     try {
       const url = await uploadFileToStorage(pendingFile, orgId, 'ekipman-belge', `${ekipmanId}-${Date.now()}`);
-      if (!url) { alert('Dosya yüklenemedi.'); return; }
+      if (!url) {
+        onError?.('Dosya yüklenemedi. Lütfen tekrar deneyin.');
+        return;
+      }
       onBelgeEkle({
         ad: form.ad || pendingFile.name,
         dosyaAdi: pendingFile.name,
@@ -104,6 +116,7 @@ export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeE
 
   const handleGoruntule = async (belge: EkipmanBelge) => {
     setOpeningId(belge.id);
+    // Senkron olarak pencereyi hemen aç — mobil popup blocker geçmek için
     const win = window.open('', '_blank');
     if (win) {
       win.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="font-size:16px">Belge yükleniyor...</p></body></html>');
@@ -115,6 +128,7 @@ export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeE
         else window.open(url, '_blank');
       } else {
         if (win && !win.closed) win.close();
+        onError?.('Belge erişim linki alınamadı.');
       }
     } finally {
       setOpeningId(null);
@@ -154,8 +168,8 @@ export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeE
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] flex items-center gap-1" style={{ color: '#64748B' }}>
-              <i className="ri-calendar-line" />
-              Geçerlilik: {new Date(belge.gecerlilikTarihi).toLocaleDateString('tr-TR')}
+              <i className="ri-calendar-check-line" />
+              Geçerlilik: {new Date(belge.gecerlilikTarihi + 'T00:00:00').toLocaleDateString('tr-TR')}
             </span>
             {!isArsiv && <GecerlilikBadge tarih={belge.gecerlilikTarihi} />}
           </div>
@@ -205,7 +219,7 @@ export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeE
       {canEdit && !showForm && (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl cursor-pointer text-sm font-semibold transition-all"
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl cursor-pointer text-sm font-semibold transition-all whitespace-nowrap"
           style={{ background: 'rgba(99,102,241,0.08)', border: '1px dashed rgba(99,102,241,0.3)', color: '#818CF8' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.14)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; }}>
@@ -220,6 +234,11 @@ export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeE
           style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
           <p className="text-xs font-bold" style={{ color: '#818CF8' }}>
             <i className="ri-file-add-line mr-1.5" />Yeni Belge Ekle
+            {aktifBelgeler.length > 0 && (
+              <span className="ml-2 text-[10px] font-normal" style={{ color: '#FBBF24' }}>
+                <i className="ri-archive-line mr-0.5" />Mevcut aktif belge arşive alınacak
+              </span>
+            )}
           </p>
 
           {/* Belge adı */}
@@ -304,11 +323,11 @@ export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeE
         <div>
           <button
             onClick={() => setShowArsiv(p => !p)}
-            className="flex items-center gap-2 text-xs font-semibold cursor-pointer py-1 whitespace-nowrap"
+            className="flex items-center gap-2 text-xs font-semibold cursor-pointer py-1 whitespace-nowrap w-full"
             style={{ color: '#475569' }}>
-            <i className={`ri-archive-line`} />
+            <i className="ri-archive-line" />
             Arşiv ({arsivBelgeler.length} belge)
-            {showArsiv ? <i className="ri-arrow-up-s-line ml-auto" /> : <i className="ri-arrow-down-s-line ml-auto" />}
+            <i className={`ml-auto ${showArsiv ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'}`} />
           </button>
           {showArsiv && (
             <div className="space-y-2 mt-2">

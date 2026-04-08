@@ -38,7 +38,7 @@ export default function KontrolGecmisiPanel({ gecmis }: Props) {
           Toplam {gecmis.length} kontrol kaydı
         </span>
         <span className="text-xs ml-auto" style={{ color: '#475569' }}>
-          Son: {new Date(gecmis[0].tarih).toLocaleDateString('tr-TR')}
+          Son: {new Date(gecmis[0].tarih).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
         </span>
       </div>
 

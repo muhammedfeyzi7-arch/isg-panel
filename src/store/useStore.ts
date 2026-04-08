@@ -1289,6 +1289,15 @@ export function useStore(
       ) as Partial<Ekipman>;
     }
 
+    // kontrolGecmisi ve belgeler undefined gelirse mevcut değeri koru — override etme
+    // Bu sayede addEkipmanKontrolKaydi + updateEkipman aynı anda çağrılınca veri kaybolmaz
+    if (safeRest.kontrolGecmisi === undefined) {
+      delete safeRest.kontrolGecmisi;
+    }
+    if (safeRest.belgeler === undefined) {
+      delete safeRest.belgeler;
+    }
+
     let updated: Ekipman | null = null;
     let snapshot: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
