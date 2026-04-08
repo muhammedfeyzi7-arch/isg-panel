@@ -169,7 +169,11 @@ export default function EkipmanBelgePanel({ ekipmanId, orgId, belgeler, onBelgeE
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] flex items-center gap-1" style={{ color: '#64748B' }}>
               <i className="ri-calendar-check-line" />
-              Geçerlilik: {new Date(belge.gecerlilikTarihi + 'T00:00:00').toLocaleDateString('tr-TR')}
+              Geçerlilik: {(() => {
+                const iso = belge.gecerlilikTarihi.split('T')[0];
+                const [y, m, d] = iso.split('-').map(Number);
+                return new Date(y, m - 1, d).toLocaleDateString('tr-TR');
+              })()}
             </span>
             {!isArsiv && <GecerlilikBadge tarih={belge.gecerlilikTarihi} />}
           </div>

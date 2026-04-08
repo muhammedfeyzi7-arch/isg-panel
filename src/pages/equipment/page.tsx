@@ -27,7 +27,12 @@ function parseTrDate(d: string): string {
 }
 
 function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad: string }[]): void {
-  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '-';
+  const fmtDate = (d: string) => {
+    if (!d) return '-';
+    const iso = d.split('T')[0];
+    const [y, m, day] = iso.split('-').map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString('tr-TR');
+  };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const aktif = ekipmanlar.filter(e => !e.silinmis);
@@ -341,20 +346,27 @@ const defaultForm: Omit<Ekipman, 'id' | 'olusturmaTarihi'> = {
   notlar: '',
 };
 
+/** ISO tarih string'ini (YYYY-MM-DD veya ISO) yerel saat dilimiyle Date'e çevirir */
+function parseLocalDate(s: string): Date {
+  const iso = s.split('T')[0]; // sadece YYYY-MM-DD kısmı
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0); // yerel gece yarısı — UTC offset yok
+}
+
+/** Yerel bugünden itibaren kaç gün kaldığını hesaplar (negatif = geçmiş) */
 function getDaysUntil(dateStr: string): number {
   if (!dateStr) return 999;
-  // ISO date string'i (YYYY-MM-DD) yerel saat dilimine göre parse et
-  // new Date('2025-04-08') UTC gece yarısı oluşturur — UTC+3'te bu 03:00 yerel saat olur
-  // Bu yüzden string'i manuel parse edip yerel tarih olarak oluşturuyoruz
-  const parseLocalDate = (s: string): Date => {
-    const iso = s.split('T')[0]; // sadece tarih kısmı
-    const [y, m, d] = iso.split('-').map(Number);
-    return new Date(y, m - 1, d, 0, 0, 0, 0); // yerel gece yarısı
-  };
   const target = parseLocalDate(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/** ISO tarih string'ini Türkçe formatla gösterir (UTC offset olmadan) */
+function fmtLocalDate(dateStr: string): string {
+  if (!dateStr) return '—';
+  const d = parseLocalDate(dateStr);
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export default function EkipmanlarPage() {
@@ -960,8 +972,8 @@ export default function EkipmanlarPage() {
                       {ekipman.marka && <p className="text-xs mt-0.5" style={{ color: 'var(--text-faint)' }}>{ekipman.marka} {ekipman.model}</p>}
                       {ekipman.sonrakiKontrolTarihi && (
                         <p className={`text-xs mt-1 font-medium ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : ''}`} style={!isOverdue && !isUrgent ? { color: 'var(--text-muted)' } : {}}>
-                          Kontrol: {new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR')}
-                          {isOverdue && ' — Gecikmiş!'}
+                          Kontrol: {fmtLocalDate(ekipman.sonrakiKontrolTarihi)}
+                          {isOverdue && ` — ${Math.abs(days)} gün gecikmiş!`}
                           {isUrgent && !isOverdue && ` — ${days} gün kaldı`}
                         </p>
                       )}
@@ -1039,13 +1051,13 @@ export default function EkipmanlarPage() {
                       </td>
                       <td>
                         <span className="text-sm text-slate-400">
-                          {ekipman.sonKontrolTarihi ? new Date(ekipman.sonKontrolTarihi).toLocaleDateString('tr-TR') : '—'}
+                          {fmtLocalDate(ekipman.sonKontrolTarihi)}
                         </span>
                       </td>
                       <td>
                         <div>
                           <span className={`text-sm ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : 'text-slate-400'}`}>
-                            {ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi).toLocaleDateString('tr-TR') : '—'}
+                            {fmtLocalDate(ekipman.sonrakiKontrolTarihi)}
                           </span>
                           {isOverdue && <p className="text-[10px] text-red-500 mt-0.5">{Math.abs(days)} gün gecikmiş</p>}
                           {isUrgent && !isOverdue && <p className="text-[10px] text-yellow-500 mt-0.5">{days} gün kaldı</p>}
