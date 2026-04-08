@@ -852,7 +852,7 @@ export default function IsIzniPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>İş İzni Takip</h1>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>İş İzinleri</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
             {isDenetci ? 'Onay bekleyen iş izinlerini değerlendirin' : 'İş izinlerini oluşturun ve takip edin'}
           </p>

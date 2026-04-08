@@ -1468,7 +1468,7 @@ export default function SahaPage() {
       {/* Başlık */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>İSG Saha</h2>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetimleri</h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Hızlı saha işlemleri</p>
         </div>
         <div className="w-8 h-8 flex items-center justify-center rounded-xl" style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}>

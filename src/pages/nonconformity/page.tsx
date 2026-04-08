@@ -160,7 +160,7 @@ export default function UygunsuzluklarPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetim</h2>
+          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetimleri</h2>
           <p className="text-sm mt-1" style={{ color: '#64748B' }}>Uygunsuzlukları kaydedin, takip edin ve raporlayın</p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">

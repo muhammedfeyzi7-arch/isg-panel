@@ -92,6 +92,17 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
 
   useEffect(() => { void fetchDosyalar(); }, [fetchDosyalar]);
 
+  const openUrl = (url: string, fileName: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    // Mobilde download attribute olmadan aç — görüntüleme için
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const handleAc = async (dosya: EvrakDosya, usedSlug: string) => {
     setAcikDosya(dosya.name);
     try {
@@ -99,7 +110,6 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
       const prefix = (dosya as EvrakDosya & { _prefix?: string })._prefix ?? `${orgId}/is-izni-evrak/${firmaId}/${usedSlug}`;
       const filePath = `${prefix}/${dosya.name}`;
       console.log('[ISG] Opening file path:', filePath);
-      console.log('[ISG] orgId:', orgId, 'firmaId:', firmaId, 'slug:', usedSlug);
 
       // Önce createSignedUrl ile dene
       const { data: signData, error: signErr } = await supabase.storage
@@ -109,7 +119,7 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
       console.log('[ISG] createSignedUrl result:', { ok: !!signData?.signedUrl, error: signErr?.message });
 
       if (signData?.signedUrl) {
-        window.open(signData.signedUrl, '_blank');
+        openUrl(signData.signedUrl, dosya.name);
         return;
       }
 
@@ -121,7 +131,7 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
         console.log('[ISG] Fallback trying:', fp);
         const { data: fd, error: fe } = await supabase.storage.from('uploads').createSignedUrl(fp, 86400);
         console.log('[ISG] Fallback result:', { path: fp, ok: !!fd?.signedUrl, error: fe?.message });
-        if (fd?.signedUrl) { window.open(fd.signedUrl, '_blank'); opened = true; break; }
+        if (fd?.signedUrl) { openUrl(fd.signedUrl, dosya.name); opened = true; break; }
       }
 
       // Son çare: storage list ile tam path bul
@@ -136,7 +146,7 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
           if (found) {
             const fp2 = `${pfx}/${found.name}`;
             const { data: fd2 } = await supabase.storage.from('uploads').createSignedUrl(fp2, 86400);
-            if (fd2?.signedUrl) { window.open(fd2.signedUrl, '_blank'); opened = true; break; }
+            if (fd2?.signedUrl) { openUrl(fd2.signedUrl, dosya.name); opened = true; break; }
           }
         }
       }

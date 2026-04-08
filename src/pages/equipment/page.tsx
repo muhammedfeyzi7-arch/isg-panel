@@ -835,7 +835,7 @@ export default function EkipmanlarPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Ekipman Kontrolleri</h2>
+          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Ekipman</h2>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Ekipman kayıtlarını ve kontrol durumlarını yönetin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">

@@ -139,14 +139,17 @@ async function exportEgitimlerToExcel(
     applyColHeader(ws1, cols1);
 
     aktif.forEach((eg, i) => {
-      const firma = firmalar.find(f => f.id === eg.firmaId);
+      // Çoklu firma desteği: firmaIds varsa ilk firmayı göster, yoksa firmaId kullan
+      const firmaIds = eg.firmaIds && eg.firmaIds.length > 0 ? eg.firmaIds : (eg.firmaId ? [eg.firmaId] : []);
+      const firmaAdlari = firmaIds.map(id => firmalar.find(f => f.id === id)?.ad || '—').join(', ');
+      const firma = firmalar.find(f => f.id === (firmaIds[0] ?? eg.firmaId));
       const stats = getKatilimStats(eg, personeller);
       // Katılım oranı: katılan / firma toplam personeli
       const oran = stats.toplam > 0 ? `%${Math.round((stats.katildi / stats.toplam) * 100)}` : '—';
       const exRow = ws1.getRow(5 + i);
       exRow.height = 18;
       const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
-      const vals = [i + 1, eg.ad, firma?.ad || '—', fmtDate(eg.tarih), eg.egitmen || '—', stats.toplam, stats.kayitliKatilimci, stats.katildi, stats.katilmadi, oran, eg.aciklama || '—'];
+      const vals = [i + 1, eg.ad, firmaAdlari, fmtDate(eg.tarih), eg.egitmen || '—', stats.toplam, stats.kayitliKatilimci, stats.katildi, stats.katilmadi, oran, eg.aciklama || '—'];
       vals.forEach((val, ci) => {
         const cell = exRow.getCell(ci + 1);
         cell.value = val;
@@ -185,13 +188,16 @@ async function exportEgitimlerToExcel(
         : legacyIds.map(id => ({ personelId: id, katildi: true }));
 
       if (allIds.length === 0) return;
+      // Katılımcı detay sayfasında da çoklu firma adını kullan
+      const egFirmaIds2 = eg.firmaIds && eg.firmaIds.length > 0 ? eg.firmaIds : (eg.firmaId ? [eg.firmaId] : []);
+      const egFirmaAdlari2 = egFirmaIds2.map(id => firmalar.find(f => f.id === id)?.ad || '—').join(', ');
       allIds.forEach((k, i) => {
         const p = personeller.find(x => x.id === k.personelId);
         const exRow = ws2.getRow(rowIdx);
         exRow.height = 18;
         const bg = (rowIdx - 5) % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
         const durumLabel = k.katildi ? 'Katıldı' : 'Katılmadı';
-        const vals = [i + 1, eg.ad, firma?.ad || '—', fmtDate(eg.tarih), p?.adSoyad || '—', p?.gorev || '—', durumLabel];
+        const vals = [i + 1, eg.ad, egFirmaAdlari2, fmtDate(eg.tarih), p?.adSoyad || '—', p?.gorev || '—', durumLabel];
         vals.forEach((val, ci) => {
           const cell = exRow.getCell(ci + 1);
           cell.value = val;

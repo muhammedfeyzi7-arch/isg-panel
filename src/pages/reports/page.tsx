@@ -365,11 +365,14 @@ export default function RaporlarPage() {
     [evraklar, selectedFirmaId, dateFrom, dateTo],
   );
   const filtreEgitimler = useMemo(
-    () => egitimler.filter(e =>
-      !e.silinmis &&
-      (selectedFirmaId === 'all' || e.firmaId === selectedFirmaId) &&
-      isInDateRange(e.olusturmaTarihi)
-    ),
+    () => egitimler.filter(e => {
+      if (e.silinmis) return false;
+      if (!isInDateRange(e.olusturmaTarihi)) return false;
+      if (selectedFirmaId === 'all') return true;
+      // Çoklu firma desteği: firmaIds array'ini kontrol et, yoksa firmaId'ye bak
+      const egFirmaIds = e.firmaIds && e.firmaIds.length > 0 ? e.firmaIds : (e.firmaId ? [e.firmaId] : []);
+      return egFirmaIds.includes(selectedFirmaId);
+    }),
     [egitimler, selectedFirmaId, dateFrom, dateTo],
   );
   const filtreMuayeneler = useMemo(
@@ -516,19 +519,24 @@ export default function RaporlarPage() {
     };
   }, [aktifEgitimler]);
 
-  // Firma bazlı eğitim dağılımı
+  // Firma bazlı eğitim dağılımı — çoklu firma (firmaIds) desteğiyle
   const egitimFirmaDagilim = useMemo(() => {
     const map = new Map<string, { firmaAd: string; egitimSayisi: number; toplamKatilimci: number; toplamKatildi: number }>();
     aktifEgitimler.forEach(e => {
-      const firma = aktifFirmalar.find(f => f.id === e.firmaId);
-      if (!firma) return;
       const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
-      const existing = map.get(e.firmaId) ?? { firmaAd: firma.ad, egitimSayisi: 0, toplamKatilimci: 0, toplamKatildi: 0 };
-      map.set(e.firmaId, {
-        firmaAd: firma.ad,
-        egitimSayisi: existing.egitimSayisi + 1,
-        toplamKatilimci: existing.toplamKatilimci + katilimcilar.length,
-        toplamKatildi: existing.toplamKatildi + katilimcilar.filter(k => k.katildi).length,
+      const katildi = katilimcilar.filter(k => k.katildi).length;
+      // Çoklu firma desteği
+      const egFirmaIds = e.firmaIds && e.firmaIds.length > 0 ? e.firmaIds : (e.firmaId ? [e.firmaId] : []);
+      egFirmaIds.forEach(firmaId => {
+        const firma = aktifFirmalar.find(f => f.id === firmaId);
+        if (!firma) return;
+        const existing = map.get(firmaId) ?? { firmaAd: firma.ad, egitimSayisi: 0, toplamKatilimci: 0, toplamKatildi: 0 };
+        map.set(firmaId, {
+          firmaAd: firma.ad,
+          egitimSayisi: existing.egitimSayisi + 1,
+          toplamKatilimci: existing.toplamKatilimci + katilimcilar.length,
+          toplamKatildi: existing.toplamKatildi + katildi,
+        });
       });
     });
     return Array.from(map.values()).sort((a, b) => b.egitimSayisi - a.egitimSayisi).slice(0, 8);
@@ -971,7 +979,9 @@ export default function RaporlarPage() {
         exEgitimler
           .sort((a, b) => new Date(b.tarih || b.olusturmaTarihi).getTime() - new Date(a.tarih || a.olusturmaTarihi).getTime())
           .forEach((e, i) => {
-            const firma = aktifFirmalar.find(f => f.id === e.firmaId);
+            // Çoklu firma desteği
+            const exEgFirmaIds = e.firmaIds && e.firmaIds.length > 0 ? e.firmaIds : (e.firmaId ? [e.firmaId] : []);
+            const exEgFirmaAd = exEgFirmaIds.map(id => aktifFirmalar.find(f => f.id === id)?.ad || '—').join(', ');
             const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
             const katildi = katilimcilar.filter(k => k.katildi).length;
             const katilmadi = katilimcilar.filter(k => !k.katildi).length;
@@ -982,7 +992,7 @@ export default function RaporlarPage() {
             const exRow = egitimListeWs.getRow(6 + i);
             exRow.height = dinamikHeight;
             const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
-            const vals = [i+1, e.ad, firma?.ad||'—', e.egitmen||'—', fmtDate(e.tarih), e.aciklama||'—', katilimcilar.length, katildi, katilmadi, oran];
+            const vals = [i+1, e.ad, exEgFirmaAd, e.egitmen||'—', fmtDate(e.tarih), e.aciklama||'—', katilimcilar.length, katildi, katilmadi, oran];
             vals.forEach((val, ci) => {
               const cell = exRow.getCell(ci + 1);
               cell.value = val;
@@ -1043,7 +1053,9 @@ export default function RaporlarPage() {
         exEgitimler
           .sort((a, b) => new Date(b.tarih || b.olusturmaTarihi).getTime() - new Date(a.tarih || a.olusturmaTarihi).getTime())
           .forEach(e => {
-            const firma = aktifFirmalar.find(f => f.id === e.firmaId);
+            // Çoklu firma desteği
+            const katilimEgFirmaIds = e.firmaIds && e.firmaIds.length > 0 ? e.firmaIds : (e.firmaId ? [e.firmaId] : []);
+            const katilimEgFirmaAd = katilimEgFirmaIds.map(id => aktifFirmalar.find(f => f.id === id)?.ad || '—').join(', ');
             const katilimcilar = e.katilimcilar ?? (e.katilimciIds ?? []).map(id => ({ personelId: id, katildi: true }));
             katilimcilar.forEach(k => {
               const personel = exPersoneller.find(p => p.id === k.personelId);
@@ -1051,7 +1063,7 @@ export default function RaporlarPage() {
               exRow.height = 18;
               const bg = katilimRowIdx % 2 === 0 ? 'FFFFFFFF' : 'FFF0F4FF';
               const durumLabel = k.katildi ? 'Katıldı' : 'Katılmadı';
-              const vals = [katilimRowIdx + 1, e.ad, firma?.ad||'—', fmtDate(e.tarih), personel?.adSoyad||'—', personel?.gorev||'—', durumLabel];
+              const vals = [katilimRowIdx + 1, e.ad, katilimEgFirmaAd, fmtDate(e.tarih), personel?.adSoyad||'—', personel?.gorev||'—', durumLabel];
               vals.forEach((val, ci) => {
                 const cell = exRow.getCell(ci + 1);
                 cell.value = val;
@@ -1218,7 +1230,11 @@ export default function RaporlarPage() {
             const aP = exPersoneller.filter(p => p.firmaId === f.id && p.durum === 'Aktif').length;
             const eS = exEvraklar.filter(e => e.firmaId === f.id).length;
             const xE = exEvraklar.filter(e => e.firmaId === f.id && (e.durum === 'Eksik' || e.durum === 'Süre Dolmuş')).length;
-            const firmaEgitimler = exEgitimler.filter(e => e.firmaId === f.id);
+            // Çoklu firma desteği: firmaIds array'ini kontrol et
+            const firmaEgitimler = exEgitimler.filter(e => {
+              const egFirmaIds = e.firmaIds && e.firmaIds.length > 0 ? e.firmaIds : (e.firmaId ? [e.firmaId] : []);
+              return egFirmaIds.includes(f.id);
+            });
             const egS = firmaEgitimler.length;
             // Katılım oranı: firmanın toplam personel sayısına göre hesaplanır
             let firmaToplamKatilimci = 0;
@@ -1264,7 +1280,7 @@ export default function RaporlarPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
-            Raporlar &amp; Analiz
+            Raporlar
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
             {secilenFirma ? (

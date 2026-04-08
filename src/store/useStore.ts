@@ -398,24 +398,90 @@ export function useStore(
 
     const KAN: Record<string, string> = { 'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-', 'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-' };
 
-    const TABLE_MAP: Record<string, (rows: unknown[]) => void> = {
-      firmalar:       (rows) => setFirmalar(rows as Firma[]),
-      personeller:    (rows) => setPersoneller((rows as Personel[]).map(p => ({
-        ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
-      }))),
-      evraklar:       (rows) => setEvraklar((rows as Evrak[]).map(e => ({ ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? '') }))),
-      egitimler:      (rows) => setEgitimler(rows as Egitim[]),
-      muayeneler:     (rows) => setMuayeneler(rows as Muayene[]),
-      uygunsuzluklar: (rows) => setUygunsuzluklar((rows as Uygunsuzluk[]).map(u => ({ ...u, durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus }))),
-      ekipmanlar:     (rows) => setEkipmanlar(rows as Ekipman[]),
-      gorevler:       (rows) => setGorevler(rows as Gorev[]),
-      tutanaklar:     (rows) => setTutanaklar(rows as Tutanak[]),
-      is_izinleri:    (rows) => setIsIzinleri(rows as IsIzni[]),
+    // ── Tek kayıt patch — tüm tabloyu yeniden çekmek yerine sadece değişen kaydı güncelle ──
+    // Bu sayede karşı cihazdan gelen değişiklikler ANINDA yansır (iş izinleri gibi)
+    const applyPatch = (table: string, rawRecord: unknown, eventType: string, recordId: string) => {
+      if (eventType === 'DELETE') {
+        // Silinen kaydı state'den çıkar — tüm tabloyu yeniden çekmeye gerek yok
+        switch (table) {
+          case 'firmalar':       setFirmalar(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'personeller':    setPersoneller(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'evraklar':       setEvraklar(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'egitimler':      setEgitimler(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'muayeneler':     setMuayeneler(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'uygunsuzluklar': setUygunsuzluklar(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'ekipmanlar':     setEkipmanlar(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'gorevler':       setGorevler(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'tutanaklar':     setTutanaklar(prev => prev.filter(r => r.id !== recordId)); break;
+          case 'is_izinleri':    setIsIzinleri(prev => prev.filter(r => r.id !== recordId)); break;
+        }
+        return;
+      }
+
+      // INSERT veya UPDATE — payload.new.data içindeki kaydı direkt uygula
+      const data = rawRecord as Record<string, unknown>;
+      if (!data) return;
+
+      const upsertRecord = <T extends { id: string }>(
+        setter: (fn: (prev: T[]) => T[]) => void,
+        transform?: (r: T) => T,
+      ) => {
+        const record = (transform ? transform(data as unknown as T) : data) as T;
+        setter(prev => {
+          const idx = prev.findIndex(r => r.id === recordId);
+          if (idx === -1) {
+            // Yeni kayıt — başa ekle
+            return [record, ...prev];
+          }
+          // Mevcut kaydı güncelle
+          const next = [...prev];
+          next[idx] = record;
+          return next;
+        });
+      };
+
+      switch (table) {
+        case 'firmalar':
+          upsertRecord<Firma>(setFirmalar);
+          break;
+        case 'personeller':
+          upsertRecord<Personel>(setPersoneller, p => ({
+            ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
+          }));
+          break;
+        case 'evraklar':
+          upsertRecord<Evrak>(setEvraklar, e => ({
+            ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
+          }));
+          break;
+        case 'egitimler':
+          upsertRecord<Egitim>(setEgitimler);
+          break;
+        case 'muayeneler':
+          upsertRecord<Muayene>(setMuayeneler);
+          break;
+        case 'uygunsuzluklar':
+          upsertRecord<Uygunsuzluk>(setUygunsuzluklar, u => ({
+            ...u,
+            durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus,
+          }));
+          break;
+        case 'ekipmanlar':
+          upsertRecord<Ekipman>(setEkipmanlar);
+          break;
+        case 'gorevler':
+          upsertRecord<Gorev>(setGorevler);
+          break;
+        case 'tutanaklar':
+          upsertRecord<Tutanak>(setTutanaklar);
+          break;
+        case 'is_izinleri':
+          upsertRecord<IsIzni>(setIsIzinleri);
+          break;
+      }
     };
 
-    const TABLES = Object.keys(TABLE_MAP);
-
-    // reloadTable: activeOrgId closure'ını kullanır — stale ref sorunu yok
+    // Fallback: tüm tabloyu yeniden çek (patch başarısız olursa veya data yoksa)
     const reloadTable = async (table: string) => {
       try {
         const { data, error } = await supabase
@@ -430,12 +496,29 @@ export function useStore(
         }
         if (!data) return;
         const rows = data.map(r => r.data as unknown);
-        TABLE_MAP[table]?.(rows);
-        console.log(`[ISG] Realtime reload OK: ${table} (${rows.length} rows) org=${activeOrgId}`);
+        // TABLE_MAP yerine applyPatch ile tek tek uygula
+        switch (table) {
+          case 'firmalar':       setFirmalar(rows as Firma[]); break;
+          case 'personeller':    setPersoneller((rows as Personel[]).map(p => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') }))); break;
+          case 'evraklar':       setEvraklar((rows as Evrak[]).map(e => ({ ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? '') }))); break;
+          case 'egitimler':      setEgitimler(rows as Egitim[]); break;
+          case 'muayeneler':     setMuayeneler(rows as Muayene[]); break;
+          case 'uygunsuzluklar': setUygunsuzluklar((rows as Uygunsuzluk[]).map(u => ({ ...u, durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus }))); break;
+          case 'ekipmanlar':     setEkipmanlar(rows as Ekipman[]); break;
+          case 'gorevler':       setGorevler(rows as Gorev[]); break;
+          case 'tutanaklar':     setTutanaklar(rows as Tutanak[]); break;
+          case 'is_izinleri':    setIsIzinleri(rows as IsIzni[]); break;
+        }
+        console.log(`[ISG] Realtime full-reload OK: ${table} (${rows.length} rows) org=${activeOrgId}`);
       } catch (err) {
         console.error(`[ISG] reloadTable exception (${table}):`, err);
       }
     };
+
+    const TABLES = [
+      'firmalar', 'personeller', 'evraklar', 'egitimler',
+      'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar', 'is_izinleri',
+    ];
 
     // Device ID: her sekme/cihaz için unique, session boyunca sabit
     const deviceId = getDeviceId();
@@ -447,7 +530,6 @@ export function useStore(
     };
 
     // Unique channel ismi — her org+user kombinasyonu için ayrı channel
-    // Timestamp ekleyerek eski stale channel çakışmasını önle
     const channelName = `isg_rt_${activeOrgId}_${userId}_${Date.now()}`;
     let channel = supabase.channel(channelName);
 
@@ -456,25 +538,41 @@ export function useStore(
         'postgres_changes' as Parameters<typeof channel.on>[0],
         { event: '*', schema: 'public', table, filter: `organization_id=eq.${activeOrgId}` } as Parameters<typeof channel.on>[1],
         (payload: { eventType: string; new: Record<string, unknown>; old?: Record<string, unknown> }) => {
-          // DELETE event'larında payload.new boş gelir — doğrudan reload yap
-          if (payload.eventType === 'DELETE') {
-            void reloadTable(table);
-            onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
-            return;
-          }
-
-          // REPLICA IDENTITY FULL sayesinde payload.new'de device_id artık geliyor
-          // Sadece AYNI cihazdan gelen kendi değişikliklerini skip et
-          // Farklı cihazdan (mobil saha → PC) aynı user_id gelse bile reload yap
+          // Kendi cihazımızdan gelen değişiklikleri skip et
           const remoteDeviceId = payload.new?.device_id as string | undefined;
           if (remoteDeviceId && remoteDeviceId === deviceId) {
             console.log(`[ISG] Realtime skip (own device): ${table}`);
             return;
           }
 
-          console.log(`[ISG] Realtime incoming: ${table} event=${payload.eventType} from device=${remoteDeviceId ?? 'unknown'}`);
-          void reloadTable(table);
-          onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
+          const recordId = (payload.new?.id ?? payload.old?.id) as string | undefined;
+          console.log(`[ISG] Realtime incoming: ${table} event=${payload.eventType} id=${recordId} from device=${remoteDeviceId ?? 'unknown'}`);
+
+          if (payload.eventType === 'DELETE') {
+            // DELETE: payload.new boş gelir, old.id'den sil
+            const delId = (payload.old?.id) as string | undefined;
+            if (delId) {
+              applyPatch(table, null, 'DELETE', delId);
+            } else {
+              // id yoksa fallback reload
+              void reloadTable(table);
+            }
+            onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
+            return;
+          }
+
+          // INSERT / UPDATE: payload.new.data içinde tam kayıt var
+          const newData = payload.new?.data;
+          if (newData && recordId) {
+            // Anında patch — DB'ye tekrar sorgu atmadan
+            applyPatch(table, newData, payload.eventType, recordId);
+            onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
+          } else {
+            // data yoksa fallback: tüm tabloyu yeniden çek
+            console.warn(`[ISG] Realtime: no data in payload for ${table}/${recordId}, falling back to reload`);
+            void reloadTable(table);
+            onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
+          }
         },
       ) as typeof channel;
     });
@@ -485,7 +583,6 @@ export function useStore(
       } else {
         console.log(`[ISG] Realtime ${status} for org=${activeOrgId} channel=${channelName}`);
       }
-      // CHANNEL_ERROR veya TIMED_OUT olursa logla — otomatik reconnect Supabase tarafından yapılır
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         console.warn(`[ISG] Realtime connection issue (${status}) — Supabase will auto-reconnect`);
       }
