@@ -1341,7 +1341,7 @@ function FirmaEkipmanModal({
 // Ana Saha Sayfası
 // ─────────────────────────────────────────────────────────────────────────────
 export default function SahaPage() {
-  const { ekipmanlar, updateEkipman, addToast, ekipmanKontrolBildirimi } = useApp();
+  const { ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, addToast, ekipmanKontrolBildirimi, currentUser, dataLoading } = useApp();
 
   const [showQr, setShowQr] = useState(false);
   const [showUygunsuzlukForm, setShowUygunsuzlukForm] = useState(false);
@@ -1352,18 +1352,28 @@ export default function SahaPage() {
   const [qrFoundEkipman, setQrFoundEkipman] = useState<Ekipman | null>(null);
 
   // QR redirect'ten gelen ekipman ID'sini sessionStorage'dan oku
+  // dataLoading false olunca tekrar kontrol et — veriler yüklenmeden önce gelmiş olabilir
+  const [pendingQrId, setPendingQrId] = useState<string | null>(() => sessionStorage.getItem('qr_ekipman_id'));
+
   useEffect(() => {
     const qrId = sessionStorage.getItem('qr_ekipman_id');
-    if (qrId) {
-      sessionStorage.removeItem('qr_ekipman_id');
-      const ekipman = ekipmanlar.find(e => e.id === qrId);
-      if (ekipman) {
-        setQrFoundEkipman(ekipman);
-        addToast(`Ekipman bulundu: ${ekipman.ad}`, 'success');
-      }
+    if (qrId) setPendingQrId(qrId);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingQrId) return;
+    if (dataLoading) return; // Veriler yüklenene kadar bekle
+    const ekipman = ekipmanlar.find(e => e.id === pendingQrId);
+    sessionStorage.removeItem('qr_ekipman_id');
+    setPendingQrId(null);
+    if (ekipman) {
+      setQrFoundEkipman(ekipman);
+      addToast(`Ekipman bulundu: ${ekipman.ad}`, 'success');
+    } else {
+      addToast('QR kodu okundu fakat ekipman bulunamadı.', 'warning');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ekipmanlar]);
+  }, [pendingQrId, dataLoading, ekipmanlar]);
 
   const applyQueueItem = useCallback(async (item: OfflineQueueItem) => {
     if (item.type === 'ekipman_kontrol') {
@@ -1404,12 +1414,22 @@ export default function SahaPage() {
   const handleKontrolYapildi = useCallback(async (ekipmanId: string) => {
     const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
     if (!ekipman) return;
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
     const sonraki = new Date();
     sonraki.setMonth(sonraki.getMonth() + 1);
     const sonrakiStr = sonraki.toISOString().split('T')[0];
     const gecikmisDi = ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi) < new Date() : false;
     const updates = { sonKontrolTarihi: today, sonrakiKontrolTarihi: sonrakiStr, durum: 'Uygun' as const };
+
+    // Kontrol geçmişine kayıt ekle — hem QR hem manuel kontrol için
+    addEkipmanKontrolKaydi(ekipmanId, {
+      tarih: now,
+      kontrolEden: currentUser?.ad || 'Saha Kullanıcısı',
+      kontrolEdenId: currentUser?.id || '',
+      durum: 'Uygun',
+      kaynak: 'qr',
+    });
 
     if (!isOnline) {
       // Çevrimdışı: sadece offline queue'ya ekle — updateEkipman DB'ye yazmaya çalışır, başarısız olur
@@ -1430,7 +1450,7 @@ export default function SahaPage() {
       setQrFoundEkipman(null);
       addToast('Kontrol kaydedildi! Durum "Uygun" olarak güncellendi.', 'success');
     }
-  }, [ekipmanlar, updateEkipman, ekipmanKontrolBildirimi, isOnline, addToQueue, addToast]);
+  }, [ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, currentUser, ekipmanKontrolBildirimi, isOnline, addToQueue, addToast]);
 
   const handleDurumDegistir = useCallback(async (ekipmanId: string, yeniDurum: EkipmanStatus) => {
     const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
