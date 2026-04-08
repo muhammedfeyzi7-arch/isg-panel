@@ -484,8 +484,35 @@ export function useStore(
   }, [fetchWithCache, setUygunsuzluklar]);
 
   const fetchEkipmanlar = useCallback(async (orgId: string) => {
-    await fetchWithCache<Ekipman>('ekipmanlar', orgId, setEkipmanlar);
-  }, [fetchWithCache, setEkipmanlar]);
+    // Ekipmanlar için her zaman DB'den taze çek (cache bypass)
+    // Hem deleted_at=NULL hem data.silinmis=false olanları al
+    const cacheKey = `ekipmanlar_${orgId}`;
+    const res = await fetchAllRows('ekipmanlar', orgId);
+    if (!res.data) return;
+    // fetchAllRows zaten deleted_at IS NULL filtresi uyguluyor
+    // Ek olarak data.silinmis=true olanları da filtrele (eski saveToDb deleted_at set etmemişti)
+    const allRows = res.data.map(r => r.data as Ekipman);
+    const activeRows = allRows.filter(e => !e.silinmis && !e.cascadeSilindi);
+    const deletedRows = allRows.filter(e => e.silinmis || e.cascadeSilindi);
+    // State'e hem aktif hem silinmiş kayıtları yükle — çöp kutusu için gerekli
+    // Ama silinmiş olanlar için deleted_at'i DB'de düzelt (eski kayıtlar için)
+    setEkipmanlar([...activeRows, ...deletedRows]);
+    void writeCache(cacheKey, [...activeRows, ...deletedRows]);
+    console.log(`[ISG] fetchEkipmanlar DB ✓ (active=${activeRows.length}, deleted=${deletedRows.length}) → cache updated`);
+    // Eski kayıtlarda deleted_at=NULL ama silinmis=true olanları DB'de düzelt
+    if (deletedRows.length > 0) {
+      const now = new Date().toISOString();
+      deletedRows.forEach(e => {
+        supabase.from('ekipmanlar')
+          .update({ deleted_at: now })
+          .eq('id', e.id)
+          .eq('organization_id', orgId)
+          .then(({ error }) => {
+            if (!error) console.log(`[ISG] Fixed deleted_at for ekipman ${e.id}`);
+          });
+      });
+    }
+  }, [fetchAllRows, setEkipmanlar]);
 
   const fetchGorevler = useCallback(async (orgId: string) => {
     await fetchWithCache<Gorev>('gorevler', orgId, setGorevler);
@@ -566,15 +593,25 @@ export function useStore(
     const orgId = orgIdRef.current;
     if (!orgId) return;
     setDataLoading(true);
-    // partialLoading: veri zaten var, sadece arka planda yenileniyor
     setPartialLoading(true);
     try {
-      await loadAllData(orgId);
+      // Hem firmalar/personeller hem ekipmanlar dahil tüm tabloları yenile
+      await Promise.all([
+        loadAllData(orgId),
+        // Ekipmanlar: cache'i atlayıp DB'den taze çek (aktif + silinmiş birlikte)
+        fetchAllRows('ekipmanlar', orgId).then(res => {
+          if (!res.data) return;
+          const allRows = res.data.map(r => r.data as Ekipman);
+          setEkipmanlar(allRows);
+          void writeCache(`ekipmanlar_${orgId}`, allRows);
+          console.log(`[ISG] refreshAllData ekipmanlar ✓ (${allRows.length} rows)`);
+        }),
+      ]);
     } finally {
       setDataLoading(false);
       setPartialLoading(false);
     }
-  }, [loadAllData]);
+  }, [loadAllData, fetchAllRows, setEkipmanlar]);
 
   // ── Load from Supabase ──
   useEffect(() => {
@@ -591,9 +628,29 @@ export function useStore(
     setPageLoading(true);  // ilk yükleme — tüm sayfa skeleton
     console.log(`[ISG] Loading data for org=${organizationId} user=${userId}`);
 
-    loadAllData(organizationId).then(() => {
+    const orgId = organizationId;
+    loadAllData(orgId).then(() => {
       setDataLoading(false);
       setPageLoading(false); // veri geldi — skeleton kaldır
+      // Ekipmanlar: cache'i atlayıp DB'den taze çek (aktif + silinmiş birlikte)
+      fetchAllRows('ekipmanlar', orgId).then(res => {
+        if (!res.data) return;
+        const allRows = res.data.map(r => r.data as Ekipman);
+        setEkipmanlar(allRows);
+        void writeCache(`ekipmanlar_${orgId}`, allRows);
+        console.log(`[ISG] Initial ekipmanlar DB ✓ (${allRows.length} rows)`);
+        // Eski kayıtlarda deleted_at=NULL ama silinmis=true olanları DB'de düzelt
+        const now = new Date().toISOString();
+        allRows.filter(e => e.silinmis || e.cascadeSilindi).forEach(e => {
+          supabase.from('ekipmanlar')
+            .update({ deleted_at: now })
+            .eq('id', e.id)
+            .eq('organization_id', orgId)
+            .then(({ error }) => {
+              if (!error) console.log(`[ISG] Fixed deleted_at for ekipman ${e.id}`);
+            });
+        });
+      });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, userId, orgLoading]);
@@ -791,6 +848,12 @@ export function useStore(
           // INSERT / UPDATE: payload.new.data içinde tam kayıt var
           const newData = payload.new?.data;
           if (newData && recordId) {
+            // Kalıcı silinen kayıtlar için gelen UPDATE event'ini yoksay
+            // (permanentDelete öncesi deleted_at set ederken UPDATE event'i geliyor)
+            if (ownDeletesRef.current.has(recordId)) {
+              console.log(`[ISG] Realtime skip (own permanent delete UPDATE): ${table}/${recordId}`);
+              return;
+            }
             // Anında patch — DB'ye tekrar sorgu atmadan
             applyPatch(table, newData, payload.eventType, recordId);
             onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
@@ -1506,15 +1569,22 @@ export function useStore(
     const now = new Date().toISOString();
     let updated: Ekipman | null = null;
     let snapshot: Ekipman | null = null;
-    setEkipmanlar(prev => prev.map(e => {
-      if (e.id !== id) return e;
-      snapshot = e;
-      updated = { ...e, silinmis: true as const, silinmeTarihi: now };
-      return updated;
-    }));
+    let nextState: Ekipman[] = [];
+    setEkipmanlar(prev => {
+      const mapped = prev.map(e => {
+        if (e.id !== id) return e;
+        snapshot = e;
+        updated = { ...e, silinmis: true as const, silinmeTarihi: now };
+        return updated;
+      });
+      nextState = mapped;
+      return mapped;
+    });
     if (updated) {
       const orgId = orgIdRef.current;
       const uid = userIdRef.current;
+      // Cache'i anında güncelle — sayfa yenilenince silinmiş kayıt geri gelmesin
+      if (orgId) void writeCache(`ekipmanlar_${orgId}`, nextState);
       if (orgId && uid) {
         supabase
           .from('ekipmanlar')
@@ -1524,7 +1594,11 @@ export function useStore(
           .then(({ error }) => {
             if (error) {
               console.error('[ISG] deleteEkipman DB error:', error.message);
-              if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
+              if (snapshot) {
+                setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
+                // Cache'i rollback et
+                if (orgId) void writeCache(`ekipmanlar_${orgId}`, ekipmanlarRef.current);
+              }
               onSaveErrorRef.current?.(`Ekipman silinemedi: ${error.message}`);
             } else {
               console.log(`[ISG] deleteEkipman OK: ${id}`);
@@ -1552,15 +1626,27 @@ export function useStore(
 
   const permanentDeleteEkipman = useCallback(async (id: string) => {
     const snapshot = ekipmanlarRef.current;
+    const orgId = orgIdRef.current;
+    // ownDeletesRef'e ERKEN ekle — realtime event gelmeden önce işaretlenmiş olsun
     ownDeletesRef.current.add(id);
-    _setEkipmanlar(prev => prev.filter(e => e.id !== id));
+    const next = snapshot.filter(e => e.id !== id);
+    _setEkipmanlar(next);
+    if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
+      // Önce deleted_at set et (realtime event için device_id de yazılsın)
+      await supabase.from('ekipmanlar')
+        .update({ deleted_at: new Date().toISOString(), device_id: getDeviceId() })
+        .eq('id', id);
+      // Sonra kalıcı sil
       await dbDelete('ekipmanlar', id);
       console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
+      // 5 saniye sonra ownDeletesRef'ten temizle
+      setTimeout(() => ownDeletesRef.current.delete(id), 5000);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipman FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
       _setEkipmanlar(snapshot);
+      if (orgId) void writeCache(`ekipmanlar_${orgId}`, snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
     }
@@ -1569,15 +1655,27 @@ export function useStore(
   const permanentDeleteEkipmanMany = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
     const snapshot = ekipmanlarRef.current;
+    const orgId = orgIdRef.current;
+    // ownDeletesRef'e ERKEN ekle
     ids.forEach(id => ownDeletesRef.current.add(id));
-    _setEkipmanlar(prev => prev.filter(e => !ids.includes(e.id)));
+    const next = snapshot.filter(e => !ids.includes(e.id));
+    _setEkipmanlar(next);
+    if (orgId) void writeCache(`ekipmanlar_${orgId}`, next);
     try {
+      // Önce deleted_at set et
+      await supabase.from('ekipmanlar')
+        .update({ deleted_at: new Date().toISOString(), device_id: getDeviceId() })
+        .in('id', ids);
+      // Sonra kalıcı sil
       await dbDeleteMany('ekipmanlar', ids);
       console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
+      // 5 saniye sonra temizle
+      setTimeout(() => ids.forEach(id => ownDeletesRef.current.delete(id)), 5000);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipmanMany FAILED, rolling back:', err);
       ids.forEach(id => ownDeletesRef.current.delete(id));
       _setEkipmanlar(snapshot);
+      if (orgId) void writeCache(`ekipmanlar_${orgId}`, snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
       throw err;
     }
