@@ -11,7 +11,7 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-const VALID_ROLES = ['admin', 'denetci', 'member'];
+const VALID_ROLES = ['admin', 'denetci', 'member', 'firma_user'];
 
 function normalizeRole(role: string): string {
   if (VALID_ROLES.includes(role)) return role;
@@ -21,6 +21,7 @@ function normalizeRole(role: string): string {
 function getRoleLabel(role: string): string {
   if (role === 'admin') return 'Admin Kullanıcı';
   if (role === 'denetci') return 'Saha Personeli';
+  if (role === 'firma_user') return 'Firma Yetkilisi';
   return 'Evrak/Dökümantasyon Denetçi';
 }
 
@@ -217,7 +218,7 @@ async function handleRequest(
   if (action === 'list') {
     const { data: members, error: listError } = await adminClient
       .from('user_organizations')
-      .select('user_id, role, is_active, must_change_password, display_name, email, joined_at')
+      .select('user_id, role, is_active, must_change_password, display_name, email, joined_at, firm_id')
       .eq('organization_id', orgId)
       .order('joined_at', { ascending: true });
 
@@ -249,11 +250,12 @@ async function handleRequest(
 
   // ── CREATE USER ──
   if (action === 'create') {
-    const { email: newEmail, password, display_name, role } = body as {
+    const { email: newEmail, password, display_name, role, firm_id } = body as {
       email: string;
       password: string;
       display_name: string;
       role: string;
+      firm_id?: string;
     };
 
     if (!newEmail || !password || !display_name) {
@@ -272,6 +274,14 @@ async function handleRequest(
 
     const normalizedEmail = newEmail.toLowerCase().trim();
     const assignedRole = normalizeRole(role);
+
+    // firma_user için firm_id zorunlu
+    if (assignedRole === 'firma_user' && !firm_id) {
+      return new Response(
+        JSON.stringify({ error: 'Firma Yetkilisi rolü için firma seçimi zorunludur.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     const { data: existingMember } = await adminClient
       .from('user_organizations')
@@ -300,7 +310,6 @@ async function handleRequest(
     if (existingAuthUser) {
       newUserId = existingAuthUser.id;
 
-      // Mevcut kullanıcının metadata'sını güncelle (org ve rol bilgisi için)
       try {
         await adminClient.auth.admin.updateUserById(newUserId, {
           user_metadata: {
@@ -322,7 +331,6 @@ async function handleRequest(
         user_metadata: {
           full_name: display_name,
           admin_created: true,
-          // Org ve rol bilgisini metadata'ya yaz — setup-organization bu bilgiyi kullanır
           organization_id: orgId,
           role: assignedRole,
         },
@@ -355,17 +363,24 @@ async function handleRequest(
       newUserId = newUser.user.id;
     }
 
+    // user_organizations INSERT — firma_user için firm_id de kaydediliyor
+    const insertPayload: Record<string, unknown> = {
+      user_id: newUserId,
+      organization_id: orgId,
+      role: assignedRole,
+      display_name,
+      email: normalizedEmail,
+      is_active: true,
+      must_change_password: true,
+    };
+
+    if (assignedRole === 'firma_user' && firm_id) {
+      insertPayload.firm_id = firm_id;
+    }
+
     const { error: memberError } = await adminClient
       .from('user_organizations')
-      .insert({
-        user_id: newUserId,
-        organization_id: orgId,
-        role: assignedRole,
-        display_name,
-        email: normalizedEmail,
-        is_active: true,
-        must_change_password: true,
-      });
+      .insert(insertPayload);
 
     if (memberError) {
       if (memberError.code === '23505') {
@@ -382,7 +397,6 @@ async function handleRequest(
       });
     }
 
-    // Profiles kaydını güvenli şekilde oluştur (tour_completed: false ile)
     await ensureProfileRecord(adminClient, newUserId, assignedRole);
 
     const roleLabel = getRoleLabel(assignedRole);
@@ -459,7 +473,6 @@ async function handleRequest(
       });
     }
 
-    // Rol değiştiğinde auth metadata'yı da güncelle
     if (role !== undefined) {
       try {
         const { data: authUserData } = await adminClient.auth.admin.getUserById(target_user_id);
@@ -602,7 +615,6 @@ async function handleRequest(
       );
     }
 
-    // user_organizations'dan sil (tüm kayıtlar — aktif/pasif)
     const { error: deleteError } = await adminClient
       .from('user_organizations')
       .delete()
@@ -616,14 +628,12 @@ async function handleRequest(
       });
     }
 
-    // Kullanıcının başka herhangi bir org üyeliği var mı kontrol et (aktif veya pasif)
     const { data: otherMemberships } = await adminClient
       .from('user_organizations')
       .select('organization_id')
       .eq('user_id', target_user_id)
       .limit(1);
 
-    // Başka hiçbir org üyeliği yoksa Supabase Auth'dan da sil
     if (!otherMemberships || otherMemberships.length === 0) {
       try {
         const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(target_user_id);

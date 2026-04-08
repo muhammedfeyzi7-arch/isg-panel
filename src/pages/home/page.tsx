@@ -55,7 +55,17 @@ function AppContent() {
     );
   }
 
+  const isFirmaUser = org?.role === 'firma_user';
+
+  // firma_user yasak modüllere erişmeye çalışırsa dashboard'a yönlendir
+  const FIRMA_USER_ALLOWED = new Set(['dashboard', 'personeller', 'evraklar', 'egitimler', 'uygunsuzluklar']);
+
   const renderPage = () => {
+    // firma_user için modul kısıtlaması
+    if (isFirmaUser && !FIRMA_USER_ALLOWED.has(activeModule)) {
+      return <DashboardPage />;
+    }
+
     switch (activeModule) {
       case 'firmalar': return <FirmalarPage />;
       case 'personeller': return <PersonellerPage />;
@@ -64,14 +74,13 @@ function AppContent() {
       case 'muayeneler': return <MuayenelerPage />;
       case 'uygunsuzluklar': return <UygunsuzluklarPage />;
       case 'ekipmanlar': return <EkipmanlarPage />;
-
       case 'tutanaklar': return <TutanaklarPage />;
       case 'is-izinleri': return <IsIzniPage />;
       case 'firma-evraklari': return <FirmaEvraklariPage />;
       case 'saha': return <SahaPage />;
       case 'raporlar': return <RaporlarPage />;
       case 'copkutusu': return <CopKutusuPage />;
-      case 'ayarlar': return <SettingsPage />;
+      case 'ayarlar': return isFirmaUser ? <DashboardPage /> : <SettingsPage />;
       default: return <DashboardPage />;
     }
   };

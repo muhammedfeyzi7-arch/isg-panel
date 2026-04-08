@@ -14,6 +14,7 @@ interface Member {
   display_name: string;
   email: string;
   joined_at: string;
+  firm_id?: string;
 }
 
 interface AddUserForm {
@@ -21,6 +22,12 @@ interface AddUserForm {
   email: string;
   password: string;
   role: string;
+  firm_id: string;
+}
+
+interface Firma {
+  id: string;
+  ad: string;
 }
 
 interface FetchOptions {
@@ -29,12 +36,13 @@ interface FetchOptions {
   body: string;
 }
 
-const emptyForm: AddUserForm = { display_name: '', email: '', password: '', role: 'member' };
+const emptyForm: AddUserForm = { display_name: '', email: '', password: '', role: 'member', firm_id: '' };
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; gradient: string }> = {
   admin: { label: 'Admin Kullanıcı', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', gradient: 'linear-gradient(135deg, #F59E0B, #EA580C)' },
   denetci: { label: 'Saha Personeli', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', gradient: 'linear-gradient(135deg, #06B6D4, #0891B2)' },
   member: { label: 'Evrak/Dökümantasyon Denetçi', color: '#818CF8', bg: 'rgba(99,102,241,0.1)', gradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)' },
+  firma_user: { label: 'Firma Yetkilisi', color: '#10B981', bg: 'rgba(16,185,129,0.1)', gradient: 'linear-gradient(135deg, #10B981, #059669)' },
 };
 
 export default function TeamMembersSection() {
@@ -56,6 +64,7 @@ export default function TeamMembersSection() {
   const [resetShowPassword, setResetShowPassword] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [firmalar, setFirmalar] = useState<Firma[]>([]);
 
   const getAuthHeader = useCallback(async (): Promise<string> => {
     // Önce mevcut session'ı al
@@ -156,32 +165,56 @@ export default function TeamMembersSection() {
     }
   }, [org?.id, getAuthHeader, fetchWithRetry, addToast]);
 
+  const fetchFirmalar = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('firmalar')
+        .select('id, data')
+        .order('id');
+      if (!error && data) {
+        const list = data
+          .filter((f) => f.data?.silinmis !== true && f.data?.silinmis !== 'true')
+          .map((f) => ({ id: f.id as string, ad: (f.data?.ad as string) || f.id }))
+          .sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+        setFirmalar(list);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
   useEffect(() => {
     if (org?.role === 'admin') {
       fetchMembers();
+      fetchFirmalar();
     }
-  }, [org?.role, fetchMembers]);
+  }, [org?.role, fetchMembers, fetchFirmalar]);
 
   const handleAddUser = async () => {
     setFormError(null);
     if (!form.display_name.trim()) { setFormError('Ad Soyad zorunludur.'); return; }
     if (!form.email.trim() || !form.email.includes('@')) { setFormError('Geçerli bir e-posta girin.'); return; }
     if (!form.password || form.password.length < 8) { setFormError('Şifre en az 8 karakter olmalıdır.'); return; }
+    if (form.role === 'firma_user' && !form.firm_id) { setFormError('Firma Yetkilisi rolü için firma seçimi zorunludur.'); return; }
 
     setFormLoading(true);
     try {
       const authHeader = await getAuthHeader();
+      const payload: Record<string, unknown> = {
+        action: 'create',
+        organization_id: org?.id,
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        display_name: form.display_name.trim(),
+        role: form.role,
+      };
+      if (form.role === 'firma_user' && form.firm_id) {
+        payload.firm_id = form.firm_id;
+      }
       const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
-        body: JSON.stringify({
-          action: 'create',
-          organization_id: org?.id,
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          display_name: form.display_name.trim(),
-          role: form.role,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -515,6 +548,7 @@ export default function TeamMembersSection() {
                         <option value="admin">Admin Kullanıcı</option>
                         <option value="denetci">Saha Personeli</option>
                         <option value="member">Evrak/Dökümantasyon Denetçi</option>
+                        <option value="firma_user">Firma Yetkilisi</option>
                       </select>
 
                       <button
@@ -670,14 +704,39 @@ export default function TeamMembersSection() {
                 <label style={labelStyle}>Rol</label>
                 <select
                   value={form.role}
-                  onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+                  onChange={e => setForm(p => ({ ...p, role: e.target.value, firm_id: '' }))}
                   style={{ ...inputStyle, cursor: 'pointer' }}
                 >
                   <option value="member">Evrak/Dökümantasyon Denetçi</option>
                   <option value="denetci">Saha Personeli</option>
                   <option value="admin">Admin Kullanıcı</option>
+                  <option value="firma_user">Firma Yetkilisi</option>
                 </select>
               </div>
+
+              {form.role === 'firma_user' && (
+                <div>
+                  <label style={labelStyle}>
+                    Firma Seç *
+                    <span style={{ color: '#EF4444', marginLeft: '2px' }}>(zorunlu)</span>
+                  </label>
+                  <select
+                    value={form.firm_id}
+                    onChange={e => setForm(p => ({ ...p, firm_id: e.target.value }))}
+                    style={{ ...inputStyle, cursor: 'pointer', borderColor: !form.firm_id ? 'rgba(239,68,68,0.4)' : undefined }}
+                  >
+                    <option value="">-- Firma seçin --</option>
+                    {firmalar.map(f => (
+                      <option key={f.id} value={f.id}>{f.ad}</option>
+                    ))}
+                  </select>
+                  {firmalar.length === 0 && (
+                    <p className="text-[10px] mt-1" style={{ color: '#F59E0B' }}>
+                      Henüz firma bulunamadı. Önce firma eklemeniz gerekiyor.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div

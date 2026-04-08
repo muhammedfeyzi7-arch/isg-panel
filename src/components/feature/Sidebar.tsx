@@ -21,6 +21,11 @@ const ROLE_MODULES: Record<string, string[]> = {
     'uygunsuzluklar', 'ekipmanlar', 'is-izinleri',
     'saha', 'raporlar', 'copkutusu',
   ],
+  firma_user: [
+    'dashboard', 'personeller',
+    'evraklar', 'egitimler',
+    'uygunsuzluklar',
+  ],
 };
 
 function getAllowedModules(role: string): string[] {
@@ -68,9 +73,10 @@ const menuGroups: { label: string; items: MenuItem[] }[] = [
 ];
 
 const ROLE_LABELS: Record<string, { label: string; color: string; dot: string }> = {
-  admin:   { label: 'Admin Kullanıcı',                  color: '#F59E0B', dot: '#F59E0B' },
-  denetci: { label: 'Saha Personeli',                   color: '#22D3EE', dot: '#22D3EE' },
-  member:  { label: 'Evrak/Dökümantasyon Denetçi',      color: '#A78BFA', dot: '#A78BFA' },
+  admin:      { label: 'Admin Kullanıcı',              color: '#F59E0B', dot: '#F59E0B' },
+  denetci:    { label: 'Saha Personeli',               color: '#22D3EE', dot: '#22D3EE' },
+  member:     { label: 'Evrak/Dökümantasyon Denetçi',  color: '#A78BFA', dot: '#A78BFA' },
+  firma_user: { label: 'Firma Yetkilisi',              color: '#34D399', dot: '#34D399' },
 };
 
 interface SidebarProps {
