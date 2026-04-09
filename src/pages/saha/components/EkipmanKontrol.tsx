@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useEffect, useMemo, memo, useRef, useCallback } from 'react';
 import { useApp } from '@/store/AppContext';
 import Modal from '@/components/base/Modal';
 import type { Ekipman, EkipmanStatus, Evrak } from '@/types';
-import { getSignedUrlFromPath } from '@/utils/fileUpload';
+import { getSignedUrlFromPath, uploadFileToStorage } from '@/utils/fileUpload';
 
 export const STATUS_CFG: Record<EkipmanStatus, { label: string; color: string; bg: string; icon: string }> = {
   'Uygun':       { label: 'Uygun',       color: '#34D399', bg: 'rgba(52,211,153,0.12)',  icon: 'ri-checkbox-circle-line' },
@@ -10,6 +10,151 @@ export const STATUS_CFG: Record<EkipmanStatus, { label: string; color: string; b
   'Bakımda':     { label: 'Bakımda',     color: '#FBBF24', bg: 'rgba(251,191,36,0.12)',  icon: 'ri-time-line' },
   'Hurda':       { label: 'Hurda',       color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-delete-bin-line' },
 };
+
+// Durumlar için açıklama/fotoğraf zorunlu mu?
+const REQUIRES_DETAIL: EkipmanStatus[] = ['Uygun Değil', 'Bakımda', 'Hurda'];
+
+// ─── Durum Detay Modal ────────────────────────────────────────────────────────
+interface DurumDetayModalProps {
+  open: boolean;
+  durum: EkipmanStatus;
+  onConfirm: (aciklama: string, foto: File | null) => void;
+  onCancel: () => void;
+}
+
+function DurumDetayModal({ open, durum, onConfirm, onCancel }: DurumDetayModalProps) {
+  const [aciklama, setAciklama] = useState('');
+  const [foto, setFoto] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const fotoRef = useRef<HTMLInputElement>(null);
+  const cfg = STATUS_CFG[durum] ?? STATUS_CFG['Uygun Değil'];
+
+  useEffect(() => {
+    if (open) { setAciklama(''); setFoto(null); setFotoPreview(null); }
+  }, [open]);
+
+  const handleFoto = (file: File) => {
+    setFoto(file);
+    const reader = new FileReader();
+    reader.onload = ev => setFotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const canConfirm = aciklama.trim().length > 0 || foto !== null;
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl p-5 space-y-4"
+        style={{ background: 'var(--bg-card)', border: `1px solid ${cfg.color}40`, maxHeight: '90vh', overflowY: 'auto' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Başlık */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: cfg.bg }}>
+            <i className={`${cfg.icon} text-lg`} style={{ color: cfg.color }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              Durum: <span style={{ color: cfg.color }}>{durum}</span>
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
+              Açıklama veya fotoğraf ekleyin
+            </p>
+          </div>
+          <button onClick={onCancel} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0" style={{ background: 'rgba(255,255,255,0.06)', color: '#64748B' }}>
+            <i className="ri-close-line text-sm" />
+          </button>
+        </div>
+
+        {/* Açıklama */}
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>
+            Açıklama <span className="text-[10px] font-normal" style={{ color: '#475569' }}>(opsiyonel — fotoğraf yeterliyse boş bırakabilirsiniz)</span>
+          </label>
+          <textarea
+            value={aciklama}
+            onChange={e => setAciklama(e.target.value)}
+            placeholder={`${durum} nedeni, gözlem veya öneri...`}
+            rows={3}
+            maxLength={500}
+            className="isg-input resize-none text-sm"
+          />
+          <p className="text-[10px] mt-1 text-right" style={{ color: '#334155' }}>{aciklama.length}/500</p>
+        </div>
+
+        {/* Fotoğraf */}
+        <div>
+          <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>
+            Fotoğraf <span className="text-[10px] font-normal" style={{ color: '#475569' }}>(opsiyonel — açıklama yeterliyse boş bırakabilirsiniz)</span>
+          </label>
+          {fotoPreview ? (
+            <div className="relative rounded-xl overflow-hidden" style={{ border: `1px solid ${cfg.color}40` }}>
+              <img src={fotoPreview} alt="Kontrol fotoğrafı" className="w-full object-cover rounded-xl" style={{ maxHeight: '160px' }} />
+              <button
+                onClick={() => { setFoto(null); setFotoPreview(null); }}
+                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                style={{ background: 'rgba(0,0,0,0.6)', color: '#EF4444' }}>
+                <i className="ri-close-line text-sm" />
+              </button>
+              <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg text-[10px] font-semibold" style={{ background: 'rgba(0,0,0,0.6)', color: '#34D399' }}>
+                <i className="ri-camera-line mr-1" />{foto?.name}
+              </div>
+            </div>
+          ) : (
+            <div
+              onClick={() => fotoRef.current?.click()}
+              className="flex flex-col items-center justify-center gap-2 py-4 rounded-xl cursor-pointer transition-all"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = `${cfg.color}50`; e.currentTarget.style.background = `${cfg.bg}`; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+            >
+              <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: cfg.bg }}>
+                <i className="ri-camera-line text-base" style={{ color: cfg.color }} />
+              </div>
+              <p className="text-xs font-medium" style={{ color: '#64748B' }}>Fotoğraf ekle</p>
+              <p className="text-[10px]" style={{ color: '#475569' }}>JPG, PNG • Maks. 10MB</p>
+            </div>
+          )}
+          <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFoto(f); }} />
+        </div>
+
+        {/* Uyarı — ikisi de boşsa */}
+        {!canConfirm && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+            <i className="ri-information-line text-xs" style={{ color: '#FBBF24' }} />
+            <p className="text-xs" style={{ color: '#FCD34D' }}>En az bir açıklama veya fotoğraf gereklidir.</p>
+          </div>
+        )}
+
+        {/* Butonlar */}
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#64748B' }}
+          >
+            İptal
+          </button>
+          <button
+            onClick={() => canConfirm && onConfirm(aciklama, foto)}
+            disabled={!canConfirm}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: cfg.bg, border: `1px solid ${cfg.color}60`, color: cfg.color }}
+          >
+            <i className="ri-save-line mr-1" />Kaydet
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Ekipman Evrakları ────────────────────────────────────────────────────────
 function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
@@ -139,7 +284,7 @@ interface EkipmanDetayPanelProps {
   ekipman: Ekipman;
   onBack: () => void;
   onKontrolYapildi: (id: string) => void;
-  onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
+  onDurumDegistir: (id: string, durum: EkipmanStatus, aciklama?: string, foto?: File | null) => void;
   isOnline: boolean;
   kontrolBasarili?: boolean;
 }
@@ -149,125 +294,155 @@ export const EkipmanDetayPanel = memo(function EkipmanDetayPanel({
 }: EkipmanDetayPanelProps) {
   const { firmalar } = useApp();
   const [activeTab, setActiveTab] = useState<'detay' | 'evraklar'>('detay');
+  const [pendingDurum, setPendingDurum] = useState<EkipmanStatus | null>(null);
   const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
   const firma = firmalar.find(f => f.id === ekipman.firmaId);
   const days = ekipman.sonrakiKontrolTarihi
     ? Math.ceil((new Date(ekipman.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000)
     : null;
 
-  return (
-    <div className="space-y-4">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm font-semibold cursor-pointer" style={{ color: '#64748B' }}>
-        <i className="ri-arrow-left-line text-base" />Listeye Dön
-      </button>
+  const handleDurumClick = (d: EkipmanStatus) => {
+    if (REQUIRES_DETAIL.includes(d)) {
+      setPendingDurum(d);
+    } else {
+      onDurumDegistir(ekipman.id, d);
+    }
+  };
 
-      {kontrolBasarili && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)' }}>
-          <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(52,211,153,0.2)' }}>
-            <i className="ri-checkbox-circle-fill text-base" style={{ color: '#34D399' }} />
+  const handleDetayConfirm = (aciklama: string, foto: File | null) => {
+    if (!pendingDurum) return;
+    onDurumDegistir(ekipman.id, pendingDurum, aciklama, foto);
+    setPendingDurum(null);
+  };
+
+  return (
+    <>
+      <DurumDetayModal
+        open={pendingDurum !== null}
+        durum={pendingDurum ?? 'Uygun Değil'}
+        onConfirm={handleDetayConfirm}
+        onCancel={() => setPendingDurum(null)}
+      />
+
+      <div className="space-y-4">
+        <button onClick={onBack} className="flex items-center gap-2 text-sm font-semibold cursor-pointer" style={{ color: '#64748B' }}>
+          <i className="ri-arrow-left-line text-base" />Listeye Dön
+        </button>
+
+        {kontrolBasarili && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)' }}>
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(52,211,153,0.2)' }}>
+              <i className="ri-checkbox-circle-fill text-base" style={{ color: '#34D399' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold" style={{ color: '#34D399' }}>Kontrol kaydedildi!</p>
+              <p className="text-xs mt-0.5" style={{ color: '#475569' }}>
+                {isOnline ? 'Durum "Uygun" olarak güncellendi.' : 'Bağlantı gelince sunucuya gönderilecek.'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: sc.bg }}>
+            <i className={`${sc.icon} text-xl`} style={{ color: sc.color }} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold" style={{ color: '#34D399' }}>Kontrol kaydedildi!</p>
-            <p className="text-xs mt-0.5" style={{ color: '#475569' }}>
-              {isOnline ? 'Durum "Uygun" olarak güncellendi.' : 'Bağlantı gelince sunucuya gönderilecek.'}
-            </p>
+            <p className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</p>
+            {firma && <p className="text-xs mt-0.5" style={{ color: '#475569' }}><i className="ri-building-2-line mr-1" />{firma.ad}</p>}
+            {ekipman.tur && <p className="text-xs" style={{ color: '#334155' }}>{ekipman.tur}</p>}
           </div>
+          <span className="text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
         </div>
-      )}
 
-      <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: sc.bg }}>
-          <i className={`${sc.icon} text-xl`} style={{ color: sc.color }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</p>
-          {firma && <p className="text-xs mt-0.5" style={{ color: '#475569' }}><i className="ri-building-2-line mr-1" />{firma.ad}</p>}
-          {ekipman.tur && <p className="text-xs" style={{ color: '#334155' }}>{ekipman.tur}</p>}
-        </div>
-        <span className="text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
-      </div>
-
-      <div className="flex items-center gap-1 px-1 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <button onClick={() => setActiveTab('detay')} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: activeTab === 'detay' ? 'rgba(52,211,153,0.2)' : 'transparent', color: activeTab === 'detay' ? '#34D399' : '#64748B' }}>
-          <i className="ri-tools-line text-xs" />Kontrol
-        </button>
-        <button onClick={() => setActiveTab('evraklar')} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: activeTab === 'evraklar' ? 'rgba(99,102,241,0.2)' : 'transparent', color: activeTab === 'evraklar' ? '#818CF8' : '#64748B' }}>
-          <i className="ri-file-list-3-line text-xs" />Evraklar
-        </button>
-      </div>
-
-      {activeTab === 'detay' ? (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            {ekipman.seriNo && (
-              <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569' }}>Seri No</p>
-                <p className="text-sm font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{ekipman.seriNo}</p>
-              </div>
-            )}
-            {ekipman.marka && (
-              <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569' }}>Marka / Model</p>
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{ekipman.marka} {ekipman.model}</p>
-              </div>
-            )}
-            {ekipman.sonKontrolTarihi && (
-              <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569' }}>Son Kontrol</p>
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{new Date(ekipman.sonKontrolTarihi).toLocaleDateString('tr-TR')}</p>
-              </div>
-            )}
-            {ekipman.bulunduguAlan && (
-              <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569' }}>Bulunduğu Alan</p>
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{ekipman.bulunduguAlan}</p>
-              </div>
-            )}
-          </div>
-
-          {days !== null && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: days < 0 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${days < 0 ? 'rgba(239,68,68,0.2)' : days <= 7 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
-              <i className="ri-calendar-line text-sm" style={{ color: days < 0 ? '#EF4444' : days <= 7 ? '#FBBF24' : '#475569' }} />
-              <span className="text-sm font-medium" style={{ color: days < 0 ? '#F87171' : days <= 7 ? '#FCD34D' : '#64748B' }}>
-                {days < 0 ? `Kontrol ${Math.abs(days)} gün gecikmiş!` : days === 0 ? 'Kontrol bugün yapılmalı!' : days <= 7 ? `Kontrol ${days} gün içinde yapılmalı` : `Sonraki kontrol: ${new Date(ekipman.sonrakiKontrolTarihi!).toLocaleDateString('tr-TR')}`}
-              </span>
-            </div>
-          )}
-
-          <button
-            onClick={() => onKontrolYapildi(ekipman.id)}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl cursor-pointer transition-all duration-200"
-            style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.25)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.15)'; }}
-          >
-            <div className="w-5 h-5 flex items-center justify-center">
-              <i className={`${!isOnline ? 'ri-save-line' : 'ri-checkbox-circle-line'} text-base`} style={{ color: '#34D399' }} />
-            </div>
-            <span className="text-sm font-bold" style={{ color: '#34D399' }}>
-              {!isOnline ? 'Kontrol Yaptım (Çevrimdışı Kaydedilir)' : 'Kontrol Yaptım'}
-            </span>
+        <div className="flex items-center gap-1 px-1 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <button onClick={() => setActiveTab('detay')} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: activeTab === 'detay' ? 'rgba(52,211,153,0.2)' : 'transparent', color: activeTab === 'detay' ? '#34D399' : '#64748B' }}>
+            <i className="ri-tools-line text-xs" />Kontrol
           </button>
+          <button onClick={() => setActiveTab('evraklar')} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: activeTab === 'evraklar' ? 'rgba(99,102,241,0.2)' : 'transparent', color: activeTab === 'evraklar' ? '#818CF8' : '#64748B' }}>
+            <i className="ri-file-list-3-line text-xs" />Evraklar
+          </button>
+        </div>
 
-          <div>
-            <p className="text-[10px] font-semibold mb-2 uppercase tracking-wide" style={{ color: '#475569' }}>Durum Değiştir</p>
-            <div className="grid grid-cols-4 gap-1.5">
-              {(['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'] as EkipmanStatus[]).map(d => {
-                const cfg = STATUS_CFG[d];
-                const isActive = ekipman.durum === d;
-                return (
-                  <button key={d} onClick={() => onDurumDegistir(ekipman.id, d)} className="py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: isActive ? cfg.bg : 'rgba(255,255,255,0.04)', border: `1px solid ${isActive ? cfg.color + '80' : 'rgba(255,255,255,0.08)'}`, color: isActive ? cfg.color : '#64748B' }}>
-                    {cfg.label}
-                  </button>
-                );
-              })}
+        {activeTab === 'detay' ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              {ekipman.seriNo && (
+                <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569' }}>Seri No</p>
+                  <p className="text-sm font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>{ekipman.seriNo}</p>
+                </div>
+              )}
+              {ekipman.marka && (
+                <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569' }}>Marka / Model</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{ekipman.marka} {ekipman.model}</p>
+                </div>
+              )}
+              {ekipman.sonKontrolTarihi && (
+                <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569' }}>Son Kontrol</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{new Date(ekipman.sonKontrolTarihi).toLocaleDateString('tr-TR')}</p>
+                </div>
+              )}
+              {ekipman.bulunduguAlan && (
+                <div className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569' }}>Bulunduğu Alan</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{ekipman.bulunduguAlan}</p>
+                </div>
+              )}
+            </div>
+
+            {days !== null && (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: days < 0 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${days < 0 ? 'rgba(239,68,68,0.2)' : days <= 7 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
+                <i className="ri-calendar-line text-sm" style={{ color: days < 0 ? '#EF4444' : days <= 7 ? '#FBBF24' : '#475569' }} />
+                <span className="text-sm font-medium" style={{ color: days < 0 ? '#F87171' : days <= 7 ? '#FCD34D' : '#64748B' }}>
+                  {days < 0 ? `Kontrol ${Math.abs(days)} gün gecikmiş!` : days === 0 ? 'Kontrol bugün yapılmalı!' : days <= 7 ? `Kontrol ${days} gün içinde yapılmalı` : `Sonraki kontrol: ${new Date(ekipman.sonrakiKontrolTarihi!).toLocaleDateString('tr-TR')}`}
+                </span>
+              </div>
+            )}
+
+            <button
+              onClick={() => onKontrolYapildi(ekipman.id)}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl cursor-pointer transition-all duration-200"
+              style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.25)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.15)'; }}
+            >
+              <div className="w-5 h-5 flex items-center justify-center">
+                <i className={`${!isOnline ? 'ri-save-line' : 'ri-checkbox-circle-line'} text-base`} style={{ color: '#34D399' }} />
+              </div>
+              <span className="text-sm font-bold" style={{ color: '#34D399' }}>
+                {!isOnline ? 'Kontrol Yaptım (Çevrimdışı Kaydedilir)' : 'Kontrol Yaptım'}
+              </span>
+            </button>
+
+            <div>
+              <p className="text-[10px] font-semibold mb-2 uppercase tracking-wide" style={{ color: '#475569' }}>Durum Değiştir</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'] as EkipmanStatus[]).map(d => {
+                  const cfg = STATUS_CFG[d];
+                  const isActive = ekipman.durum === d;
+                  return (
+                    <button key={d} onClick={() => handleDurumClick(d)} className="py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: isActive ? cfg.bg : 'rgba(255,255,255,0.04)', border: `1px solid ${isActive ? cfg.color + '80' : 'rgba(255,255,255,0.08)'}`, color: isActive ? cfg.color : '#64748B' }}>
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {REQUIRES_DETAIL.includes(ekipman.durum) && (
+                <p className="text-[10px] mt-1.5 flex items-center gap-1" style={{ color: '#475569' }}>
+                  <i className="ri-information-line" />
+                  Bu durum için açıklama/fotoğraf kontrol geçmişine kaydedildi.
+                </p>
+              )}
             </div>
           </div>
-        </div>
-      ) : (
-        <EkipmanEvraklari ekipman={ekipman} />
-      )}
-    </div>
+        ) : (
+          <EkipmanEvraklari ekipman={ekipman} />
+        )}
+      </div>
+    </>
   );
 });
 
@@ -326,7 +501,7 @@ interface EkipmanListeModalProps {
   open: boolean;
   onClose: () => void;
   onKontrolYapildi: (id: string) => void;
-  onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
+  onDurumDegistir: (id: string, durum: EkipmanStatus, aciklama?: string, foto?: File | null) => void;
   isOnline: boolean;
   initialEkipmanId?: string | null;
 }
@@ -458,7 +633,7 @@ interface FirmaEkipmanModalProps {
   firmaId: string | null;
   onClose: () => void;
   onKontrolYapildi: (id: string) => void;
-  onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
+  onDurumDegistir: (id: string, durum: EkipmanStatus, aciklama?: string, foto?: File | null) => void;
   isOnline: boolean;
 }
 

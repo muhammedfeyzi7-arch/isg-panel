@@ -48,28 +48,36 @@ function RedFotoImg({ src, className, style }: { src: string; className?: string
 
   useEffect(() => {
     if (!src) return;
-    // Zaten tam URL ise direkt kullan
     if (src.startsWith('http')) {
-      // Eski signed URL — yenile
-      if (src.includes('/sign/') || src.includes('token=')) {
-        // Signed URL'den path çıkar ve yeniden üret
-        const match = src.match(/\/object\/(?:sign|public)\/uploads\/(.+?)(?:\?|$)/);
-        if (match) {
-          getSignedUrlFromPath(match[1]).then(url => setSignedUrl(url));
-        } else {
-          setSignedUrl(src);
-        }
+      const match = src.match(/\/object\/(?:sign|public)\/uploads\/(.+?)(?:\?|$)/);
+      if (match) {
+        getSignedUrlFromPath(match[1]).then(url => setSignedUrl(url));
       } else {
         setSignedUrl(src);
       }
       return;
     }
-    // Storage path ise signed URL üret
     getSignedUrlFromPath(src).then(url => setSignedUrl(url));
   }, [src]);
 
+  const handleClick = () => {
+    if (signedUrl) window.open(signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
   if (!signedUrl) return <div className="rounded-lg h-20 animate-pulse" style={{ background: 'rgba(239,68,68,0.1)' }} />;
-  return <img src={signedUrl} alt="Red fotoğrafı" className={className} style={style} />;
+  return (
+    <div className="relative group cursor-pointer" onClick={handleClick}>
+      <img src={signedUrl} alt="Red fotoğrafı" className={className} style={style} />
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg" style={{ background: 'rgba(0,0,0,0.45)' }}>
+        <div className="w-9 h-9 flex items-center justify-center rounded-full" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)' }}>
+          <i className="ri-zoom-in-line text-white text-base" />
+        </div>
+      </div>
+      <div className="absolute bottom-2 right-2 px-2 py-1 rounded-lg text-[10px] font-semibold" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}>
+        <i className="ri-external-link-line mr-1" />Büyüt
+      </div>
+    </div>
+  );
 }
 
 // ─── Evrak listesi bileşeni ─────────────────────────────────────────────────
@@ -120,10 +128,17 @@ function IsIzniEvraklari({ izinId, orgId, firmaId, izinTuru, onRefresh }: {
         const prefix = `${orgId}/is-izni-evrak/${firmaId}/${slug}`;
         const { data, error } = await supabase.storage
           .from('uploads')
-          .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
+          .list(prefix, { limit: 200, sortBy: { column: 'updated_at', order: 'desc' } });
         if (!error && data && data.length > 0) {
           const filtered = data
-            .filter(f => f.name.startsWith(izinId) && !f.name.includes('_red_'))
+            .filter(f => {
+              if (!f.name || f.name === '.emptyFolderPlaceholder') return false;
+              // Sadece bu izne ait dosyaları göster
+              if (!f.name.startsWith(izinId)) return false;
+              // Red fotoğraflarını gösterme
+              if (f.name.includes('_red_')) return false;
+              return true;
+            })
             .map(f => ({ ...f, _slug: slug } as EvrakDosya));
           allFiles = [...allFiles, ...filtered];
         }
@@ -141,12 +156,28 @@ function IsIzniEvraklari({ izinId, orgId, firmaId, izinTuru, onRefresh }: {
   useEffect(() => { void fetchDosyalar(); }, [fetchDosyalar, onRefresh]);
 
   const handleAc = async (dosya: EvrakDosya) => {
+    // Senkron olarak pencereyi hemen aç — popup blocker geçmek için
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="font-size:16px">Belge yükleniyor...</p></body></html>');
+    }
     setAcikDosya(dosya.name);
-    const slug = dosya._slug ?? izinTuruSlug;
-    const filePath = `${orgId}/is-izni-evrak/${firmaId}/${slug}/${dosya.name}`;
-    const url = await getSignedUrl(filePath);
-    if (url) window.open(url, '_blank');
-    setAcikDosya(null);
+    try {
+      const slug = dosya._slug ?? izinTuruSlug;
+      const filePath = `${orgId}/is-izni-evrak/${firmaId}/${slug}/${dosya.name}`;
+      const { data } = await supabase.storage.from('uploads').createSignedUrl(filePath, 86400);
+      const url = data?.signedUrl ?? null;
+      if (url) {
+        if (win && !win.closed) win.location.href = url;
+        else window.open(url, '_blank');
+      } else {
+        if (win && !win.closed) win.close();
+      }
+    } catch {
+      if (win && !win.closed) win.close();
+    } finally {
+      setAcikDosya(null);
+    }
   };
 
   const getFileIcon = (name: string) => {
@@ -219,6 +250,270 @@ function IsIzniEvraklari({ izinId, orgId, firmaId, izinTuru, onRefresh }: {
         );
       })}
     </div>
+  );
+}
+
+// ─── Detay Modal (Admin/Member) — Detay + Geçmiş sekmeleri ────────────────
+interface ViewDetayModalProps {
+  record: IsIzni;
+  firmalar: { id: string; ad: string }[];
+  personeller: { adSoyad: string }[];
+  orgId: string;
+  evrakRefresh: number;
+  canEdit: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  onPdf: () => void;
+}
+
+function ViewDetayModal({ record, firmalar, personeller, orgId, evrakRefresh, canEdit, onClose, onEdit, onPdf }: ViewDetayModalProps) {
+  const [tab, setTab] = useState<'detay' | 'gecmis'>('detay');
+  const dur = DURUM_CONFIG[record.durum];
+  const hasEvent = record.durum !== 'Onay Bekliyor';
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`İzin Detayı — ${record.izinNo}`}
+      size="md"
+      icon="ri-shield-keyhole-line"
+      footer={
+        <>
+          <button onClick={onPdf} className="btn-secondary whitespace-nowrap">
+            <i className="ri-file-pdf-line" /> PDF
+          </button>
+          <button onClick={onClose} className="btn-primary whitespace-nowrap">Kapat</button>
+        </>
+      }
+    >
+      {/* Sekme navigasyonu */}
+      <div className="flex items-center gap-1 p-1 rounded-xl mb-4" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+        <button
+          onClick={() => setTab('detay')}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+          style={{ background: tab === 'detay' ? 'rgba(96,165,250,0.18)' : 'transparent', color: tab === 'detay' ? '#60A5FA' : 'var(--text-muted)' }}
+        >
+          <i className="ri-information-line" />Detay
+        </button>
+        <button
+          onClick={() => setTab('gecmis')}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+          style={{ background: tab === 'gecmis' ? 'rgba(239,68,68,0.18)' : 'transparent', color: tab === 'gecmis' ? '#EF4444' : 'var(--text-muted)' }}
+        >
+          <i className="ri-history-line" />Geçmiş
+          {hasEvent && (
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: record.durum === 'Reddedildi' ? '#EF4444' : '#34D399' }} />
+          )}
+        </button>
+      </div>
+
+      {tab === 'gecmis' ? (
+        <div className="space-y-2">
+          {/* Oluşturulma */}
+          <div className="flex items-start gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(96,165,250,0.15)' }}>
+              <i className="ri-add-circle-line text-sm" style={{ color: '#60A5FA' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold" style={{ color: '#60A5FA' }}>İzin Oluşturuldu</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{record.olusturanKisi || '—'}</p>
+              {record.olusturmaTarihi && (
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                  {new Date(record.olusturmaTarihi).toLocaleString('tr-TR')}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Onaylandı */}
+          {record.durum === 'Onaylandı' && record.onaylayanKisi && (
+            <div className="flex items-start gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
+              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(52,211,153,0.15)' }}>
+                <i className="ri-checkbox-circle-line text-sm" style={{ color: '#34D399' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold" style={{ color: '#34D399' }}>Onaylandı</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{record.onaylayanKisi}</p>
+                {record.onayTarihi && (
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                    {new Date(record.onayTarihi).toLocaleDateString('tr-TR')}
+                  </p>
+                )}
+                {record.sahaNotu && (
+                  <p className="text-xs mt-1.5 italic px-2 py-1.5 rounded-lg" style={{ color: '#94A3B8', background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.1)' }}>
+                    &ldquo;{record.sahaNotu}&rdquo;
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Reddedildi */}
+          {record.durum === 'Reddedildi' && (
+            <div className="flex items-start gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(239,68,68,0.15)' }}>
+                <i className="ri-close-circle-line text-sm" style={{ color: '#EF4444' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold" style={{ color: '#EF4444' }}>Reddedildi</p>
+                  {canEdit && (
+                    <button
+                      onClick={onEdit}
+                      className="text-[10px] font-semibold px-2 py-1 rounded-lg cursor-pointer whitespace-nowrap flex-shrink-0"
+                      style={{ background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }}
+                    >
+                      <i className="ri-edit-line mr-0.5" />Düzenle
+                    </button>
+                  )}
+                </div>
+                {record.reddedenKisi && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{record.reddedenKisi}</p>}
+                {record.reddetmeTarihi && (
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                    {new Date(record.reddetmeTarihi).toLocaleDateString('tr-TR')}
+                  </p>
+                )}
+                {record.sahaNotu && (
+                  <p className="text-xs mt-1.5 italic px-2 py-1.5 rounded-lg" style={{ color: '#F87171', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
+                    &ldquo;{record.sahaNotu}&rdquo;
+                  </p>
+                )}
+                {/* Red fotoğrafı — tıklanabilir, yeni sekmede açılır */}
+                {record.redFotoUrl && (
+                  <div className="mt-3">
+                    <p className="text-[10px] font-semibold mb-1.5" style={{ color: '#EF4444' }}>
+                      <i className="ri-camera-line mr-1" />Red Fotoğrafı
+                      <span className="ml-1 font-normal" style={{ color: '#64748B' }}>(tıklayarak büyütün)</span>
+                    </p>
+                    <RedFotoImg
+                      src={record.redFotoUrl}
+                      className="rounded-lg max-h-52 object-cover w-full"
+                      style={{ border: '1px solid rgba(239,68,68,0.2)' }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Onay bekliyor */}
+          {record.durum === 'Onay Bekliyor' && (
+            <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
+                <i className="ri-time-line text-sm" style={{ color: '#F59E0B' }} />
+              </div>
+              <div>
+                <p className="text-xs font-bold" style={{ color: '#F59E0B' }}>Onay Bekleniyor</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Henüz değerlendirme yapılmadı</p>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Durum banner */}
+          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${dur.border}` }}>
+            <div className="flex items-center gap-3 px-4 py-3" style={{ background: dur.bg }}>
+              <i className={`${dur.icon} flex-shrink-0 text-base`} style={{ color: dur.color }} />
+              <div className="flex-1">
+                <p className="text-sm font-bold" style={{ color: dur.color }}>{dur.label}</p>
+                {record.durum === 'Onaylandı' && record.onaylayanKisi && (
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                      <i className="ri-user-line text-[10px]" />{record.onaylayanKisi}
+                    </span>
+                    {record.onayTarihi && (
+                      <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                        <i className="ri-calendar-check-line text-[10px]" />{new Date(record.onayTarihi).toLocaleDateString('tr-TR')}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {record.durum === 'Reddedildi' && (
+                  <div className="mt-1 space-y-0.5">
+                    {record.reddedenKisi && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                          <i className="ri-user-line text-[10px]" />{record.reddedenKisi}
+                        </span>
+                        {record.reddetmeTarihi && (
+                          <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                            <i className="ri-calendar-close-line text-[10px]" />{new Date(record.reddetmeTarihi).toLocaleDateString('tr-TR')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {record.sahaNotu && (
+                      <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                        <i className="ri-chat-1-line mr-1 text-[10px]" />{record.sahaNotu}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+              {record.durum === 'Reddedildi' && canEdit && (
+                <button
+                  onClick={onEdit}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap flex-shrink-0"
+                  style={{ background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }}
+                >
+                  <i className="ri-edit-line mr-1" />Düzenle
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Süresi geçmiş uyarı */}
+          {isExpired(record.bitisTarihi) && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <i className="ri-alarm-warning-line flex-shrink-0" style={{ color: '#EF4444' }} />
+              <p className="text-xs font-semibold" style={{ color: '#EF4444' }}>Bu iş izninin süresi geçmiş!</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {[
+              { label: 'İzin No',   value: record.izinNo },
+              { label: 'Tip',       value: record.tip },
+              { label: 'Firma',     value: firmalar.find(f => f.id === record.firmaId)?.ad || '—' },
+              { label: 'Oluşturan', value: record.olusturanKisi || '—' },
+              { label: 'Başlangıç', value: record.baslamaTarihi ? new Date(record.baslamaTarihi).toLocaleDateString('tr-TR') : '—' },
+              { label: 'Bitiş',     value: record.bitisTarihi ? new Date(record.bitisTarihi).toLocaleDateString('tr-TR') : '—' },
+            ].map(item => (
+              <div key={item.label} className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg-item)' }}>
+                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {record.aciklama && (
+            <div className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg-item)' }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Açıklama</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{record.aciklama}</p>
+            </div>
+          )}
+
+          {/* Evraklar */}
+          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(96,165,250,0.2)' }}>
+            <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: 'rgba(96,165,250,0.07)', borderBottom: '1px solid rgba(96,165,250,0.15)' }}>
+              <i className="ri-attachment-2 text-sm" style={{ color: '#60A5FA' }} />
+              <p className="text-xs font-bold" style={{ color: '#60A5FA' }}>Yüklü Evraklar</p>
+            </div>
+            <div className="p-3">
+              <IsIzniEvraklari
+                izinId={record.id}
+                orgId={orgId}
+                firmaId={record.firmaId}
+                izinTuru={record.tip}
+                onRefresh={evrakRefresh}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -1269,145 +1564,19 @@ export default function IsIzniPage() {
 
       {/* ── Admin/Member Detay Modal ── */}
       {viewRecord && (
-        <Modal
-          open={!!viewRecord}
+        <ViewDetayModal
+          record={viewRecord}
+          firmalar={firmalar}
+          personeller={personeller}
+          orgId={org?.id ?? 'unknown'}
+          evrakRefresh={evrakRefresh}
+          canEdit={canEdit}
           onClose={() => setViewRecordId(null)}
-          title={`İzin Detayı — ${viewRecord.izinNo}`}
-          size="md"
-          icon="ri-shield-keyhole-line"
-          footer={
-            <>
-              <button
-                onClick={() => { const f = firmalar.find(x => x.id === viewRecord.firmaId); generateIsIzniPdf(viewRecord, f, personeller.filter(p => viewRecord.calisanlar?.includes(p.adSoyad))); }}
-                className="btn-secondary whitespace-nowrap"
-              >
-                <i className="ri-file-pdf-line" /> PDF
-              </button>
-              <button onClick={() => setViewRecordId(null)} className="btn-primary whitespace-nowrap">Kapat</button>
-            </>
-          }
-        >
-          <div className="space-y-3">
-            {/* Durum */}
-            {(() => {
-              const dur = DURUM_CONFIG[viewRecord.durum];
-              return (
-                <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${dur.border}` }}>
-                  <div className="flex items-center gap-3 px-4 py-3" style={{ background: dur.bg }}>
-                    <i className={`${dur.icon} flex-shrink-0 text-base`} style={{ color: dur.color }} />
-                    <div className="flex-1">
-                      <p className="text-sm font-bold" style={{ color: dur.color }}>{dur.label}</p>
-                      {viewRecord.durum === 'Onaylandı' && viewRecord.onaylayanKisi && (
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                            <i className="ri-user-line text-[10px]" />{viewRecord.onaylayanKisi}
-                          </span>
-                          {viewRecord.onayTarihi && (
-                            <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                              <i className="ri-calendar-check-line text-[10px]" />{new Date(viewRecord.onayTarihi).toLocaleDateString('tr-TR')}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {viewRecord.durum === 'Reddedildi' && (
-                        <div className="mt-1 space-y-0.5">
-                          {viewRecord.reddedenKisi && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                                <i className="ri-user-line text-[10px]" />{viewRecord.reddedenKisi}
-                              </span>
-                              {viewRecord.reddetmeTarihi && (
-                                <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                                  <i className="ri-calendar-close-line text-[10px]" />{new Date(viewRecord.reddetmeTarihi).toLocaleDateString('tr-TR')}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {viewRecord.sahaNotu && (
-                            <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                              <i className="ri-chat-1-line mr-1 text-[10px]" />{viewRecord.sahaNotu}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    {viewRecord.durum === 'Reddedildi' && canEdit && (
-                      <button
-                        onClick={() => { setViewRecordId(null); openEdit(viewRecord); }}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap flex-shrink-0"
-                        style={{ background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }}
-                      >
-                        <i className="ri-edit-line mr-1" />Düzenle
-                      </button>
-                    )}
-                  </div>
-                  {/* Red fotoğrafı */}
-                  {viewRecord.durum === 'Reddedildi' && viewRecord.redFotoUrl && (
-                    <div className="px-4 py-3" style={{ borderTop: `1px solid ${dur.border}`, background: 'rgba(239,68,68,0.04)' }}>
-                      <p className="text-[10px] font-semibold mb-2" style={{ color: '#EF4444' }}>
-                        <i className="ri-camera-line mr-1" />Red Fotoğrafı
-                      </p>
-                      <RedFotoImg
-                        src={viewRecord.redFotoUrl!}
-                        className="rounded-lg max-h-40 object-cover cursor-pointer w-full"
-                        style={{ border: '1px solid rgba(239,68,68,0.2)' }}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Süresi geçmiş uyarı */}
-            {isExpired(viewRecord.bitisTarihi) && (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                <i className="ri-alarm-warning-line flex-shrink-0" style={{ color: '#EF4444' }} />
-                <p className="text-xs font-semibold" style={{ color: '#EF4444' }}>Bu iş izninin süresi geçmiş!</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2.5">
-              {[
-                { label: 'İzin No',   value: viewRecord.izinNo },
-                { label: 'Tip',       value: viewRecord.tip },
-                { label: 'Firma',     value: firmalar.find(f => f.id === viewRecord.firmaId)?.ad || '—' },
-                { label: 'Oluşturan', value: viewRecord.olusturanKisi || '—' },
-                { label: 'Başlangıç', value: viewRecord.baslamaTarihi ? new Date(viewRecord.baslamaTarihi).toLocaleDateString('tr-TR') : '—' },
-                { label: 'Bitiş',     value: viewRecord.bitisTarihi ? new Date(viewRecord.bitisTarihi).toLocaleDateString('tr-TR') : '—' },
-              ].map(item => (
-                <div key={item.label} className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg-item)' }}>
-                  <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{item.label}</p>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{item.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {viewRecord.aciklama && (
-              <div className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--bg-item)' }}>
-                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Açıklama</p>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{viewRecord.aciklama}</p>
-              </div>
-            )}
-
-            {/* Evraklar */}
-            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(96,165,250,0.2)' }}>
-              <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: 'rgba(96,165,250,0.07)', borderBottom: '1px solid rgba(96,165,250,0.15)' }}>
-                <i className="ri-attachment-2 text-sm" style={{ color: '#60A5FA' }} />
-                <p className="text-xs font-bold" style={{ color: '#60A5FA' }}>Yüklü Evraklar</p>
-              </div>
-              <div className="p-3">
-                <IsIzniEvraklari
-                  izinId={viewRecord.id}
-                  orgId={org?.id ?? 'unknown'}
-                  firmaId={viewRecord.firmaId}
-                  izinTuru={viewRecord.tip}
-                  onRefresh={evrakRefresh}
-                />
-              </div>
-            </div>
-          </div>
-        </Modal>
+          onEdit={() => { setViewRecordId(null); openEdit(viewRecord); }}
+          onPdf={() => { const f = firmalar.find(x => x.id === viewRecord.firmaId); generateIsIzniPdf(viewRecord, f, personeller.filter(p => viewRecord.calisanlar?.includes(p.adSoyad))); }}
+        />
       )}
+
 
       {/* ── Denetçi Değerlendirme Modal — store'dan canlı okunuyor ── */}
       {denetciRecord && (

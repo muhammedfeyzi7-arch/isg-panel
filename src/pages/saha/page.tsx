@@ -1,12 +1,11 @@
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { useApp } from '@/store/AppContext';
-import NonconformityForm from '@/pages/nonconformity/components/NonconformityForm';
+import SahaUygunsuzlukForm from './components/SahaUygunsuzlukForm';
 import DetailModal from '@/pages/nonconformity/components/DetailModal';
 import KapatmaModal from '@/pages/nonconformity/components/KapatmaModal';
 import type { Ekipman, EkipmanStatus, Uygunsuzluk } from '@/types';
 import { useOfflineQueue, type OfflineQueueItem } from '@/hooks/useOfflineQueue';
 import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHelper';
-import { supabase } from '@/lib/supabase';
 import IsIzniSahaBolumu from './components/IsIzniSahaBolumu';
 import { OfflineBand, PendingModal } from './components/OfflineBand';
 import QrScanner, { loadJsQR } from './components/QrScanner';
@@ -17,8 +16,7 @@ import {
   FirmaEkipmanModal,
   FirmaOzeti,
 } from './components/EkipmanKontrol';
-import { getSignedUrlFromPath } from '@/utils/fileUpload';
-import type { Evrak } from '@/types';
+import { uploadFileToStorage } from '@/utils/fileUpload';
 
 // ─── Sekme Tanımları ──────────────────────────────────────────────────────────
 type SahaTab = 'qr' | 'ekipman' | 'izin' | 'uygunsuzluk';
@@ -468,7 +466,7 @@ const UygunsuzlukTab = memo(function UygunsuzlukTab() {
         onEdit={(rec) => { setDetailRecord(null); setEditRecord(rec); setShowForm(true); }}
       />
       <KapatmaModal record={kapatmaRecord} onClose={() => setKapatmaRecord(null)} />
-      <NonconformityForm isOpen={showForm} onClose={() => { setShowForm(false); setEditRecord(null); }} editRecord={editRecord} />
+      <SahaUygunsuzlukForm isOpen={showForm} onClose={() => { setShowForm(false); setEditRecord(null); }} editRecord={editRecord} />
     </>
   );
 });
@@ -478,66 +476,15 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
   ekipman: Ekipman;
   onClose: () => void;
   onKontrolYapildi: (id: string) => void;
-  onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
+  onDurumDegistir: (id: string, durum: EkipmanStatus, aciklama?: string, foto?: File | null) => void;
   isOnline: boolean;
 }) {
-  const { firmalar, addToast, org } = useApp();
-  const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
-  const firma = firmalar.find(f => f.id === ekipman.firmaId);
-  const days = ekipman.sonrakiKontrolTarihi
-    ? Math.ceil((new Date(ekipman.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000)
-    : null;
+  const [kontrolBasarili, setKontrolBasarili] = useState(false);
 
-  const [evraklar, setEvraklar] = useState<Evrak[]>([]);
-  const [evraklarLoading, setEvraklarLoading] = useState(true);
-  const [downloading, setDownloading] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!ekipman.firmaId || !org?.id) { setEvraklar([]); setEvraklarLoading(false); return; }
-    setEvraklarLoading(true);
-    supabase.from('evraklar').select('id, data').eq('organization_id', org.id).is('deleted_at', null)
-      .then(({ data, error }) => {
-        if (error || !data) { setEvraklar([]); setEvraklarLoading(false); return; }
-        const parsed: Evrak[] = data
-          .map((row: { id: string; data: Evrak }) => ({ ...row.data, id: row.id }))
-          .filter((e: Evrak) => !e.silinmis && !e.cascadeSilindi && e.firmaId === ekipman.firmaId)
-          .sort((a: Evrak, b: Evrak) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? ''));
-        setEvraklar(parsed);
-        setEvraklarLoading(false);
-      });
-  }, [ekipman.firmaId, org?.id]);
-
-  const fmtDate = (iso?: string) => {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
-
-  const getStatusColor = (durum: string) => {
-    if (durum === 'Yüklü') return { color: '#34D399', bg: 'rgba(52,211,153,0.12)' };
-    if (durum === 'Süre Yaklaşıyor') return { color: '#FBBF24', bg: 'rgba(251,191,36,0.12)' };
-    if (durum === 'Süre Dolmuş') return { color: '#F87171', bg: 'rgba(248,113,113,0.12)' };
-    return { color: '#94A3B8', bg: 'rgba(148,163,184,0.12)' };
-  };
-
-  const handleView = async (evrak: Evrak) => {
-    const url = evrak.dosyaUrl ? await getSignedUrlFromPath(evrak.dosyaUrl) : null;
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-    else addToast('Belge erişim linki alınamadı.', 'error');
-  };
-
-  const handleDownload = async (evrak: Evrak) => {
-    if (!evrak.dosyaUrl) { addToast('Bu evrak için dosya bulunamadı.', 'error'); return; }
-    setDownloading(evrak.id);
-    try {
-      const url = await getSignedUrlFromPath(evrak.dosyaUrl);
-      if (!url) { addToast('Dosya indirilemedi.', 'error'); return; }
-      const a = document.createElement('a');
-      a.href = url; a.download = evrak.dosyaAdi || evrak.ad;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      addToast(`"${evrak.ad}" indiriliyor...`, 'success');
-    } finally { setDownloading(null); }
+  const handleKontrol = (id: string) => {
+    onKontrolYapildi(id);
+    setKontrolBasarili(true);
+    setTimeout(() => setKontrolBasarili(false), 3000);
   };
 
   return (
@@ -554,114 +501,21 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
           <i className="ri-close-line text-xs" />
         </button>
       </div>
-
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: sc.bg }}>
-          <i className={`${sc.icon} text-xl`} style={{ color: sc.color }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</p>
-          {firma && <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{firma.ad}</p>}
-          {ekipman.tur && <p className="text-xs" style={{ color: '#334155' }}>{ekipman.tur}</p>}
-          {ekipman.seriNo && <p className="text-[10px] font-mono mt-0.5" style={{ color: '#334155' }}>S/N: {ekipman.seriNo}</p>}
-        </div>
-        <span className="text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
-      </div>
-
-      {days !== null && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl mb-3" style={{ background: days < 0 ? 'rgba(239,68,68,0.08)' : days <= 7 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${days < 0 ? 'rgba(239,68,68,0.2)' : days <= 7 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
-          <i className="ri-calendar-line text-xs" style={{ color: days < 0 ? '#EF4444' : days <= 7 ? '#FBBF24' : '#475569' }} />
-          <span className="text-xs font-medium" style={{ color: days < 0 ? '#F87171' : days <= 7 ? '#FCD34D' : '#64748B' }}>
-            {days < 0 ? `Kontrol ${Math.abs(days)} gün gecikmiş!` : days === 0 ? 'Kontrol bugün yapılmalı!' : days <= 7 ? `Kontrol ${days} gün içinde yapılmalı` : `Sonraki kontrol: ${new Date(ekipman.sonrakiKontrolTarihi!).toLocaleDateString('tr-TR')}`}
-          </span>
-        </div>
-      )}
-
-      <button
-        onClick={() => onKontrolYapildi(ekipman.id)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200 mb-3"
-        style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)' }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.25)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.15)'; }}
-      >
-        <div className="w-5 h-5 flex items-center justify-center">
-          <i className={`${!isOnline ? 'ri-save-line' : 'ri-checkbox-circle-line'} text-base`} style={{ color: '#34D399' }} />
-        </div>
-        <span className="text-sm font-bold" style={{ color: '#34D399' }}>
-          {!isOnline ? 'Kontrol Yaptım (Çevrimdışı Kaydedilir)' : 'Kontrol Yaptım'}
-        </span>
-      </button>
-
-      <div className="mb-4">
-        <p className="text-[10px] font-semibold mb-2 uppercase tracking-wide" style={{ color: '#475569' }}>Durum Değiştir</p>
-        <div className="grid grid-cols-4 gap-1.5">
-          {(['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'] as EkipmanStatus[]).map(d => {
-            const cfg = STATUS_CFG[d];
-            const isActive = ekipman.durum === d;
-            return (
-              <button key={d} onClick={() => onDurumDegistir(ekipman.id, d)} className="py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: isActive ? cfg.bg : 'rgba(255,255,255,0.04)', border: `1px solid ${isActive ? cfg.color + '80' : 'rgba(255,255,255,0.08)'}`, color: isActive ? cfg.color : '#64748B' }}>
-                {cfg.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#475569' }}>Firma Evrakları</p>
-          {!evraklarLoading && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8' }}>{evraklar.length} evrak</span>}
-        </div>
-        {evraklarLoading ? (
-          <div className="flex items-center gap-2 px-3 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin flex-shrink-0" style={{ borderColor: 'rgba(99,102,241,0.3)', borderTopColor: '#818CF8' }} />
-            <span className="text-xs" style={{ color: '#475569' }}>Evraklar yükleniyor...</span>
-          </div>
-        ) : evraklar.length === 0 ? (
-          <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)' }}>
-            <i className="ri-folder-open-line text-sm" style={{ color: '#475569' }} />
-            <p className="text-xs" style={{ color: '#475569' }}>Bu firmaya ait evrak bulunamadı</p>
-          </div>
-        ) : (
-          <div className="space-y-2 overflow-y-auto pr-0.5" style={{ maxHeight: '240px' }}>
-            {evraklar.map(evrak => {
-              const sc2 = getStatusColor(evrak.durum);
-              const isExpired = evrak.durum === 'Süre Dolmuş';
-              const isNearing = evrak.durum === 'Süre Yaklaşıyor';
-              return (
-                <div key={evrak.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${isExpired ? 'rgba(248,113,113,0.2)' : isNearing ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.07)'}` }}>
-                  <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: sc2.bg }}>
-                    <i className="ri-file-text-line text-sm" style={{ color: sc2.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{evrak.ad}</p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {evrak.tur && <span className="text-[10px]" style={{ color: '#475569' }}>{evrak.tur}</span>}
-                      {evrak.gecerlilikTarihi && <span className="text-[10px]" style={{ color: isExpired ? '#F87171' : isNearing ? '#FCD34D' : '#475569' }}><i className="ri-calendar-line mr-0.5" />{fmtDate(evrak.gecerlilikTarihi)}</span>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap" style={{ background: sc2.bg, color: sc2.color }}>{evrak.durum}</span>
-                    {evrak.dosyaUrl && (
-                      <>
-                        <button onClick={() => handleView(evrak)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}><i className="ri-eye-line text-xs" /></button>
-                        <button onClick={() => handleDownload(evrak)} disabled={downloading === evrak.id} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}><i className={`${downloading === evrak.id ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} text-xs`} /></button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <EkipmanDetayPanel
+        ekipman={ekipman}
+        onBack={onClose}
+        onKontrolYapildi={handleKontrol}
+        onDurumDegistir={onDurumDegistir}
+        isOnline={isOnline}
+        kontrolBasarili={kontrolBasarili}
+      />
     </div>
   );
 }
 
 // ─── Ana Saha Sayfası ─────────────────────────────────────────────────────────
 export default function SahaPage() {
-  const { ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, addToast, ekipmanKontrolBildirimi, currentUser, dataLoading, uygunsuzluklar, isIzinleri } = useApp();
+  const { ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, addToast, ekipmanKontrolBildirimi, currentUser, dataLoading, uygunsuzluklar, isIzinleri, org } = useApp();
   const [activeTab, setActiveTab] = useState<SahaTab>('qr');
   const [showPendingModal, setShowPendingModal] = useState(false);
 
@@ -744,9 +598,32 @@ export default function SahaPage() {
     }
   }, [ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, currentUser, ekipmanKontrolBildirimi, isOnline, addToQueue, addToast]);
 
-  const handleDurumDegistir = useCallback(async (ekipmanId: string, yeniDurum: EkipmanStatus) => {
+  const handleDurumDegistir = useCallback(async (ekipmanId: string, yeniDurum: EkipmanStatus, aciklama?: string, foto?: File | null) => {
     const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
     if (!ekipman || ekipman.durum === yeniDurum) return;
+
+    const now = new Date().toISOString();
+    const orgId = org?.id ?? 'unknown';
+
+    // Fotoğraf varsa yükle
+    let fotoUrl: string | undefined;
+    if (foto && orgId !== 'unknown') {
+      try {
+        const uploadedUrl = await uploadFileToStorage(foto, orgId, 'ekipman-kontrol', `${ekipmanId}-${Date.now()}`);
+        if (uploadedUrl) fotoUrl = uploadedUrl;
+      } catch { /* fotoğraf yüklenemese de devam et */ }
+    }
+
+    // Kontrol geçmişine kaydet
+    addEkipmanKontrolKaydi(ekipmanId, {
+      tarih: now,
+      kontrolEden: currentUser?.ad || 'Saha Kullanıcısı',
+      kontrolEdenId: currentUser?.id || '',
+      durum: yeniDurum,
+      notlar: aciklama || undefined,
+      fotoUrl,
+      kaynak: 'qr',
+    });
 
     if (!isOnline) {
       updateEkipman(ekipmanId, { durum: yeniDurum });
@@ -760,7 +637,7 @@ export default function SahaPage() {
       updateEkipman(ekipmanId, { durum: yeniDurum });
       addToast(`Durum "${yeniDurum}" olarak güncellendi.`, 'success');
     }
-  }, [ekipmanlar, updateEkipman, isOnline, addToQueue, addToast]);
+  }, [ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, currentUser, org, isOnline, addToQueue, addToast]);
 
   // Aktif sekme badge sayıları
   const { uygunsuzlukBadge, izinBadge, ekipmanBadge } = useMemo(() => {

@@ -18,8 +18,25 @@ function RedFotoImg({ src, className, style }: { src: string; className?: string
     }
     getSignedUrlFromPath(src).then(url => setSignedUrl(url));
   }, [src]);
+
+  const handleClick = () => {
+    if (signedUrl) window.open(signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
   if (!signedUrl) return <div className="rounded-lg h-20 animate-pulse" style={{ background: 'rgba(239,68,68,0.1)' }} />;
-  return <img src={signedUrl} alt="Red fotoğrafı" className={className} style={style} />;
+  return (
+    <div className="relative group cursor-pointer" onClick={handleClick}>
+      <img src={signedUrl} alt="Red fotoğrafı" className={className} style={style} />
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg" style={{ background: 'rgba(0,0,0,0.45)' }}>
+        <div className="w-9 h-9 flex items-center justify-center rounded-full" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)' }}>
+          <i className="ri-zoom-in-line text-white text-base" />
+        </div>
+      </div>
+      <div className="absolute bottom-2 right-2 px-2 py-1 rounded-lg text-[10px] font-semibold" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}>
+        <i className="ri-external-link-line mr-1" />Büyüt
+      </div>
+    </div>
+  );
 }
 
 // ─── Durum config ────────────────────────────────────────────────────────────
