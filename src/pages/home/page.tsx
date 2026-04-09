@@ -75,6 +75,11 @@ function AppContent() {
     }
   }, [activeModule]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Superadmin sayfası — loading screen atla
+  if (location.pathname === '/superadmin') {
+    return <SuperAdminPage />;
+  }
+
   // İlk yükleme — loading screen göster (cache varsa çok kısa sürer)
   if (!loadingDone) {
     return <AppLoadingScreen onDone={() => setLoadingDone(true)} />;
