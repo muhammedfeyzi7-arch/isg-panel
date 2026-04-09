@@ -2,6 +2,16 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
 import SupportModal from './SupportModal';
+import { supabase } from '@/lib/supabase';
+
+interface SupportNotification {
+  id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  ticket_id: string | null;
+}
 
 const moduleTitles: Record<string, { label: string; icon: string }> = {
   dashboard:      { label: 'Genel Bakış',        icon: 'ri-dashboard-3-line' },
@@ -55,6 +65,36 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
 
   const [refreshing, setRefreshing] = useState(false);
   const [refreshDone, setRefreshDone] = useState(false);
+  const [supportNotifs, setSupportNotifs] = useState<SupportNotification[]>([]);
+  const [supportNotifOpen, setSupportNotifOpen] = useState(false);
+  const supportNotifRef = useRef<HTMLDivElement>(null);
+
+  const unreadSupportCount = supportNotifs.filter(n => !n.is_read).length;
+
+  const fetchSupportNotifs = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from('notifications')
+      .select('id, title, message, is_read, created_at, ticket_id')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (data) setSupportNotifs(data as SupportNotification[]);
+  }, []);
+
+  useEffect(() => { fetchSupportNotifs(); }, [fetchSupportNotifs]);
+
+  const markSupportRead = async (id: string) => {
+    setSupportNotifs(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  };
+
+  const markAllSupportRead = async () => {
+    setSupportNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
+    const ids = supportNotifs.filter(n => !n.is_read).map(n => n.id);
+    if (ids.length > 0) await supabase.from('notifications').update({ is_read: true }).in('id', ids);
+  };
 
   const handleRefresh = async () => {
     if (refreshing || dataLoading) return;
@@ -120,6 +160,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
       if (searchRef.current  && !searchRef.current.contains(e.target as Node))  setSearchFocus(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
       if (notifRef.current   && !notifRef.current.contains(e.target as Node))   setNotifOpen(false);
+      if (supportNotifRef.current && !supportNotifRef.current.contains(e.target as Node)) setSupportNotifOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -350,6 +391,88 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           <i className="ri-add-line text-sm" />
           <span className="hidden lg:inline">Hızlı Ekle</span>
         </button>
+
+        {/* ── Support Notifications (Supabase) ── */}
+        <div className="relative flex-shrink-0" ref={supportNotifRef}>
+          <button
+            onClick={() => { setSupportNotifOpen(v => !v); setNotifOpen(false); setProfileOpen(false); setQuickOpen(false); fetchSupportNotifs(); }}
+            className="w-9 h-9 lg:w-8 lg:h-8 flex items-center justify-center rounded-xl lg:rounded-lg cursor-pointer transition-all duration-200 relative"
+            style={{ background: supportNotifOpen ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)') : iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
+            title="Destek Bildirimleri"
+          >
+            <i className="ri-message-3-line text-base lg:text-sm" style={{ color: supportNotifOpen ? (isDark ? '#E2E8F0' : '#0F172A') : textMuted }} />
+            {unreadSupportCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full px-1"
+                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 0 6px rgba(16,185,129,0.5)' }}>
+                {unreadSupportCount > 9 ? '9+' : unreadSupportCount}
+              </span>
+            )}
+          </button>
+
+          {supportNotifOpen && (
+            <div className="absolute right-0 top-11 z-50 w-[320px] animate-slide-up overflow-hidden"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '16px', boxShadow: isDark ? '0 25px 60px rgba(0,0,0,0.6)' : '0 20px 50px rgba(15,23,42,0.15)', backdropFilter: 'blur(20px)' }}>
+              <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                    <i className="ri-message-3-line text-xs" style={{ color: '#10B981' }} />
+                  </div>
+                  <p className="text-[13px] font-bold" style={{ color: nameColor }}>Destek Yanıtları</p>
+                  {unreadSupportCount > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                      {unreadSupportCount} yeni
+                    </span>
+                  )}
+                </div>
+                {unreadSupportCount > 0 && (
+                  <button onClick={markAllSupportRead} className="text-[11px] cursor-pointer font-semibold px-2 py-1 rounded-lg transition-all"
+                    style={{ color: '#10B981', background: 'rgba(16,185,129,0.08)' }}>
+                    Tümünü oku
+                  </button>
+                )}
+              </div>
+              {supportNotifs.length === 0 ? (
+                <div className="py-10 px-4 text-center">
+                  <div className="w-10 h-10 flex items-center justify-center rounded-2xl mx-auto mb-3" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                    <i className="ri-check-double-line text-lg" style={{ color: '#10B981' }} />
+                  </div>
+                  <p className="text-[12px] font-semibold" style={{ color: isDark ? '#E2E8F0' : '#334155' }}>Yeni bildirim yok</p>
+                  <p className="text-[11px] mt-1" style={{ color: '#64748B' }}>Admin yanıt verince burada görünür</p>
+                </div>
+              ) : (
+                <div className="max-h-72 overflow-y-auto">
+                  {supportNotifs.map((n, idx) => (
+                    <div key={n.id}
+                      onClick={() => markSupportRead(n.id)}
+                      className="px-4 py-3 cursor-pointer transition-all"
+                      style={{
+                        borderBottom: idx < supportNotifs.length - 1 ? `1px solid ${dropdownBorder}` : 'none',
+                        opacity: n.is_read ? 0.5 : 1,
+                        background: !n.is_read ? (isDark ? 'rgba(16,185,129,0.04)' : 'rgba(16,185,129,0.03)') : 'transparent',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = dropdownItemHover; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = !n.is_read ? (isDark ? 'rgba(16,185,129,0.04)' : 'rgba(16,185,129,0.03)') : 'transparent'; }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0 mt-0.5" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                          <i className="ri-reply-line text-xs" style={{ color: '#10B981' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-[12px] font-semibold truncate flex-1" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{n.title}</p>
+                            {!n.is_read && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#10B981' }} />}
+                          </div>
+                          <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: '#64748B' }}>{n.message}</p>
+                          <p className="text-[10px] mt-1" style={{ color: '#94A3B8' }}>{new Date(n.created_at).toLocaleString('tr-TR')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* ── Notifications ── */}
         <div className="relative flex-shrink-0" ref={notifRef}>

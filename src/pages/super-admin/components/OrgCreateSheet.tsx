@@ -10,7 +10,7 @@ interface Props {
 
 const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
 
-const inputCls = 'w-full bg-white/5 border border-white/10 hover:border-white/15 focus:border-amber-500/30 text-white placeholder-slate-600 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500/10 transition-all';
+const inputCls = 'w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-amber-400 focus:bg-white text-slate-900 placeholder-slate-400 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/15 transition-all';
 
 export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
   const [form, setForm] = useState({
@@ -69,62 +69,62 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
 
   return createPortal(
     <>
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" onClick={handleClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-[#0d0d14] border-l border-white/6 z-50 overflow-y-auto flex flex-col">
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50" onClick={handleClose} />
+      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white border-l border-slate-200 z-50 overflow-y-auto flex flex-col shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 sticky top-0 bg-[#0d0d14] z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/15">
-              <i className="ri-add-circle-line text-emerald-400 text-base"></i>
+            <div className="w-10 h-10 flex items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-200">
+              <i className="ri-add-circle-line text-emerald-600 text-base"></i>
             </div>
             <div>
-              <h2 className="text-white font-semibold text-sm">Yeni Organizasyon</h2>
-              <p className="text-slate-600 text-xs">Org + admin kullanıcı oluştur</p>
+              <h2 className="text-slate-900 font-bold text-sm">Yeni Organizasyon</h2>
+              <p className="text-slate-400 text-xs">Org + admin kullanıcı oluştur</p>
             </div>
           </div>
-          <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/8 text-slate-500 hover:text-white transition-colors cursor-pointer">
+          <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
             <i className="ri-close-line text-lg"></i>
           </button>
         </div>
 
-        <div className="flex-1 px-6 py-6">
+        <div className="flex-1 px-6 py-6 bg-slate-50">
           {success ? (
             /* Başarı ekranı */
             <div className="space-y-6">
               <div className="flex flex-col items-center text-center py-8">
-                <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/15 mb-5">
-                  <i className="ri-checkbox-circle-line text-emerald-400 text-3xl"></i>
+                <div className="w-16 h-16 flex items-center justify-center rounded-3xl bg-emerald-50 border border-emerald-200 mb-5">
+                  <i className="ri-checkbox-circle-line text-emerald-600 text-3xl"></i>
                 </div>
-                <h3 className="text-white font-bold text-lg mb-1">Oluşturuldu!</h3>
+                <h3 className="text-slate-900 font-black text-lg mb-1">Oluşturuldu!</h3>
                 <p className="text-slate-500 text-sm">Bu bilgileri müşteriye iletin.</p>
               </div>
 
-              <div className="bg-white/3 rounded-xl border border-white/6 overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                 {[
                   { label: 'Organizasyon', value: success.org_name, mono: false },
                   { label: 'Davet Kodu', value: success.invite_code, mono: true },
                   { label: 'Admin E-posta', value: success.admin_email, mono: false },
                 ].map((row, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-white/4 last:border-0">
-                    <span className="text-slate-500 text-xs">{row.label}</span>
-                    <span className={`text-sm font-medium text-white ${row.mono ? 'font-mono bg-white/8 px-2 py-0.5 rounded-lg text-xs' : ''}`}>
+                  <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-slate-100 last:border-0">
+                    <span className="text-slate-500 text-xs font-medium">{row.label}</span>
+                    <span className={`text-sm font-semibold text-slate-900 ${row.mono ? 'font-mono bg-slate-100 px-2 py-0.5 rounded-lg text-xs' : ''}`}>
                       {row.value}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <button onClick={handleClose} className="w-full py-2.5 bg-white/8 hover:bg-white/12 text-white text-sm font-medium rounded-xl transition-all cursor-pointer">
+              <button onClick={handleClose} className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all cursor-pointer">
                 Kapat
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Org Bilgileri */}
-              <div className="space-y-4">
-                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
-                  <i className="ri-building-2-line text-amber-400"></i>
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm">
+                <p className="text-slate-600 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                  <i className="ri-building-2-line text-amber-500"></i>
                   Organizasyon
                 </p>
                 <Field label="Organizasyon Adı" required>
@@ -140,12 +140,10 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
                 </div>
               </div>
 
-              <div className="border-t border-white/5"></div>
-
               {/* Admin Kullanıcı */}
-              <div className="space-y-4">
-                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
-                  <i className="ri-user-star-line text-amber-400"></i>
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm">
+                <p className="text-slate-600 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                  <i className="ri-user-star-line text-amber-500"></i>
                   Admin Kullanıcı
                 </p>
                 <Field label="Ad Soyad" required>
@@ -163,7 +161,7 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
                       placeholder="En az 8 karakter"
                       className={`${inputCls} pr-10`}
                     />
-                    <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer transition-colors">
+                    <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer transition-colors">
                       <i className={showPw ? 'ri-eye-off-line text-sm' : 'ri-eye-line text-sm'}></i>
                     </button>
                   </div>
@@ -171,7 +169,7 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
               </div>
 
               {error && (
-                <div className="flex items-center gap-2.5 bg-red-500/8 border border-red-500/15 text-red-400 text-sm rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">
                   <i className="ri-error-warning-line flex-shrink-0"></i>
                   <span>{error}</span>
                 </div>
@@ -180,7 +178,7 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-semibold text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
+                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-40 text-white font-bold text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 shadow-lg shadow-emerald-400/20"
               >
                 {loading ? <><i className="ri-loader-4-line animate-spin"></i> Oluşturuluyor...</> : <><i className="ri-add-circle-line"></i> Organizasyon Oluştur</>}
               </button>
@@ -196,8 +194,8 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-500 mb-1.5">
-        {label} {required && <span className="text-red-400">*</span>}
+      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+        {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
     </div>

@@ -53,44 +53,47 @@ export default function SuperAdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex">
+    <div className="min-h-screen bg-slate-50 flex">
       {/* Sol dekoratif panel */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
-        {/* Gradient arka plan */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0f0f1a] via-[#0a0a0f] to-[#0f0f1a]" />
-        {/* Dekoratif daireler */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-amber-500/5 blur-3xl" />
-        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 rounded-full bg-orange-500/5 blur-3xl" />
-        {/* Grid pattern */}
+      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        {/* Subtle pattern */}
         <div
-          className="absolute inset-0 opacity-[0.03]"
+          className="absolute inset-0 opacity-[0.04]"
           style={{
             backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
+            backgroundSize: '48px 48px',
           }}
         />
+        {/* Glow circles */}
+        <div className="absolute top-1/3 left-1/3 w-72 h-72 rounded-full bg-amber-400/10 blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-56 h-56 rounded-full bg-orange-400/8 blur-3xl" />
+
         {/* İçerik */}
-        <div className="relative z-10 px-12 text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/20 mb-8">
-            <i className="ri-shield-keyhole-fill text-amber-400 text-3xl"></i>
+        <div className="relative z-10 px-14 text-center">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 mb-8 shadow-2xl shadow-amber-500/30">
+            <i className="ri-shield-keyhole-fill text-white text-3xl"></i>
           </div>
-          <h2 className="text-3xl font-bold text-white mb-4 tracking-tight">
+          <h2 className="text-3xl font-black text-white mb-3 tracking-tight">
             ISG Denetim
           </h2>
-          <p className="text-slate-400 text-base leading-relaxed max-w-xs mx-auto">
-            Organizasyonlarınızı yönetin, abonelikleri takip edin.
+          <p className="text-slate-400 text-sm leading-relaxed max-w-xs mx-auto mb-10">
+            Tüm organizasyonları tek panelden yönetin.
           </p>
-          <div className="mt-10 flex flex-col gap-3 text-left max-w-xs mx-auto">
+
+          <div className="flex flex-col gap-3 text-left max-w-xs mx-auto">
             {[
-              { icon: 'ri-building-2-line', text: 'Tüm organizasyonları görüntüle' },
-              { icon: 'ri-calendar-check-line', text: 'Abonelik tarihlerini yönet' },
-              { icon: 'ri-user-add-line', text: 'Yeni müşteri hesabı oluştur' },
+              { icon: 'ri-building-2-line', text: 'Organizasyon yönetimi', sub: 'Tüm müşterileri görüntüle' },
+              { icon: 'ri-calendar-check-line', text: 'Abonelik takibi', sub: 'Bitiş tarihlerini yönet' },
+              { icon: 'ri-customer-service-2-line', text: 'Destek sistemi', sub: 'Talepleri yanıtla' },
             ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3 text-slate-400 text-sm">
-                <div className="w-7 h-7 flex items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/15 flex-shrink-0">
-                  <i className={`${item.icon} text-amber-400 text-xs`}></i>
+              <div key={i} className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/8">
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-amber-400/15 border border-amber-400/20 flex-shrink-0">
+                  <i className={`${item.icon} text-amber-400 text-sm`}></i>
                 </div>
-                {item.text}
+                <div>
+                  <p className="text-white text-sm font-semibold">{item.text}</p>
+                  <p className="text-slate-500 text-xs">{item.sub}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -98,29 +101,33 @@ export default function SuperAdminLoginPage() {
       </div>
 
       {/* Sağ login paneli */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12">
+      <div className="w-full lg:w-[55%] flex items-center justify-center px-6 py-12 bg-white">
         <div className="w-full max-w-sm">
           {/* Mobil logo */}
           <div className="lg:hidden text-center mb-10">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 mb-3">
-              <i className="ri-shield-keyhole-fill text-amber-400 text-2xl"></i>
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 mb-3 shadow-lg shadow-amber-400/25">
+              <i className="ri-shield-keyhole-fill text-white text-2xl"></i>
             </div>
-            <h1 className="text-xl font-bold text-white">ISG Denetim Admin</h1>
+            <h1 className="text-xl font-black text-slate-900">ISG Denetim Admin</h1>
           </div>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white tracking-tight">Hoş geldiniz</h1>
-            <p className="text-slate-500 text-sm mt-1">Süper admin paneline giriş yapın</p>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full mb-5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              <span className="text-amber-700 text-xs font-semibold">Süper Admin Paneli</span>
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Hoş geldiniz</h1>
+            <p className="text-slate-500 text-sm mt-1.5">Hesabınıza giriş yapın</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
                 E-posta
               </label>
               <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-slate-500">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-slate-400">
                   <i className="ri-mail-line text-sm"></i>
                 </div>
                 <input
@@ -129,18 +136,18 @@ export default function SuperAdminLoginPage() {
                   onChange={e => setEmail(e.target.value)}
                   placeholder="admin@example.com"
                   autoComplete="email"
-                  className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-amber-500/50 text-white placeholder-slate-600 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500/20 transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-amber-400 focus:bg-white text-slate-900 placeholder-slate-400 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition-all"
                 />
               </div>
             </div>
 
             {/* Şifre */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
                 Şifre
               </label>
               <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-slate-500">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-slate-400">
                   <i className="ri-lock-line text-sm"></i>
                 </div>
                 <input
@@ -149,12 +156,12 @@ export default function SuperAdminLoginPage() {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-amber-500/50 text-white placeholder-slate-600 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500/20 transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-amber-400 focus:bg-white text-slate-900 placeholder-slate-400 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(v => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300 cursor-pointer transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
                 >
                   <i className={showPw ? 'ri-eye-off-line text-sm' : 'ri-eye-line text-sm'}></i>
                 </button>
@@ -163,7 +170,7 @@ export default function SuperAdminLoginPage() {
 
             {/* Hata */}
             {error && (
-              <div className="flex items-center gap-2.5 bg-red-500/8 border border-red-500/15 text-red-400 text-sm rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">
                 <i className="ri-error-warning-line flex-shrink-0 text-base"></i>
                 <span>{error}</span>
               </div>
@@ -173,7 +180,7 @@ export default function SuperAdminLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-white font-semibold rounded-xl py-3 text-sm transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 mt-2"
+              className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 disabled:opacity-50 text-white font-bold rounded-xl py-3 text-sm transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 mt-2 shadow-lg shadow-amber-400/25"
             >
               {loading ? (
                 <><i className="ri-loader-4-line animate-spin"></i> Giriş yapılıyor...</>
@@ -183,7 +190,7 @@ export default function SuperAdminLoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-slate-700 text-xs mt-8">
+          <p className="text-center text-slate-400 text-xs mt-8">
             Yalnızca yetkili sistem yöneticileri erişebilir
           </p>
         </div>

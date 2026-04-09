@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 interface SupportModalProps {
   open: boolean;
@@ -15,7 +16,7 @@ const ISSUE_TYPES = [
 ];
 
 export default function SupportModal({ open, onClose }: SupportModalProps) {
-  const { theme, currentUser } = useApp();
+  const { theme, currentUser, org } = useApp();
   const { user } = useAuth();
   const isDark = theme === 'dark';
 
@@ -61,25 +62,21 @@ export default function SupportModal({ open, onClose }: SupportModalProps) {
 
     setStatus('sending');
     try {
-      const form = e.currentTarget;
-      const data = new URLSearchParams();
-      data.append('email', user?.email ?? currentUser.email ?? '');
-      data.append('name', currentUser.ad ?? 'Kullanıcı');
-      data.append('issue_type', selectedType.label);
-      data.append('subject', subject);
-      data.append('message', message);
-
-      const res = await fetch('https://readdy.ai/api/form/d79r8j9rcamcd36dbltg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: data.toString(),
+      const { error } = await supabase.from('support_tickets').insert({
+        organization_id: org?.id ?? null,
+        user_id: user?.id ?? null,
+        user_email: user?.email ?? currentUser.email ?? '',
+        user_name: currentUser.ad ?? 'Kullanıcı',
+        issue_type: issueType,
+        subject: subject.trim(),
+        message: message.trim(),
+        status: 'open',
       });
 
-      if (res.ok) {
-        setStatus('success');
-        form.reset();
-      } else {
+      if (error) {
         setStatus('error');
+      } else {
+        setStatus('success');
       }
     } catch {
       setStatus('error');
