@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
+const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/super-admin-orgs';
+
 interface Organization {
   id: string;
   name: string;
@@ -9,7 +11,8 @@ interface Organization {
   subscription_start: string | null;
   subscription_end: string | null;
   created_at: string;
-  member_count?: number;
+  member_count: number;
+  creator_email: string | null;
 }
 
 interface EditForm {
@@ -18,11 +21,13 @@ interface EditForm {
   subscription_end: string;
 }
 
+type AccessState = 'loading' | 'forbidden' | 'granted';
+
 export default function SuperAdminPage() {
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [access, setAccess] = useState<AccessState>('loading');
   const [currentEmail, setCurrentEmail] = useState('');
   const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({ is_active: true, subscription_start: '', subscription_end: '' });
   const [saving, setSaving] = useState(false);
@@ -34,35 +39,45 @@ export default function SuperAdminPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const checkAuth = useCallback(async () => {
-    const { data } = await supabase.auth.getUser();
-    const email = data?.user?.email ?? '';
-    setCurrentEmail(email);
-    setAuthorized(!!email);
+  const getAuthHeader = async (): Promise<string | null> => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ? `Bearer ${data.session.access_token}` : null;
+  };
+
+  const checkAccess = useCallback(async () => {
+    setAccess('loading');
+    try {
+      const token = await getAuthHeader();
+      if (!token) { setAccess('forbidden'); return; }
+
+      const res = await fetch(`${EDGE_URL}?op=check_admin`, {
+        headers: { Authorization: token },
+      });
+
+      if (res.status === 200) {
+        const json = await res.json();
+        setCurrentEmail(json.email ?? '');
+        setAccess('granted');
+      } else {
+        setAccess('forbidden');
+      }
+    } catch {
+      setAccess('forbidden');
+    }
   }, []);
 
   const loadOrgs = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('id, name, invite_code, is_active, subscription_start, subscription_end, created_at')
-        .order('created_at', { ascending: false });
+      const token = await getAuthHeader();
+      if (!token) throw new Error('No token');
 
-      if (error) throw error;
-
-      const orgsWithCount = await Promise.all(
-        (data ?? []).map(async (org) => {
-          const { count } = await supabase
-            .from('user_organizations')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', org.id)
-            .eq('is_active', true);
-          return { ...org, member_count: count ?? 0 };
-        })
-      );
-
-      setOrgs(orgsWithCount);
+      const res = await fetch(`${EDGE_URL}?op=list`, {
+        headers: { Authorization: token },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Hata');
+      setOrgs(json.data ?? []);
     } catch (e) {
       showToast('Organizasyonlar yüklenemedi: ' + String(e), 'error');
     } finally {
@@ -71,12 +86,12 @@ export default function SuperAdminPage() {
   }, []);
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    checkAccess();
+  }, [checkAccess]);
 
   useEffect(() => {
-    if (authorized) loadOrgs();
-  }, [authorized, loadOrgs]);
+    if (access === 'granted') loadOrgs();
+  }, [access, loadOrgs]);
 
   const startEdit = (org: Organization) => {
     setEditingId(org.id);
@@ -92,17 +107,21 @@ export default function SuperAdminPage() {
   const saveEdit = async (orgId: string) => {
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('organizations')
-        .update({
+      const token = await getAuthHeader();
+      if (!token) throw new Error('No token');
+
+      const res = await fetch(`${EDGE_URL}?op=update`, {
+        method: 'POST',
+        headers: { Authorization: token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId,
           is_active: editForm.is_active,
           subscription_start: editForm.subscription_start || null,
           subscription_end: editForm.subscription_end || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', orgId);
-
-      if (error) throw error;
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Hata');
       showToast('Kaydedildi!', 'success');
       setEditingId(null);
       await loadOrgs();
@@ -132,7 +151,8 @@ export default function SuperAdminPage() {
 
   const filtered = orgs.filter(o =>
     o.name.toLowerCase().includes(search.toLowerCase()) ||
-    o.invite_code.toLowerCase().includes(search.toLowerCase())
+    o.invite_code.toLowerCase().includes(search.toLowerCase()) ||
+    (o.creator_email ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
   const stats = {
@@ -143,23 +163,29 @@ export default function SuperAdminPage() {
     passive: orgs.filter(o => !o.is_active).length,
   };
 
-  if (authorized === null) {
+  // Loading screen
+  if (access === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+          <p className="text-sm text-gray-400">Yetki kontrol ediliyor...</p>
+        </div>
       </div>
     );
   }
 
-  if (!authorized) {
+  // Forbidden screen
+  if (access === 'forbidden') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-sm">
           <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4 bg-red-100 rounded-full">
-            <i className="ri-lock-line text-2xl text-red-500" />
+            <i className="ri-shield-cross-line text-2xl text-red-500" />
           </div>
           <h1 className="text-xl font-semibold text-gray-800 mb-2">Erişim Reddedildi</h1>
-          <p className="text-gray-500 text-sm">Önce giriş yapmanız gerekmektedir.</p>
+          <p className="text-gray-500 text-sm">Bu sayfaya erişim yetkiniz bulunmamaktadır.</p>
+          <p className="text-gray-400 text-xs mt-2">Hata kodu: 403 Forbidden</p>
         </div>
       </div>
     );
@@ -168,7 +194,7 @@ export default function SuperAdminPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {toast && (
-        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-lg text-sm font-medium transition-all ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-lg text-sm font-medium transition-all shadow-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
           {toast.type === 'success' ? <i className="ri-check-line mr-2" /> : <i className="ri-error-warning-line mr-2" />}
           {toast.msg}
         </div>
@@ -186,20 +212,26 @@ export default function SuperAdminPage() {
               <p className="text-xs text-gray-400">{currentEmail}</p>
             </div>
           </div>
-          <button
-            onClick={loadOrgs}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
-          >
-            <i className={`ri-refresh-line ${loading ? 'animate-spin' : ''}`} />
-            Yenile
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded-full font-medium">
+              <i className="ri-shield-check-line mr-1" />
+              Yetkili Erişim
+            </span>
+            <button
+              onClick={loadOrgs}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+            >
+              <i className={`ri-refresh-line ${loading ? 'animate-spin' : ''}`} />
+              Yenile
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-8 py-8">
 
-        {/* İstatistik kartları */}
+        {/* Stats */}
         <div className="grid grid-cols-5 gap-4 mb-8">
           {[
             { label: 'Toplam', value: stats.total, icon: 'ri-building-2-line', bg: 'bg-gray-100', text: 'text-gray-700' },
@@ -218,13 +250,13 @@ export default function SuperAdminPage() {
           ))}
         </div>
 
-        {/* Arama */}
+        {/* Search */}
         <div className="mb-4">
           <div className="relative max-w-xs">
             <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
             <input
               type="text"
-              placeholder="Organizasyon veya kod ara..."
+              placeholder="İsim, kod veya e-posta ara..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-200"
@@ -232,7 +264,7 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        {/* Tablo */}
+        {/* Table */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3">
@@ -251,6 +283,7 @@ export default function SuperAdminPage() {
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/80">
                   <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">Organizasyon</th>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Kurucu</th>
                   <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Durum</th>
                   <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Başlangıç</th>
                   <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Bitiş</th>
@@ -269,6 +302,10 @@ export default function SuperAdminPage() {
                           <p className="text-sm font-semibold text-gray-900">{org.name}</p>
                           <p className="text-xs text-gray-400 font-mono mt-0.5">{org.invite_code}</p>
                         </div>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <p className="text-xs text-gray-500">{org.creator_email ?? '—'}</p>
                       </td>
 
                       <td className="px-4 py-4">
@@ -365,7 +402,7 @@ export default function SuperAdminPage() {
           )}
         </div>
 
-        {/* Bilgi notu */}
+        {/* Info note */}
         <div className="mt-5 bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-start gap-3">
           <div className="w-5 h-5 flex items-center justify-center mt-0.5 shrink-0">
             <i className="ri-information-line text-amber-500 text-sm" />
@@ -376,6 +413,7 @@ export default function SuperAdminPage() {
               <li>• <strong>Bitiş tarihi</strong> geçmiş organizasyonlar bir sonraki girişte sisteme giremez</li>
               <li>• <strong>Pasif</strong> yapılan organizasyonlar bir sonraki girişte anında engellenir</li>
               <li>• Tarih boş bırakılırsa o organizasyon süresiz aktif sayılır</li>
+              <li>• Erişim yalnızca <strong>veritabanında yetkili</strong> olarak işaretlenmiş kullanıcılara açıktır</li>
             </ul>
           </div>
         </div>
