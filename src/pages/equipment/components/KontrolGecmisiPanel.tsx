@@ -246,8 +246,8 @@ export default function KontrolGecmisiPanel({ gecmis }: Props) {
                   </p>
                 )}
 
-                {/* Fotoğraf butonu — sadece Uygun Değil + fotoUrl varsa */}
-                {isUygunDegil && kayit.fotoUrl && (
+                {/* Fotoğraf butonu — Uygun Değil + fotoUrl varsa */}
+                {kayit.fotoUrl && (
                   <div className="mt-1.5">
                     <FotoButton fotoUrl={kayit.fotoUrl} />
                   </div>

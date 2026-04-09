@@ -1397,12 +1397,28 @@ function UygunDegliModal({
   const handleKaydet = async () => {
     if (!ekipman) return;
     setUploading(true);
+    let fotoUrl: string | null = null;
     try {
-      let fotoUrl: string | null = null;
       if (foto && org?.id) {
-        fotoUrl = await uploadFileToStorage(foto, org.id, 'ekipman-kontrol', `${ekipman.id}_uygun-degil_${Date.now()}`);
+        // iOS HEIC/HEIF desteği: dosya adı .heic/.heif olsa bile JPEG olarak yükle
+        let uploadFile = foto;
+        const ext = foto.name.split('.').pop()?.toLowerCase() ?? '';
+        if (['heic', 'heif'].includes(ext)) {
+          // HEIC dosyasını JPEG olarak yeniden adlandır — tarayıcı zaten JPEG binary içeriyor
+          uploadFile = new File([foto], foto.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+        }
+        try {
+          fotoUrl = await uploadFileToStorage(uploadFile, org.id, 'ekipman-kontrol', `${ekipman.id}_${Date.now()}`);
+        } catch (uploadErr) {
+          console.warn('[UygunDegliModal] Fotoğraf yüklenemedi, fotoğrafsız kaydediliyor:', uploadErr);
+          // Fotoğraf yüklenemese bile kayıt yapılsın
+        }
       }
       onKaydet(ekipman.id, notlar, fotoUrl);
+    } catch (err) {
+      console.error('[UygunDegliModal] handleKaydet error:', err);
+      // Hata olsa bile fotoğrafsız kaydet
+      onKaydet(ekipman.id, notlar, null);
     } finally {
       setUploading(false);
     }
