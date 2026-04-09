@@ -234,6 +234,74 @@ export async function getSignedUrlsBulk(
 }
 
 /**
+ * Görsel dosyaları upload öncesi sıkıştır (Canvas API)
+ * Telefon kamerası 5-15MB çeker — bu fonksiyon 500KB-1MB'a düşürür.
+ * PDF ve diğer dosyalara dokunmaz.
+ *
+ * @param file       - Sıkıştırılacak dosya
+ * @param maxWidth   - Maksimum genişlik (px), default 1920
+ * @param quality    - JPEG kalitesi 0-1, default 0.82
+ */
+async function compressImageIfNeeded(
+  file: File,
+  maxWidth = 1920,
+  quality = 0.82,
+): Promise<File> {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const isImage = ['jpg', 'jpeg', 'png'].includes(ext);
+
+  // Görsel değilse veya zaten küçükse (< 300KB) dokunma
+  if (!isImage || file.size < 300 * 1024) return file;
+
+  return new Promise<File>((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      // Boyut hesapla — oranı koru
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          // Sıkıştırma işe yaramadıysa (nadiren olur) orijinali kullan
+          if (blob.size >= file.size) { resolve(file); return; }
+          const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+          console.log(
+            `[fileUpload] compress: ${(file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB` +
+            ` (${Math.round((1 - compressed.size / file.size) * 100)}% küçüldü)`,
+          );
+          resolve(compressed);
+        },
+        'image/jpeg',
+        quality,
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file); // Hata durumunda orijinali kullan
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
  * Merkezi dosya yükleme yardımcısı
  * File objesi → Supabase Storage (private) → storage PATH döner (DB'ye kaydedilir)
  * NOT: Artık signed URL değil, filePath döner. Görüntüleme için getSignedUrlFromPath kullan.
@@ -259,13 +327,16 @@ export async function uploadFileToStorage(
   }
 
   try {
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
+    // Görsel ise upload öncesi sıkıştır — telefon fotoğrafları 5-15MB olabiliyor
+    const fileToUpload = await compressImageIfNeeded(file);
+
+    const fileExt = fileToUpload.name.split('.').pop()?.toLowerCase() ?? 'bin';
     const uuid = recordId ?? crypto.randomUUID();
-    const filePath = `${orgId}/${module}/${uuid}.${ext}`;
+    const filePath = `${orgId}/${module}/${uuid}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('uploads')
-      .upload(filePath, file, { upsert: true, contentType: file.type });
+      .upload(filePath, fileToUpload, { upsert: true, contentType: fileToUpload.type });
 
     if (error) {
       console.error(`[fileUpload] Storage error (${module}):`, error);
@@ -282,6 +353,7 @@ export async function uploadFileToStorage(
 
 /**
  * base64 data URL → Supabase Storage (private) → filePath döner
+ * Görsel ise upload öncesi otomatik sıkıştırır (telefon fotoğrafları için kritik)
  */
 export async function uploadBase64ToStorage(
   base64: string,
@@ -295,10 +367,8 @@ export async function uploadBase64ToStorage(
     const mimeMatch = meta.match(/data:([^;]+);/);
     const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
     const ext = fileName?.split('.').pop()?.toLowerCase() ?? mime.split('/')[1]?.split('+')[0] ?? 'bin';
-    const filePath = `${orgId}/${module}/${recordId}.${ext}`;
 
     // Enforce 50MB server-side limit on base64 uploads
-    // base64 is ~33% larger than binary, so actual size = base64.length * 0.75
     const estimatedBytes = Math.ceil(data.length * 0.75);
     const MAX_BYTES = 50 * 1024 * 1024;
     if (estimatedBytes > MAX_BYTES) {
@@ -312,16 +382,33 @@ export async function uploadBase64ToStorage(
     for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
     const blob = new Blob([ab], { type: mime });
 
+    // Görsel ise sıkıştır — telefon kamerası 5-15MB çekiyor
+    const isImage = ['image/jpeg', 'image/jpg', 'image/png'].includes(mime);
+    let uploadBlob = blob;
+    let uploadMime = mime;
+    let uploadExt = ext;
+
+    if (isImage && blob.size > 300 * 1024) {
+      const tempFile = new File([blob], `photo.${ext}`, { type: mime });
+      const compressed = await compressImageIfNeeded(tempFile);
+      if (compressed !== tempFile) {
+        uploadBlob = compressed;
+        uploadMime = 'image/jpeg';
+        uploadExt = 'jpg';
+      }
+    }
+
+    const filePath = `${orgId}/${module}/${recordId}.${uploadExt}`;
+
     const { error } = await supabase.storage
       .from('uploads')
-      .upload(filePath, blob, { upsert: true, contentType: mime });
+      .upload(filePath, uploadBlob, { upsert: true, contentType: uploadMime });
 
     if (error) {
       console.error(`[fileUpload] base64 Storage error (${module}):`, error);
       return null;
     }
 
-    // DB'ye filePath kaydet — expire olmaz
     return filePath;
   } catch (err) {
     console.error(`[fileUpload] base64 error (${module}):`, err);
