@@ -111,7 +111,7 @@ export default function SupportTicketsPanel() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-slate-900 font-bold text-base flex items-center gap-2">
             <i className="ri-customer-service-2-line text-emerald-600"></i>
@@ -125,17 +125,17 @@ export default function SupportTicketsPanel() {
           <p className="text-slate-500 text-xs mt-0.5 font-medium">{tickets.length} toplam talep</p>
         </div>
         <div className="flex gap-1.5 items-center">
-          <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+          <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-sm flex-1 sm:flex-none">
             {(['all', 'open', 'replied'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 text-xs rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex-1 sm:flex-none px-3 py-1.5 text-xs rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   filter === f ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}>
                 {f === 'all' ? 'Tümü' : f === 'open' ? 'Açık' : 'Yanıtlandı'}
               </button>
             ))}
           </div>
-          <button onClick={fetchTickets} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 cursor-pointer transition-all shadow-sm">
+          <button onClick={fetchTickets} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 cursor-pointer transition-all shadow-sm flex-shrink-0">
             <i className={`ri-refresh-line text-sm ${loading ? 'animate-spin' : ''}`}></i>
           </button>
         </div>
@@ -207,18 +207,18 @@ export default function SupportTicketsPanel() {
       {selected && createPortal(
         <>
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50" onClick={() => setSelected(null)} />
-          <div className="fixed right-0 top-0 h-full w-full max-w-lg bg-white border-l border-slate-200 z-50 flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0 bg-white">
-              <div>
-                <h3 className="text-slate-900 font-bold text-sm">{selected.subject}</h3>
-                <p className="text-slate-400 text-xs mt-0.5">{selected.user_name} · {selected.org_name || '—'}</p>
+          <div className="fixed right-0 top-0 h-full w-full md:max-w-lg bg-white border-l border-slate-200 z-50 flex flex-col">
+            <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-100 flex-shrink-0 bg-white">
+              <div className="min-w-0 flex-1 pr-3">
+                <h3 className="text-slate-900 font-bold text-sm truncate">{selected.subject}</h3>
+                <p className="text-slate-400 text-xs mt-0.5 truncate">{selected.user_name} · {selected.org_name || '—'}</p>
               </div>
-              <button onClick={() => setSelected(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
+              <button onClick={() => setSelected(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer flex-shrink-0">
                 <i className="ri-close-line text-lg"></i>
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 bg-slate-50">
+            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-5 bg-slate-50">
               {/* Kullanıcı mesajı */}
               <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">

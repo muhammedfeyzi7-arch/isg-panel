@@ -10,7 +10,7 @@ interface Props {
 
 const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
 
-const inputCls = 'w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-amber-400 focus:bg-white text-slate-900 placeholder-slate-400 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/15 transition-all';
+const inputCls = 'w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-indigo-400 focus:bg-white text-slate-900 placeholder-slate-400 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400/15 transition-all';
 
 export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
   const [form, setForm] = useState({
@@ -75,13 +75,13 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
   return createPortal(
     <>
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50" onClick={handleClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white border-l border-slate-200 z-50 overflow-y-auto flex flex-col shadow-2xl">
+      <div className="fixed right-0 top-0 h-full w-full md:max-w-md bg-white border-l border-slate-200 z-50 overflow-y-auto flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-200">
-              <i className="ri-add-circle-line text-emerald-600 text-base"></i>
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-indigo-50 border border-indigo-100">
+              <i className="ri-add-circle-line text-indigo-600 text-base"></i>
             </div>
             <div>
               <h2 className="text-slate-900 font-bold text-sm">Yeni Organizasyon</h2>
@@ -93,7 +93,7 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 px-6 py-6 bg-slate-50">
+        <div className="flex-1 px-4 md:px-6 py-6 bg-slate-50">
           {success ? (
             /* Başarı ekranı */
             <div className="space-y-6">
@@ -105,7 +105,7 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
                 <p className="text-slate-500 text-sm">Bu bilgileri müşteriye iletin.</p>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                 {[
                   { label: 'Organizasyon', value: success.org_name, mono: false },
                   { label: 'Davet Kodu', value: success.invite_code, mono: true },
@@ -125,11 +125,11 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {/* Org Bilgileri */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
                 <p className="text-slate-600 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                  <i className="ri-building-2-line text-amber-500"></i>
+                  <i className="ri-building-2-line text-indigo-500"></i>
                   Organizasyon
                 </p>
                 <Field label="Organizasyon Adı" required>
@@ -146,9 +146,9 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
               </div>
 
               {/* Admin Kullanıcı */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
                 <p className="text-slate-600 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                  <i className="ri-user-star-line text-amber-500"></i>
+                  <i className="ri-user-star-line text-indigo-500"></i>
                   Admin Kullanıcı
                 </p>
                 <Field label="Ad Soyad" required>
@@ -183,7 +183,7 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-40 text-white font-bold text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 shadow-lg shadow-emerald-400/20"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
               >
                 {loading ? <><i className="ri-loader-4-line animate-spin"></i> Oluşturuluyor...</> : <><i className="ri-add-circle-line"></i> Organizasyon Oluştur</>}
               </button>

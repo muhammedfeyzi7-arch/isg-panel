@@ -60,7 +60,7 @@ export default function SuperAdminPage() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex items-center gap-3 text-slate-400">
           <i className="ri-loader-4-line animate-spin text-xl"></i>
           <span className="text-sm font-medium">Yetki kontrol ediliyor...</span>
@@ -72,52 +72,52 @@ export default function SuperAdminPage() {
   if (!isSuperAdmin) return null;
 
   const statCards = [
-    { icon: 'ri-building-2-line', label: 'Toplam Org.', value: stats.total, key: 'all' as const, color: '#6366F1', bg: '#EEF2FF' },
-    { icon: 'ri-checkbox-circle-line', label: 'Aktif', value: stats.active, key: 'active' as const, color: '#10B981', bg: '#ECFDF5' },
-    { icon: 'ri-pause-circle-line', label: 'Pasif', value: stats.passive, key: 'passive' as const, color: '#EF4444', bg: '#FEF2F2' },
-    { icon: 'ri-timer-flash-line', label: 'Süresi Doldu', value: stats.expired, key: 'expired' as const, color: '#F97316', bg: '#FFF7ED' },
-    { icon: 'ri-alarm-warning-line', label: '14 Günde Doluyor', value: stats.expiringSoon, key: null, color: '#F59E0B', bg: '#FFFBEB' },
-    { icon: 'ri-team-line', label: 'Toplam Üye', value: stats.totalMembers, key: null, color: '#64748B', bg: '#F8FAFC' },
+    { icon: 'ri-building-2-line',   label: 'Toplam Org.',    value: stats.total,        key: 'all' as const,     color: '#6366F1', bg: '#EEF2FF' },
+    { icon: 'ri-checkbox-circle-line', label: 'Aktif',        value: stats.active,       key: 'active' as const,  color: '#10B981', bg: '#ECFDF5' },
+    { icon: 'ri-pause-circle-line', label: 'Pasif',           value: stats.passive,      key: 'passive' as const, color: '#EF4444', bg: '#FEF2F2' },
+    { icon: 'ri-timer-flash-line',  label: 'Süresi Doldu',   value: stats.expired,      key: 'expired' as const, color: '#F97316', bg: '#FFF7ED' },
+    { icon: 'ri-alarm-warning-line',label: '14 Günde Doluyor',value: stats.expiringSoon, key: null,               color: '#F59E0B', bg: '#FFFBEB' },
+    { icon: 'ri-team-line',         label: 'Toplam Üye',     value: stats.totalMembers, key: null,               color: '#64748B', bg: '#F8FAFC' },
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: '#F8FAFC' }}>
+    <div className="min-h-screen bg-slate-50">
       {/* Navbar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-screen-xl mx-auto px-8 h-16 flex items-center justify-between">
+        <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-14 md:h-16 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #F59E0B, #F97316)' }}>
-              <i className="ri-shield-keyhole-fill text-white text-sm"></i>
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-600">
+              <i className="ri-shield-keyhole-fill text-white text-xs md:text-sm"></i>
             </div>
             <div>
-              <p className="text-slate-900 font-bold text-sm leading-none">Admin Panel</p>
-              <p className="text-slate-400 text-xs mt-0.5">isgdenetim.com.tr</p>
+              <p className="text-slate-900 font-bold text-xs md:text-sm leading-none">Admin Panel</p>
+              <p className="text-slate-400 text-xs mt-0.5 hidden sm:block">isgdenetim.com.tr</p>
             </div>
           </div>
 
           {/* Sağ aksiyonlar */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             {activeTab === 'orgs' && (
               <button
                 onClick={() => setCreateOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold cursor-pointer whitespace-nowrap transition-all hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, #F59E0B, #F97316)' }}
+                className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl text-white text-xs md:text-sm font-semibold cursor-pointer whitespace-nowrap transition-all bg-indigo-600 hover:bg-indigo-700"
               >
                 <i className="ri-add-line"></i>
-                Yeni Organizasyon
+                <span className="hidden sm:inline">Yeni Organizasyon</span>
+                <span className="sm:hidden">Yeni</span>
               </button>
             )}
             <button
               onClick={fetchOrgs}
               disabled={loading}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 cursor-pointer transition-all"
+              className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 cursor-pointer transition-all"
             >
               <i className={`ri-refresh-line text-sm ${loading ? 'animate-spin' : ''}`}></i>
             </button>
             <button
               onClick={handleLogout}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 hover:text-red-500 text-slate-500 cursor-pointer transition-all"
+              className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 hover:text-red-500 text-slate-500 cursor-pointer transition-all"
             >
               <i className="ri-logout-box-line text-sm"></i>
             </button>
@@ -125,15 +125,15 @@ export default function SuperAdminPage() {
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-8 py-8 space-y-6">
+      <main className="max-w-screen-xl mx-auto px-4 md:px-8 py-4 md:py-8 space-y-4 md:space-y-6">
 
         {/* Tab switcher */}
-        <div className="flex gap-1 p-1 bg-white border border-slate-200 rounded-xl w-fit">
+        <div className="flex gap-1 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit">
           {(['orgs', 'support'] as const).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex-1 sm:flex-none px-4 md:px-5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === t
                   ? 'bg-slate-900 text-white'
                   : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
@@ -149,26 +149,26 @@ export default function SuperAdminPage() {
         {activeTab === 'orgs' && (
           <>
             {/* Stat kartları */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4">
               {statCards.map((s, i) => {
                 const isActive = s.key !== null && filter === s.key;
                 return (
                   <button
                     key={i}
                     onClick={() => s.key && setFilter(s.key)}
-                    className={`p-5 rounded-2xl border text-left transition-all ${s.key ? 'cursor-pointer' : 'cursor-default'} ${
+                    className={`p-3 md:p-5 rounded-2xl border text-left transition-all ${s.key ? 'cursor-pointer' : 'cursor-default'} ${
                       isActive
                         ? 'border-slate-900 bg-slate-900'
                         : 'bg-white border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center mb-4"
+                      className="w-7 h-7 md:w-9 md:h-9 rounded-xl flex items-center justify-center mb-2 md:mb-4"
                       style={{ background: isActive ? 'rgba(255,255,255,0.15)' : s.bg }}
                     >
-                      <i className={`${s.icon} text-sm`} style={{ color: isActive ? '#fff' : s.color }}></i>
+                      <i className={`${s.icon} text-xs md:text-sm`} style={{ color: isActive ? '#fff' : s.color }}></i>
                     </div>
-                    <p className={`text-2xl font-black mb-1 ${isActive ? 'text-white' : 'text-slate-900'}`}>{s.value}</p>
+                    <p className={`text-xl md:text-2xl font-black mb-0.5 md:mb-1 ${isActive ? 'text-white' : 'text-slate-900'}`}>{s.value}</p>
                     <p className={`text-xs font-medium leading-tight ${isActive ? 'text-slate-400' : 'text-slate-500'}`}>{s.label}</p>
                   </button>
                 );
@@ -178,7 +178,7 @@ export default function SuperAdminPage() {
             {/* Tablo kartı */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               {/* Tablo başlığı */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 gap-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-slate-900 font-bold text-sm">
                     {filter === 'all' ? 'Tüm Organizasyonlar' : filter === 'active' ? 'Aktif Organizasyonlar' : filter === 'passive' ? 'Pasif Organizasyonlar' : 'Süresi Dolmuş'}
@@ -187,14 +187,14 @@ export default function SuperAdminPage() {
                     {filteredOrgs.length}
                   </span>
                 </div>
-                <div className="relative">
+                <div className="relative w-full sm:w-auto">
                   <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                   <input
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Organizasyon ara..."
-                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 transition-all w-56"
+                    className="w-full sm:w-56 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 transition-all"
                   />
                 </div>
               </div>

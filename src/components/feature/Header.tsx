@@ -114,6 +114,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const [notifOpen, setNotifOpen]     = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [supportViewTicketId, setSupportViewTicketId] = useState<string | null>(null);
   const [search, setSearch]           = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -443,7 +444,14 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                 <div className="max-h-72 overflow-y-auto">
                   {supportNotifs.map((n, idx) => (
                     <div key={n.id}
-                      onClick={() => markSupportRead(n.id)}
+                      onClick={() => {
+                        markSupportRead(n.id);
+                        setSupportNotifOpen(false);
+                        if (n.ticket_id) {
+                          setSupportViewTicketId(n.ticket_id);
+                          setSupportOpen(true);
+                        }
+                      }}
                       className="px-4 py-3 cursor-pointer transition-all"
                       style={{
                         borderBottom: idx < supportNotifs.length - 1 ? `1px solid ${dropdownBorder}` : 'none',
@@ -737,7 +745,11 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
       </header>
 
       {/* Support Modal */}
-      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+      <SupportModal
+        open={supportOpen}
+        onClose={() => { setSupportOpen(false); setSupportViewTicketId(null); }}
+        viewTicketId={supportViewTicketId}
+      />
 
       {/* ══════════════════════════════════════════════════════
           QUICK ADD MODAL

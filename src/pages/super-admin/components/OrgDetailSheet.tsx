@@ -72,32 +72,32 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
   return createPortal(
     <>
       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white border-l border-slate-200 z-50 flex flex-col shadow-2xl">
+      <div className="fixed right-0 top-0 h-full w-full md:max-w-md bg-white border-l border-slate-200 z-50 flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white text-sm font-black flex-shrink-0 shadow-md shadow-amber-400/25">
+        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-100 flex-shrink-0 bg-white">
+          <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-600 text-white text-sm font-black flex-shrink-0">
               {initials}
             </div>
-            <div>
-              <h2 className="text-slate-900 font-bold text-sm leading-tight">{org.name}</h2>
+            <div className="min-w-0">
+              <h2 className="text-slate-900 font-bold text-sm leading-tight truncate">{org.name}</h2>
               <p className="text-slate-400 text-xs font-mono mt-0.5">{org.invite_code}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer flex-shrink-0">
             <i className="ri-close-line text-lg"></i>
           </button>
         </div>
 
         {/* Sekmeler */}
-        <div className="flex border-b border-slate-100 px-6 flex-shrink-0 bg-white">
+        <div className="flex border-b border-slate-100 px-4 md:px-6 flex-shrink-0 bg-white">
           {(['info', 'members'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                tab === t ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+                tab === t ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
               {t === 'info' ? 'Bilgiler & Yönetim' : 'Üyeler'}
@@ -106,7 +106,7 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
         </div>
 
         {/* İçerik */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 bg-slate-50">
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-4 bg-slate-50">
 
           {tab === 'members' && <OrgMembersTab orgId={org.id} />}
 
@@ -135,7 +135,7 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
               </div>
 
               {/* Bilgiler */}
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                 {[
                   { icon: 'ri-calendar-line', label: 'Oluşturulma', value: formatDate(org.created_at), cls: '' },
                   { icon: 'ri-team-line', label: 'Üye Sayısı', value: `${org.member_count || 0} üye`, cls: '' },
@@ -152,24 +152,24 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
               </div>
 
               {/* Abonelik Tarihi */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
                 <h3 className="text-slate-700 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                  <i className="ri-calendar-2-line text-amber-500"></i>Abonelik Bitiş Tarihini Güncelle
+                  <i className="ri-calendar-2-line text-indigo-500"></i>Abonelik Bitiş Tarihini Güncelle
                 </h3>
                 <div className="flex gap-2">
                   <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                    className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15 transition-all" />
+                    className="flex-1 bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 transition-all" />
                   <button onClick={handleSaveDate} disabled={saving || !endDate}
-                    className="px-4 py-2 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 shadow-md shadow-amber-400/20">
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5">
                     {saving ? <i className="ri-loader-4-line animate-spin"></i> : <i className="ri-save-line"></i>}Kaydet
                   </button>
                 </div>
               </div>
 
               {/* Aktif/Pasif */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4">
                 <h3 className="text-slate-700 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <i className="ri-toggle-line text-amber-500"></i>Organizasyon Durumu
+                  <i className="ri-toggle-line text-indigo-500"></i>Organizasyon Durumu
                 </h3>
                 <button onClick={handleToggleActive} disabled={saving}
                   className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 border ${
@@ -213,7 +213,7 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
 
         {/* Toast */}
         {toast && (
-          <div className={`mx-6 mb-4 flex items-center gap-2 text-sm rounded-xl px-4 py-3 border flex-shrink-0 ${
+          <div className={`mx-4 md:mx-6 mb-4 flex items-center gap-2 text-sm rounded-xl px-4 py-3 border flex-shrink-0 ${
             toast.type === 'ok'
               ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
               : 'bg-red-50 border-red-200 text-red-600'
