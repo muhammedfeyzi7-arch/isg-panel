@@ -653,7 +653,7 @@ export function useStore(
 
     // ── Tek kayıt patch — tüm tabloyu yeniden çekmek yerine sadece değişen kaydı güncelle ──
     // Bu sayede karşı cihazdan gelen değişiklikler ANINDA yansır (iş izinleri gibi)
-    const applyPatch = (table: string, rawRecord: unknown, eventType: string, recordId: string) => {
+    const applyPatch = (table: string, rawRecord: unknown, eventType: string, recordId: string, incomingUpdatedAt?: string) => {
       if (eventType === 'DELETE') {
         // Silinen kaydı state'den çıkar + cache'i güncelle
         const filterAndCache = <T extends { id: string }>(
@@ -689,14 +689,27 @@ export function useStore(
         setter: (fn: (prev: T[]) => T[]) => void,
         transform?: (r: T) => T,
         cacheTable?: string,
+        incomingUpdatedAt?: string,
       ) => {
         const record = (transform ? transform(data as unknown as T) : data) as T;
         setter(prev => {
           const idx = prev.findIndex(r => r.id === recordId);
           let next: T[];
           if (idx === -1) {
+            // Yeni kayıt — direkt ekle
             next = [record, ...prev];
           } else {
+            // Mevcut kayıt — timestamp karşılaştır
+            const existing = prev[idx];
+            const existingUpdatedAt = (existing as unknown as Record<string, unknown>)?.updated_at as string | undefined;
+            const incomingTs = incomingUpdatedAt;
+
+            if (existingUpdatedAt && incomingTs && incomingTs <= existingUpdatedAt) {
+              // Gelen veri daha eski veya aynı — state'i ezme
+              console.log(`[ISG] applyPatch SKIP (stale): id=${recordId} existing=${existingUpdatedAt} incoming=${incomingTs}`);
+              return prev;
+            }
+
             next = [...prev];
             next[idx] = record;
           }
@@ -710,41 +723,41 @@ export function useStore(
 
       switch (table) {
         case 'firmalar':
-          upsertRecord<Firma>(setFirmalar, undefined, 'firmalar');
+          upsertRecord<Firma>(setFirmalar, undefined, 'firmalar', incomingUpdatedAt);
           break;
         case 'personeller':
           upsertRecord<Personel>(setPersoneller, p => ({
             ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
-          }), 'personeller');
+          }), 'personeller', incomingUpdatedAt);
           break;
         case 'evraklar':
           upsertRecord<Evrak>(setEvraklar, e => ({
             ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
-          }), 'evraklar');
+          }), 'evraklar', incomingUpdatedAt);
           break;
         case 'egitimler':
-          upsertRecord<Egitim>(setEgitimler, undefined, 'egitimler');
+          upsertRecord<Egitim>(setEgitimler, undefined, 'egitimler', incomingUpdatedAt);
           break;
         case 'muayeneler':
-          upsertRecord<Muayene>(setMuayeneler, undefined, 'muayeneler');
+          upsertRecord<Muayene>(setMuayeneler, undefined, 'muayeneler', incomingUpdatedAt);
           break;
         case 'uygunsuzluklar':
           upsertRecord<Uygunsuzluk>(setUygunsuzluklar, u => ({
             ...u,
             durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus,
-          }), 'uygunsuzluklar');
+          }), 'uygunsuzluklar', incomingUpdatedAt);
           break;
         case 'ekipmanlar':
-          upsertRecord<Ekipman>(setEkipmanlar, undefined, 'ekipmanlar');
+          upsertRecord<Ekipman>(setEkipmanlar, undefined, 'ekipmanlar', incomingUpdatedAt);
           break;
         case 'gorevler':
-          upsertRecord<Gorev>(setGorevler, undefined, 'gorevler');
+          upsertRecord<Gorev>(setGorevler, undefined, 'gorevler', incomingUpdatedAt);
           break;
         case 'tutanaklar':
-          upsertRecord<Tutanak>(setTutanaklar, undefined, 'tutanaklar');
+          upsertRecord<Tutanak>(setTutanaklar, undefined, 'tutanaklar', incomingUpdatedAt);
           break;
         case 'is_izinleri':
-          upsertRecord<IsIzni>(setIsIzinleri, undefined, 'is_izinleri');
+          upsertRecord<IsIzni>(setIsIzinleri, undefined, 'is_izinleri', incomingUpdatedAt);
           break;
       }
     };
@@ -759,6 +772,16 @@ export function useStore(
           await fetchEkipmanlar(activeOrgId, true /* ignoreCache */);
           return;
         }
+        // Diğer tablolar — ignoreCache=true ile direkt DB'ye git
+        if (table === 'firmalar') { await fetchWithCache<Firma>('firmalar', activeOrgId, setFirmalar, undefined, true); return; }
+        if (table === 'personeller') { await fetchWithCache<Personel>('personeller', activeOrgId, setPersoneller, p => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') }), true); return; }
+        if (table === 'evraklar') { await fetchWithCache<Evrak>('evraklar', activeOrgId, setEvraklar, e => ({ ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? '') }), true); return; }
+        if (table === 'egitimler') { await fetchWithCache<Egitim>('egitimler', activeOrgId, setEgitimler, undefined, true); return; }
+        if (table === 'muayeneler') { await fetchWithCache<Muayene>('muayeneler', activeOrgId, setMuayeneler, undefined, true); return; }
+        if (table === 'uygunsuzluklar') { await fetchWithCache<Uygunsuzluk>('uygunsuzluklar', activeOrgId, setUygunsuzluklar, u => ({ ...u, durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus }), true); return; }
+        if (table === 'gorevler') { await fetchWithCache<Gorev>('gorevler', activeOrgId, setGorevler, undefined, true); return; }
+        if (table === 'tutanaklar') { await fetchWithCache<Tutanak>('tutanaklar', activeOrgId, setTutanaklar, undefined, true); return; }
+        if (table === 'is_izinleri') { await fetchWithCache<IsIzni>('is_izinleri', activeOrgId, setIsIzinleri, undefined, true); return; }
         // Use paginated fetch to bypass 1000-row limit
         const { data, error } = await fetchAllRows(table, activeOrgId);
         if (error) {
@@ -843,6 +866,7 @@ export function useStore(
 
           // INSERT / UPDATE: payload.new.data içinde tam kayıt var
           const newData = payload.new?.data;
+          const incomingTs = payload.new?.updated_at as string | undefined;
           if (newData && recordId) {
             // Kalıcı silinen kayıtlar için gelen UPDATE event'ini yoksay
             // (permanentDelete öncesi deleted_at set ederken UPDATE event'i geliyor)
@@ -851,7 +875,7 @@ export function useStore(
               return;
             }
             // Anında patch — DB'ye tekrar sorgu atmadan
-            applyPatch(table, newData, payload.eventType, recordId);
+            applyPatch(table, newData, payload.eventType, recordId, incomingTs);
             onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
           } else {
             // data yoksa fallback: tüm tabloyu yeniden çek

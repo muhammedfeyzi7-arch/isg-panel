@@ -98,7 +98,7 @@ function SubscriptionWarningBanner({
       const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       return { org, diffDays };
     })
-    .filter(({ diffDays }) => diffDays > 0 && diffDays <= 14)
+    .filter(({ diffDays }) => diffDays > 0 && diffDays <= 30)
     .sort((a, b) => a.diffDays - b.diffDays);
 
   if (warnings.length === 0) return null;
@@ -354,8 +354,8 @@ function MembersModal({
   };
 
   const roleLabel = (role: string) => {
-    if (role === 'admin') return { label: 'Yönetici', color: 'bg-gray-900 text-white' };
-    if (role === 'manager') return { label: 'Müdür', color: 'bg-gray-700 text-white' };
+    if (role === 'admin') return { label: 'Yönetici', color: 'bg-emerald-100 text-emerald-700' };
+    if (role === 'manager') return { label: 'Müdür', color: 'bg-amber-100 text-amber-700' };
     return { label: 'Üye', color: 'bg-gray-100 text-gray-600' };
   };
 
@@ -752,10 +752,11 @@ export default function SuperAdminPage() {
     const end = new Date(org.subscription_end);
     end.setHours(23, 59, 59, 999);
     const now = new Date();
+    // diffDays: negative means expired
     const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    if (end < now) return { label: 'Süresi Doldu', color: 'bg-red-50 text-red-700', dot: 'bg-red-500' };
+    if (diffDays <= 0) return { label: 'Süresi Doldu', color: 'bg-red-50 text-red-700', dot: 'bg-red-500' };
     if (diffDays <= 3) return { label: `${diffDays} gün kaldı`, color: 'bg-red-50 text-red-700', dot: 'bg-red-500' };
-    if (diffDays <= 14) return { label: `${diffDays} gün kaldı`, color: 'bg-amber-50 text-amber-700', dot: 'bg-amber-500' };
+    if (diffDays <= 30) return { label: `${diffDays} gün kaldı`, color: 'bg-amber-50 text-amber-700', dot: 'bg-amber-500' };
     return { label: 'Aktif', color: 'bg-green-50 text-green-700', dot: 'bg-green-500' };
   };
 
@@ -767,9 +768,12 @@ export default function SuperAdminPage() {
 
   const stats = {
     total: orgs.length,
-    active: orgs.filter(o => getStatus(o).label === 'Aktif').length,
+    active: orgs.filter(o => {
+      const s = getStatus(o);
+      return s.label === 'Aktif';
+    }).length,
     expired: orgs.filter(o => getStatus(o).label === 'Süresi Doldu').length,
-    expiringSoon: orgs.filter(o => getStatus(o).label.includes('gün')).length,
+    expiringSoon: orgs.filter(o => getStatus(o).label.includes('gün kaldı')).length,
     passive: orgs.filter(o => !o.is_active).length,
   };
 

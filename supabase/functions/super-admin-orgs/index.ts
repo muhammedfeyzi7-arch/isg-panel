@@ -81,23 +81,36 @@ Deno.serve(async (req) => {
 
       const orgsWithCount = await Promise.all(
         (orgs ?? []).map(async (org) => {
+          // Member count
           const { count } = await adminClient
             .from('user_organizations')
             .select('*', { count: 'exact', head: true })
             .eq('organization_id', org.id)
             .eq('is_active', true);
 
-          let creatorEmail = null;
+          // Creator email: first try user_organizations, then auth.users via admin API
+          let creatorEmail: string | null = null;
           if (org.created_by) {
+            // Try user_organizations first
             const { data: uo } = await adminClient
               .from('user_organizations')
               .select('email')
               .eq('user_id', org.created_by)
               .maybeSingle();
             creatorEmail = uo?.email ?? null;
+
+            // If not found, try auth.users
+            if (!creatorEmail) {
+              try {
+                const { data: authUser } = await adminClient.auth.admin.getUserById(org.created_by);
+                creatorEmail = authUser?.user?.email ?? null;
+              } catch (_) {
+                // ignore
+              }
+            }
           }
 
-          // Last activity
+          // Last activity - try by organization_id
           const { data: lastLog } = await adminClient
             .from('activity_logs')
             .select('created_at')
@@ -137,7 +150,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // user_organizations kolonları: id, user_id, organization_id, role, email, display_name, is_active, joined_at
       const { data: members, error: membersError } = await adminClient
         .from('user_organizations')
         .select('id, user_id, email, display_name, role, is_active, joined_at')
@@ -146,29 +158,59 @@ Deno.serve(async (req) => {
 
       if (membersError) throw membersError;
 
-      // Last activity per member
+      // Enrich with activity data
       const enriched = await Promise.all(
         (members ?? []).map(async (m) => {
-          const { data: lastLog } = await adminClient
-            .from('activity_logs')
-            .select('created_at, action_type, module')
-            .eq('organization_id', orgId)
-            .eq('user_id', m.user_id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          // Try by user_id first, then by user_email
+          let lastLog = null;
+          let actionCount = 0;
 
-          const { count: actionCount } = await adminClient
-            .from('activity_logs')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', orgId)
-            .eq('user_id', m.user_id);
+          if (m.user_id) {
+            const { data: logByUserId } = await adminClient
+              .from('activity_logs')
+              .select('created_at, action_type, module')
+              .eq('organization_id', orgId)
+              .eq('user_id', m.user_id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            const { count: countByUserId } = await adminClient
+              .from('activity_logs')
+              .select('*', { count: 'exact', head: true })
+              .eq('organization_id', orgId)
+              .eq('user_id', m.user_id);
+
+            lastLog = logByUserId;
+            actionCount = countByUserId ?? 0;
+          }
+
+          // If no results by user_id, try by email
+          if (!lastLog && m.email) {
+            const { data: logByEmail } = await adminClient
+              .from('activity_logs')
+              .select('created_at, action_type, module')
+              .eq('organization_id', orgId)
+              .eq('user_email', m.email)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            const { count: countByEmail } = await adminClient
+              .from('activity_logs')
+              .select('*', { count: 'exact', head: true })
+              .eq('organization_id', orgId)
+              .eq('user_email', m.email);
+
+            lastLog = logByEmail;
+            actionCount = countByEmail ?? 0;
+          }
 
           return {
             ...m,
             last_activity: lastLog?.created_at ?? null,
             last_action: lastLog ? `${lastLog.module ?? ''} - ${lastLog.action_type ?? ''}` : null,
-            action_count: actionCount ?? 0,
+            action_count: actionCount,
           };
         })
       );
@@ -288,7 +330,6 @@ Deno.serve(async (req) => {
       const body = await req.json();
       const { orgId } = body;
 
-      // Get org info
       const { data: org, error: orgError } = await adminClient
         .from('organizations')
         .select('id, name, subscription_end')
@@ -302,7 +343,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get active members
       const { data: members } = await adminClient
         .from('user_organizations')
         .select('email, display_name, role')
@@ -320,7 +360,6 @@ Deno.serve(async (req) => {
       const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
       if (!RESEND_API_KEY) {
-        // No email service configured - return member list for manual action
         return new Response(JSON.stringify({
           success: false,
           error: 'E-posta servisi yapılandırılmamış (RESEND_API_KEY eksik)',
@@ -333,7 +372,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Send emails via Resend
       const results = [];
       for (const member of (members ?? [])) {
         try {
