@@ -4,7 +4,7 @@ import type { Egitim, EgitimKatilimci } from '../../types';
 import type ExcelJSType from 'exceljs';
 import Modal from '../../components/base/Modal';
 import { usePermissions } from '@/hooks/usePermissions';
-import AiKatilimAnaliz, { type EgitimMetaBilgi } from './components/AiKatilimAnaliz';
+import AiKatilimAnaliz from './components/AiKatilimAnaliz';
 
 
 
@@ -829,6 +829,7 @@ export default function EgitimlerPage() {
             }}
             onEkle={(personelIds) => {
               setForm(prev => {
+                // Zaten listede olmayanları ekle, katildi=true
                 const mevcutIds = new Set(prev.katilimcilar.map(k => k.personelId));
                 const yeniKatilimcilar = personelIds
                   .filter(id => !mevcutIds.has(id))
@@ -837,50 +838,6 @@ export default function EgitimlerPage() {
                   ...prev,
                   katilimcilar: [...prev.katilimcilar, ...yeniKatilimcilar],
                 };
-              });
-            }}
-            onMetaOkundu={(meta: EgitimMetaBilgi) => {
-              setForm(prev => {
-                const updates: Partial<typeof prev> = {};
-
-                // Eğitim adı: projeAdi veya mevcut boşsa doldur
-                if (meta.projeAdi && !prev.ad.trim()) {
-                  updates.ad = meta.projeAdi;
-                }
-
-                // Eğitmen: boşsa doldur
-                if (meta.egitmen && !prev.egitmen.trim()) {
-                  const egitmenStr = meta.egitmenGorev
-                    ? `${meta.egitmen} (${meta.egitmenGorev})`
-                    : meta.egitmen;
-                  updates.egitmen = egitmenStr;
-                }
-
-                // Tarih: boşsa ve geçerli bir tarih ise doldur
-                if (meta.egitimTarihi && !prev.tarih) {
-                  // DD.MM.YYYY → YYYY-MM-DD dönüşümü dene
-                  const ddmmyyyy = meta.egitimTarihi.match(/^(\d{1,2})[./\-](\d{1,2})[./\-](\d{4})$/);
-                  if (ddmmyyyy) {
-                    const [, d, m, y] = ddmmyyyy;
-                    updates.tarih = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                  } else {
-                    // YYYY-MM-DD formatında direkt dene
-                    const isoDate = meta.egitimTarihi.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                    if (isoDate) updates.tarih = meta.egitimTarihi;
-                  }
-                }
-
-                // Açıklama: yer ve süre bilgisini ekle
-                const ekstraBilgiler: string[] = [];
-                if (meta.egitimYeri) ekstraBilgiler.push(`Yer: ${meta.egitimYeri}`);
-                if (meta.egitimSuresi) ekstraBilgiler.push(`Süre: ${meta.egitimSuresi}`);
-                if (meta.firmaAdi) ekstraBilgiler.push(`Firma: ${meta.firmaAdi}`);
-
-                if (ekstraBilgiler.length > 0 && !prev.aciklama.trim()) {
-                  updates.aciklama = ekstraBilgiler.join(' | ');
-                }
-
-                return { ...prev, ...updates };
               });
             }}
           />
