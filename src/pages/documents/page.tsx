@@ -7,7 +7,7 @@ import Modal from '../../components/base/Modal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import { getEvrakKategori, KATEGORI_META } from '../../utils/evrakKategori';
 import BulkEvrakUpload from './components/BulkEvrakUpload';
-import { getSignedUrlFromPath } from '@/utils/fileUpload';
+import { getSignedUrlFromPath, validateFile } from '@/utils/fileUpload';
 
 const EVRAK_TURLERI = ['Kimlik', 'EK-2', 'Sağlık Raporu', 'Sürücü Belgesi', 'SRC', 'Sertifika / MYK / Diploma', 'Oryantasyon Eğitimi', 'İşbaşı Eğitimi', 'İş Sözleşmesi', 'Diğer'];
 
@@ -157,6 +157,12 @@ export default function EvraklarPage() {
 
   const handleFileChange = (file?: File) => {
     if (!file) return;
+    try {
+      validateFile(file);
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Geçersiz dosya.', 'error');
+      return;
+    }
     setPendingFile(file);
     setForm(prev => ({
       ...prev,

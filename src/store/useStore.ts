@@ -418,19 +418,24 @@ export function useStore(
     orgId: string,
     setter: (rows: T[]) => void,
     transform?: (row: T) => T,
+    ignoreCache?: boolean,
   ): Promise<void> => {
     const cacheKey = `${table}_${orgId}`;
 
-    // 1. Cache'ten anında yükle
-    const cached = await readCache<T[]>(cacheKey);
-    if (cached) {
-      setter(cached.data);
-      console.log(`[ISG] fetch ${table} cache HIT (${cached.data.length} rows)`);
-      // Fresh ise DB'ye gitme
-      if ((Date.now() - cached.ts) < CACHE_TTL_MS) {
-        console.log(`[ISG] fetch ${table} cache FRESH — skipping DB`);
-        return;
+    if (!ignoreCache) {
+      // 1. Cache'ten anında yükle
+      const cached = await readCache<T[]>(cacheKey);
+      if (cached) {
+        setter(cached.data);
+        console.log(`[ISG] fetch ${table} cache HIT (${cached.data.length} rows)`);
+        // Fresh ise DB'ye gitme
+        if ((Date.now() - cached.ts) < CACHE_TTL_MS) {
+          console.log(`[ISG] fetch ${table} cache FRESH — skipping DB`);
+          return;
+        }
       }
+    } else {
+      console.log(`[ISG] fetch ${table} ignoreCache=true — going directly to DB`);
     }
 
     // 2. DB'den çek
@@ -477,8 +482,24 @@ export function useStore(
     });
   }, [fetchWithCache, setUygunsuzluklar]);
 
-  const fetchEkipmanlar = useCallback(async (orgId: string) => {
+  const fetchEkipmanlar = useCallback(async (orgId: string, ignoreCache?: boolean) => {
     const cacheKey = `ekipmanlar_${orgId}`;
+
+    // Cache kontrolü — ignoreCache=true ise atla (realtime reload için)
+    if (!ignoreCache) {
+      const cached = await readCache<Ekipman[]>(cacheKey);
+      if (cached) {
+        setEkipmanlar(cached.data);
+        console.log(`[ISG] fetchEkipmanlar cache HIT (${cached.data.length} rows)`);
+        if ((Date.now() - cached.ts) < CACHE_TTL_MS) {
+          console.log(`[ISG] fetchEkipmanlar cache FRESH — skipping DB`);
+          return;
+        }
+      }
+    } else {
+      console.log(`[ISG] fetchEkipmanlar ignoreCache=true — going directly to DB`);
+    }
+
     const PAGE_SIZE = 500;
     let allRows: Ekipman[] = [];
     let from = 0;
@@ -729,11 +750,13 @@ export function useStore(
     };
 
     // Fallback: tüm tabloyu yeniden çek (patch başarısız olursa veya data yoksa)
+    // ignoreCache=true: realtime event'ten gelince HER ZAMAN DB'ye git, cache'i atla
     const reloadTable = async (table: string) => {
       try {
+        console.log(`[ISG] reloadTable: ${table} — bypassing cache, fetching from DB`);
         // Ekipmanlar için özel fetch — deleted_at filtresi YOK (aktif + silinmiş hepsi lazım)
         if (table === 'ekipmanlar') {
-          await fetchEkipmanlar(activeOrgId);
+          await fetchEkipmanlar(activeOrgId, true /* ignoreCache */);
           return;
         }
         // Use paginated fetch to bypass 1000-row limit
@@ -744,6 +767,8 @@ export function useStore(
         }
         if (!data) return;
         const rows = data.map(r => r.data as unknown);
+        // Cache'i de güncelle — bir sonraki normal fetch cache'ten gelsin
+        void writeCache(`${table}_${activeOrgId}`, rows);
         // TABLE_MAP yerine applyPatch ile tek tek uygula
         switch (table) {
           case 'firmalar':       setFirmalar(rows as Firma[]); break;
@@ -1614,18 +1639,16 @@ export function useStore(
     ownDeletesRef.current.add(id);
     _setEkipmanlar(prev => prev.filter(e => e.id !== id));
     try {
-      // TEST: edge function devre dışı — direkt supabase.delete()
-      console.log(`[ISG][TEST] permanentDeleteEkipman direkt delete: ${id}`);
-      const { error, data } = await supabase
-        .from('ekipmanlar')
-        .delete()
-        .eq('id', id)
-        .select();
-      console.log(`[ISG][TEST] delete result — data:`, data, 'error:', error);
-      if (error) throw new Error(error.message);
-      console.log(`[ISG][TEST] permanentDeleteEkipman OK: ${id} — silinen satır sayısı: ${data?.length ?? 0}`);
+      await dbDelete('ekipmanlar', id);
+      // Cache'i de güncelle — silinen kaydı çıkar
+      const orgId = orgIdRef.current;
+      if (orgId) {
+        const updated = ekipmanlarRef.current;
+        void writeCache(`ekipmanlar_${orgId}`, updated);
+      }
+      console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
     } catch (err) {
-      console.error('[ISG][TEST] permanentDeleteEkipman FAILED, rolling back:', err);
+      console.error('[ISG] permanentDeleteEkipman FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
       _setEkipmanlar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
@@ -1639,18 +1662,16 @@ export function useStore(
     ids.forEach(id => ownDeletesRef.current.add(id));
     _setEkipmanlar(prev => prev.filter(e => !ids.includes(e.id)));
     try {
-      // TEST: edge function devre dışı — direkt supabase.delete()
-      console.log(`[ISG][TEST] permanentDeleteEkipmanMany direkt delete: ${ids.join(', ')}`);
-      const { error, data } = await supabase
-        .from('ekipmanlar')
-        .delete()
-        .in('id', ids)
-        .select();
-      console.log(`[ISG][TEST] delete many result — data:`, data, 'error:', error);
-      if (error) throw new Error(error.message);
-      console.log(`[ISG][TEST] permanentDeleteEkipmanMany OK: ${ids.length} items — silinen: ${data?.length ?? 0}`);
+      await dbDeleteMany('ekipmanlar', ids);
+      // Cache'i de güncelle — silinen kayıtları çıkar
+      const orgId = orgIdRef.current;
+      if (orgId) {
+        const updated = ekipmanlarRef.current;
+        void writeCache(`ekipmanlar_${orgId}`, updated);
+      }
+      console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
     } catch (err) {
-      console.error('[ISG][TEST] permanentDeleteEkipmanMany FAILED, rolling back:', err);
+      console.error('[ISG] permanentDeleteEkipmanMany FAILED, rolling back:', err);
       ids.forEach(id => ownDeletesRef.current.delete(id));
       _setEkipmanlar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);

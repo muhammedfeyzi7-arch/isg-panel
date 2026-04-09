@@ -1654,6 +1654,7 @@ export default function SahaPage() {
       kontrolEdenId: currentUser?.id || '',
       durum: 'Uygun Değil',
       notlar: notlar || undefined,
+      fotoUrl: fotoUrl || undefined,
       kaynak: 'qr',
     };
 

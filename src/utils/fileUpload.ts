@@ -28,20 +28,67 @@ function setCachedUrl(bucket: string, filePath: string, url: string): void {
   urlCache.set(key, { url, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
+// Desteklenen MIME tipleri
+const ALLOWED_MIME: Record<string, string> = {
+  pdf:  'application/pdf',
+  jpg:  'image/jpeg',
+  jpeg: 'image/jpeg',
+  png:  'image/png',
+};
+
+// İş izni / şirket belgeleri için genişletilmiş MIME listesi (docx/doc dahil)
+const ALLOWED_MIME_EXTENDED: Record<string, string> = {
+  ...ALLOWED_MIME,
+  doc:  'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls:  'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+};
+
 /**
- * Dosya doğrulama — boyut ve tip kontrolü
- * @returns null if valid, error message string if invalid
+ * Dosya doğrulama — boyut, uzantı ve MIME tip kontrolü
+ *
+ * @param file       - Doğrulanacak dosya
+ * @param extended   - true → PDF/JPG/PNG + DOC/DOCX/XLS/XLSX kabul edilir
+ *                     false (default) → sadece PDF/JPG/PNG
+ * @throws Error     - Geçersiz dosyada hata fırlatır (mesaj kullanıcıya gösterilir)
  */
-export function validateFile(file: File, maxMB = 50): string | null {
+export function validateFile(file: File, extended = false): void {
+  if (!file) throw new Error('Dosya seçilmedi.');
+
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const allowedMap = extended ? ALLOWED_MIME_EXTENDED : ALLOWED_MIME;
+
+  // Uzantı kontrolü
+  if (!allowedMap[ext]) {
+    const allowed = extended
+      ? 'PDF, JPG, PNG, DOC, DOCX, XLS, XLSX'
+      : 'PDF, JPG, PNG';
+    throw new Error(`Desteklenmeyen dosya formatı (.${ext}). Sadece ${allowed} dosyaları kabul edilmektedir.`);
+  }
+
+  // MIME tip kontrolü (tarayıcı tarafından belirlenir — ek güvenlik katmanı)
+  const expectedMime = allowedMap[ext];
+  if (file.type && file.type !== '' && file.type !== expectedMime) {
+    // Bazı tarayıcılar MIME'i yanlış belirleyebilir — sadece uyarı logla, engelleme
+    console.warn(`[validateFile] MIME mismatch: expected ${expectedMime}, got ${file.type}`);
+  }
+
+  // Boyut kontrolü — PDF max 50MB, görseller max 20MB
+  const isPdf = ext === 'pdf';
+  const isImage = ['jpg', 'jpeg', 'png'].includes(ext);
+  const maxMB = isPdf ? 50 : isImage ? 20 : 50;
   const maxBytes = maxMB * 1024 * 1024;
+
   if (file.size > maxBytes) {
-    return `Dosya boyutu ${maxMB}MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB).`;
+    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    const limitMsg = isPdf
+      ? 'PDF dosyaları max 50MB olabilir.'
+      : isImage
+      ? 'Görsel dosyaları (JPG/PNG) max 20MB olabilir.'
+      : `Dosya max ${maxMB}MB olabilir.`;
+    throw new Error(`Dosya boyutu çok büyük (${sizeMB}MB). ${limitMsg}`);
   }
-  const allowed = /\.(pdf|jpg|jpeg|png)$/i;
-  if (!allowed.test(file.name)) {
-    return 'Sadece PDF, JPG ve PNG dosyaları desteklenmektedir.';
-  }
-  return null;
 }
 
 /**
@@ -197,11 +244,18 @@ export async function uploadFileToStorage(
   module: string,
   recordId?: string,
 ): Promise<string | null> {
-  // Enforce 50MB server-side limit — cannot be bypassed by frontend
-  const MAX_BYTES = 50 * 1024 * 1024;
-  if (file.size > MAX_BYTES) {
-    console.error(`[fileUpload] File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB > 50MB limit`);
-    throw new Error(`Dosya boyutu 50MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB). Lütfen daha küçük bir dosya seçin.`);
+  // ── SON SAVUNMA: Her upload noktasından önce merkezi validation ──
+  // is-izni ve company-documents modülleri genişletilmiş format kabul eder
+  const isExtended = ['is-izni-evrak', 'company-doc', 'tutanak'].includes(module);
+  validateFile(file, isExtended);
+
+  // Uzantı güvenlik kontrolü — dosya adı manipülasyonuna karşı
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const safeExts = isExtended
+    ? ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx']
+    : ['pdf', 'jpg', 'jpeg', 'png'];
+  if (!safeExts.includes(ext)) {
+    throw new Error(`Güvenlik hatası: .${ext} uzantısı bu modülde desteklenmiyor.`);
   }
 
   try {

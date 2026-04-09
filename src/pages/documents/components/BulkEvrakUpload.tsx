@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../../../store/AppContext';
 import { getEvrakKategori, KATEGORI_META } from '../../../utils/evrakKategori';
-import { uploadFileToStorage } from '../../../utils/fileUpload';
+import { uploadFileToStorage, validateFile } from '../../../utils/fileUpload';
 import type { EvrakStatus } from '../../../types';
 
 const EVRAK_TURLERI = [
@@ -71,12 +71,10 @@ export default function BulkEvrakUpload({ open, onClose }: Props) {
     const items: FileItem[] = [];
 
     for (const file of newFiles) {
-      if (!file.type.match(/pdf|jpg|jpeg|png/i) && !file.name.match(/\.(pdf|jpg|jpeg|png)$/i)) {
-        addToast(`${file.name} — desteklenmeyen format, atlandı.`, 'warning');
-        continue;
-      }
-      if (file.size > 50 * 1024 * 1024) {
-        addToast(`${file.name} — 50MB sınırını aşıyor, atlandı.`, 'warning');
+      try {
+        validateFile(file);
+      } catch (e) {
+        addToast(`${file.name} — ${e instanceof Error ? e.message : 'Geçersiz dosya.'}`, 'warning');
         continue;
       }
       const nameWithoutExt = file.name.replace(/\.[^.]+$/, '');

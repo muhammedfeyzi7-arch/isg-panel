@@ -5,7 +5,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { generateIsIzniNo } from '@/store/useStore';
 import Modal from '@/components/base/Modal';
 import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
-import { getSignedUrl } from '@/utils/fileUpload';
+import { getSignedUrl, validateFile } from '@/utils/fileUpload';
 import { supabase } from '@/lib/supabase';
 
 // ─── Tip renk/ikon config ───────────────────────────────────────────────────
@@ -651,12 +651,21 @@ export default function IsIzniPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
+    const validFiles: File[] = [];
+    for (const file of files) {
+      try {
+        validateFile(file, true); // extended: doc/docx/xls/xlsx de kabul
+        validFiles.push(file);
+      } catch (err) {
+        addToast(`${file.name} — ${err instanceof Error ? err.message : 'Geçersiz dosya.'}`, 'error');
+      }
+    }
+    if (validFiles.length === 0) { e.target.value = ''; return; }
     setFormEvraklar(prev => {
       const existing = new Set(prev.map(f => f.name));
-      const newFiles = files.filter(f => !existing.has(f.name));
+      const newFiles = validFiles.filter(f => !existing.has(f.name));
       return [...prev, ...newFiles];
     });
-    // Reset input so same file can be re-selected
     e.target.value = '';
   };
 
