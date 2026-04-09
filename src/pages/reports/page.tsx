@@ -604,14 +604,26 @@ export default function RaporlarPage() {
     { name: 'Süresi Geçmiş', value: saglikStats.gecmis, color: '#EF4444' },
   ].filter(d => d.value > 0), [saglikStats]);
 
+  const egitimDurumSub = useMemo(() => {
+    const tamamlandi = aktifEgitimler.filter(e => e.durum === 'Tamamlandı').length;
+    const planlandi = aktifEgitimler.filter(e => e.durum === 'Planlandı').length;
+    const eksik = aktifEgitimler.filter(e => e.durum === 'Eksik').length;
+    const parts: string[] = [];
+    if (tamamlandi > 0) parts.push(`${tamamlandi} tamamlandı`);
+    if (planlandi > 0) parts.push(`${planlandi} planlandı`);
+    if (eksik > 0) parts.push(`${eksik} eksik`);
+    return parts.length > 0 ? parts.join(' · ') : 'Kayıt yok';
+  }, [aktifEgitimler]);
+
   const kpiCards = [
     { label: 'Toplam Firma', value: aktifFirmalar.length, icon: 'ri-building-2-line', color: '#3B82F6', sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma` },
     { label: 'Toplam Personel', value: aktifPersoneller.length, icon: 'ri-team-line', color: '#10B981', sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel` },
     { label: 'Toplam Evrak', value: aktifEvraklar.length, icon: 'ri-file-list-3-line', color: '#F59E0B', sub: `${evrakStats.eksik + evrakStats.sureDolmus} sorunlu evrak` },
-    { label: 'Eğitim Kayıtları', value: aktifEgitimler.length, icon: 'ri-graduation-cap-line', color: '#6366F1', sub: `%${egitimKatilimStats.katilimOrani} katılım oranı` },
+    { label: 'Eğitim Kayıtları', value: aktifEgitimler.length, icon: 'ri-graduation-cap-line', color: '#6366F1', sub: egitimDurumSub },
     { label: 'Açık Uygunsuzluk', value: uygunsuzlukStats.acik, icon: 'ri-alert-line', color: uygunsuzlukStats.acik > 0 ? '#EF4444' : '#10B981', sub: `${uygunsuzlukStats.kapandi} kapatıldı` },
     { label: 'Sağlık Takibi', value: saglikStats.toplam, icon: 'ri-heart-pulse-line', color: '#EC4899', sub: `${saglikStats.gecmis} süresi geçmiş` },
-    { label: 'Tutanaklar', value: aktifTutanaklar.length, icon: 'ri-article-line', color: '#F97316', sub: `${aktifTutanaklar.filter(t => t.durum === 'Onaylandı').length} onaylı` },
+    { label: 'Ekipmanlar', value: aktifEkipmanlar.length, icon: 'ri-tools-line', color: '#F97316', sub: `${aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').length} uygun değil · ${aktifEkipmanlar.filter(e => e.sonrakiKontrolTarihi && new Date(e.sonrakiKontrolTarihi) < new Date()).length} gecikmiş` },
+    { label: 'Tutanaklar', value: aktifTutanaklar.length, icon: 'ri-article-line', color: '#14B8A6', sub: `${aktifTutanaklar.filter(t => t.durum === 'Onaylandı').length} onaylı` },
   ];
 
   // Özet sağlık skoru — Excel export'ta da kullanılıyor, bu yüzden export'tan önce tanımlanmalı
@@ -1557,7 +1569,7 @@ export default function RaporlarPage() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
         {kpiCards.map((card, i) => (
           <AnimatedKPICard key={card.label} {...card} delay={i * 60} />
         ))}

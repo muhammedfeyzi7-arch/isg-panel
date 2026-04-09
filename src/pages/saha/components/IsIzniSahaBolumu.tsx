@@ -68,14 +68,20 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
       let allFiles: EvrakDosya[] = [];
       for (const slug of slugsToTry) {
         const prefix = `${orgId}/is-izni-evrak/${firmaId}/${slug}`;
-        console.log('[ISG] Listing prefix:', prefix);
         const { data, error } = await supabase.storage
           .from('uploads')
-          .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
-        console.log('[ISG] List result:', { slug, count: data?.length, error: error?.message, files: data?.map(f => f.name) });
+          .list(prefix, { limit: 200, sortBy: { column: 'updated_at', order: 'desc' } });
         if (!error && data && data.length > 0) {
           const filtered = data
-            .filter(f => f.name && f.name !== '.emptyFolderPlaceholder' && !f.name.includes('_red_'))
+            .filter(f => {
+              if (!f.name || f.name === '.emptyFolderPlaceholder') return false;
+              // Sadece bu izne ait dosyaları göster — dosya adı izinId ile başlamalı
+              // Format: {izinId}_{timestamp}_{filename} veya {izinId}_{timestamp}_{slug}_{filename}
+              if (!f.name.startsWith(izinId)) return false;
+              // Red fotoğraflarını gösterme (bunlar başka amaçlı)
+              if (f.name.includes('_red_')) return false;
+              return true;
+            })
             .map(f => ({ ...f, _slug: slug, _prefix: prefix } as EvrakDosya & { _prefix: string }));
           allFiles = [...allFiles, ...filtered];
         }
@@ -88,7 +94,7 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
     } finally {
       setYukleniyor(false);
     }
-  }, [orgId, firmaId, izinTuruSlug, izinTuruSlugOrig, izinId]);
+  }, [orgId, firmaId, izinId, izinTuruSlug, izinTuruSlugOrig]);
 
   useEffect(() => { void fetchDosyalar(); }, [fetchDosyalar]);
 
@@ -536,6 +542,8 @@ export default function IsIzniSahaBolumu() {
       isIzniBildirimi(izin.izinNo, izin.id, 'onaylandi', 'Sahada uygundur');
       addToast(`${izin.izinNo} onaylandı.`, 'success');
       setSeciliIzinId(null);
+      // Onay sonrası tamamlanan sekmesine geç
+      setTab('tamamlanan');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Onay kaydedilemedi: ${msg}`, 'error');
@@ -595,6 +603,8 @@ export default function IsIzniSahaBolumu() {
       isIzniBildirimi(izin.izinNo, izin.id, 'reddedildi', not);
       addToast(`${izin.izinNo} reddedildi.`, 'error');
       setSeciliIzinId(null);
+      // Red sonrası tamamlanan sekmesine geç
+      setTab('tamamlanan');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       addToast(`Red kaydedilemedi: ${msg}`, 'error');

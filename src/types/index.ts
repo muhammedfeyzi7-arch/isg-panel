@@ -181,6 +181,7 @@ export interface EkipmanKontrolKaydi {
   kontrolEdenId: string;   // Supabase user id
   durum: EkipmanStatus;    // Kontrol sonrası durum
   notlar?: string;
+  fotoUrl?: string;        // Kontrol sırasında çekilen fotoğraf (storage path)
   kaynak: 'qr' | 'manuel'; // QR ile mi, manuel mi yapıldı
 }
 

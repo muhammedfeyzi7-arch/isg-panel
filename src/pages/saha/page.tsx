@@ -44,20 +44,36 @@ const QrTab = memo(function QrTab({ isOnline, onKontrolYapildi, onDurumDegistir 
 
   const handleQrResult = useCallback((text: string) => {
     setShowQr(false);
-    const match = text.match(/\/equipment\/qr\/([^/?#\s]+)/);
-    if (match) {
-      const ekipmanId = match[1];
+    // /equipment/qr/:id veya ?module=saha&qr=:id veya direkt UUID formatında olabilir
+    const urlMatch = text.match(/\/equipment\/qr\/([^/?#\s]+)/);
+    const moduleMatch = text.match(/[?&]qr=([^&\s]+)/);
+    // UUID pattern — direkt ID olarak da gelebilir
+    const uuidMatch = text.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    const ekipmanId = urlMatch?.[1] ?? moduleMatch?.[1] ?? (uuidMatch ? text.trim() : null);
+
+    if (ekipmanId) {
       const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
       if (ekipman) { setQrFoundEkipman(ekipman); addToast(`Ekipman bulundu: ${ekipman.ad}`, 'success'); return; }
-      addToast('QR kodu okundu fakat ekipman bulunamadı.', 'warning');
+      // ID var ama ekipman yok — başka org'a ait veya silinmiş olabilir
+      addToast('QR kodu geçerli fakat bu ekipman kayıtlı değil.', 'warning');
       return;
     }
     if (text.startsWith('http://') || text.startsWith('https://')) {
-      addToast('QR okundu — yönlendiriliyor...', 'success');
+      // URL ama bizim formatımızda değil — son segment ID olabilir
+      const segments = text.replace(/[?#].*/, '').split('/').filter(Boolean);
+      const lastSegment = segments[segments.length - 1];
+      if (lastSegment) {
+        const ekipman = ekipmanlar.find(e => e.id === lastSegment);
+        if (ekipman) { setQrFoundEkipman(ekipman); addToast(`Ekipman bulundu: ${ekipman.ad}`, 'success'); return; }
+      }
+      addToast('QR okundu — harici link açılıyor...', 'success');
       window.open(text, '_blank', 'noopener,noreferrer');
       return;
     }
-    addToast(`QR içeriği: ${text.slice(0, 60)}${text.length > 60 ? '...' : ''}`, 'info');
+    // Düz metin — ID olarak dene
+    const ekipmanByText = ekipmanlar.find(e => e.id === text.trim());
+    if (ekipmanByText) { setQrFoundEkipman(ekipmanByText); addToast(`Ekipman bulundu: ${ekipmanByText.ad}`, 'success'); return; }
+    addToast(`QR içeriği okunamadı veya ekipman bulunamadı.`, 'warning');
   }, [ekipmanlar, addToast]);
 
   return (
@@ -239,9 +255,11 @@ const EkipmanTab = memo(function EkipmanTab({ isOnline, onKontrolYapildi, onDuru
   const [showFirmaModal, setShowFirmaModal] = useState(false);
   const [selectedFirmaId, setSelectedFirmaId] = useState<string | null>(null);
 
-  const aktif = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
+  const aktif = useMemo(() => ekipmanlar.filter(e => !e.silinmis && !e.cascadeSilindi), [ekipmanlar]);
   const uygunDegil = useMemo(() => aktif.filter(e => e.durum === 'Uygun Değil').length, [aktif]);
+  // Gecikmiş: sadece kontrolü geçmiş olanlar (yaklaşan hariç)
   const gecikmis = useMemo(() => aktif.filter(e => e.sonrakiKontrolTarihi && new Date(e.sonrakiKontrolTarihi) < new Date()).length, [aktif]);
+  // Yaklaşan: 0-7 gün içinde kontrolü dolacak olanlar
   const yaklasan = useMemo(() => aktif.filter(e => {
     if (!e.sonrakiKontrolTarihi) return false;
     const d = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000);
@@ -326,9 +344,20 @@ const UygunsuzlukTab = memo(function UygunsuzlukTab() {
   const [editRecord, setEditRecord] = useState<Uygunsuzluk | null>(null);
   const [showForm, setShowForm] = useState(false);
 
+  // Silinmemiş tüm uygunsuzluklar — cascadeSilindi olanları ve silinmiş olanları çıkar
   const aktif = useMemo(() => uygunsuzluklar.filter(u => !u.silinmis && !u.cascadeSilindi), [uygunsuzluklar]);
-  const aciklar = useMemo(() => aktif.filter(u => u.durum !== 'Kapandı').sort((a, b) => (b.olusturmaTarihi ?? b.tarih ?? '').localeCompare(a.olusturmaTarihi ?? a.tarih ?? '')), [aktif]);
-  const kapalilar = useMemo(() => aktif.filter(u => u.durum === 'Kapandı').sort((a, b) => (b.kapatmaTarihi ?? '').localeCompare(a.kapatmaTarihi ?? '')), [aktif]);
+  // Açık: 'Kapandı' dışındaki tüm durumlar — geçmiş kayıtlar dahil
+  const aciklar = useMemo(() => aktif.filter(u => u.durum !== 'Kapandı').sort((a, b) => {
+    const da = b.olusturmaTarihi ?? b.tarih ?? '';
+    const db = a.olusturmaTarihi ?? a.tarih ?? '';
+    return da.localeCompare(db);
+  }), [aktif]);
+  // Kapalı: 'Kapandı' olanlar — kapatmaTarihi yoksa olusturmaTarihi'ne göre sırala
+  const kapalilar = useMemo(() => aktif.filter(u => u.durum === 'Kapandı').sort((a, b) => {
+    const da = b.kapatmaTarihi ?? b.olusturmaTarihi ?? b.tarih ?? '';
+    const db = a.kapatmaTarihi ?? a.olusturmaTarihi ?? a.tarih ?? '';
+    return da.localeCompare(db);
+  }), [aktif]);
   const liste = tab === 'acik' ? aciklar : kapalilar;
 
   const fmtDate = (iso?: string) => {
@@ -738,7 +767,7 @@ export default function SahaPage() {
     return {
       uygunsuzlukBadge: uygunsuzluklar.filter(u => !u.silinmis && !u.cascadeSilindi && u.durum !== 'Kapandı').length,
       izinBadge: isIzinleri.filter(i => !i.silinmis && i.durum === 'Onay Bekliyor').length,
-      ekipmanBadge: ekipmanlar.filter(e => !e.silinmis && (e.durum === 'Uygun Değil' || (e.sonrakiKontrolTarihi && new Date(e.sonrakiKontrolTarihi) < new Date()))).length,
+      ekipmanBadge: ekipmanlar.filter(e => !e.silinmis && !e.cascadeSilindi && (e.durum === 'Uygun Değil' || (e.sonrakiKontrolTarihi && new Date(e.sonrakiKontrolTarihi) < new Date()))).length,
     };
   }, [ekipmanlar, uygunsuzluklar, isIzinleri]);
 

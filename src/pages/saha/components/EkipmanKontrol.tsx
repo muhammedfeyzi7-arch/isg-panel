@@ -348,7 +348,7 @@ export function EkipmanListeModal({ open, onClose, onKontrolYapildi, onDurumDegi
     }
   }, [open, initialEkipmanId]);
 
-  const aktif = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
+  const aktif = useMemo(() => ekipmanlar.filter(e => !e.silinmis && !e.cascadeSilindi), [ekipmanlar]);
 
   const filtered = useMemo(() => aktif.filter(e => {
     const firma = firmalar.find(f => f.id === e.firmaId);
@@ -362,6 +362,7 @@ export function EkipmanListeModal({ open, onClose, onKontrolYapildi, onDurumDegi
     toplam: aktif.length,
     uygun: aktif.filter(e => e.durum === 'Uygun').length,
     uygunDegil: aktif.filter(e => e.durum === 'Uygun Değil').length,
+    gecikmis: aktif.filter(e => e.sonrakiKontrolTarihi && new Date(e.sonrakiKontrolTarihi) < new Date()).length,
     yaklasan: aktif.filter(e => {
       if (!e.sonrakiKontrolTarihi) return false;
       const d = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000);
@@ -401,7 +402,7 @@ export function EkipmanListeModal({ open, onClose, onKontrolYapildi, onDurumDegi
               { label: 'Toplam', val: stats.toplam, color: '#818CF8' },
               { label: 'Uygun', val: stats.uygun, color: '#34D399' },
               { label: 'Uygun Değil', val: stats.uygunDegil, color: '#F87171' },
-              { label: 'Yaklaşan', val: stats.yaklasan, color: '#FBBF24' },
+              { label: 'Gecikmiş', val: stats.gecikmis, color: '#EF4444' },
             ].map(s => (
               <div key={s.label} className="flex flex-col items-center py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <span className="text-lg font-bold" style={{ color: s.color }}>{s.val}</span>

@@ -94,9 +94,9 @@ function buildHtml(
     const kapatmaFoto = r.kapatmaFotoMevcut ? photoMap.get(`${r.id}_kapatma`) : undefined;
     const rowBg = i % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
     const sev = SEV_STYLE[r.severity] ?? { bg: '#F1F5F9', color: '#64748B', border: '#E2E8F0' };
-    const durumBg = r.durum === 'Kapandı' ? '#DCFCE7' : '#FEE2E2';
-    const durumColor = r.durum === 'Kapandı' ? '#16A34A' : '#DC2626';
-    const durumBorder = r.durum === 'Kapandı' ? '#BBF7D0' : '#FECACA';
+    const durumBg = r.durum === 'Kapandı' ? '#16A34A' : '#DC2626';
+    const durumColor = '#FFFFFF';
+    const durumBorder = r.durum === 'Kapandı' ? '#15803D' : '#B91C1C';
     const durumIcon = r.durum === 'Kapandı' ? '✓' : '●';
 
     const td = `padding:8px 7px;vertical-align:middle;border-bottom:1px solid #E5E7EB;border-right:1px solid #E5E7EB;font-size:11px;color:#374151;`;
@@ -454,8 +454,27 @@ export async function exportDofToExcel(
       };
       if (colNumber === 15) {
         const val = cell.value as string;
-        if (val === 'Açık') { cell.font = { bold: true, color: { argb: 'FFDC2626' }, size: 11 }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
-        else if (val === 'Kapandı') { cell.font = { bold: true, color: { argb: 'FF16A34A' }, size: 11 }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+        if (val === 'Açık') {
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFEF4444' } },
+            bottom: { style: 'thin', color: { argb: 'FFEF4444' } },
+            left: { style: 'thin', color: { argb: 'FFEF4444' } },
+            right: { style: 'thin', color: { argb: 'FFEF4444' } },
+          };
+        } else if (val === 'Kapandı') {
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF22C55E' } },
+            bottom: { style: 'thin', color: { argb: 'FF22C55E' } },
+            left: { style: 'thin', color: { argb: 'FF22C55E' } },
+            right: { style: 'thin', color: { argb: 'FF22C55E' } },
+          };
+        }
       }
       if (colNumber === 14) {
         const val = cell.value as string;

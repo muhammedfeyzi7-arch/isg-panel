@@ -27,29 +27,43 @@ function parseTrDate(d: string): string {
 }
 
 function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad: string }[]): void {
+  // Yerel saat dilimiyle tarih parse — UTC offset sorununu önler
+  const parseLocal = (s: string): Date => {
+    if (!s) return new Date(0);
+    const iso = s.split('T')[0];
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+  };
+
   const fmtDate = (d: string) => {
     if (!d) return '-';
-    const iso = d.split('T')[0];
-    const [y, m, day] = iso.split('-').map(Number);
-    return new Date(y, m - 1, day).toLocaleDateString('tr-TR');
+    return parseLocal(d).toLocaleDateString('tr-TR');
   };
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const aktif = ekipmanlar.filter(e => !e.silinmis);
-  const tarih = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
+
+  const daysUntil = (dateStr: string): number => {
+    if (!dateStr) return 9999;
+    return Math.ceil((parseLocal(dateStr).getTime() - today.getTime()) / 86400000);
+  };
+
+  const aktif = ekipmanlar.filter(e => !e.silinmis && !e.cascadeSilindi);
 
   const uygunSayisi = aktif.filter(e => e.durum === 'Uygun').length;
   const uygunDegil = aktif.filter(e => e.durum === 'Uygun Değil').length;
   const bakimda = aktif.filter(e => e.durum === 'Bakımda').length;
   const hurda = aktif.filter(e => e.durum === 'Hurda').length;
+  // Yaklaşan: 0-30 gün içinde kontrolü dolacak (sayfayla tutarlı)
   const yaklasan = aktif.filter(e => {
     if (!e.sonrakiKontrolTarihi) return false;
-    const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000);
-    return diff >= 0 && diff <= 3;
+    const diff = daysUntil(e.sonrakiKontrolTarihi);
+    return diff >= 0 && diff <= 30;
   }).length;
+  // Gecikmiş: kontrol tarihi geçmiş
   const gecikmis = aktif.filter(e => {
     if (!e.sonrakiKontrolTarihi) return false;
-    return new Date(e.sonrakiKontrolTarihi) < today;
+    return daysUntil(e.sonrakiKontrolTarihi) < 0;
   }).length;
 
   // ── Stil tanımları ──
@@ -88,10 +102,13 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
     const sl = s.toLowerCase();
     let fg = '64748B'; let bg = 'F1F5F9';
     if (sl === 'uygun' || sl === 'zamanında') { fg = '16A34A'; bg = 'DCFCE7'; }
-    else if (sl.includes('değil') || sl.includes('gecikmiş') || sl.includes('geçti')) { fg = 'DC2626'; bg = 'FEE2E2'; }
-    else if (sl.includes('kaldı') || sl.includes('yaklaşan') || sl === 'bugün') { fg = 'D97706'; bg = 'FEF3C7'; }
+    else if (sl.includes('değil') || sl.includes('gecikmiş') || sl.includes('geçti') || sl === 'kritik') { fg = 'DC2626'; bg = 'FEE2E2'; }
+    else if (sl.includes('kaldı') || sl.includes('yaklaşan') || sl === 'bugün' || sl === 'yüksek') { fg = 'D97706'; bg = 'FEF3C7'; }
+    else if (sl === 'orta') { fg = 'EA580C'; bg = 'FFEDD5'; }
+    else if (sl === 'düşük') { fg = '0369A1'; bg = 'E0F2FE'; }
     else if (sl === 'bakımda') { fg = 'EA580C'; bg = 'FFEDD5'; }
     else if (sl === 'hurda') { fg = '64748B'; bg = 'F1F5F9'; }
+    else if (sl === 'tarih belirtilmemiş') { fg = '64748B'; bg = 'F8FAFC'; }
     return { font: { bold: true, sz: 10, color: { rgb: fg }, name: 'Calibri' }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'center', vertical: 'center' }, border: thinBorder };
   };
 
@@ -103,10 +120,11 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
     const firma = firmalar.find(f => f.id === e.firmaId);
     let kontrolDurumu = '-';
     if (e.sonrakiKontrolTarihi) {
-      const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000);
-      if (diff < 0) kontrolDurumu = 'GECİKMİŞ';
+      const diff = daysUntil(e.sonrakiKontrolTarihi);
+      if (diff < 0) kontrolDurumu = `GECİKMİŞ (${Math.abs(diff)} gün)`;
       else if (diff === 0) kontrolDurumu = 'BUGÜN';
-      else if (diff <= 3) kontrolDurumu = `${diff} gün kaldı`;
+      else if (diff <= 7) kontrolDurumu = `${diff} gün kaldı (Acil)`;
+      else if (diff <= 30) kontrolDurumu = `${diff} gün kaldı`;
       else kontrolDurumu = 'Zamanında';
     }
     return [idx + 1, e.ad || '-', e.tur || '-', firma?.ad || '-', e.bulunduguAlan || '-', e.marka || '-', e.model || '-', e.seriNo || '-', fmtDate(e.sonKontrolTarihi), fmtDate(e.sonrakiKontrolTarihi), kontrolDurumu, e.durum || '-', e.belgeMevcut ? 'Evet' : 'Hayır', e.aciklama || '-'];
@@ -159,6 +177,12 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
   XLSXStyle.utils.book_append_sheet(wb, ws1, 'Ekipman Listesi');
 
   // ── Sayfa 2: Durum Özeti ──
+  const zamaninda = aktif.filter(e => {
+    if (!e.sonrakiKontrolTarihi) return false;
+    return daysUntil(e.sonrakiKontrolTarihi) > 30;
+  }).length;
+  const kontrolTarihibelirtilmemis = aktif.filter(e => !e.sonrakiKontrolTarihi).length;
+
   const ozet2Rows = [
     ['EKİPMAN DURUM ÖZETİ'],
     ['Durum', 'Adet', 'Oran (%)'],
@@ -169,19 +193,21 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
     ['TOPLAM', aktif.length, 100],
     [],
     ['KONTROL TAKVİMİ'],
-    ['Durum', 'Adet'],
-    ['Zamanında', aktif.length - yaklasan - gecikmis],
-    ['Yaklaşan (≤30 gün)', yaklasan],
-    ['Gecikmiş', gecikmis],
+    ['Durum', 'Adet', 'Açıklama'],
+    ['Zamanında', zamaninda, '30 günden fazla süre var'],
+    ['Yaklaşan (≤30 gün)', yaklasan, '0-30 gün içinde kontrol gerekli'],
+    ['Gecikmiş', gecikmis, 'Kontrol tarihi geçmiş'],
+    ['Tarih Belirtilmemiş', kontrolTarihibelirtilmemis, 'Sonraki kontrol tarihi girilmemiş'],
     [],
-    ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR')],
+    ['Rapor Tarihi', new Date().toLocaleDateString('tr-TR'), ''],
+    ['Rapor Saati', new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), ''],
   ];
   const ws2 = XLSXStyle.utils.aoa_to_sheet(ozet2Rows);
   if (!ws2['!merges']) ws2['!merges'] = [];
   ws2['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } });
   ws2['!merges'].push({ s: { r: 8, c: 0 }, e: { r: 8, c: 2 } });
   ozet2Rows.forEach((row, ri) => {
-    (row as (string | number)[]).forEach((val, ci) => {
+    (row as (string | number | undefined)[]).forEach((val, ci) => {
       const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
       if (!ws2[addr]) ws2[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
       let s: object = cellS(ri);
@@ -190,15 +216,18 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
       else if (ri === 6) s = totalS;
       else if (ri >= 2 && ri <= 5) {
         if (ci === 0) s = statusS(String(val ?? ''));
-        else s = { ...cellS(ri - 2, 'center'), font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, border: thinBorder };
-      } else if (ri >= 10 && ri <= 12) {
+        else if (ci === 1) s = { ...cellS(ri - 2, 'center'), font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, border: thinBorder };
+        else s = cellS(ri - 2, 'center');
+      } else if (ri >= 10 && ri <= 13) {
+        // Kontrol takvimi satırları
         if (ci === 0) s = statusS(String(val ?? ''));
-        else s = { ...cellS(ri - 10, 'center'), font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, border: thinBorder };
-      } else if (ri === 14) s = sumLabelS;
+        else if (ci === 1) s = { ...cellS(ri - 10, 'center'), font: { bold: true, sz: 11, color: { rgb: '1E293B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, border: thinBorder };
+        else s = { ...cellS(ri - 10), font: { sz: 9, italic: true, color: { rgb: '64748B' }, name: 'Calibri' }, fill: { fgColor: { rgb: ri % 2 === 0 ? ROW_NORMAL : ROW_ALT } }, border: thinBorder };
+      } else if (ri >= 15) s = sumLabelS;
       (ws2[addr] as XLSXStyle.CellObject).s = s;
     });
   });
-  ws2['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 12 }];
+  ws2['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 36 }];
   if (!ws2['!rows']) ws2['!rows'] = [];
   (ws2['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
   (ws2['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
@@ -206,54 +235,74 @@ function exportEkipmanToExcel(ekipmanlar: Ekipman[], firmalar: { id: string; ad:
   (ws2['!rows'] as XLSXStyle.RowInfo[])[9] = { hpt: 22 };
   XLSXStyle.utils.book_append_sheet(wb, ws2, 'Durum Özeti');
 
-  // ── Sayfa 3: Kritik Kontroller ──
+  // ── Sayfa 3: Yaklaşan & Gecikmiş Kontroller (≤30 gün + gecikmiş) ──
   const kritikler = aktif
-    .filter(e => { if (!e.sonrakiKontrolTarihi) return false; const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000); return diff <= 3; })
-    .sort((a, b) => new Date(a.sonrakiKontrolTarihi).getTime() - new Date(b.sonrakiKontrolTarihi).getTime());
+    .filter(e => {
+      if (!e.sonrakiKontrolTarihi) return false;
+      return daysUntil(e.sonrakiKontrolTarihi) <= 30; // gecikmiş (negatif) + yaklaşan (0-30)
+    })
+    .sort((a, b) => parseLocal(a.sonrakiKontrolTarihi).getTime() - parseLocal(b.sonrakiKontrolTarihi).getTime());
 
-  const COLS3 = ['Ekipman Adı', 'Tür', 'Firma', 'Kontrol Tarihi', 'Kalan Süre', 'Durum'];
+  const COLS3 = ['Ekipman Adı', 'Tür', 'Firma', 'Bulunduğu Alan', 'Kontrol Tarihi', 'Kalan Süre', 'Öncelik', 'Ekipman Durumu'];
   const kritikData = kritikler.map(e => {
     const firma = firmalar.find(f => f.id === e.firmaId);
-    const diff = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - today.getTime()) / 86400000);
-    return [e.ad, e.tur || '-', firma?.ad || '-', fmtDate(e.sonrakiKontrolTarihi), diff < 0 ? `${Math.abs(diff)} gün gecikmiş` : diff === 0 ? 'BUGÜN' : `${diff} gün kaldı`, e.durum];
+    const diff = daysUntil(e.sonrakiKontrolTarihi);
+    let kalanSure: string;
+    let oncelik: string;
+    if (diff < 0) { kalanSure = `${Math.abs(diff)} gün gecikmiş`; oncelik = 'KRİTİK'; }
+    else if (diff === 0) { kalanSure = 'BUGÜN'; oncelik = 'KRİTİK'; }
+    else if (diff <= 7) { kalanSure = `${diff} gün kaldı`; oncelik = 'YÜKSEK'; }
+    else if (diff <= 14) { kalanSure = `${diff} gün kaldı`; oncelik = 'ORTA'; }
+    else { kalanSure = `${diff} gün kaldı`; oncelik = 'DÜŞÜK'; }
+    return [e.ad, e.tur || '-', firma?.ad || '-', e.bulunduguAlan || '-', fmtDate(e.sonrakiKontrolTarihi), kalanSure, oncelik, e.durum];
   });
+
   const ws3Rows = [
-    ['YAKLAŞAN & GECİKMİŞ KONTROLLER'],
+    [`YAKLAŞAN & GECİKMİŞ KONTROLLER — ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}`],
+    [`Toplam ${kritikler.length} ekipman kontrol gerektiriyor (${gecikmis} gecikmiş, ${yaklasan} yaklaşan)`],
     COLS3,
-    ...(kritikData.length > 0 ? kritikData : [['Yaklaşan veya gecikmiş kontrol bulunmuyor.', '', '', '', '', '']]),
+    ...(kritikData.length > 0 ? kritikData : [['Yaklaşan veya gecikmiş kontrol bulunmuyor.', '', '', '', '', '', '', '']]),
   ];
   const ws3 = XLSXStyle.utils.aoa_to_sheet(ws3Rows);
   if (!ws3['!merges']) ws3['!merges'] = [];
   ws3['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: COLS3.length - 1 } });
+  ws3['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: COLS3.length - 1 } });
+
+  const subTitleS = { font: { sz: 10, italic: true, color: { rgb: 'CBD5E1' }, name: 'Calibri' }, fill: { fgColor: { rgb: '1E293B' } }, alignment: { horizontal: 'left', vertical: 'center' }, border: medBorder };
+
   ws3Rows.forEach((row, ri) => {
     (row as (string | number)[]).forEach((val, ci) => {
       const addr = XLSXStyle.utils.encode_cell({ r: ri, c: ci });
       if (!ws3[addr]) ws3[addr] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's' };
-      let s: object = cellS(ri - 2);
+      let s: object = cellS(ri - 3);
       if (ri === 0) s = titleS;
-      else if (ri === 1) s = headerS;
+      else if (ri === 1) s = subTitleS;
+      else if (ri === 2) s = headerS;
       else {
-        const dataRi = ri - 2;
-        if (ci === 4) s = statusS(String(val ?? ''));
-        else if (ci === 5) s = statusS(String(val ?? ''));
-        else if (ci === 3) s = cellS(dataRi, 'center');
+        const dataRi = ri - 3;
+        if (ci === 5) s = statusS(String(val ?? '')); // Kalan Süre
+        else if (ci === 6) s = statusS(String(val ?? '')); // Öncelik
+        else if (ci === 7) s = statusS(String(val ?? '')); // Durum
+        else if (ci === 4) s = cellS(dataRi, 'center'); // Kontrol Tarihi
         else s = cellS(dataRi);
       }
       (ws3[addr] as XLSXStyle.CellObject).s = s;
     });
   });
-  ws3['!cols'] = [{ wch: 28 }, { wch: 20 }, { wch: 24 }, { wch: 16 }, { wch: 22 }, { wch: 16 }];
+  ws3['!cols'] = [{ wch: 26 }, { wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 22 }, { wch: 12 }, { wch: 16 }];
   if (!ws3['!rows']) ws3['!rows'] = [];
   (ws3['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
-  (ws3['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
-  XLSXStyle.utils.book_append_sheet(wb, ws3, 'Kritik Kontroller');
+  (ws3['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 18 };
+  (ws3['!rows'] as XLSXStyle.RowInfo[])[2] = { hpt: 22 };
+  XLSXStyle.utils.book_append_sheet(wb, ws3, 'Yaklaşan & Gecikmiş');
 
   const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${new Date().toLocaleDateString('tr-TR')} Ekipman Kontrol Raporu.xlsx`;
+  const raporTarih = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\./g, '-');
+  link.download = `${raporTarih} Ekipman Kontrol Raporu.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -326,7 +375,7 @@ const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: s
   'Hurda': { label: 'Hurda', color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-delete-bin-line' },
 };
 
-const defaultForm: Omit<Ekipman, 'id' | 'olusturmaTarihi'> = {
+const defaultForm: Omit<Ekipman, 'id' | 'olusturmaTarihi'> & { belgeGecerlilikTarihi?: string } = {
   ad: '',
   tur: '',
   firmaId: '',
@@ -344,6 +393,7 @@ const defaultForm: Omit<Ekipman, 'id' | 'olusturmaTarihi'> = {
   dosyaTipi: '',
   dosyaVeri: '',
   notlar: '',
+  belgeGecerlilikTarihi: '',
 };
 
 /** ISO tarih string'ini (YYYY-MM-DD veya ISO) yerel saat dilimiyle Date'e çevirir */
@@ -380,7 +430,7 @@ export default function EkipmanlarPage() {
   const [modalTab, setModalTab] = useState<'bilgiler' | 'belgeler' | 'gecmis'>('bilgiler');
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState<Omit<Ekipman, 'id' | 'olusturmaTarihi'>>(defaultForm);
+  const [form, setForm] = useState<Omit<Ekipman, 'id' | 'olusturmaTarihi'> & { belgeGecerlilikTarihi?: string }>(defaultForm);
   const [showImport, setShowImport] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<{ row: number; ad: string; status: 'ok' | 'error'; message: string }[] | null>(null);
@@ -398,6 +448,9 @@ export default function EkipmanlarPage() {
   const [kontrolForm, setKontrolForm] = useState<{ durum: EkipmanStatus; notlar: string; sonrakiKontrolTarihi: string }>({
     durum: 'Uygun', notlar: '', sonrakiKontrolTarihi: '',
   });
+  const [kontrolFoto, setKontrolFoto] = useState<File | null>(null);
+  const [kontrolFotoPreview, setKontrolFotoPreview] = useState<string | null>(null);
+  const kontrolFotoRef = useRef<HTMLInputElement>(null);
   const [kontrolSaving, setKontrolSaving] = useState(false);
 
   // Toplu silme state
@@ -529,6 +582,7 @@ export default function EkipmanlarPage() {
       dosyaTipi: ekipman.dosyaTipi || '', dosyaVeri: '', notlar: ekipman.notlar,
       kontrolGecmisi: ekipman.kontrolGecmisi,
       belgeler: ekipman.belgeler,
+      belgeGecerlilikTarihi: (ekipman as Ekipman & { belgeGecerlilikTarihi?: string }).belgeGecerlilikTarihi || '',
     });
     setShowModal(true);
   };
@@ -545,20 +599,24 @@ export default function EkipmanlarPage() {
     try {
       const now = new Date().toISOString();
       const todayStr = now.split('T')[0];
-      // addEkipmanKontrolKaydi zaten sonKontrolTarihi'ni güncelliyor (store içinde)
-      // updateEkipman'ı AYRI çağırıyoruz — sadece durum + sonrakiKontrolTarihi için
-      // ÖNEMLİ: addEkipmanKontrolKaydi'yi önce çağır, sonra updateEkipman
-      // updateEkipman kontrolGecmisi'ni override etmemeli — sadece belirtilen alanları günceller
+      const orgId = org?.id ?? 'unknown';
+
+      // Fotoğraf varsa yükle
+      let fotoUrl: string | undefined;
+      if (kontrolFoto && orgId !== 'unknown') {
+        const uploadedUrl = await uploadFileToStorage(kontrolFoto, orgId, 'ekipman-kontrol', `${kontrolEkipmanId}-${Date.now()}`);
+        if (uploadedUrl) fotoUrl = uploadedUrl;
+      }
+
       addEkipmanKontrolKaydi(kontrolEkipmanId, {
         tarih: now,
         kontrolEden: currentUser.ad || 'Kullanıcı',
         kontrolEdenId: currentUser.id,
         durum: kontrolForm.durum,
         notlar: kontrolForm.notlar || undefined,
+        fotoUrl,
         kaynak: 'manuel',
       });
-      // Sadece durum ve tarih alanlarını güncelle — kontrolGecmisi'ne dokunma
-      // updateEkipman spread ile merge ediyor, kontrolGecmisi undefined gelirse mevcut değer korunur
       updateEkipman(kontrolEkipmanId, {
         durum: kontrolForm.durum,
         sonKontrolTarihi: todayStr,
@@ -567,6 +625,8 @@ export default function EkipmanlarPage() {
       addToast('Kontrol kaydı oluşturuldu.', 'success');
       setShowKontrolModal(false);
       setKontrolEkipmanId(null);
+      setKontrolFoto(null);
+      setKontrolFotoPreview(null);
     } finally {
       setKontrolSaving(false);
     }
@@ -1134,13 +1194,13 @@ export default function EkipmanlarPage() {
       {/* Manuel Kontrol Kaydı Modal */}
       <Modal
         isOpen={showKontrolModal}
-        onClose={() => { setShowKontrolModal(false); setKontrolEkipmanId(null); }}
+        onClose={() => { setShowKontrolModal(false); setKontrolEkipmanId(null); setKontrolFoto(null); setKontrolFotoPreview(null); }}
         title="Kontrol Kaydı Oluştur"
         size="sm"
         icon="ri-checkbox-circle-line"
         footer={
           <>
-            <button onClick={() => setShowKontrolModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
+            <button onClick={() => { setShowKontrolModal(false); setKontrolFoto(null); setKontrolFotoPreview(null); }} className="btn-secondary whitespace-nowrap">İptal</button>
             <button onClick={() => void handleKontrolKaydet()} disabled={kontrolSaving} className="btn-primary whitespace-nowrap disabled:opacity-50">
               {kontrolSaving ? <><i className="ri-loader-4-line animate-spin mr-1" />Kaydediliyor...</> : <><i className="ri-save-line mr-1" />Kaydet</>}
             </button>
@@ -1148,8 +1208,9 @@ export default function EkipmanlarPage() {
         }
       >
         <div className="space-y-4">
+          {/* Kontrol Sonucu */}
           <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Kontrol Sonucu</label>
+            <label className="block text-xs font-semibold mb-2" style={{ color: '#94A3B8' }}>Kontrol Sonucu</label>
             <div className="grid grid-cols-2 gap-2">
               {(['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'] as EkipmanStatus[]).map(d => {
                 const cfg = STATUS_CONFIG[d];
@@ -1159,7 +1220,7 @@ export default function EkipmanlarPage() {
                     className="flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer text-xs font-semibold whitespace-nowrap transition-all"
                     style={{
                       background: isSelected ? cfg.bg : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${isSelected ? cfg.color + '50' : 'rgba(255,255,255,0.08)'}`,
+                      border: `1px solid ${isSelected ? cfg.color + '60' : 'rgba(255,255,255,0.08)'}`,
                       color: isSelected ? cfg.color : '#64748B',
                     }}>
                     <i className={cfg.icon} />{d}
@@ -1168,17 +1229,69 @@ export default function EkipmanlarPage() {
               })}
             </div>
           </div>
+
+          {/* Sonraki Kontrol Tarihi */}
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Sonraki Kontrol Tarihi</label>
             <input type="date" value={kontrolForm.sonrakiKontrolTarihi}
               onChange={e => setKontrolForm(p => ({ ...p, sonrakiKontrolTarihi: e.target.value }))}
               className="isg-input" />
           </div>
+
+          {/* Fotoğraf */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>
+              Kontrol Fotoğrafı <span className="text-[10px] font-normal" style={{ color: '#475569' }}>(opsiyonel)</span>
+            </label>
+            {kontrolFotoPreview ? (
+              <div className="relative rounded-xl overflow-hidden" style={{ border: '1px solid rgba(52,211,153,0.25)' }}>
+                <img src={kontrolFotoPreview} alt="Kontrol fotoğrafı" className="w-full object-cover rounded-xl" style={{ maxHeight: '180px' }} />
+                <button
+                  onClick={() => { setKontrolFoto(null); setKontrolFotoPreview(null); }}
+                  className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                  style={{ background: 'rgba(0,0,0,0.6)', color: '#EF4444' }}>
+                  <i className="ri-close-line text-sm" />
+                </button>
+                <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg text-[10px] font-semibold" style={{ background: 'rgba(0,0,0,0.6)', color: '#34D399' }}>
+                  <i className="ri-camera-line mr-1" />{kontrolFoto?.name}
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => kontrolFotoRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-2 py-5 rounded-xl cursor-pointer transition-all"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.35)'; e.currentTarget.style.background = 'rgba(52,211,153,0.04)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}>
+                <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(52,211,153,0.1)' }}>
+                  <i className="ri-camera-line text-lg" style={{ color: '#34D399' }} />
+                </div>
+                <p className="text-xs font-medium" style={{ color: '#64748B' }}>Fotoğraf ekle</p>
+                <p className="text-[10px]" style={{ color: '#475569' }}>JPG, PNG • Maks. 10MB</p>
+              </div>
+            )}
+            <input
+              ref={kontrolFotoRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setKontrolFoto(file);
+                const reader = new FileReader();
+                reader.onload = ev => setKontrolFotoPreview(ev.target?.result as string);
+                reader.readAsDataURL(file);
+              }}
+            />
+          </div>
+
+          {/* Notlar */}
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Notlar</label>
             <textarea value={kontrolForm.notlar}
               onChange={e => setKontrolForm(p => ({ ...p, notlar: e.target.value }))}
-              placeholder="Kontrol notu (opsiyonel)..."
+              placeholder="Kontrol notu, gözlem veya öneri..."
               rows={3} maxLength={500} className="isg-input resize-none" />
           </div>
         </div>
@@ -1383,45 +1496,85 @@ export default function EkipmanlarPage() {
 
           {/* Belge */}
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Belge Mevcut mu?</label>
-            <div className="flex items-center gap-4 mt-2">
+            <label className="block text-xs font-semibold mb-2" style={{ color: '#94A3B8' }}>Belge Mevcut mu?</label>
+            <div className="flex items-center gap-3">
               {[true, false].map(v => (
-                <label key={String(v)} className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" checked={form.belgeMevcut === v} onChange={() => setForm(p => ({ ...p, belgeMevcut: v, ...(v === false ? { dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '' } : {}) }))} className="cursor-pointer" style={{ accentColor: '#3B82F6' }} />
-                  <span className="text-sm text-slate-300">{v ? 'Evet' : 'Hayır'}</span>
+                <label key={String(v)} className="flex items-center gap-2 cursor-pointer px-4 py-2.5 rounded-xl transition-all"
+                  style={{
+                    background: form.belgeMevcut === v ? (v ? 'rgba(52,211,153,0.12)' : 'rgba(100,116,139,0.1)') : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${form.belgeMevcut === v ? (v ? 'rgba(52,211,153,0.35)' : 'rgba(100,116,139,0.3)') : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                  <input type="radio" checked={form.belgeMevcut === v}
+                    onChange={() => setForm(p => ({ ...p, belgeMevcut: v, ...(v === false ? { dosyaAdi: '', dosyaBoyutu: 0, dosyaTipi: '', dosyaVeri: '', belgeGecerlilikTarihi: '' } : {}) }))}
+                    className="cursor-pointer" style={{ accentColor: v ? '#34D399' : '#64748B' }} />
+                  <span className="text-sm font-semibold" style={{ color: form.belgeMevcut === v ? (v ? '#34D399' : '#94A3B8') : '#64748B' }}>
+                    {v ? 'Evet' : 'Hayır'}
+                  </span>
                 </label>
               ))}
             </div>
+
             {form.belgeMevcut && (
-              <div className="mt-3">
-                <div
-                  className="rounded-xl p-4 text-center cursor-pointer transition-all duration-200"
-                  style={{ border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}
-                  onClick={() => fileRef.current?.click()}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.4)'; e.currentTarget.style.background = 'rgba(52,211,153,0.04)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
-                >
-                  {form.dosyaAdi ? (
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.12)' }}>
-                        <i className="ri-file-check-line text-lg" style={{ color: '#10B981' }} />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-medium text-slate-200">{form.dosyaAdi}</p>
-                        <p className="text-xs mt-1" style={{ color: '#475569' }}>{form.dosyaBoyutu ? `${(form.dosyaBoyutu / 1024).toFixed(1)} KB` : ''} — Değiştirmek için tıklayın</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <i className="ri-upload-cloud-2-line text-2xl mb-1.5" style={{ color: '#334155' }} />
-                      <p className="text-sm font-medium text-slate-400">Belgeyi sürükleyin veya tıklayın</p>
-                      <p className="text-xs mt-1" style={{ color: '#334155' }}>PDF, JPG, PNG • Maks. 50MB</p>
-                    </>
-                  )}
+              <div className="mt-3 space-y-3 p-4 rounded-xl" style={{ background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                {/* Geçerlilik Tarihi */}
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>
+                    Belge Geçerlilik Tarihi <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={form.belgeGecerlilikTarihi ?? ''}
+                    onChange={e => setForm(p => ({ ...p, belgeGecerlilikTarihi: e.target.value }))}
+                    className="isg-input"
+                  />
+                  {form.belgeGecerlilikTarihi && (() => {
+                    const days = Math.ceil((new Date(form.belgeGecerlilikTarihi).getTime() - Date.now()) / 86400000);
+                    if (days < 0) return <p className="text-xs mt-1 font-semibold" style={{ color: '#EF4444' }}><i className="ri-error-warning-line mr-1" />Belge süresi {Math.abs(days)} gün önce dolmuş!</p>;
+                    if (days <= 30) return <p className="text-xs mt-1 font-semibold" style={{ color: '#FBBF24' }}><i className="ri-alarm-warning-line mr-1" />{days} gün içinde dolacak</p>;
+                    return <p className="text-xs mt-1" style={{ color: '#34D399' }}><i className="ri-checkbox-circle-line mr-1" />{days} gün geçerli</p>;
+                  })()}
                 </div>
-                <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={e => handleFileChange(e.target.files?.[0])} />
+
+                {/* Dosya Yükleme */}
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Belge Dosyası</label>
+                  <div
+                    className="rounded-xl p-4 text-center cursor-pointer transition-all duration-200"
+                    style={{ border: '2px dashed rgba(52,211,153,0.2)', background: 'rgba(255,255,255,0.02)' }}
+                    onClick={() => fileRef.current?.click()}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.5)'; e.currentTarget.style.background = 'rgba(52,211,153,0.06)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.2)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
+                  >
+                    {form.dosyaAdi ? (
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(52,211,153,0.15)' }}>
+                          <i className="ri-file-check-line text-lg" style={{ color: '#34D399' }} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-semibold" style={{ color: '#34D399' }}>{form.dosyaAdi}</p>
+                          <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{form.dosyaBoyutu ? `${(form.dosyaBoyutu / 1024).toFixed(1)} KB` : ''} — Değiştirmek için tıklayın</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <i className="ri-upload-cloud-2-line text-2xl mb-1.5" style={{ color: '#475569' }} />
+                        <p className="text-sm font-medium" style={{ color: '#64748B' }}>Belgeyi sürükleyin veya tıklayın</p>
+                        <p className="text-xs mt-1" style={{ color: '#475569' }}>PDF, JPG, PNG • Maks. 50MB</p>
+                      </>
+                    )}
+                  </div>
+                  <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={e => handleFileChange(e.target.files?.[0])} />
+                </div>
+
+                {/* Belgeler sekmesine yönlendirme */}
+                {editId && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                    <i className="ri-information-line text-sm" style={{ color: '#818CF8' }} />
+                    <p className="text-xs" style={{ color: '#818CF8' }}>Birden fazla belge yönetmek için <button onClick={() => setModalTab('belgeler')} className="font-bold underline cursor-pointer">Belgeler sekmesini</button> kullanın.</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
