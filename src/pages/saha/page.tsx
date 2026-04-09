@@ -31,7 +31,7 @@ const TABS: { id: SahaTab; label: string; icon: string; color: string; activeBg:
 interface QrTabProps {
   isOnline: boolean;
   onKontrolYapildi: (id: string) => void;
-  onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
+  onDurumDegistir: (id: string, durum: EkipmanStatus, aciklama?: string, foto?: File | null) => void;
 }
 
 const QrTab = memo(function QrTab({ isOnline, onKontrolYapildi, onDurumDegistir }: QrTabProps) {
@@ -81,7 +81,7 @@ const QrTab = memo(function QrTab({ isOnline, onKontrolYapildi, onDurumDegistir 
           ekipman={qrFoundEkipman}
           onClose={() => setQrFoundEkipman(null)}
           onKontrolYapildi={(id) => { onKontrolYapildi(id); setQrFoundEkipman(null); }}
-          onDurumDegistir={(id, durum) => { onDurumDegistir(id, durum); setQrFoundEkipman(prev => prev?.id === id ? { ...prev, durum } : prev); }}
+          onDurumDegistir={(id, durum, aciklama, foto) => { onDurumDegistir(id, durum, aciklama, foto); setQrFoundEkipman(prev => prev?.id === id ? { ...prev, durum } : prev); }}
           isOnline={isOnline}
         />
       )}
@@ -131,7 +131,7 @@ const QrTab = memo(function QrTab({ isOnline, onKontrolYapildi, onDurumDegistir 
 // ─── Son Kontrol Edilen Ekipmanlar ────────────────────────────────────────────
 function RecentEkipmanlar({ onKontrolYapildi, onDurumDegistir, isOnline }: {
   onKontrolYapildi: (id: string) => void;
-  onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
+  onDurumDegistir: (id: string, durum: EkipmanStatus, aciklama?: string, foto?: File | null) => void;
   isOnline: boolean;
 }) {
   const { ekipmanlar, firmalar } = useApp();
@@ -237,7 +237,7 @@ function RecentEkipmanlar({ onKontrolYapildi, onDurumDegistir, isOnline }: {
 interface EkipmanTabProps {
   isOnline: boolean;
   onKontrolYapildi: (id: string) => void;
-  onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
+  onDurumDegistir: (id: string, durum: EkipmanStatus, aciklama?: string, foto?: File | null) => void;
 }
 
 const EkipmanTab = memo(function EkipmanTab({ isOnline, onKontrolYapildi, onDurumDegistir }: EkipmanTabProps) {
