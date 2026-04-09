@@ -100,12 +100,11 @@ export default function Modal({
         inset: 0,
         zIndex: 99999,
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         justifyContent: 'center',
-        padding: '0',
+        padding: '16px',
         animation: exiting ? 'modal-backdrop-out 0.22s ease forwards' : 'modal-backdrop-in 0.2s ease both',
       }}
-      className="sm:items-center sm:p-4"
     >
       {/* Backdrop */}
       <div
@@ -122,7 +121,7 @@ export default function Modal({
 
       {/* Modal panel */}
       <div
-        className={`w-full ${sizeClasses[size]} modal-panel rounded-t-[20px] sm:rounded-[16px]`}
+        className={`w-full ${sizeClasses[size]} modal-panel rounded-[16px]`}
         style={{
           position: 'relative',
           zIndex: 1,
