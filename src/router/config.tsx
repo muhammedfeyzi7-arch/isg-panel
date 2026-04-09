@@ -7,6 +7,9 @@ import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
 import QrRedirectPage from "../pages/equipment/QrRedirectPage";
+import SuperAdminLoginPage from "../pages/super-admin/login/page";
+import SuperAdminPage from "../pages/super-admin/page";
+import SubscriptionExpiredPage from "../pages/subscription-expired/page";
 
 // Tüm modül route'ları — her biri Home component'ini render eder
 // Home, URL'deki :module parametresini okuyarak doğru sayfayı gösterir
@@ -66,6 +69,18 @@ const routes: RouteObject[] = [
         <QrRedirectPage />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/super-admin/login",
+    element: <SuperAdminLoginPage />,
+  },
+  {
+    path: "/super-admin",
+    element: <SuperAdminPage />,
+  },
+  {
+    path: "/subscription-expired",
+    element: <SubscriptionExpiredPage />,
   },
   {
     path: "*",
