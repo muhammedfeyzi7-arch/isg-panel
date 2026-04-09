@@ -1611,20 +1611,21 @@ export function useStore(
 
   const permanentDeleteEkipman = useCallback(async (id: string) => {
     const snapshot = ekipmanlarRef.current;
-    // ownDeletesRef'e ekle — realtime DELETE event gelince "başka kullanıcı" sanmasın
     ownDeletesRef.current.add(id);
     _setEkipmanlar(prev => prev.filter(e => e.id !== id));
     try {
-      const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/delete-ekipman', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [id] }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Silme başarısız');
-      console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
+      // TEST: edge function devre dışı — direkt supabase.delete()
+      console.log(`[ISG][TEST] permanentDeleteEkipman direkt delete: ${id}`);
+      const { error, data } = await supabase
+        .from('ekipmanlar')
+        .delete()
+        .eq('id', id)
+        .select();
+      console.log(`[ISG][TEST] delete result — data:`, data, 'error:', error);
+      if (error) throw new Error(error.message);
+      console.log(`[ISG][TEST] permanentDeleteEkipman OK: ${id} — silinen satır sayısı: ${data?.length ?? 0}`);
     } catch (err) {
-      console.error('[ISG] permanentDeleteEkipman FAILED, rolling back:', err);
+      console.error('[ISG][TEST] permanentDeleteEkipman FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
       _setEkipmanlar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
@@ -1635,20 +1636,21 @@ export function useStore(
   const permanentDeleteEkipmanMany = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
     const snapshot = ekipmanlarRef.current;
-    // ownDeletesRef'e hepsini ekle — realtime event'leri skip et
     ids.forEach(id => ownDeletesRef.current.add(id));
     _setEkipmanlar(prev => prev.filter(e => !ids.includes(e.id)));
     try {
-      const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/delete-ekipman', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Silme başarısız');
-      console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
+      // TEST: edge function devre dışı — direkt supabase.delete()
+      console.log(`[ISG][TEST] permanentDeleteEkipmanMany direkt delete: ${ids.join(', ')}`);
+      const { error, data } = await supabase
+        .from('ekipmanlar')
+        .delete()
+        .in('id', ids)
+        .select();
+      console.log(`[ISG][TEST] delete many result — data:`, data, 'error:', error);
+      if (error) throw new Error(error.message);
+      console.log(`[ISG][TEST] permanentDeleteEkipmanMany OK: ${ids.length} items — silinen: ${data?.length ?? 0}`);
     } catch (err) {
-      console.error('[ISG] permanentDeleteEkipmanMany FAILED, rolling back:', err);
+      console.error('[ISG][TEST] permanentDeleteEkipmanMany FAILED, rolling back:', err);
       ids.forEach(id => ownDeletesRef.current.delete(id));
       _setEkipmanlar(snapshot);
       onSaveErrorRef.current?.(`Kalıcı silme hatası (ekipmanlar): ${err instanceof Error ? err.message : String(err)}`);
