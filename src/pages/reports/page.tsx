@@ -626,13 +626,36 @@ export default function RaporlarPage() {
     { label: 'Tutanaklar', value: aktifTutanaklar.length, icon: 'ri-article-line', color: '#14B8A6', sub: `${aktifTutanaklar.filter(t => t.durum === 'Onaylandı').length} onaylı` },
   ];
 
-  // Özet sağlık skoru — Excel export'ta da kullanılıyor, bu yüzden export'tan önce tanımlanmalı
+  // Özet sağlık skoru — tüm alanları kapsamlı hesaplar
   const healthScore = useMemo(() => {
-    const total = aktifEvraklar.length;
-    if (total === 0) return 100;
-    const sorunlu = evrakStats.eksik + evrakStats.sureDolmus;
-    return Math.max(0, Math.round(((total - sorunlu) / total) * 100));
-  }, [aktifEvraklar, evrakStats]);
+    // Her kategori için ceza puanı (toplam 100 üzerinden)
+    // 1. Evrak sorunları (ağırlık: 35 puan)
+    const evrakTotal = aktifEvraklar.length;
+    const evrakSorunlu = evrakStats.eksik + evrakStats.sureDolmus;
+    const evrakCeza = evrakTotal > 0 ? (evrakSorunlu / evrakTotal) * 35 : 0;
+
+    // 2. Açık uygunsuzluklar (ağırlık: 30 puan) — kritik olanlar daha fazla ceza
+    const acikUygunsuzluk = aktifUygunsuzluklar.filter(u => u.durum !== 'Kapandı').length;
+    const kritikUygunsuzluk = aktifUygunsuzluklar.filter(u => u.durum !== 'Kapandı' && (u.severity === 'Kritik' || u.severity === 'Yüksek')).length;
+    const uygunsuzlukRef = Math.max(aktifUygunsuzluklar.length, 1);
+    const uygunsuzlukCeza = Math.min(30, ((acikUygunsuzluk * 1 + kritikUygunsuzluk * 2) / uygunsuzlukRef) * 30);
+
+    // 3. Gecikmiş / uygun olmayan ekipmanlar (ağırlık: 20 puan)
+    const ekipmanTotal = aktifEkipmanlar.length;
+    const ekipmanSorunlu = aktifEkipmanlar.filter(e =>
+      e.durum === 'Uygun Değil' ||
+      (e.sonrakiKontrolTarihi && new Date(e.sonrakiKontrolTarihi) < new Date())
+    ).length;
+    const ekipmanCeza = ekipmanTotal > 0 ? (ekipmanSorunlu / ekipmanTotal) * 20 : 0;
+
+    // 4. Süresi geçmiş sağlık takibi (ağırlık: 15 puan)
+    const saglikTotal = saglikStats.toplam;
+    const saglikSorunlu = saglikStats.gecmis;
+    const saglikCeza = saglikTotal > 0 ? (saglikSorunlu / saglikTotal) * 15 : 0;
+
+    const toplamCeza = evrakCeza + uygunsuzlukCeza + ekipmanCeza + saglikCeza;
+    return Math.max(0, Math.round(100 - toplamCeza));
+  }, [aktifEvraklar, evrakStats, aktifUygunsuzluklar, aktifEkipmanlar, saglikStats]);
 
   const healthColor = healthScore >= 80 ? '#10B981' : healthScore >= 60 ? '#F59E0B' : '#EF4444';
   const healthLabel = healthScore >= 80 ? 'İyi' : healthScore >= 60 ? 'Orta' : 'Kritik';
@@ -1674,7 +1697,18 @@ export default function RaporlarPage() {
                     {healthLabel}
                   </span>
                   <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
-                    {evrakStats.eksik + evrakStats.sureDolmus} sorunlu evrak
+                    {(() => {
+                      const sorunlar = [];
+                      const evrakSorun = evrakStats.eksik + evrakStats.sureDolmus;
+                      const uygunsuzlukAcik = aktifUygunsuzluklar.filter(u => u.durum !== 'Kapandı').length;
+                      const ekipmanSorun = aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil' || (e.sonrakiKontrolTarihi && new Date(e.sonrakiKontrolTarihi) < new Date())).length;
+                      const saglikSorun = saglikStats.gecmis;
+                      if (evrakSorun > 0) sorunlar.push(`${evrakSorun} sorunlu evrak`);
+                      if (uygunsuzlukAcik > 0) sorunlar.push(`${uygunsuzlukAcik} açık uygunsuzluk`);
+                      if (ekipmanSorun > 0) sorunlar.push(`${ekipmanSorun} sorunlu ekipman`);
+                      if (saglikSorun > 0) sorunlar.push(`${saglikSorun} gecikmiş sağlık`);
+                      return sorunlar.length > 0 ? sorunlar.join(' · ') : 'Sorun tespit edilmedi';
+                    })()}
                   </p>
                 </div>
                 <div className="w-full space-y-2 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>

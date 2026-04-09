@@ -1412,6 +1412,8 @@ export function useStore(
       if (e.id !== ekipmanId) return e;
       updated = {
         ...e,
+        // Durum, kontrol geçmişi ve son kontrol tarihini tek seferde güncelle
+        durum: kayit.durum,
         kontrolGecmisi: [yeniKayit, ...(e.kontrolGecmisi ?? [])],
         sonKontrolTarihi: kayit.tarih.split('T')[0],
       };

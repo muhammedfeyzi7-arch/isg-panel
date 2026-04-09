@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, memo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '@/store/AppContext';
-import Modal from '@/components/base/Modal';
 import type { Ekipman, EkipmanStatus, Evrak } from '@/types';
 import { getSignedUrlFromPath, uploadFileToStorage } from '@/utils/fileUpload';
 
@@ -11,10 +11,90 @@ export const STATUS_CFG: Record<EkipmanStatus, { label: string; color: string; b
   'Hurda':       { label: 'Hurda',       color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-delete-bin-line' },
 };
 
-// Durumlar için açıklama/fotoğraf zorunlu mu?
 const REQUIRES_DETAIL: EkipmanStatus[] = ['Uygun Değil', 'Bakımda', 'Hurda'];
 
-// ─── Durum Detay Modal ────────────────────────────────────────────────────────
+// ─── Saha Bottom Sheet Wrapper ────────────────────────────────────────────────
+interface SahaSheetProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  icon?: string;
+  iconColor?: string;
+  children: React.ReactNode;
+  maxWidth?: number;
+}
+
+function SahaSheet({ open, onClose, title, icon, iconColor = '#34D399', children, maxWidth = 520 }: SahaSheetProps) {
+  const [visible, setVisible] = useState(false);
+  const [animIn, setAnimIn] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setVisible(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => setAnimIn(true)));
+    } else {
+      setAnimIn(false);
+      const t = setTimeout(() => setVisible(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  if (!visible) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[300] flex items-end justify-center"
+      style={{
+        background: animIn ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0)',
+        backdropFilter: animIn ? 'blur(6px)' : 'none',
+        transition: 'background 0.3s ease, backdrop-filter 0.3s ease',
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full rounded-t-3xl flex flex-col"
+        style={{
+          maxWidth,
+          background: 'var(--bg-card, #0f172a)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderBottom: 'none',
+          maxHeight: '92vh',
+          transform: animIn ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+        </div>
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          {icon && (
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${iconColor}18` }}>
+              <i className={`${icon} text-base`} style={{ color: iconColor }} />
+            </div>
+          )}
+          <p className="flex-1 font-bold text-base" style={{ color: 'var(--text-primary, #f1f5f9)' }}>{title}</p>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl cursor-pointer flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.06)', color: '#64748B' }}
+          >
+            <i className="ri-close-line text-sm" />
+          </button>
+        </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {children}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ─── Durum Detay Modal (bottom-sheet) ────────────────────────────────────────
 interface DurumDetayModalProps {
   open: boolean;
   durum: EkipmanStatus;
@@ -42,41 +122,20 @@ function DurumDetayModal({ open, durum, onConfirm, onCancel }: DurumDetayModalPr
 
   const canConfirm = aciklama.trim().length > 0 || foto !== null;
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-      onClick={onCancel}
+    <SahaSheet
+      open={open}
+      onClose={onCancel}
+      title={`Durum: ${durum}`}
+      icon={cfg.icon}
+      iconColor={cfg.color}
+      maxWidth={480}
     >
-      <div
-        className="w-full max-w-sm rounded-2xl p-5 space-y-4"
-        style={{ background: 'var(--bg-card)', border: `1px solid ${cfg.color}40`, maxHeight: '90vh', overflowY: 'auto' }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Başlık */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: cfg.bg }}>
-            <i className={`${cfg.icon} text-lg`} style={{ color: cfg.color }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              Durum: <span style={{ color: cfg.color }}>{durum}</span>
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
-              Açıklama veya fotoğraf ekleyin
-            </p>
-          </div>
-          <button onClick={onCancel} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0" style={{ background: 'rgba(255,255,255,0.06)', color: '#64748B' }}>
-            <i className="ri-close-line text-sm" />
-          </button>
-        </div>
-
+      <div className="space-y-4">
         {/* Açıklama */}
         <div>
           <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>
-            Açıklama <span className="text-[10px] font-normal" style={{ color: '#475569' }}>(opsiyonel — fotoğraf yeterliyse boş bırakabilirsiniz)</span>
+            Açıklama <span className="text-[10px] font-normal" style={{ color: '#475569' }}>(opsiyonel)</span>
           </label>
           <textarea
             value={aciklama}
@@ -84,7 +143,7 @@ function DurumDetayModal({ open, durum, onConfirm, onCancel }: DurumDetayModalPr
             placeholder={`${durum} nedeni, gözlem veya öneri...`}
             rows={3}
             maxLength={500}
-            className="isg-input resize-none text-sm"
+            className="isg-input resize-none text-sm w-full"
           />
           <p className="text-[10px] mt-1 text-right" style={{ color: '#334155' }}>{aciklama.length}/500</p>
         </div>
@@ -92,40 +151,45 @@ function DurumDetayModal({ open, durum, onConfirm, onCancel }: DurumDetayModalPr
         {/* Fotoğraf */}
         <div>
           <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>
-            Fotoğraf <span className="text-[10px] font-normal" style={{ color: '#475569' }}>(opsiyonel — açıklama yeterliyse boş bırakabilirsiniz)</span>
+            Fotoğraf <span className="text-[10px] font-normal" style={{ color: '#475569' }}>(opsiyonel)</span>
           </label>
           {fotoPreview ? (
             <div className="relative rounded-xl overflow-hidden" style={{ border: `1px solid ${cfg.color}40` }}>
-              <img src={fotoPreview} alt="Kontrol fotoğrafı" className="w-full object-cover rounded-xl" style={{ maxHeight: '160px' }} />
+              <img src={fotoPreview} alt="Kontrol fotoğrafı" className="w-full object-cover rounded-xl" style={{ maxHeight: '180px' }} />
               <button
                 onClick={() => { setFoto(null); setFotoPreview(null); }}
                 className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
                 style={{ background: 'rgba(0,0,0,0.6)', color: '#EF4444' }}>
                 <i className="ri-close-line text-sm" />
               </button>
-              <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg text-[10px] font-semibold" style={{ background: 'rgba(0,0,0,0.6)', color: '#34D399' }}>
-                <i className="ri-camera-line mr-1" />{foto?.name}
-              </div>
             </div>
           ) : (
-            <div
-              onClick={() => fotoRef.current?.click()}
-              className="flex flex-col items-center justify-center gap-2 py-4 rounded-xl cursor-pointer transition-all"
-              style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = `${cfg.color}50`; e.currentTarget.style.background = `${cfg.bg}`; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
-            >
-              <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: cfg.bg }}>
-                <i className="ri-camera-line text-base" style={{ color: cfg.color }} />
-              </div>
-              <p className="text-xs font-medium" style={{ color: '#64748B' }}>Fotoğraf ekle</p>
-              <p className="text-[10px]" style={{ color: '#475569' }}>JPG, PNG • Maks. 10MB</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { if (fotoRef.current) { fotoRef.current.removeAttribute('capture'); fotoRef.current.click(); } }}
+                className="flex flex-col items-center justify-center gap-2 py-4 rounded-xl cursor-pointer transition-all"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)' }}
+              >
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: cfg.bg }}>
+                  <i className="ri-image-line text-base" style={{ color: cfg.color }} />
+                </div>
+                <p className="text-xs font-medium" style={{ color: '#64748B' }}>Galeriden</p>
+              </button>
+              <button
+                onClick={() => { if (fotoRef.current) { fotoRef.current.setAttribute('capture', 'environment'); fotoRef.current.click(); } }}
+                className="flex flex-col items-center justify-center gap-2 py-4 rounded-xl cursor-pointer transition-all"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)' }}
+              >
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: cfg.bg }}>
+                  <i className="ri-camera-line text-base" style={{ color: cfg.color }} />
+                </div>
+                <p className="text-xs font-medium" style={{ color: '#64748B' }}>Kamera</p>
+              </button>
             </div>
           )}
           <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFoto(f); }} />
         </div>
 
-        {/* Uyarı — ikisi de boşsa */}
         {!canConfirm && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
             <i className="ri-information-line text-xs" style={{ color: '#FBBF24' }} />
@@ -133,11 +197,10 @@ function DurumDetayModal({ open, durum, onConfirm, onCancel }: DurumDetayModalPr
           </div>
         )}
 
-        {/* Butonlar */}
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-2 pt-1 pb-2">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
+            className="flex-1 py-3 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#64748B' }}
           >
             İptal
@@ -145,14 +208,14 @@ function DurumDetayModal({ open, durum, onConfirm, onCancel }: DurumDetayModalPr
           <button
             onClick={() => canConfirm && onConfirm(aciklama, foto)}
             disabled={!canConfirm}
-            className="flex-1 py-2.5 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 py-3 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: cfg.bg, border: `1px solid ${cfg.color}60`, color: cfg.color }}
           >
             <i className="ri-save-line mr-1" />Kaydet
           </button>
         </div>
       </div>
-    </div>
+    </SahaSheet>
   );
 }
 
@@ -243,7 +306,7 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
             <p className="text-xs mt-2" style={{ color: '#475569' }}>Bu firmaya ait evrak bulunamadı</p>
           </div>
         ) : (
-          <div className="space-y-2 overflow-y-auto pr-0.5" style={{ maxHeight: '280px' }}>
+          <div className="space-y-2">
             {firmaEvraklari.map(evrak => {
               const sc = getStatusColor(evrak.durum);
               const isExpired = evrak.durum === 'Süre Dolmuş';
@@ -279,6 +342,113 @@ function EkipmanEvraklari({ ekipman }: { ekipman: Ekipman }) {
   );
 }
 
+// ─── Kontrol Geçmişi ──────────────────────────────────────────────────────────
+function KontrolGecmisi({ ekipman }: { ekipman: Ekipman }) {
+  const { addToast } = useApp();
+  const gecmis = ekipman.kontrolGecmisi ?? [];
+
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleFotoAc = async (fotoUrl: string) => {
+    try {
+      const url = await getSignedUrlFromPath(fotoUrl);
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      else addToast('Fotoğraf açılamadı.', 'error');
+    } catch {
+      addToast('Fotoğraf açılamadı.', 'error');
+    }
+  };
+
+  if (gecmis.length === 0) {
+    return (
+      <div className="text-center py-10 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <i className="ri-history-line text-2xl" style={{ color: '#334155' }} />
+        <p className="text-xs mt-2" style={{ color: '#475569' }}>Henüz kontrol geçmişi yok</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {gecmis.map((kayit, idx) => {
+        const sc = STATUS_CFG[kayit.durum] ?? STATUS_CFG['Uygun'];
+        return (
+          <div key={kayit.id ?? idx} className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${sc.color}25` }}>
+            <div className="flex items-center gap-3 px-3 py-2.5">
+              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: sc.bg }}>
+                <i className={`${sc.icon} text-sm`} style={{ color: sc.color }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-md" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
+                  {kayit.kaynak === 'qr' && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>QR</span>
+                  )}
+                </div>
+                <p className="text-xs mt-0.5 font-medium" style={{ color: '#94A3B8' }}>{kayit.kontrolEden}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: '#475569' }}>{fmtDate(kayit.tarih)}</p>
+              </div>
+            </div>
+            {kayit.notlar && (
+              <div className="px-3 pb-2.5">
+                <p className="text-xs px-2.5 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', color: '#94A3B8', borderLeft: `2px solid ${sc.color}50` }}>
+                  {kayit.notlar}
+                </p>
+              </div>
+            )}
+            {kayit.fotoUrl && (
+              <div className="px-3 pb-2.5">
+                <button
+                  onClick={() => handleFotoAc(kayit.fotoUrl!)}
+                  className="relative w-full rounded-xl overflow-hidden cursor-pointer group"
+                  style={{ border: `1px solid ${sc.color}30` }}
+                >
+                  <FotoThumbnail fotoUrl={kayit.fotoUrl} />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" style={{ background: 'rgba(0,0,0,0.5)' }}>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(0,0,0,0.7)' }}>
+                      <i className="ri-zoom-in-line text-sm text-white" />
+                      <span className="text-xs font-semibold text-white">Büyüt</span>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Fotoğraf thumbnail — signed URL ile yükler
+function FotoThumbnail({ fotoUrl }: { fotoUrl: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSignedUrlFromPath(fotoUrl).then(url => {
+      if (!cancelled && url) setSrc(url);
+    });
+    return () => { cancelled = true; };
+  }, [fotoUrl]);
+
+  if (!src) {
+    return (
+      <div className="w-full h-24 flex items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+        <i className="ri-loader-4-line animate-spin text-lg" style={{ color: '#475569' }} />
+      </div>
+    );
+  }
+
+  return (
+    <img src={src} alt="Kontrol fotoğrafı" className="w-full object-cover rounded-xl" style={{ maxHeight: '160px' }} />
+  );
+}
+
 // ─── Ekipman Detay Paneli ─────────────────────────────────────────────────────
 interface EkipmanDetayPanelProps {
   ekipman: Ekipman;
@@ -293,13 +463,14 @@ export const EkipmanDetayPanel = memo(function EkipmanDetayPanel({
   ekipman, onBack, onKontrolYapildi, onDurumDegistir, isOnline, kontrolBasarili,
 }: EkipmanDetayPanelProps) {
   const { firmalar } = useApp();
-  const [activeTab, setActiveTab] = useState<'detay' | 'evraklar'>('detay');
+  const [activeTab, setActiveTab] = useState<'detay' | 'gecmis' | 'evraklar'>('detay');
   const [pendingDurum, setPendingDurum] = useState<EkipmanStatus | null>(null);
   const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
   const firma = firmalar.find(f => f.id === ekipman.firmaId);
   const days = ekipman.sonrakiKontrolTarihi
     ? Math.ceil((new Date(ekipman.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000)
     : null;
+  const gecmisCount = ekipman.kontrolGecmisi?.length ?? 0;
 
   const handleDurumClick = (d: EkipmanStatus) => {
     if (REQUIRES_DETAIL.includes(d)) {
@@ -343,6 +514,7 @@ export const EkipmanDetayPanel = memo(function EkipmanDetayPanel({
           </div>
         )}
 
+        {/* Ekipman Başlık Kartı */}
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="w-12 h-12 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: sc.bg }}>
             <i className={`${sc.icon} text-xl`} style={{ color: sc.color }} />
@@ -355,16 +527,23 @@ export const EkipmanDetayPanel = memo(function EkipmanDetayPanel({
           <span className="text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
         </div>
 
+        {/* Sekmeler */}
         <div className="flex items-center gap-1 px-1 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <button onClick={() => setActiveTab('detay')} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: activeTab === 'detay' ? 'rgba(52,211,153,0.2)' : 'transparent', color: activeTab === 'detay' ? '#34D399' : '#64748B' }}>
+          <button onClick={() => setActiveTab('detay')} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-full text-[11px] font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: activeTab === 'detay' ? 'rgba(52,211,153,0.2)' : 'transparent', color: activeTab === 'detay' ? '#34D399' : '#64748B' }}>
             <i className="ri-tools-line text-xs" />Kontrol
           </button>
-          <button onClick={() => setActiveTab('evraklar')} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: activeTab === 'evraklar' ? 'rgba(99,102,241,0.2)' : 'transparent', color: activeTab === 'evraklar' ? '#818CF8' : '#64748B' }}>
+          <button onClick={() => setActiveTab('gecmis')} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-full text-[11px] font-bold cursor-pointer transition-all duration-150 whitespace-nowrap relative" style={{ background: activeTab === 'gecmis' ? 'rgba(251,191,36,0.2)' : 'transparent', color: activeTab === 'gecmis' ? '#FBBF24' : '#64748B' }}>
+            <i className="ri-history-line text-xs" />Geçmiş
+            {gecmisCount > 0 && (
+              <span className="ml-1 text-[9px] font-bold px-1 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.2)', color: '#FBBF24' }}>{gecmisCount}</span>
+            )}
+          </button>
+          <button onClick={() => setActiveTab('evraklar')} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-full text-[11px] font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: activeTab === 'evraklar' ? 'rgba(99,102,241,0.2)' : 'transparent', color: activeTab === 'evraklar' ? '#818CF8' : '#64748B' }}>
             <i className="ri-file-list-3-line text-xs" />Evraklar
           </button>
         </div>
 
-        {activeTab === 'detay' ? (
+        {activeTab === 'detay' && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               {ekipman.seriNo && (
@@ -419,12 +598,13 @@ export const EkipmanDetayPanel = memo(function EkipmanDetayPanel({
 
             <div>
               <p className="text-[10px] font-semibold mb-2 uppercase tracking-wide" style={{ color: '#475569' }}>Durum Değiştir</p>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-2 gap-2">
                 {(['Uygun', 'Uygun Değil', 'Bakımda', 'Hurda'] as EkipmanStatus[]).map(d => {
                   const cfg = STATUS_CFG[d];
                   const isActive = ekipman.durum === d;
                   return (
-                    <button key={d} onClick={() => handleDurumClick(d)} className="py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all duration-150 whitespace-nowrap" style={{ background: isActive ? cfg.bg : 'rgba(255,255,255,0.04)', border: `1px solid ${isActive ? cfg.color + '80' : 'rgba(255,255,255,0.08)'}`, color: isActive ? cfg.color : '#64748B' }}>
+                    <button key={d} onClick={() => handleDurumClick(d)} className="py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all duration-150 whitespace-nowrap flex items-center justify-center gap-1.5" style={{ background: isActive ? cfg.bg : 'rgba(255,255,255,0.04)', border: `1px solid ${isActive ? cfg.color + '80' : 'rgba(255,255,255,0.08)'}`, color: isActive ? cfg.color : '#64748B' }}>
+                      <i className={`${cfg.icon} text-xs`} />
                       {cfg.label}
                     </button>
                   );
@@ -438,7 +618,13 @@ export const EkipmanDetayPanel = memo(function EkipmanDetayPanel({
               )}
             </div>
           </div>
-        ) : (
+        )}
+
+        {activeTab === 'gecmis' && (
+          <KontrolGecmisi ekipman={ekipman} />
+        )}
+
+        {activeTab === 'evraklar' && (
           <EkipmanEvraklari ekipman={ekipman} />
         )}
       </div>
@@ -496,7 +682,7 @@ export const EkipmanKart = memo(function EkipmanKart({ ekipman, firmaAd, onClick
   );
 });
 
-// ─── Ekipman Liste Modal ──────────────────────────────────────────────────────
+// ─── Ekipman Liste Modal (bottom-sheet) ──────────────────────────────────────
 interface EkipmanListeModalProps {
   open: boolean;
   onClose: () => void;
@@ -538,11 +724,6 @@ export function EkipmanListeModal({ open, onClose, onKontrolYapildi, onDurumDegi
     uygun: aktif.filter(e => e.durum === 'Uygun').length,
     uygunDegil: aktif.filter(e => e.durum === 'Uygun Değil').length,
     gecikmis: aktif.filter(e => e.sonrakiKontrolTarihi && new Date(e.sonrakiKontrolTarihi) < new Date()).length,
-    yaklasan: aktif.filter(e => {
-      if (!e.sonrakiKontrolTarihi) return false;
-      const d = Math.ceil((new Date(e.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000);
-      return d >= 0 && d <= 7;
-    }).length,
   }), [aktif]);
 
   const handleKontrol = (id: string) => {
@@ -554,12 +735,12 @@ export function EkipmanListeModal({ open, onClose, onKontrolYapildi, onDurumDegi
   const currentEkipman = selectedId ? (ekipmanlar.find(e => e.id === selectedId) ?? null) : null;
 
   return (
-    <Modal
-      isOpen={open}
+    <SahaSheet
+      open={open}
       onClose={() => { setSelectedId(null); onClose(); }}
       title={currentEkipman ? currentEkipman.ad : 'Ekipman Kontrolleri'}
-      size="lg"
-      icon="ri-tools-line"
+      icon={currentEkipman ? (STATUS_CFG[currentEkipman.durum]?.icon ?? 'ri-tools-line') : 'ri-tools-line'}
+      iconColor={currentEkipman ? (STATUS_CFG[currentEkipman.durum]?.color ?? '#818CF8') : '#818CF8'}
     >
       {currentEkipman ? (
         <EkipmanDetayPanel
@@ -589,10 +770,10 @@ export function EkipmanListeModal({ open, onClose, onKontrolYapildi, onDurumDegi
           <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
               <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#475569' }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ekipman veya firma ara..." className="isg-input pl-8 text-sm" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ekipman veya firma ara..." className="isg-input pl-8 text-sm w-full" />
             </div>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-sm" style={{ minWidth: '130px' }}>
-              <option value="">Tüm Durumlar</option>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-sm" style={{ minWidth: '120px' }}>
+              <option value="">Tümü</option>
               {Object.keys(STATUS_CFG).map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
@@ -603,7 +784,7 @@ export function EkipmanListeModal({ open, onClose, onKontrolYapildi, onDurumDegi
               <p className="text-sm font-medium" style={{ color: '#475569' }}>Ekipmanlar yükleniyor...</p>
             </div>
           ) : (
-            <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '400px' }}>
+            <div className="space-y-2 pb-4">
               {filtered.length === 0 ? (
                 <div className="text-center py-12">
                   <i className="ri-tools-line text-3xl" style={{ color: '#334155' }} />
@@ -623,11 +804,11 @@ export function EkipmanListeModal({ open, onClose, onKontrolYapildi, onDurumDegi
           )}
         </>
       )}
-    </Modal>
+    </SahaSheet>
   );
 }
 
-// ─── Firma Ekipman Modal ──────────────────────────────────────────────────────
+// ─── Firma Ekipman Modal (bottom-sheet) ──────────────────────────────────────
 interface FirmaEkipmanModalProps {
   open: boolean;
   firmaId: string | null;
@@ -658,12 +839,12 @@ export function FirmaEkipmanModal({ open, firmaId, onClose, onKontrolYapildi, on
   const currentEkipman = selectedId ? (ekipmanlar.find(e => e.id === selectedId) ?? null) : null;
 
   return (
-    <Modal
-      isOpen={open}
+    <SahaSheet
+      open={open}
       onClose={() => { setSelectedId(null); onClose(); }}
       title={currentEkipman ? currentEkipman.ad : (firma?.ad ?? 'Firma Ekipmanları')}
-      size="lg"
-      icon="ri-building-2-line"
+      icon={currentEkipman ? (STATUS_CFG[currentEkipman.durum]?.icon ?? 'ri-building-2-line') : 'ri-building-2-line'}
+      iconColor={currentEkipman ? (STATUS_CFG[currentEkipman.durum]?.color ?? '#818CF8') : '#818CF8'}
     >
       {currentEkipman ? (
         <EkipmanDetayPanel
@@ -699,7 +880,7 @@ export function FirmaEkipmanModal({ open, firmaId, onClose, onKontrolYapildi, on
               </div>
             </div>
           )}
-          <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '440px' }}>
+          <div className="space-y-2 pb-4">
             {firmaEkipmanlari.length === 0 ? (
               <div className="text-center py-12">
                 <i className="ri-tools-line text-3xl" style={{ color: '#334155' }} />
@@ -715,7 +896,7 @@ export function FirmaEkipmanModal({ open, firmaId, onClose, onKontrolYapildi, on
           </div>
         </>
       )}
-    </Modal>
+    </SahaSheet>
   );
 }
 

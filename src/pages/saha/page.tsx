@@ -1,8 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import { useApp } from '@/store/AppContext';
 import SahaUygunsuzlukForm from './components/SahaUygunsuzlukForm';
-import DetailModal from '@/pages/nonconformity/components/DetailModal';
-import KapatmaModal from '@/pages/nonconformity/components/KapatmaModal';
+import { SahaDetayModal, SahaKapatmaModal } from './components/SahaUygunsuzlukModals';
 import type { Ekipman, EkipmanStatus, Uygunsuzluk } from '@/types';
 import { useOfflineQueue, type OfflineQueueItem } from '@/hooks/useOfflineQueue';
 import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHelper';
@@ -221,21 +220,15 @@ function RecentEkipmanlar({ onKontrolYapildi, onDurumDegistir, isOnline }: {
         </div>
       )}
 
-      {/* Detay Modal */}
-      {currentEkipman && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setSelectedId(null)}>
-          <div className="w-full max-w-md rounded-2xl p-5 space-y-4" style={{ background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <EkipmanDetayPanel
-              ekipman={currentEkipman}
-              onBack={() => setSelectedId(null)}
-              onKontrolYapildi={handleKontrol}
-              onDurumDegistir={onDurumDegistir}
-              isOnline={isOnline}
-              kontrolBasarili={kontrolBasarili}
-            />
-          </div>
-        </div>
-      )}
+      {/* Detay Sheet */}
+      <EkipmanListeModal
+        open={!!currentEkipman}
+        onClose={() => setSelectedId(null)}
+        onKontrolYapildi={handleKontrol}
+        onDurumDegistir={onDurumDegistir}
+        isOnline={isOnline}
+        initialEkipmanId={currentEkipman?.id ?? null}
+      />
     </>
   );
 }
@@ -459,13 +452,13 @@ const UygunsuzlukTab = memo(function UygunsuzlukTab() {
         </div>
       )}
 
-      <DetailModal
+      <SahaDetayModal
         record={detailRecord}
         onClose={() => setDetailRecord(null)}
         onKapat={(rec) => { setDetailRecord(null); setKapatmaRecord(rec); }}
         onEdit={(rec) => { setDetailRecord(null); setEditRecord(rec); setShowForm(true); }}
       />
-      <KapatmaModal record={kapatmaRecord} onClose={() => setKapatmaRecord(null)} />
+      <SahaKapatmaModal record={kapatmaRecord} onClose={() => setKapatmaRecord(null)} />
       <SahaUygunsuzlukForm isOpen={showForm} onClose={() => { setShowForm(false); setEditRecord(null); }} editRecord={editRecord} />
     </>
   );
@@ -572,8 +565,9 @@ export default function SahaPage() {
     sonraki.setMonth(sonraki.getMonth() + 1);
     const sonrakiStr = sonraki.toISOString().split('T')[0];
     const gecikmisDi = ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi) < new Date() : false;
-    const updates = { sonKontrolTarihi: today, sonrakiKontrolTarihi: sonrakiStr, durum: 'Uygun' as const };
 
+    // addEkipmanKontrolKaydi artık durum + sonKontrolTarihi'ni de güncelliyor
+    // Sadece sonrakiKontrolTarihi için updateEkipman çağırıyoruz
     addEkipmanKontrolKaydi(ekipmanId, {
       tarih: now,
       kontrolEden: currentUser?.ad || 'Saha Kullanıcısı',
@@ -581,10 +575,11 @@ export default function SahaPage() {
       durum: 'Uygun',
       kaynak: 'qr',
     });
+    // sonrakiKontrolTarihi'ni güncelle (durum zaten addEkipmanKontrolKaydi'de güncellendi)
+    updateEkipman(ekipmanId, { sonrakiKontrolTarihi: sonrakiStr });
+    ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
 
     if (!isOnline) {
-      updateEkipman(ekipmanId, updates);
-      ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
       await addToQueue({
         type: 'ekipman_kontrol',
         label: `${ekipman.ad} — Kontrol kaydı`,
@@ -592,8 +587,6 @@ export default function SahaPage() {
       });
       addToast('Kontrol kaydedildi! Bağlantı gelince sunucuya gönderilecek.', 'success');
     } else {
-      updateEkipman(ekipmanId, updates);
-      ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
       addToast('Kontrol kaydedildi! Durum "Uygun" olarak güncellendi.', 'success');
     }
   }, [ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, currentUser, ekipmanKontrolBildirimi, isOnline, addToQueue, addToast]);
@@ -614,7 +607,7 @@ export default function SahaPage() {
       } catch { /* fotoğraf yüklenemese de devam et */ }
     }
 
-    // Kontrol geçmişine kaydet
+    // addEkipmanKontrolKaydi artık durum'u da güncelliyor — ayrıca updateEkipman çağırmaya gerek yok
     addEkipmanKontrolKaydi(ekipmanId, {
       tarih: now,
       kontrolEden: currentUser?.ad || 'Saha Kullanıcısı',
@@ -626,7 +619,6 @@ export default function SahaPage() {
     });
 
     if (!isOnline) {
-      updateEkipman(ekipmanId, { durum: yeniDurum });
       await addToQueue({
         type: 'ekipman_durum',
         label: `${ekipman.ad} — Durum: ${yeniDurum}`,
@@ -634,10 +626,9 @@ export default function SahaPage() {
       });
       addToast(`Durum "${yeniDurum}" olarak kaydedildi. Bağlantı gelince gönderilecek.`, 'success');
     } else {
-      updateEkipman(ekipmanId, { durum: yeniDurum });
       addToast(`Durum "${yeniDurum}" olarak güncellendi.`, 'success');
     }
-  }, [ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, currentUser, org, isOnline, addToQueue, addToast]);
+  }, [ekipmanlar, addEkipmanKontrolKaydi, currentUser, org, isOnline, addToQueue, addToast]);
 
   // Aktif sekme badge sayıları
   const { uygunsuzlukBadge, izinBadge, ekipmanBadge } = useMemo(() => {
