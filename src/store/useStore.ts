@@ -154,10 +154,9 @@ async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
 const DB_NAME = 'isg_cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'tables';
-// Cache TTL: sadece ilk render'da skeleton göstermemek için kullanılır
-// Realtime event gelince cache anlık güncellenir
-// loadAllData her zaman cache'i göster + DB'den güncelle (TTL bypass)
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 saat — realtime sync halleder, TTL sadece emergency fallback
+// Cache sadece sayfa yenileme anında kullanılır — realtime zaten anlık günceller
+// 30 saniye: yenileme sonrası hızlı açılış için yeterli, stale veri riski yok
+const CACHE_TTL_MS = 30 * 1000; // 30 saniye
 
 function openCacheDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -500,71 +499,67 @@ export function useStore(
     await fetchWithCache<IsIzni>('is_izinleri', orgId, setIsIzinleri);
   }, [fetchWithCache, setIsIzinleri]);
 
-  // ── Core data loader — cache-first göster + HER ZAMAN DB'den güncelle ──
-  // Strateji: 
-  //   1. Cache varsa anında göster (skeleton yok, hızlı açılış)
-  //   2. Her zaman DB'den çek — cache stale olabilir (realtime subscription kopmuş olabilir)
-  //   3. DB'den gelen yeni veriyle state + cache güncelle
+  // ── Core data loader — cache-first, sonra arka planda güncelle ──
   const loadAllData = useCallback(async (orgId: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    type TableConfig = { key: string; setter: (rows: any[]) => void; transform?: (r: any) => any };
-    const TABLES_CONFIG: TableConfig[] = [
-      { key: 'firmalar',        setter: setFirmalar },
-      { key: 'personeller',     setter: setPersoneller,     transform: (p: Personel) => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') }) },
-      { key: 'evraklar',        setter: setEvraklar,        transform: (e: Evrak) => ({ ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? '') }) },
-      { key: 'egitimler',       setter: setEgitimler },
-      { key: 'muayeneler',      setter: setMuayeneler },
-      { key: 'uygunsuzluklar',  setter: setUygunsuzluklar,  transform: (u: Uygunsuzluk) => ({ ...u, durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus }) },
-      { key: 'ekipmanlar',      setter: setEkipmanlar },
-      { key: 'gorevler',        setter: setGorevler },
-      { key: 'tutanaklar',      setter: setTutanaklar },
-      { key: 'is_izinleri',     setter: setIsIzinleri },
-    ];
+    const firmaKey = `firmalar_${orgId}`;
+    const personelKey = `personeller_${orgId}`;
 
-    // 1. Cache'i paralel oku — anında göster
-    const cacheResults = await Promise.all(
-      TABLES_CONFIG.map(({ key }) => readCache<unknown[]>(`${key}_${orgId}`))
-    );
+    // 1. Cache'ten anında yükle (varsa)
+    const [cachedFirmalar, cachedPersoneller] = await Promise.all([
+      readCache<Firma[]>(firmaKey),
+      readCache<Personel[]>(personelKey),
+    ]);
 
-    let hasCachedData = true;
-    TABLES_CONFIG.forEach(({ key, setter, transform }, i) => {
-      const cached = cacheResults[i];
-      if (cached) {
-        const rows = transform ? cached.data.map(transform) : cached.data;
-        setter(rows);
-        console.log(`[ISG] loadAllData cache HIT ${key} (${cached.data.length} rows)`);
-      } else {
-        hasCachedData = false;
-        console.log(`[ISG] loadAllData cache MISS ${key}`);
-      }
-    });
+    const now = Date.now();
+    const firmaFresh = cachedFirmalar && (now - cachedFirmalar.ts) < CACHE_TTL_MS;
+    const personelFresh = cachedPersoneller && (now - cachedPersoneller.ts) < CACHE_TTL_MS;
 
-    // 2. Cache varsa pageLoading'i hemen kapat — kullanıcı anında görür
-    if (hasCachedData) {
+    if (cachedFirmalar) {
+      setFirmalar(cachedFirmalar.data);
+      console.log(`[ISG] loadAllData cache HIT firmalar (${cachedFirmalar.data.length} rows, ${firmaFresh ? 'fresh' : 'stale'})`);
+    }
+    if (cachedPersoneller) {
+      setPersoneller(cachedPersoneller.data);
+      console.log(`[ISG] loadAllData cache HIT personeller (${cachedPersoneller.data.length} rows, ${personelFresh ? 'fresh' : 'stale'})`);
+    }
+
+    // Cache varsa ve fresh ise → pageLoading'i hemen kapat (kullanıcı anında görür)
+    if (cachedFirmalar && cachedPersoneller) {
       setPageLoading(false);
       setDataLoading(false);
     }
 
-    // 3. HER ZAMAN DB'den çek — cache stale olabilir (realtime kopmuş, farklı cihaz)
-    // Bu arka planda çalışır, kullanıcı cache'ten anında görür
-    console.log(`[ISG] loadAllData: fetching all ${TABLES_CONFIG.length} tables from DB (always fresh)`);
-    const dbResults = await Promise.allSettled(
-      TABLES_CONFIG.map(({ key }) => fetchAllRows(key, orgId))
-    );
+    // 2. Stale veya cache yok → DB'den çek
+    const needsFirma = !firmaFresh;
+    const needsPersonel = !personelFresh;
 
-    TABLES_CONFIG.forEach(({ key, setter, transform }, i) => {
-      const result = dbResults[i];
-      if (result.status === 'fulfilled' && result.value.data) {
-        let rows = result.value.data.map((r: { data: unknown }) => r.data as unknown);
-        if (transform) rows = rows.map(transform);
-        setter(rows);
-        void writeCache(`${key}_${orgId}`, rows);
-        console.log(`[ISG] loadAllData DB ${key} ✓ (${rows.length} rows) → cache updated`);
-      } else if (result.status === 'rejected') {
-        console.error(`[ISG] loadAllData DB error for ${key}:`, result.reason);
-      }
-    });
-  }, [fetchAllRows, setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, setTutanaklar, setIsIzinleri]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!needsFirma && !needsPersonel) {
+      console.log('[ISG] loadAllData: both fresh from cache, skipping DB fetch');
+      return;
+    }
+
+    const results = await Promise.allSettled([
+      needsFirma ? fetchAllRows('firmalar', orgId) : Promise.resolve({ data: null, error: null }),
+      needsPersonel ? fetchAllRows('personeller', orgId) : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    const [firmaRes, personelRes] = results;
+
+    if (needsFirma && firmaRes.status === 'fulfilled' && firmaRes.value.data) {
+      const rows = extractRows<Firma>(firmaRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>);
+      setFirmalar(rows);
+      void writeCache(firmaKey, rows);
+      console.log(`[ISG] loadAllData DB firmalar ✓ (${rows.length} rows) → cache updated`);
+    }
+
+    if (needsPersonel && personelRes.status === 'fulfilled' && personelRes.value.data) {
+      const rows = extractRows<Personel>(personelRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>)
+        .map(p => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') }));
+      setPersoneller(rows);
+      void writeCache(personelKey, rows);
+      console.log(`[ISG] loadAllData DB personeller ✓ (${rows.length} rows) → cache updated`);
+    }
+  }, [fetchAllRows, setFirmalar, setPersoneller, extractRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Public refresh function — called by UI refresh buttons ──
   const refreshAllData = useCallback(async () => {

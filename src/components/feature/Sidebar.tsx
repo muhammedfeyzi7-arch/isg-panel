@@ -141,7 +141,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
     <>
     <aside
       className={`
-        fixed left-0 top-0 h-screen flex flex-col z-40
+        fixed left-0 top-0 h-screen flex flex-col z-[42]
         ${collapsed ? 'w-[56px]' : 'w-[220px]'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}

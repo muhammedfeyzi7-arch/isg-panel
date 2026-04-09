@@ -100,11 +100,12 @@ export default function Modal({
         inset: 0,
         zIndex: 99999,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         justifyContent: 'center',
-        padding: '8px',
+        padding: '0',
         animation: exiting ? 'modal-backdrop-out 0.22s ease forwards' : 'modal-backdrop-in 0.2s ease both',
       }}
+      className="sm:items-center sm:p-4"
     >
       {/* Backdrop */}
       <div
@@ -121,16 +122,15 @@ export default function Modal({
 
       {/* Modal panel */}
       <div
-        className={`w-full ${sizeClasses[size]} modal-panel`}
+        className={`w-full ${sizeClasses[size]} modal-panel rounded-t-[20px] sm:rounded-[16px]`}
         style={{
           position: 'relative',
           zIndex: 1,
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: 'calc(100dvh - 48px)',
+          maxHeight: 'calc(100dvh - 16px)',
           background: isDark ? '#0A0F1E' : '#FFFFFF',
           border: `1px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.1)'}`,
-          borderRadius: '16px',
           boxShadow: isDark
             ? `0 0 0 1px ${accentColor}18, 0 24px 80px rgba(0,0,0,0.7), 0 0 60px ${accentColor}08`
             : `0 0 0 1px rgba(15,23,42,0.06), 0 20px 60px rgba(15,23,42,0.18)`,
