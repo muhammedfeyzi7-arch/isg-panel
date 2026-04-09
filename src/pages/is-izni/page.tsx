@@ -5,7 +5,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { generateIsIzniNo } from '@/store/useStore';
 import Modal from '@/components/base/Modal';
 import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
-import { getSignedUrl, validateFile } from '@/utils/fileUpload';
+import { uploadFileToStorage, getSignedUrl, getSignedUrlFromPath } from '@/utils/fileUpload';
 import { supabase } from '@/lib/supabase';
 
 // ─── Tip renk/ikon config ───────────────────────────────────────────────────
@@ -45,59 +45,31 @@ function getDaysLeft(bitisTarihi: string): number | null {
 // ─── Red fotoğrafı bileşeni — path veya URL'den signed URL üretir ──────────
 function RedFotoImg({ src, className, style }: { src: string; className?: string; style?: React.CSSProperties }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!src) return;
-    setError(false);
-    setSignedUrl(null);
-
-    const load = async () => {
-      // Zaten tam HTTP URL ise — signed URL'den path çıkar ve yenile
-      if (src.startsWith('http')) {
-        // Supabase storage URL'inden path çıkar
-        const match = src.match(/\/storage\/v1\/object\/(?:sign|public)\/uploads\/(.+?)(?:\?|$)/);
+    // Zaten tam URL ise direkt kullan
+    if (src.startsWith('http')) {
+      // Eski signed URL — yenile
+      if (src.includes('/sign/') || src.includes('token=')) {
+        // Signed URL'den path çıkar ve yeniden üret
+        const match = src.match(/\/object\/(?:sign|public)\/uploads\/(.+?)(?:\?|$)/);
         if (match) {
-          const url = await getSignedUrl(match[1]);
-          setSignedUrl(url);
+          getSignedUrlFromPath(match[1]).then(url => setSignedUrl(url));
         } else {
-          // Tanımlanamayan HTTP URL — direkt kullan
           setSignedUrl(src);
         }
-        return;
+      } else {
+        setSignedUrl(src);
       }
-      // Storage path ise direkt signed URL üret (getSignedUrl kullan, getSignedUrlFromPath değil)
-      const url = await getSignedUrl(src);
-      setSignedUrl(url);
-    };
-
-    void load();
+      return;
+    }
+    // Storage path ise signed URL üret
+    getSignedUrlFromPath(src).then(url => setSignedUrl(url));
   }, [src]);
 
-  if (error) {
-    return (
-      <div className="rounded-lg h-20 flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-        <div className="text-center">
-          <i className="ri-image-line text-xl" style={{ color: '#EF4444' }} />
-          <p className="text-[10px] mt-1" style={{ color: '#EF4444' }}>Fotoğraf yüklenemedi</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!signedUrl) {
-    return <div className="rounded-lg h-20 animate-pulse" style={{ background: 'rgba(239,68,68,0.1)' }} />;
-  }
-
-  return (
-    <img
-      src={signedUrl}
-      alt="Red fotoğrafı"
-      className={className}
-      style={style}
-      onError={() => setError(true)}
-    />
-  );
+  if (!signedUrl) return <div className="rounded-lg h-20 animate-pulse" style={{ background: 'rgba(239,68,68,0.1)' }} />;
+  return <img src={signedUrl} alt="Red fotoğrafı" className={className} style={style} />;
 }
 
 // ─── Evrak listesi bileşeni ─────────────────────────────────────────────────
@@ -651,21 +623,12 @@ export default function IsIzniPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
-    const validFiles: File[] = [];
-    for (const file of files) {
-      try {
-        validateFile(file, true); // extended: doc/docx/xls/xlsx de kabul
-        validFiles.push(file);
-      } catch (err) {
-        addToast(`${file.name} — ${err instanceof Error ? err.message : 'Geçersiz dosya.'}`, 'error');
-      }
-    }
-    if (validFiles.length === 0) { e.target.value = ''; return; }
     setFormEvraklar(prev => {
       const existing = new Set(prev.map(f => f.name));
-      const newFiles = validFiles.filter(f => !existing.has(f.name));
+      const newFiles = files.filter(f => !existing.has(f.name));
       return [...prev, ...newFiles];
     });
+    // Reset input so same file can be re-selected
     e.target.value = '';
   };
 

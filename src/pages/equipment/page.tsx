@@ -370,7 +370,7 @@ function fmtLocalDate(dateStr: string): string {
 }
 
 export default function EkipmanlarPage() {
-  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, addEkipmanBelge, addToast, quickCreate, setQuickCreate, org, refreshData, dataLoading, currentUser } = useApp();
+  const { ekipmanlar, firmalar, addEkipman, updateEkipman, deleteEkipman, addEkipmanKontrolKaydi, addEkipmanBelge, addToast, quickCreate, setQuickCreate, org, refreshData, dataLoading, currentUser } = useApp();
   const { canCreate, canEdit, canDelete } = usePermissions();
 
   const [search, setSearch] = useState('');
@@ -473,12 +473,9 @@ export default function EkipmanlarPage() {
     return n;
   });
 
-  const handleBulkDelete = async () => {
-    const ids = Array.from(selected);
-    const count = ids.length;
-    // Önce tüm seçilenleri tek tek soft-delete et (her biri için direkt DB update)
-    ids.forEach(id => deleteEkipman(id));
-    addToast(`${count} ekipman silindi.`, 'info');
+  const handleBulkDelete = () => {
+    selected.forEach(id => deleteEkipman(id));
+    addToast(`${selected.size} ekipman silindi.`, 'info');
     setSelected(new Set());
     setBulkDeleteConfirm(false);
   };
@@ -548,27 +545,25 @@ export default function EkipmanlarPage() {
     try {
       const now = new Date().toISOString();
       const todayStr = now.split('T')[0];
-      const ekipman = ekipmanlar.find(e => e.id === kontrolEkipmanId);
-
-      const yeniKayit: import('@/types').EkipmanKontrolKaydi = {
-        id: crypto.randomUUID(),
+      // addEkipmanKontrolKaydi zaten sonKontrolTarihi'ni güncelliyor (store içinde)
+      // updateEkipman'ı AYRI çağırıyoruz — sadece durum + sonrakiKontrolTarihi için
+      // ÖNEMLİ: addEkipmanKontrolKaydi'yi önce çağır, sonra updateEkipman
+      // updateEkipman kontrolGecmisi'ni override etmemeli — sadece belirtilen alanları günceller
+      addEkipmanKontrolKaydi(kontrolEkipmanId, {
         tarih: now,
         kontrolEden: currentUser.ad || 'Kullanıcı',
         kontrolEdenId: currentUser.id,
         durum: kontrolForm.durum,
         notlar: kontrolForm.notlar || undefined,
         kaynak: 'manuel',
-      };
-
-      // Tek updateEkipman çağrısı — hem kontrol geçmişi hem durum güncellenir
-      // Race condition önlenir: iki ayrı DB yazması yerine tek yazma
+      });
+      // Sadece durum ve tarih alanlarını güncelle — kontrolGecmisi'ne dokunma
+      // updateEkipman spread ile merge ediyor, kontrolGecmisi undefined gelirse mevcut değer korunur
       updateEkipman(kontrolEkipmanId, {
         durum: kontrolForm.durum,
         sonKontrolTarihi: todayStr,
         ...(kontrolForm.sonrakiKontrolTarihi ? { sonrakiKontrolTarihi: kontrolForm.sonrakiKontrolTarihi } : {}),
-        kontrolGecmisi: [yeniKayit, ...(ekipman?.kontrolGecmisi ?? [])],
       });
-
       addToast('Kontrol kaydı oluşturuldu.', 'success');
       setShowKontrolModal(false);
       setKontrolEkipmanId(null);
@@ -794,7 +789,6 @@ export default function EkipmanlarPage() {
         const turMatch = EKIPMAN_TURLERI.find(t => normStr(t) === normTur || normStr(t).includes(normTur) || normTur.includes(normStr(t)));
         const turFinal = turMatch || turRaw;
 
-        const { parseExcelDate } = await import('../../utils/importParser');
         addEkipman({
           ad,
           tur: turFinal,
@@ -803,8 +797,8 @@ export default function EkipmanlarPage() {
           seriNo: (row[4] ?? '').trim(),
           marka: (row[5] ?? '').trim(),
           model: (row[6] ?? '').trim(),
-          sonKontrolTarihi: parseExcelDate(row[7] ?? '') || parseTrDate((row[7] ?? '').trim()),
-          sonrakiKontrolTarihi: parseExcelDate(row[8] ?? '') || parseTrDate((row[8] ?? '').trim()),
+          sonKontrolTarihi: parseTrDate((row[7] ?? '').trim()),
+          sonrakiKontrolTarihi: parseTrDate((row[8] ?? '').trim()),
           durum: durumTyped,
           aciklama: (row[10] ?? '').trim(),
           belgeMevcut: false,
@@ -1528,7 +1522,7 @@ export default function EkipmanlarPage() {
         footer={
           <>
             <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={() => void handleBulkDelete()} className="btn-danger whitespace-nowrap">
+            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
               <i className="ri-delete-bin-line" /> {selected.size} Ekipmanı Sil
             </button>
           </>

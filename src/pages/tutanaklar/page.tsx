@@ -10,7 +10,7 @@ import Modal from '../../components/base/Modal';
 import { generateTutanakNo } from '../../store/useStore';
 import TutanakDetailModal from './components/TutanakDetailModal';
 import { usePermissions } from '../../hooks/usePermissions';
-import { getSignedUrlFromPath, validateFile } from '@/utils/fileUpload';
+import { getSignedUrlFromPath } from '@/utils/fileUpload';
 
 /* ── Durum renk konfig ──────────────────────────────────────── */
 const STS_CONFIG: Record<TutanakStatus, { color: string; bg: string; icon: string }> = {
@@ -719,12 +719,6 @@ export default function TutanaklarPage() {
 
   const handleFileChange = (file?: File) => {
     if (!file) return;
-    try {
-      validateFile(file);
-    } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Geçersiz dosya.', 'error');
-      return;
-    }
     setPendingFile(file);
     setForm(prev => ({
       ...prev,

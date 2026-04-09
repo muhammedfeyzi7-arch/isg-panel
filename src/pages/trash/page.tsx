@@ -130,10 +130,8 @@ export default function CopKutusuPage() {
       if (tip === 'tutanaklar')     await permanentDeleteTutanak(id);
       if (tip === 'is_izinleri')    await permanentDeleteIsIzni(id);
       addToast('Kayıt kalıcı olarak silindi.', 'info');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[TRASH] permanentDelete error:', msg, err);
-      addToast(`Silme başarısız: ${msg}`, 'error');
+    } catch {
+      addToast('Silme işlemi başarısız oldu. Lütfen tekrar deneyin.', 'error');
     }
   };
 
@@ -169,10 +167,8 @@ export default function CopKutusuPage() {
         }));
       }
       addToast(`${count} kayıt kalıcı olarak silindi.`, 'info');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[TRASH] bulkPermDelete error:', msg, err);
-      addToast(`Silme başarısız: ${msg}`, 'error');
+    } catch {
+      addToast('Silme işlemi sırasında hata oluştu. Bazı kayıtlar silinemedi.', 'error');
     }
   };
 

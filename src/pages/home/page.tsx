@@ -22,7 +22,6 @@ import SettingsPage from '../settings/page';
 import IsIzniPage from '../is-izni/page';
 import FirmaEvraklariPage from '../company-documents/page';
 import SahaPage from '../saha/page';
-import SuperAdminPage from '../super-admin/page';
 
 // URL path → modül adı eşlemesi
 const PATH_TO_MODULE: Record<string, string> = {
@@ -41,7 +40,6 @@ const PATH_TO_MODULE: Record<string, string> = {
   '/raporlar':        'raporlar',
   '/copkutusu':       'copkutusu',
   '/ayarlar':         'ayarlar',
-  '/superadmin':      'superadmin',
 };
 
 function AppContent() {
@@ -69,17 +67,11 @@ function AppContent() {
 
   // activeModule değişince URL'yi güncelle (sidebar tıklamaları için)
   useEffect(() => {
-    if (location.pathname === '/superadmin') return;
     const expectedPath = `/${activeModule}`;
     if (location.pathname !== expectedPath && PATH_TO_MODULE[expectedPath] !== undefined) {
       navigate(expectedPath, { replace: true });
     }
   }, [activeModule]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Superadmin sayfası — loading screen atla
-  if (location.pathname === '/superadmin') {
-    return <SuperAdminPage />;
-  }
 
   // İlk yükleme — loading screen göster (cache varsa çok kısa sürer)
   if (!loadingDone) {
@@ -118,11 +110,6 @@ function AppContent() {
   const FIRMA_USER_ALLOWED = new Set(['dashboard', 'personeller', 'evraklar', 'egitimler', 'uygunsuzluklar']);
 
   const renderPage = () => {
-    // Super admin sayfası — Layout olmadan direkt render
-    if (activeModule === 'superadmin') {
-      return <SuperAdminPage />;
-    }
-
     // firma_user için modul kısıtlaması
     if (isFirmaUser && !FIRMA_USER_ALLOWED.has(activeModule)) {
       return <DashboardPage />;

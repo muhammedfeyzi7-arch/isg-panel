@@ -123,22 +123,28 @@ async function dbUpsert(
 }
 
 async function dbDelete(table: string, id: string): Promise<void> {
+  // Silmeden önce device_id'yi kayda yaz — realtime event gelince kendi silmemizi skip ederiz
+  try {
+    await supabase.from(table).update({ device_id: getDeviceId() }).eq('id', id);
+  } catch { /* ignore — update başarısız olsa da silmeye devam et */ }
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) {
-    const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
-    console.error(`[ISG] DELETE ERROR ${table}/${id}:`, errMsg, error);
-    throw new Error(errMsg);
+    console.error(`[ISG] DELETE ERROR ${table}/${id}:`, error);
+    throw error;
   }
   console.log(`[ISG] DELETE OK ${table}/${id} ✓`);
 }
 
 async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  // Silmeden önce device_id'yi kayıtlara yaz — realtime event gelince kendi silmemizi skip ederiz
+  try {
+    await supabase.from(table).update({ device_id: getDeviceId() }).in('id', ids);
+  } catch { /* ignore */ }
   const { error } = await supabase.from(table).delete().in('id', ids);
   if (error) {
-    const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
-    console.error(`[ISG] DELETE_MANY ERROR ${table}:`, errMsg, error);
-    throw new Error(errMsg);
+    console.error(`[ISG] DELETE_MANY ERROR ${table}:`, error);
+    throw error;
   }
   console.log(`[ISG] DELETE_MANY OK ${table} (${ids.length} rows) ✓`);
 }
@@ -148,9 +154,10 @@ async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
 const DB_NAME = 'isg_cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'tables';
-// Cache: sayfa yenileme + tab değiştirme anında anlık açılış için
-// 5 dakika: realtime zaten patch yapıyor, stale risk yok
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 dakika
+// Cache TTL: sadece ilk render'da skeleton göstermemek için kullanılır
+// Realtime event gelince cache anlık güncellenir
+// loadAllData her zaman cache'i göster + DB'den güncelle (TTL bypass)
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 saat — realtime sync halleder, TTL sadece emergency fallback
 
 function openCacheDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -477,7 +484,6 @@ export function useStore(
     });
   }, [fetchWithCache, setUygunsuzluklar]);
 
-  // 580 gibi — fetchWithCache üzerinden, deleted_at filtreli, cache-first
   const fetchEkipmanlar = useCallback(async (orgId: string) => {
     await fetchWithCache<Ekipman>('ekipmanlar', orgId, setEkipmanlar);
   }, [fetchWithCache, setEkipmanlar]);
@@ -494,74 +500,78 @@ export function useStore(
     await fetchWithCache<IsIzni>('is_izinleri', orgId, setIsIzinleri);
   }, [fetchWithCache, setIsIzinleri]);
 
-  // ── Core data loader — cache-first, sonra arka planda güncelle ──
+  // ── Core data loader — cache-first göster + HER ZAMAN DB'den güncelle ──
+  // Strateji: 
+  //   1. Cache varsa anında göster (skeleton yok, hızlı açılış)
+  //   2. Her zaman DB'den çek — cache stale olabilir (realtime subscription kopmuş olabilir)
+  //   3. DB'den gelen yeni veriyle state + cache güncelle
   const loadAllData = useCallback(async (orgId: string) => {
-    const firmaKey = `firmalar_${orgId}`;
-    const personelKey = `personeller_${orgId}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type TableConfig = { key: string; setter: (rows: any[]) => void; transform?: (r: any) => any };
+    const TABLES_CONFIG: TableConfig[] = [
+      { key: 'firmalar',        setter: setFirmalar },
+      { key: 'personeller',     setter: setPersoneller,     transform: (p: Personel) => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') }) },
+      { key: 'evraklar',        setter: setEvraklar,        transform: (e: Evrak) => ({ ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? '') }) },
+      { key: 'egitimler',       setter: setEgitimler },
+      { key: 'muayeneler',      setter: setMuayeneler },
+      { key: 'uygunsuzluklar',  setter: setUygunsuzluklar,  transform: (u: Uygunsuzluk) => ({ ...u, durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus }) },
+      { key: 'ekipmanlar',      setter: setEkipmanlar },
+      { key: 'gorevler',        setter: setGorevler },
+      { key: 'tutanaklar',      setter: setTutanaklar },
+      { key: 'is_izinleri',     setter: setIsIzinleri },
+    ];
 
-    // 1. Cache'ten anında yükle (varsa)
-    const [cachedFirmalar, cachedPersoneller] = await Promise.all([
-      readCache<Firma[]>(firmaKey),
-      readCache<Personel[]>(personelKey),
-    ]);
+    // 1. Cache'i paralel oku — anında göster
+    const cacheResults = await Promise.all(
+      TABLES_CONFIG.map(({ key }) => readCache<unknown[]>(`${key}_${orgId}`))
+    );
 
-    const now = Date.now();
-    const firmaFresh = cachedFirmalar && (now - cachedFirmalar.ts) < CACHE_TTL_MS;
-    const personelFresh = cachedPersoneller && (now - cachedPersoneller.ts) < CACHE_TTL_MS;
+    let hasCachedData = true;
+    TABLES_CONFIG.forEach(({ key, setter, transform }, i) => {
+      const cached = cacheResults[i];
+      if (cached) {
+        const rows = transform ? cached.data.map(transform) : cached.data;
+        setter(rows);
+        console.log(`[ISG] loadAllData cache HIT ${key} (${cached.data.length} rows)`);
+      } else {
+        hasCachedData = false;
+        console.log(`[ISG] loadAllData cache MISS ${key}`);
+      }
+    });
 
-    if (cachedFirmalar) {
-      setFirmalar(cachedFirmalar.data);
-      console.log(`[ISG] loadAllData cache HIT firmalar (${cachedFirmalar.data.length} rows, ${firmaFresh ? 'fresh' : 'stale'})`);
-    }
-    if (cachedPersoneller) {
-      setPersoneller(cachedPersoneller.data);
-      console.log(`[ISG] loadAllData cache HIT personeller (${cachedPersoneller.data.length} rows, ${personelFresh ? 'fresh' : 'stale'})`);
-    }
-
-    // Cache varsa ve fresh ise → pageLoading'i hemen kapat (kullanıcı anında görür)
-    if (cachedFirmalar && cachedPersoneller) {
+    // 2. Cache varsa pageLoading'i hemen kapat — kullanıcı anında görür
+    if (hasCachedData) {
       setPageLoading(false);
       setDataLoading(false);
     }
 
-    // 2. Stale veya cache yok → DB'den çek
-    const needsFirma = !firmaFresh;
-    const needsPersonel = !personelFresh;
+    // 3. HER ZAMAN DB'den çek — cache stale olabilir (realtime kopmuş, farklı cihaz)
+    // Bu arka planda çalışır, kullanıcı cache'ten anında görür
+    console.log(`[ISG] loadAllData: fetching all ${TABLES_CONFIG.length} tables from DB (always fresh)`);
+    const dbResults = await Promise.allSettled(
+      TABLES_CONFIG.map(({ key }) => fetchAllRows(key, orgId))
+    );
 
-    if (!needsFirma && !needsPersonel) {
-      console.log('[ISG] loadAllData: both fresh from cache, skipping DB fetch');
-      return;
-    }
-
-    const results = await Promise.allSettled([
-      needsFirma ? fetchAllRows('firmalar', orgId) : Promise.resolve({ data: null, error: null }),
-      needsPersonel ? fetchAllRows('personeller', orgId) : Promise.resolve({ data: null, error: null }),
-    ]);
-
-    const [firmaRes, personelRes] = results;
-
-    if (needsFirma && firmaRes.status === 'fulfilled' && firmaRes.value.data) {
-      const rows = extractRows<Firma>(firmaRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>);
-      setFirmalar(rows);
-      void writeCache(firmaKey, rows);
-      console.log(`[ISG] loadAllData DB firmalar ✓ (${rows.length} rows) → cache updated`);
-    }
-
-    if (needsPersonel && personelRes.status === 'fulfilled' && personelRes.value.data) {
-      const rows = extractRows<Personel>(personelRes as PromiseSettledResult<{ data: { data: unknown }[] | null; error: unknown }>)
-        .map(p => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') }));
-      setPersoneller(rows);
-      void writeCache(personelKey, rows);
-      console.log(`[ISG] loadAllData DB personeller ✓ (${rows.length} rows) → cache updated`);
-    }
-  }, [fetchAllRows, setFirmalar, setPersoneller, extractRows]); // eslint-disable-line react-hooks/exhaustive-deps
+    TABLES_CONFIG.forEach(({ key, setter, transform }, i) => {
+      const result = dbResults[i];
+      if (result.status === 'fulfilled' && result.value.data) {
+        let rows = result.value.data.map((r: { data: unknown }) => r.data as unknown);
+        if (transform) rows = rows.map(transform);
+        setter(rows);
+        void writeCache(`${key}_${orgId}`, rows);
+        console.log(`[ISG] loadAllData DB ${key} ✓ (${rows.length} rows) → cache updated`);
+      } else if (result.status === 'rejected') {
+        console.error(`[ISG] loadAllData DB error for ${key}:`, result.reason);
+      }
+    });
+  }, [fetchAllRows, setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, setGorevler, setTutanaklar, setIsIzinleri]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Public refresh function — called by UI refresh buttons ──
-  // 580 gibi — sadece loadAllData, ekipmanlar ayrıca çekilmiyor
   const refreshAllData = useCallback(async () => {
     const orgId = orgIdRef.current;
     if (!orgId) return;
     setDataLoading(true);
+    // partialLoading: veri zaten var, sadece arka planda yenileniyor
     setPartialLoading(true);
     try {
       await loadAllData(orgId);
@@ -583,29 +593,12 @@ export function useStore(
     }
 
     setDataLoading(true);
-    setPageLoading(true);
+    setPageLoading(true);  // ilk yükleme — tüm sayfa skeleton
     console.log(`[ISG] Loading data for org=${organizationId} user=${userId}`);
 
-    const orgId = organizationId;
-
-    // Tüm modülleri paralel prefetch — firmalar+personeller önce (pageLoading kapatır),
-    // diğerleri arka planda yüklenir. Realtime zaten patch yapıyor, yenile gerekmez.
-    loadAllData(orgId).then(() => {
+    loadAllData(organizationId).then(() => {
       setDataLoading(false);
-      setPageLoading(false);
-      // Diğer modülleri arka planda yükle — cache varsa anında, yoksa DB'den
-      void Promise.all([
-        fetchEvraklar(orgId),
-        fetchEgitimler(orgId),
-        fetchMuayeneler(orgId),
-        fetchUygunsuzluklar(orgId),
-        fetchEkipmanlar(orgId),
-        fetchGorevler(orgId),
-        fetchTutanaklar(orgId),
-        fetchIsIzinleri(orgId),
-      ]).then(() => {
-        console.log('[ISG] All modules prefetched ✓');
-      });
+      setPageLoading(false); // veri geldi — skeleton kaldır
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, userId, orgLoading]);
@@ -614,13 +607,16 @@ export function useStore(
   useEffect(() => {
     if (!organizationId || !userId || orgLoading) return;
 
+    // Bu closure içinde her zaman güncel orgId'yi kullanmak için ref al
     const activeOrgId = organizationId;
 
     const KAN: Record<string, string> = { 'A Rh+': 'A+', 'A Rh-': 'A-', 'B Rh+': 'B+', 'B Rh-': 'B-', 'AB Rh+': 'AB+', 'AB Rh-': 'AB-', '0 Rh+': '0+', '0 Rh-': '0-' };
 
     // ── Tek kayıt patch — tüm tabloyu yeniden çekmek yerine sadece değişen kaydı güncelle ──
-    const applyPatch = (table: string, rawRecord: unknown, eventType: string, recordId: string, incomingUpdatedAt?: string) => {
+    // Bu sayede karşı cihazdan gelen değişiklikler ANINDA yansır (iş izinleri gibi)
+    const applyPatch = (table: string, rawRecord: unknown, eventType: string, recordId: string) => {
       if (eventType === 'DELETE') {
+        // Silinen kaydı state'den çıkar + cache'i güncelle
         const filterAndCache = <T extends { id: string }>(
           setter: (fn: (prev: T[]) => T[]) => void,
           cacheTable: string,
@@ -646,6 +642,7 @@ export function useStore(
         return;
       }
 
+      // INSERT veya UPDATE — payload.new.data içindeki kaydı direkt uygula
       const data = rawRecord as Record<string, unknown>;
       if (!data) return;
 
@@ -653,7 +650,6 @@ export function useStore(
         setter: (fn: (prev: T[]) => T[]) => void,
         transform?: (r: T) => T,
         cacheTable?: string,
-        incomingTs?: string,
       ) => {
         const record = (transform ? transform(data as unknown as T) : data) as T;
         setter(prev => {
@@ -662,16 +658,10 @@ export function useStore(
           if (idx === -1) {
             next = [record, ...prev];
           } else {
-            // Timestamp koruması — eski event state'i ezmesin
-            const existing = prev[idx];
-            const existingUpdatedAt = (existing as unknown as Record<string, unknown>)?.updated_at as string | undefined;
-            if (existingUpdatedAt && incomingTs && incomingTs <= existingUpdatedAt) {
-              console.log(`[ISG] applyPatch SKIP (stale): id=${recordId} existing=${existingUpdatedAt} incoming=${incomingTs}`);
-              return prev;
-            }
             next = [...prev];
             next[idx] = record;
           }
+          // Cache'i de güncelle (arka planda)
           if (cacheTable) {
             void writeCache(`${cacheTable}_${activeOrgId}`, next);
           }
@@ -681,54 +671,57 @@ export function useStore(
 
       switch (table) {
         case 'firmalar':
-          upsertRecord<Firma>(setFirmalar, undefined, 'firmalar', incomingUpdatedAt);
+          upsertRecord<Firma>(setFirmalar, undefined, 'firmalar');
           break;
         case 'personeller':
           upsertRecord<Personel>(setPersoneller, p => ({
             ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? ''),
-          }), 'personeller', incomingUpdatedAt);
+          }), 'personeller');
           break;
         case 'evraklar':
           upsertRecord<Evrak>(setEvraklar, e => ({
             ...e, kategori: e.kategori || getEvrakKategori(e.tur ?? '', e.ad ?? ''),
-          }), 'evraklar', incomingUpdatedAt);
+          }), 'evraklar');
           break;
         case 'egitimler':
-          upsertRecord<Egitim>(setEgitimler, undefined, 'egitimler', incomingUpdatedAt);
+          upsertRecord<Egitim>(setEgitimler, undefined, 'egitimler');
           break;
         case 'muayeneler':
-          upsertRecord<Muayene>(setMuayeneler, undefined, 'muayeneler', incomingUpdatedAt);
+          upsertRecord<Muayene>(setMuayeneler, undefined, 'muayeneler');
           break;
         case 'uygunsuzluklar':
           upsertRecord<Uygunsuzluk>(setUygunsuzluklar, u => ({
             ...u,
             durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus,
-          }), 'uygunsuzluklar', incomingUpdatedAt);
+          }), 'uygunsuzluklar');
           break;
         case 'ekipmanlar':
-          upsertRecord<Ekipman>(setEkipmanlar, undefined, 'ekipmanlar', incomingUpdatedAt);
+          upsertRecord<Ekipman>(setEkipmanlar, undefined, 'ekipmanlar');
           break;
         case 'gorevler':
-          upsertRecord<Gorev>(setGorevler, undefined, 'gorevler', incomingUpdatedAt);
+          upsertRecord<Gorev>(setGorevler, undefined, 'gorevler');
           break;
         case 'tutanaklar':
-          upsertRecord<Tutanak>(setTutanaklar, undefined, 'tutanaklar', incomingUpdatedAt);
+          upsertRecord<Tutanak>(setTutanaklar, undefined, 'tutanaklar');
           break;
         case 'is_izinleri':
-          upsertRecord<IsIzni>(setIsIzinleri, undefined, 'is_izinleri', incomingUpdatedAt);
+          upsertRecord<IsIzni>(setIsIzinleri, undefined, 'is_izinleri');
           break;
       }
     };
 
-    // Fallback: tüm tabloyu yeniden çek — 580 gibi, fetchAllRows direkt
+    // Fallback: tüm tabloyu yeniden çek (patch başarısız olursa veya data yoksa)
     const reloadTable = async (table: string) => {
       try {
-        console.log(`[ISG] reloadTable: ${table}`);
+        // Use paginated fetch to bypass 1000-row limit
         const { data, error } = await fetchAllRows(table, activeOrgId);
-        if (error) { console.error(`[ISG] reloadTable error (${table}):`, error); return; }
+        if (error) {
+          console.error(`[ISG] reloadTable error (${table}):`, error);
+          return;
+        }
         if (!data) return;
         const rows = data.map(r => r.data as unknown);
-        void writeCache(`${table}_${activeOrgId}`, rows);
+        // TABLE_MAP yerine applyPatch ile tek tek uygula
         switch (table) {
           case 'firmalar':       setFirmalar(rows as Firma[]); break;
           case 'personeller':    setPersoneller((rows as Personel[]).map(p => ({ ...p, kanGrubu: KAN[p.kanGrubu ?? ''] ?? (p.kanGrubu ?? '') }))); break;
@@ -741,7 +734,7 @@ export function useStore(
           case 'tutanaklar':     setTutanaklar(rows as Tutanak[]); break;
           case 'is_izinleri':    setIsIzinleri(rows as IsIzni[]); break;
         }
-        console.log(`[ISG] Realtime full-reload OK: ${table} (${rows.length} rows)`);
+        console.log(`[ISG] Realtime full-reload OK: ${table} (${rows.length} rows) org=${activeOrgId}`);
       } catch (err) {
         console.error(`[ISG] reloadTable exception (${table}):`, err);
       }
@@ -752,6 +745,7 @@ export function useStore(
       'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'gorevler', 'tutanaklar', 'is_izinleri',
     ];
 
+    // Device ID: her sekme/cihaz için unique, session boyunca sabit
     const deviceId = getDeviceId();
 
     const MODULE_NAMES: Record<string, string> = {
@@ -760,6 +754,7 @@ export function useStore(
       ekipmanlar: 'Ekipmanlar', gorevler: 'Görevler', tutanaklar: 'Tutanaklar', is_izinleri: 'İş İzinleri',
     };
 
+    // Unique channel ismi — her org+user kombinasyonu için ayrı channel
     const channelName = `isg_rt_${activeOrgId}_${userId}_${Date.now()}`;
     let channel = supabase.channel(channelName);
 
@@ -768,6 +763,7 @@ export function useStore(
         'postgres_changes' as Parameters<typeof channel.on>[0],
         { event: '*', schema: 'public', table, filter: `organization_id=eq.${activeOrgId}` } as Parameters<typeof channel.on>[1],
         (payload: { eventType: string; new: Record<string, unknown>; old?: Record<string, unknown> }) => {
+          // Kendi cihazımızdan gelen değişiklikleri skip et
           const remoteDeviceId = payload.new?.device_id as string | undefined;
           if (remoteDeviceId && remoteDeviceId === deviceId) {
             console.log(`[ISG] Realtime skip (own device): ${table}`);
@@ -778,8 +774,10 @@ export function useStore(
           console.log(`[ISG] Realtime incoming: ${table} event=${payload.eventType} id=${recordId} from device=${remoteDeviceId ?? 'unknown'}`);
 
           if (payload.eventType === 'DELETE') {
+            // DELETE: payload.new boş gelir, old.id'den sil
             const delId = (payload.old?.id) as string | undefined;
             if (delId) {
+              // Kendi kalıcı silmemizden geliyorsa bildirim gösterme
               const isOwnDelete = ownDeletesRef.current.has(delId);
               if (isOwnDelete) {
                 ownDeletesRef.current.delete(delId);
@@ -788,6 +786,7 @@ export function useStore(
               }
               applyPatch(table, null, 'DELETE', delId);
             } else {
+              // id yoksa fallback reload
               void reloadTable(table);
             }
             onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
@@ -796,48 +795,19 @@ export function useStore(
 
           // INSERT / UPDATE: payload.new.data içinde tam kayıt var
           const newData = payload.new?.data;
-          const incomingTs = payload.new?.updated_at as string | undefined;
           if (newData && recordId) {
-            if (ownDeletesRef.current.has(recordId)) {
-              console.log(`[ISG] Realtime skip (own permanent delete UPDATE): ${table}/${recordId}`);
-              return;
-            }
             // Anında patch — DB'ye tekrar sorgu atmadan
-            applyPatch(table, newData, payload.eventType, recordId, incomingTs);
-            onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
-          } else if (recordId) {
-            // data payload'da yok — sadece bu kaydı DB'den çek (tüm tabloyu değil)
-            console.warn(`[ISG] Realtime: no data in payload for ${table}/${recordId} — fetching single record`);
-            void (async () => {
-              try {
-                const { data: row, error } = await supabase
-                  .from(table)
-                  .select('id, data, updated_at')
-                  .eq('id', recordId)
-                  .maybeSingle();
-                if (error || !row?.data) {
-                  console.warn(`[ISG] Single record fetch failed for ${table}/${recordId} — falling back to full reload`);
-                  void reloadTable(table);
-                } else {
-                  const fetchedTs = row.updated_at as string | undefined;
-                  applyPatch(table, row.data, payload.eventType, recordId, fetchedTs);
-                  console.log(`[ISG] Single record fetch OK: ${table}/${recordId}`);
-                }
-              } catch (err) {
-                console.error(`[ISG] Single record fetch exception for ${table}/${recordId}:`, err);
-                void reloadTable(table);
-              }
-            })();
+            applyPatch(table, newData, payload.eventType, recordId);
             onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
           } else {
+            // data yoksa fallback: tüm tabloyu yeniden çek
+            console.warn(`[ISG] Realtime: no data in payload for ${table}/${recordId}, falling back to reload`);
             void reloadTable(table);
             onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
           }
         },
       ) as typeof channel;
     });
-
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     channel.subscribe((status, err) => {
       if (err) {
@@ -847,45 +817,17 @@ export function useStore(
       }
       if (status === 'SUBSCRIBED') {
         setRealtimeStatus('connected');
-        // Bağlantı yeniden kurulunca kaçırılan değişiklikleri cache bypass ile çek
-        if (reconnectTimer !== null) {
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-          console.log('[ISG] Realtime reconnected — refreshing stale data...');
-          // Cache TTL'i sıfırla: bir sonraki fetchWithCache DB'ye gitsin
-          void Promise.all([
-            fetchAllRows('firmalar', activeOrgId).then(res => {
-              if (res.data) { const rows = res.data.map(r => r.data as Firma); setFirmalar(rows); void writeCache(`firmalar_${activeOrgId}`, rows); }
-            }),
-            fetchAllRows('personeller', activeOrgId).then(res => {
-              if (res.data) { const rows = res.data.map(r => ({ ...r.data as Personel, kanGrubu: KAN[(r.data as Personel).kanGrubu ?? ''] ?? (r.data as Personel).kanGrubu ?? '' })); setPersoneller(rows); void writeCache(`personeller_${activeOrgId}`, rows); }
-            }),
-            fetchAllRows('uygunsuzluklar', activeOrgId).then(res => {
-              if (res.data) { const rows = (res.data.map(r => r.data as Uygunsuzluk)).map(u => ({ ...u, durum: (u.durum === 'Kapatıldı' ? 'Kapandı' : u.durum === 'İncelemede' ? 'Açık' : u.durum) as UygunsuzlukStatus })); setUygunsuzluklar(rows); void writeCache(`uygunsuzluklar_${activeOrgId}`, rows); }
-            }),
-            fetchAllRows('is_izinleri', activeOrgId).then(res => {
-              if (res.data) { const rows = res.data.map(r => r.data as IsIzni); setIsIzinleri(rows); void writeCache(`is_izinleri_${activeOrgId}`, rows); }
-            }),
-          ]).then(() => console.log('[ISG] Reconnect refresh done ✓'));
-        }
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        console.warn(`[ISG] Realtime connection issue (${status}) — scheduling reconnect check`);
+        console.warn(`[ISG] Realtime connection issue (${status}) — Supabase will auto-reconnect`);
         setRealtimeStatus('disconnected');
-        // 3 saniye sonra kontrol et — bağlantı hâlâ kopuksa işaretle
-        if (!reconnectTimer) {
-          reconnectTimer = setTimeout(() => {
-            reconnectTimer = null;
-            console.log('[ISG] Realtime still disconnected after timeout');
-          }, 3000);
-        }
       } else {
+        // JOINING, etc.
         setRealtimeStatus('connecting');
       }
     });
 
     return () => {
       console.log(`[ISG] Realtime cleanup: removing channel=${channelName}`);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
       supabase.removeChannel(channel);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1111,13 +1053,6 @@ export function useStore(
     _setPersoneller(prev => prev.filter(p => p.id !== id));
     try {
       await dbDelete('personeller', id);
-      // Cache'i de güncelle — silinen kaydı çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = personellerRef.current;
-        void writeCache(`personeller_${orgId}`, updated);
-      }
-      console.log(`[ISG] permanentDeletePersonel OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeletePersonel FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
@@ -1145,8 +1080,10 @@ export function useStore(
     let updated: Evrak | null = null;
     setEvraklar(prev => prev.map(e => {
       if (e.id !== id) return e;
-      updated = { ...e, ...rest };
-      return updated;
+      const merged = { ...e, ...rest };
+      if (rest.tur !== undefined || rest.ad !== undefined) merged.kategori = getEvrakKategori(merged.tur, merged.ad);
+      updated = merged;
+      return merged;
     }));
     if (updated) saveToDb('evraklar', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setEvraklar, saveToDb]);
@@ -1181,13 +1118,6 @@ export function useStore(
     _setEvraklar(prev => prev.filter(e => e.id !== id));
     try {
       await dbDelete('evraklar', id);
-      // Cache'i de güncelle — silinen kaydı çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = evraklarRef.current;
-        void writeCache(`evraklar_${orgId}`, updated);
-      }
-      console.log(`[ISG] permanentDeleteEvrak OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEvrak FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
@@ -1200,7 +1130,6 @@ export function useStore(
   // ──────── EĞİTİM ────────
   const addEgitim = useCallback((egitim: Omit<Egitim, 'id' | 'olusturmaTarihi'>) => {
     const id = genId();
-    // belgeDosyaVeri (base64) artık kabul edilmiyor — sadece belgeUrl kullanılır
     const { belgeDosyaVeri: _ignored, ...rest } = egitim as Egitim & { belgeDosyaVeri?: string };
     const newEgitim: Egitim = { ...rest, id, olusturmaTarihi: new Date().toISOString() };
     setEgitimler(prev => [newEgitim, ...prev]);
@@ -1250,13 +1179,6 @@ export function useStore(
     _setEgitimler(prev => prev.filter(e => e.id !== id));
     try {
       await dbDelete('egitimler', id);
-      // Cache'i de güncelle — silinen kaydı çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = egitimlerRef.current;
-        void writeCache(`egitimler_${orgId}`, updated);
-      }
-      console.log(`[ISG] permanentDeleteEgitim OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEgitim FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
@@ -1350,7 +1272,7 @@ export function useStore(
           .eq('organization_id', orgId)
           .then(({ error }) => {
             if (error) {
-              console.error('[ISG] restoreMuayene DB error:', error);
+              console.error('[ISG] restoreMuayene DB error:', error.message);
               setMuayeneler(prev => prev.map(m => m.id === id ? { ...m, silinmis: true as const } : m));
             } else {
               console.log(`[ISG] restoreMuayene OK: ${id} deleted_at=null`);
@@ -1371,13 +1293,6 @@ export function useStore(
     _setMuayeneler(prev => prev.filter(m => m.id !== id));
     try {
       await dbDelete('muayeneler', id);
-      // Cache'i de güncelle — silinen kaydı çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = muayenelerRef.current;
-        void writeCache(`muayeneler_${orgId}`, updated);
-      }
-      console.log(`[ISG] permanentDeleteMuayene OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteMuayene FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
@@ -1435,12 +1350,6 @@ export function useStore(
     _setUygunsuzluklar(prev => prev.filter(u => u.id !== id));
     try {
       await dbDelete('uygunsuzluklar', id);
-      // Cache'i de güncelle — silinen kaydı çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = uygunsuzluklarRef.current;
-        void writeCache(`uygunsuzluklar_${orgId}`, updated);
-      }
       console.log(`[ISG] permanentDeleteUygunsuzluk OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteUygunsuzluk FAILED, rolling back:', err);
@@ -1599,72 +1508,24 @@ export function useStore(
   }, [setEkipmanlar]);
 
   const deleteEkipman = useCallback((id: string) => {
-    const now = new Date().toISOString();
     let updated: Ekipman | null = null;
-    let snapshot: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
-      snapshot = e;
-      updated = { ...e, silinmis: true as const, silinmeTarihi: now };
+      updated = { ...e, silinmis: true as const, silinmeTarihi: new Date().toISOString() };
       return updated;
     }));
-    if (updated) {
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        // deleted_at'i açıkça set et — fetchAllRows .is('deleted_at', null) filtresi için kritik
-        supabase
-          .from('ekipmanlar')
-          .update({ data: updated, updated_at: now, deleted_at: now, device_id: getDeviceId() })
-          .eq('id', id)
-          .eq('organization_id', orgId)
-          .then(({ error }) => {
-            if (error) {
-              console.error('[ISG] deleteEkipman DB error:', error.message);
-              if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
-              onSaveErrorRef.current?.(`Ekipman silinemedi: ${error.message}`);
-            } else {
-              console.log(`[ISG] deleteEkipman OK: ${id} deleted_at=${now}`);
-            }
-          });
-      } else {
-        saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
-      }
-    }
+    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
     logFnRef.current?.('ekipman_deleted', 'Ekipmanlar', id, undefined, 'Ekipman silindi.');
   }, [setEkipmanlar, saveToDb]);
 
   const restoreEkipman = useCallback((id: string) => {
-    const now = new Date().toISOString();
     let updated: Ekipman | null = null;
-    let snapshot: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => {
       if (e.id !== id) return e;
-      snapshot = e;
       updated = { ...e, silinmis: false as const, silinmeTarihi: undefined };
       return updated;
     }));
-    if (updated) {
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        // deleted_at'i null'a çek — fetchAllRows geri getirsin
-        supabase
-          .from('ekipmanlar')
-          .update({ data: updated, updated_at: now, deleted_at: null, device_id: getDeviceId() })
-          .eq('id', id)
-          .eq('organization_id', orgId)
-          .then(({ error }) => {
-            if (error) {
-              console.error('[ISG] restoreEkipman DB error:', error.message);
-              if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
-              onSaveErrorRef.current?.(`Ekipman geri yüklenemedi: ${error.message}`);
-            } else {
-              console.log(`[ISG] restoreEkipman OK: ${id} deleted_at=null`);
-            }
-          });
-      } else {
-        saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
-      }
-    }
+    if (updated) saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
   }, [setEkipmanlar, saveToDb]);
 
   const ekipmanlarRef = useRef<Ekipman[]>([]);
@@ -1676,12 +1537,6 @@ export function useStore(
     _setEkipmanlar(prev => prev.filter(e => e.id !== id));
     try {
       await dbDelete('ekipmanlar', id);
-      // Cache'i de güncelle — silinen kaydı çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = ekipmanlarRef.current;
-        void writeCache(`ekipmanlar_${orgId}`, updated);
-      }
       console.log(`[ISG] permanentDeleteEkipman OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipman FAILED, rolling back:', err);
@@ -1699,12 +1554,6 @@ export function useStore(
     _setEkipmanlar(prev => prev.filter(e => !ids.includes(e.id)));
     try {
       await dbDeleteMany('ekipmanlar', ids);
-      // Cache'i de güncelle — silinen kayıtları çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = ekipmanlarRef.current;
-        void writeCache(`ekipmanlar_${orgId}`, updated);
-      }
       console.log(`[ISG] permanentDeleteEkipmanMany OK: ${ids.length} items`);
     } catch (err) {
       console.error('[ISG] permanentDeleteEkipmanMany FAILED, rolling back:', err);
@@ -1808,13 +1657,6 @@ export function useStore(
     _setTutanaklar(prev => prev.filter(t => t.id !== id));
     try {
       await dbDelete('tutanaklar', id);
-      // Cache'i de güncelle — silinen kaydı çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = tutanaklarRef2.current;
-        void writeCache(`tutanaklar_${orgId}`, updated);
-      }
-      console.log(`[ISG] permanentDeleteTutanak OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteTutanak FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
@@ -1939,20 +1781,14 @@ export function useStore(
     // is_izinleri tablosu deleted_at kolonunu kullanıyor — direkt update
     supabase
       .from('is_izinleri')
-      .update({
-        data: updated,
-        updated_at: now,
-        organization_id: orgIdRef.current,
-        user_id: userIdRef.current,
-        device_id: getDeviceId(),
-      })
+      .update({ deleted_at: now, data: updated, updated_at: now, device_id: getDeviceId() })
       .eq('id', id)
       .then(({ error }) => {
         if (error) {
-          console.error('[ISG] deleteIsIzni DB error:', error.message);
+          console.error('[ISG] deleteIsIzni DB error:', error);
           // Rollback
           setIsIzinleri(prev => prev.map(iz => iz.id === id ? current : iz));
-          onSaveErrorRef.current?.(`İş izni silinemedi: ${error.message}`);
+          onSaveErrorRef.current?.(`İş izni silme hatası: ${error.message}`);
         } else {
           console.log('[ISG] deleteIsIzni OK:', id);
         }
@@ -1969,20 +1805,14 @@ export function useStore(
     // is_izinleri tablosu deleted_at kolonunu kullanıyor — null'a çek
     supabase
       .from('is_izinleri')
-      .update({
-        data: updated,
-        updated_at: now,
-        organization_id: orgIdRef.current,
-        user_id: userIdRef.current,
-        device_id: getDeviceId(),
-      })
+      .update({ deleted_at: null, data: updated, updated_at: now, device_id: getDeviceId() })
       .eq('id', id)
       .then(({ error }) => {
         if (error) {
           console.error('[ISG] restoreIsIzni DB error:', error);
           setIsIzinleri(prev => prev.map(iz => iz.id === id ? current : iz));
         } else {
-          console.log(`[ISG] restoreIsIzni OK: ${id} deleted_at=null`);
+          console.log(`[ISG] restoreIsIzni OK: ${id}`);
         }
       });
   }, [setIsIzinleri]);
@@ -1996,13 +1826,7 @@ export function useStore(
     _setIsIzinleri(prev => prev.filter(iz => iz.id !== id));
     try {
       await dbDelete('is_izinleri', id);
-      // Cache'i de güncelle — silinen kaydı çıkar
-      const orgId = orgIdRef.current;
-      if (orgId) {
-        const updated = isIzinleriRef2.current;
-        void writeCache(`is_izinleri_${orgId}`, updated);
-      }
-      console.log(`[ISG] permanentDeleteIsIzni OK: ${id}`);
+      logFnRef.current?.('is_izni_perm_deleted', 'İş İzinleri', id, undefined, 'İş izni kalıcı silindi.');
     } catch (err) {
       console.error('[ISG] permanentDeleteIsIzni FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);

@@ -3,7 +3,6 @@ import Modal from '@/components/base/Modal';
 import type { Firma } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/store/AppContext';
-import { validateFile } from '@/utils/fileUpload';
 
 const IZIN_TURLERI = [
   'Sıcak Çalışma',
@@ -38,16 +37,13 @@ export default function TopluEvrakYukle({ open, onClose, firmalar }: Props) {
 
   const handleDosyaEkle = (files: FileList | null) => {
     if (!files) return;
-    const yeni: YuklenecekDosya[] = [];
-    for (const f of Array.from(files)) {
-      try {
-        validateFile(f, true); // extended: doc/docx/xls/xlsx de kabul
-        yeni.push({ id: Math.random().toString(36).substring(2), dosya: f, ad: f.name, durum: 'bekliyor' });
-      } catch (err) {
-        addToast(`${f.name} — ${err instanceof Error ? err.message : 'Geçersiz dosya.'}`, 'error');
-      }
-    }
-    if (yeni.length > 0) setDosyalar(prev => [...prev, ...yeni]);
+    const yeni: YuklenecekDosya[] = Array.from(files).map(f => ({
+      id: Math.random().toString(36).substring(2),
+      dosya: f,
+      ad: f.name,
+      durum: 'bekliyor',
+    }));
+    setDosyalar(prev => [...prev, ...yeni]);
   };
 
   const handleDosyaSil = (id: string) => {

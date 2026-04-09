@@ -28,67 +28,20 @@ function setCachedUrl(bucket: string, filePath: string, url: string): void {
   urlCache.set(key, { url, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-// Desteklenen MIME tipleri
-const ALLOWED_MIME: Record<string, string> = {
-  pdf:  'application/pdf',
-  jpg:  'image/jpeg',
-  jpeg: 'image/jpeg',
-  png:  'image/png',
-};
-
-// İş izni / şirket belgeleri için genişletilmiş MIME listesi (docx/doc dahil)
-const ALLOWED_MIME_EXTENDED: Record<string, string> = {
-  ...ALLOWED_MIME,
-  doc:  'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xls:  'application/vnd.ms-excel',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-};
-
 /**
- * Dosya doğrulama — boyut, uzantı ve MIME tip kontrolü
- *
- * @param file       - Doğrulanacak dosya
- * @param extended   - true → PDF/JPG/PNG + DOC/DOCX/XLS/XLSX kabul edilir
- *                     false (default) → sadece PDF/JPG/PNG
- * @throws Error     - Geçersiz dosyada hata fırlatır (mesaj kullanıcıya gösterilir)
+ * Dosya doğrulama — boyut ve tip kontrolü
+ * @returns null if valid, error message string if invalid
  */
-export function validateFile(file: File, extended = false): void {
-  if (!file) throw new Error('Dosya seçilmedi.');
-
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  const allowedMap = extended ? ALLOWED_MIME_EXTENDED : ALLOWED_MIME;
-
-  // Uzantı kontrolü
-  if (!allowedMap[ext]) {
-    const allowed = extended
-      ? 'PDF, JPG, PNG, DOC, DOCX, XLS, XLSX'
-      : 'PDF, JPG, PNG';
-    throw new Error(`Desteklenmeyen dosya formatı (.${ext}). Sadece ${allowed} dosyaları kabul edilmektedir.`);
-  }
-
-  // MIME tip kontrolü (tarayıcı tarafından belirlenir — ek güvenlik katmanı)
-  const expectedMime = allowedMap[ext];
-  if (file.type && file.type !== '' && file.type !== expectedMime) {
-    // Bazı tarayıcılar MIME'i yanlış belirleyebilir — sadece uyarı logla, engelleme
-    console.warn(`[validateFile] MIME mismatch: expected ${expectedMime}, got ${file.type}`);
-  }
-
-  // Boyut kontrolü — PDF max 50MB, görseller max 20MB
-  const isPdf = ext === 'pdf';
-  const isImage = ['jpg', 'jpeg', 'png'].includes(ext);
-  const maxMB = isPdf ? 50 : isImage ? 20 : 50;
+export function validateFile(file: File, maxMB = 50): string | null {
   const maxBytes = maxMB * 1024 * 1024;
-
   if (file.size > maxBytes) {
-    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-    const limitMsg = isPdf
-      ? 'PDF dosyaları max 50MB olabilir.'
-      : isImage
-      ? 'Görsel dosyaları (JPG/PNG) max 20MB olabilir.'
-      : `Dosya max ${maxMB}MB olabilir.`;
-    throw new Error(`Dosya boyutu çok büyük (${sizeMB}MB). ${limitMsg}`);
+    return `Dosya boyutu ${maxMB}MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB).`;
   }
+  const allowed = /\.(pdf|jpg|jpeg|png)$/i;
+  if (!allowed.test(file.name)) {
+    return 'Sadece PDF, JPG ve PNG dosyaları desteklenmektedir.';
+  }
+  return null;
 }
 
 /**
@@ -234,74 +187,6 @@ export async function getSignedUrlsBulk(
 }
 
 /**
- * Görsel dosyaları upload öncesi sıkıştır (Canvas API)
- * Telefon kamerası 5-15MB çeker — bu fonksiyon 500KB-1MB'a düşürür.
- * PDF ve diğer dosyalara dokunmaz.
- *
- * @param file       - Sıkıştırılacak dosya
- * @param maxWidth   - Maksimum genişlik (px), default 1920
- * @param quality    - JPEG kalitesi 0-1, default 0.82
- */
-async function compressImageIfNeeded(
-  file: File,
-  maxWidth = 1920,
-  quality = 0.82,
-): Promise<File> {
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  const isImage = ['jpg', 'jpeg', 'png'].includes(ext);
-
-  // Görsel değilse veya zaten küçükse (< 300KB) dokunma
-  if (!isImage || file.size < 300 * 1024) return file;
-
-  return new Promise<File>((resolve) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-
-      // Boyut hesapla — oranı koru
-      let { width, height } = img;
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve(file); return; }
-
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) { resolve(file); return; }
-          // Sıkıştırma işe yaramadıysa (nadiren olur) orijinali kullan
-          if (blob.size >= file.size) { resolve(file); return; }
-          const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
-          console.log(
-            `[fileUpload] compress: ${(file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB` +
-            ` (${Math.round((1 - compressed.size / file.size) * 100)}% küçüldü)`,
-          );
-          resolve(compressed);
-        },
-        'image/jpeg',
-        quality,
-      );
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(file); // Hata durumunda orijinali kullan
-    };
-
-    img.src = objectUrl;
-  });
-}
-
-/**
  * Merkezi dosya yükleme yardımcısı
  * File objesi → Supabase Storage (private) → storage PATH döner (DB'ye kaydedilir)
  * NOT: Artık signed URL değil, filePath döner. Görüntüleme için getSignedUrlFromPath kullan.
@@ -312,31 +197,21 @@ export async function uploadFileToStorage(
   module: string,
   recordId?: string,
 ): Promise<string | null> {
-  // ── SON SAVUNMA: Her upload noktasından önce merkezi validation ──
-  // is-izni ve company-documents modülleri genişletilmiş format kabul eder
-  const isExtended = ['is-izni-evrak', 'company-doc', 'tutanak'].includes(module);
-  validateFile(file, isExtended);
-
-  // Uzantı güvenlik kontrolü — dosya adı manipülasyonuna karşı
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  const safeExts = isExtended
-    ? ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx']
-    : ['pdf', 'jpg', 'jpeg', 'png'];
-  if (!safeExts.includes(ext)) {
-    throw new Error(`Güvenlik hatası: .${ext} uzantısı bu modülde desteklenmiyor.`);
+  // Enforce 50MB server-side limit — cannot be bypassed by frontend
+  const MAX_BYTES = 50 * 1024 * 1024;
+  if (file.size > MAX_BYTES) {
+    console.error(`[fileUpload] File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB > 50MB limit`);
+    throw new Error(`Dosya boyutu 50MB sınırını aşıyor (${(file.size / 1024 / 1024).toFixed(1)}MB). Lütfen daha küçük bir dosya seçin.`);
   }
 
   try {
-    // Görsel ise upload öncesi sıkıştır — telefon fotoğrafları 5-15MB olabiliyor
-    const fileToUpload = await compressImageIfNeeded(file);
-
-    const fileExt = fileToUpload.name.split('.').pop()?.toLowerCase() ?? 'bin';
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin';
     const uuid = recordId ?? crypto.randomUUID();
-    const filePath = `${orgId}/${module}/${uuid}.${fileExt}`;
+    const filePath = `${orgId}/${module}/${uuid}.${ext}`;
 
     const { error } = await supabase.storage
       .from('uploads')
-      .upload(filePath, fileToUpload, { upsert: true, contentType: fileToUpload.type });
+      .upload(filePath, file, { upsert: true, contentType: file.type });
 
     if (error) {
       console.error(`[fileUpload] Storage error (${module}):`, error);
@@ -353,7 +228,6 @@ export async function uploadFileToStorage(
 
 /**
  * base64 data URL → Supabase Storage (private) → filePath döner
- * Görsel ise upload öncesi otomatik sıkıştırır (telefon fotoğrafları için kritik)
  */
 export async function uploadBase64ToStorage(
   base64: string,
@@ -367,8 +241,10 @@ export async function uploadBase64ToStorage(
     const mimeMatch = meta.match(/data:([^;]+);/);
     const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
     const ext = fileName?.split('.').pop()?.toLowerCase() ?? mime.split('/')[1]?.split('+')[0] ?? 'bin';
+    const filePath = `${orgId}/${module}/${recordId}.${ext}`;
 
     // Enforce 50MB server-side limit on base64 uploads
+    // base64 is ~33% larger than binary, so actual size = base64.length * 0.75
     const estimatedBytes = Math.ceil(data.length * 0.75);
     const MAX_BYTES = 50 * 1024 * 1024;
     if (estimatedBytes > MAX_BYTES) {
@@ -382,33 +258,16 @@ export async function uploadBase64ToStorage(
     for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
     const blob = new Blob([ab], { type: mime });
 
-    // Görsel ise sıkıştır — telefon kamerası 5-15MB çekiyor
-    const isImage = ['image/jpeg', 'image/jpg', 'image/png'].includes(mime);
-    let uploadBlob = blob;
-    let uploadMime = mime;
-    let uploadExt = ext;
-
-    if (isImage && blob.size > 300 * 1024) {
-      const tempFile = new File([blob], `photo.${ext}`, { type: mime });
-      const compressed = await compressImageIfNeeded(tempFile);
-      if (compressed !== tempFile) {
-        uploadBlob = compressed;
-        uploadMime = 'image/jpeg';
-        uploadExt = 'jpg';
-      }
-    }
-
-    const filePath = `${orgId}/${module}/${recordId}.${uploadExt}`;
-
     const { error } = await supabase.storage
       .from('uploads')
-      .upload(filePath, uploadBlob, { upsert: true, contentType: uploadMime });
+      .upload(filePath, blob, { upsert: true, contentType: mime });
 
     if (error) {
       console.error(`[fileUpload] base64 Storage error (${module}):`, error);
       return null;
     }
 
+    // DB'ye filePath kaydet — expire olmaz
     return filePath;
   } catch (err) {
     console.error(`[fileUpload] base64 error (${module}):`, err);

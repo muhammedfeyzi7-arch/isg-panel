@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (signInData?.user) {
         const { data: membership } = await supabase
           .from('user_organizations')
-          .select('user_id, is_active, organization_id, organizations(is_active, subscription_end)')
+          .select('user_id, is_active')
           .eq('user_id', signInData.user.id)
           .eq('is_active', true)
           .limit(1)
@@ -126,25 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await supabase.auth.signOut({ scope: 'local' });
           clearAuthStorage();
           return { error: 'Hesabınız devre dışı bırakılmış veya organizasyondan çıkarılmış. Lütfen yöneticinizle iletişime geçin.' };
-        }
-
-        // Organizasyon abonelik kontrolü
-        const orgData = membership.organizations as { is_active: boolean; subscription_end: string | null } | null;
-        if (orgData) {
-          if (orgData.is_active === false) {
-            await supabase.auth.signOut({ scope: 'local' });
-            clearAuthStorage();
-            return { error: 'Organizasyonunuzun erişimi askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.' };
-          }
-          if (orgData.subscription_end) {
-            const endDate = new Date(orgData.subscription_end);
-            endDate.setHours(23, 59, 59, 999);
-            if (endDate < new Date()) {
-              await supabase.auth.signOut({ scope: 'local' });
-              clearAuthStorage();
-              return { error: 'Organizasyonunuzun abonelik süresi dolmuştur. Lütfen yöneticinizle iletişime geçin.' };
-            }
-          }
         }
       }
 

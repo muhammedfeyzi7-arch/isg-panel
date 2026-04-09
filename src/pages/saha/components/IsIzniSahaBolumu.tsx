@@ -29,10 +29,6 @@ const DURUM_CFG = {
   'Reddedildi':    { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.3)', icon: 'ri-close-circle-line' },
 };
 
-// ─── Evrak listesi cache (session memory) ─────────────────────────────────────
-const evrakListeCache = new Map<string, { data: EvrakDosya[]; ts: number }>();
-const EVRAK_CACHE_TTL = 5 * 60 * 1000; // 5 dakika
-
 // ─── Evrak listesi ────────────────────────────────────────────────────────────
 interface EvrakDosya {
   name: string;
@@ -66,25 +62,17 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
 
   const fetchDosyalar = useCallback(async () => {
     if (!orgId || orgId === 'unknown' || !firmaId) { setDosyalar([]); setYukleniyor(false); return; }
-
-    // Cache kontrolü
-    const cacheKey = `${orgId}/${firmaId}/${izinTuruSlug}`;
-    const cached = evrakListeCache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < EVRAK_CACHE_TTL) {
-      setDosyalar(cached.data);
-      setYukleniyor(false);
-      return;
-    }
-
     setYukleniyor(true);
     try {
       const slugsToTry = izinTuruSlug === izinTuruSlugOrig ? [izinTuruSlug] : [izinTuruSlug, izinTuruSlugOrig];
       let allFiles: EvrakDosya[] = [];
       for (const slug of slugsToTry) {
         const prefix = `${orgId}/is-izni-evrak/${firmaId}/${slug}`;
+        console.log('[ISG] Listing prefix:', prefix);
         const { data, error } = await supabase.storage
           .from('uploads')
           .list(prefix, { limit: 100, sortBy: { column: 'updated_at', order: 'desc' } });
+        console.log('[ISG] List result:', { slug, count: data?.length, error: error?.message, files: data?.map(f => f.name) });
         if (!error && data && data.length > 0) {
           const filtered = data
             .filter(f => f.name && f.name !== '.emptyFolderPlaceholder' && !f.name.includes('_red_'))
@@ -93,10 +81,7 @@ function IsIzniEvraklariSaha({ izinId, orgId, firmaId, izinTuru }: {
         }
       }
       const seen = new Set<string>();
-      const result = allFiles.filter(f => { if (seen.has(f.name)) return false; seen.add(f.name); return true; });
-      // Cache'e kaydet
-      evrakListeCache.set(cacheKey, { data: result, ts: Date.now() });
-      setDosyalar(result);
+      setDosyalar(allFiles.filter(f => { if (seen.has(f.name)) return false; seen.add(f.name); return true; }));
     } catch (e) {
       console.error('[ISG] fetchDosyalar error:', e);
       setDosyalar([]);

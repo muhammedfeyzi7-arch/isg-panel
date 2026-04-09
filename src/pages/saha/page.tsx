@@ -7,7 +7,8 @@ import Modal from '@/components/base/Modal';
 import type { Ekipman, EkipmanStatus, Uygunsuzluk, Evrak } from '@/types';
 import { useOfflineQueue, type OfflineQueueItem } from '@/hooks/useOfflineQueue';
 import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHelper';
-import { getSignedUrlFromPath, uploadFileToStorage } from '@/utils/fileUpload';
+import { getSignedUrlFromPath } from '@/utils/fileUpload';
+import { supabase } from '@/lib/supabase';
 import IsIzniSahaBolumu from './components/IsIzniSahaBolumu';
 
 // jsQR modül yükleyici
@@ -443,7 +444,6 @@ function EkipmanDetayPanel({
   ekipman,
   onBack,
   onKontrolYapildi,
-  onUygunDegliAc,
   onDurumDegistir,
   isOnline,
   kontrolBasarili,
@@ -451,7 +451,6 @@ function EkipmanDetayPanel({
   ekipman: Ekipman;
   onBack: () => void;
   onKontrolYapildi: (id: string) => void;
-  onUygunDegliAc?: (id: string) => void;
   onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
   isOnline: boolean;
   kontrolBasarili?: boolean;
@@ -557,34 +556,20 @@ function EkipmanDetayPanel({
             </div>
           )}
 
-          {/* Kontrol butonları — Uygun ve Uygun Değil */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => onKontrolYapildi(ekipman.id)}
-              className="flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200"
-              style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.25)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.15)'; }}
-            >
-              <i className="ri-checkbox-circle-line text-base" style={{ color: '#34D399' }} />
-              <span className="text-xs font-bold" style={{ color: '#34D399' }}>Uygun</span>
-            </button>
-            <button
-              onClick={() => onUygunDegliAc?.(ekipman.id)}
-              className="flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200"
-              style={{ background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.22)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.12)'; }}
-            >
-              <i className="ri-close-circle-line text-base" style={{ color: '#F87171' }} />
-              <span className="text-xs font-bold" style={{ color: '#F87171' }}>Uygun Değil</span>
-            </button>
-          </div>
-          {!isOnline && (
-            <p className="text-[10px] text-center" style={{ color: '#FBBF24' }}>
-              <i className="ri-wifi-off-line mr-1" />Çevrimdışı — bağlantı gelince gönderilir
-            </p>
-          )}
+          <button
+            onClick={() => onKontrolYapildi(ekipman.id)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200"
+            style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.25)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.15)'; }}
+          >
+            <div className="w-5 h-5 flex items-center justify-center">
+              <i className={`${!isOnline ? 'ri-save-line' : 'ri-checkbox-circle-line'} text-base`} style={{ color: '#34D399' }} />
+            </div>
+            <span className="text-sm font-bold" style={{ color: '#34D399' }}>
+              {!isOnline ? 'Kontrol Yaptım (Çevrimdışı Kaydedilir)' : 'Kontrol Yaptım'}
+            </span>
+          </button>
 
           <div>
             <p className="text-[10px] font-semibold mb-2 uppercase tracking-wide" style={{ color: '#475569' }}>Durum Değiştir</p>
@@ -615,7 +600,6 @@ function EkipmanListeModal({
   open,
   onClose,
   onKontrolYapildi,
-  onUygunDegliAc,
   onDurumDegistir,
   isOnline,
   initialEkipmanId,
@@ -623,7 +607,6 @@ function EkipmanListeModal({
   open: boolean;
   onClose: () => void;
   onKontrolYapildi: (id: string) => void;
-  onUygunDegliAc: (id: string) => void;
   onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
   isOnline: boolean;
   initialEkipmanId?: string | null;
@@ -688,7 +671,6 @@ function EkipmanListeModal({
           ekipman={currentEkipman}
           onBack={() => { setSelectedId(null); setKontrolBasarili(false); }}
           onKontrolYapildi={handleKontrol}
-          onUygunDegliAc={(id) => { onClose(); onUygunDegliAc(id); }}
           onDurumDegistir={handleDurum}
           isOnline={isOnline}
           kontrolBasarili={kontrolBasarili}
@@ -792,29 +774,50 @@ function EkipmanListeModal({
 // ─────────────────────────────────────────────────────────────────────────────
 // QR Ekipman Kartı — offline destekli + evraklar
 // ─────────────────────────────────────────────────────────────────────────────
-function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onUygunDegliAc, onDurumDegistir, isOnline }: {
+function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, isOnline }: {
   ekipman: Ekipman; onClose: () => void;
   onKontrolYapildi: (ekipmanId: string) => void;
-  onUygunDegliAc: (ekipmanId: string) => void;
   onDurumDegistir: (ekipmanId: string, durum: EkipmanStatus) => void;
   isOnline: boolean;
 }) {
-  const { firmalar, addToast, evraklar: tumEvraklar } = useApp();
+  const { firmalar, addToast, org } = useApp();
   const sc = STATUS_CFG[ekipman.durum] ?? STATUS_CFG['Uygun'];
   const firma = firmalar.find(f => f.id === ekipman.firmaId);
   const days = ekipman.sonrakiKontrolTarihi
     ? Math.ceil((new Date(ekipman.sonrakiKontrolTarihi).getTime() - Date.now()) / 86400000)
     : null;
 
-  // Evraklar — store'dan filtrele, DB çağrısı yok
-  const evraklar = useMemo(() =>
-    tumEvraklar
-      .filter(e => !e.silinmis && !e.cascadeSilindi && e.firmaId === ekipman.firmaId)
-      .sort((a, b) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? '')),
-    [tumEvraklar, ekipman.firmaId]
-  );
-  const evraklarLoading = false;
+  // Evraklar — direkt Supabase'den çek
+  const [evraklar, setEvraklar] = useState<Evrak[]>([]);
+  const [evraklarLoading, setEvraklarLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!ekipman.firmaId || !org?.id) {
+      setEvraklar([]);
+      setEvraklarLoading(false);
+      return;
+    }
+    setEvraklarLoading(true);
+    supabase
+      .from('evraklar')
+      .select('id, data')
+      .eq('organization_id', org.id)
+      .is('deleted_at', null)
+      .then(({ data, error }) => {
+        if (error || !data) { setEvraklar([]); setEvraklarLoading(false); return; }
+        const parsed: Evrak[] = data
+          .map((row: { id: string; data: Evrak }) => ({ ...row.data, id: row.id }))
+          .filter((e: Evrak) =>
+            !e.silinmis &&
+            !e.cascadeSilindi &&
+            e.firmaId === ekipman.firmaId
+          )
+          .sort((a: Evrak, b: Evrak) => (b.olusturmaTarihi ?? '').localeCompare(a.olusturmaTarihi ?? ''));
+        setEvraklar(parsed);
+        setEvraklarLoading(false);
+      });
+  }, [ekipman.firmaId, org?.id]);
 
   const fmtDate = (iso?: string) => {
     if (!iso) return '—';
@@ -888,34 +891,21 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onUygunDegliAc, onD
         </div>
       )}
 
-      {/* Kontrol butonları — Uygun ve Uygun Değil */}
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        <button
-          onClick={() => onKontrolYapildi(ekipman.id)}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200"
-          style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.25)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.15)'; }}
-        >
-          <i className="ri-checkbox-circle-line text-base" style={{ color: '#34D399' }} />
-          <span className="text-sm font-bold" style={{ color: '#34D399' }}>Uygun</span>
-        </button>
-        <button
-          onClick={() => onUygunDegliAc(ekipman.id)}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200"
-          style={{ background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.22)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.12)'; }}
-        >
-          <i className="ri-close-circle-line text-base" style={{ color: '#F87171' }} />
-          <span className="text-sm font-bold" style={{ color: '#F87171' }}>Uygun Değil</span>
-        </button>
-      </div>
-      {!isOnline && (
-        <p className="text-[10px] text-center mb-2" style={{ color: '#FBBF24' }}>
-          <i className="ri-wifi-off-line mr-1" />Çevrimdışı — bağlantı gelince gönderilir
-        </p>
-      )}
+      {/* Kontrol Yaptım butonu */}
+      <button
+        onClick={() => onKontrolYapildi(ekipman.id)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl cursor-pointer transition-all duration-200 mb-3"
+        style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.35)' }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.25)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.15)'; }}
+      >
+        <div className="w-5 h-5 flex items-center justify-center">
+          <i className={`${!isOnline ? 'ri-save-line' : 'ri-checkbox-circle-line'} text-base`} style={{ color: '#34D399' }} />
+        </div>
+        <span className="text-sm font-bold" style={{ color: '#34D399' }}>
+          {!isOnline ? 'Kontrol Yaptım (Çevrimdışı Kaydedilir)' : 'Kontrol Yaptım'}
+        </span>
+      </button>
 
       {/* Durum Değiştir */}
       <div className="mb-4">
@@ -1216,7 +1206,6 @@ function FirmaEkipmanModal({
   firmaId,
   onClose,
   onKontrolYapildi,
-  onUygunDegliAc,
   onDurumDegistir,
   isOnline,
 }: {
@@ -1224,7 +1213,6 @@ function FirmaEkipmanModal({
   firmaId: string | null;
   onClose: () => void;
   onKontrolYapildi: (id: string) => void;
-  onUygunDegliAc: (id: string) => void;
   onDurumDegistir: (id: string, durum: EkipmanStatus) => void;
   isOnline: boolean;
 }) {
@@ -1265,7 +1253,6 @@ function FirmaEkipmanModal({
           ekipman={currentEkipman}
           onBack={() => { setSelectedId(null); setKontrolBasarili(false); }}
           onKontrolYapildi={handleKontrol}
-          onUygunDegliAc={(id) => { onClose(); onUygunDegliAc(id); }}
           onDurumDegistir={(id, durum) => onDurumDegistir(id, durum)}
           isOnline={isOnline}
           kontrolBasarili={kontrolBasarili}
@@ -1353,173 +1340,8 @@ function FirmaEkipmanModal({
 // ─────────────────────────────────────────────────────────────────────────────
 // Ana Saha Sayfası
 // ─────────────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-// Uygun Değil Kontrol Modal
-// ─────────────────────────────────────────────────────────────────────────────
-function UygunDegliModal({
-  open,
-  ekipman,
-  onClose,
-  onKaydet,
-  isOnline,
-  org,
-}: {
-  open: boolean;
-  ekipman: Ekipman | null;
-  onClose: () => void;
-  onKaydet: (ekipmanId: string, notlar: string, fotoUrl: string | null) => void;
-  isOnline: boolean;
-  org: { id: string } | null;
-}) {
-  const [notlar, setNotlar] = useState('');
-  const [foto, setFoto] = useState<File | null>(null);
-  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!open) {
-      setNotlar('');
-      setFoto(null);
-      setFotoPreview(null);
-    }
-  }, [open]);
-
-  const handleFotoSec = (file?: File) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) return;
-    setFoto(file);
-    const reader = new FileReader();
-    reader.onload = e => setFotoPreview(e.target?.result as string);
-    reader.readAsDataURL(file);
-  };
-
-  const handleKaydet = async () => {
-    if (!ekipman) return;
-    setUploading(true);
-    let fotoUrl: string | null = null;
-    try {
-      if (foto && org?.id) {
-        // iOS HEIC/HEIF desteği: dosya adı .heic/.heif olsa bile JPEG olarak yükle
-        let uploadFile = foto;
-        const ext = foto.name.split('.').pop()?.toLowerCase() ?? '';
-        if (['heic', 'heif'].includes(ext)) {
-          // HEIC dosyasını JPEG olarak yeniden adlandır — tarayıcı zaten JPEG binary içeriyor
-          uploadFile = new File([foto], foto.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-        }
-        try {
-          fotoUrl = await uploadFileToStorage(uploadFile, org.id, 'ekipman-kontrol', `${ekipman.id}_${Date.now()}`);
-        } catch (uploadErr) {
-          console.warn('[UygunDegliModal] Fotoğraf yüklenemedi, fotoğrafsız kaydediliyor:', uploadErr);
-          // Fotoğraf yüklenemese bile kayıt yapılsın
-        }
-      }
-      onKaydet(ekipman.id, notlar, fotoUrl);
-    } catch (err) {
-      console.error('[UygunDegliModal] handleKaydet error:', err);
-      // Hata olsa bile fotoğrafsız kaydet
-      onKaydet(ekipman.id, notlar, null);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <Modal
-      isOpen={open}
-      onClose={onClose}
-      title="Uygun Değil — Kontrol Kaydı"
-      size="sm"
-      icon="ri-close-circle-line"
-      footer={
-        <>
-          <button onClick={onClose} disabled={uploading} className="btn-secondary whitespace-nowrap">İptal</button>
-          <button
-            onClick={() => void handleKaydet()}
-            disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white cursor-pointer whitespace-nowrap disabled:opacity-60"
-            style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}
-          >
-            {uploading
-              ? <><i className="ri-loader-4-line animate-spin text-xs" />Kaydediliyor...</>
-              : <><i className="ri-save-line text-xs" />Kaydet</>}
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {/* Ekipman bilgisi */}
-        {ekipman && (
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
-            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(248,113,113,0.15)' }}>
-              <i className="ri-close-circle-line text-sm" style={{ color: '#F87171' }} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate" style={{ color: '#F87171' }}>{ekipman.ad}</p>
-              <p className="text-xs" style={{ color: '#475569' }}>Uygun Değil olarak kaydedilecek</p>
-            </div>
-          </div>
-        )}
-
-        {/* Not alanı */}
-        <div>
-          <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>Sorun Notu *</label>
-          <textarea
-            value={notlar}
-            onChange={e => setNotlar(e.target.value)}
-            placeholder="Tespit edilen sorunu açıklayın..."
-            rows={3}
-            maxLength={500}
-            className="isg-input resize-none"
-          />
-          <p className="text-[10px] mt-1 text-right" style={{ color: '#475569' }}>{notlar.length}/500</p>
-        </div>
-
-        {/* Fotoğraf */}
-        <div>
-          <label className="block text-xs font-semibold mb-1.5" style={{ color: '#94A3B8' }}>
-            Sorun Fotoğrafı {!isOnline && <span style={{ color: '#FBBF24' }}>(çevrimdışı — yüklenemez)</span>}
-          </label>
-          {fotoPreview ? (
-            <div className="relative rounded-xl overflow-hidden" style={{ height: '160px' }}>
-              <img src={fotoPreview} alt="Sorun fotoğrafı" className="w-full h-full object-cover" />
-              <button
-                onClick={() => { setFoto(null); setFotoPreview(null); }}
-                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
-                style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
-              >
-                <i className="ri-close-line text-xs" />
-              </button>
-            </div>
-          ) : (
-            <div
-              className="rounded-xl p-4 text-center cursor-pointer transition-all"
-              style={{ border: '2px dashed rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.04)' }}
-              onClick={() => !uploading && fileRef.current?.click()}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(248,113,113,0.5)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(248,113,113,0.3)'; }}
-            >
-              <i className="ri-camera-line text-2xl mb-1" style={{ color: '#F87171' }} />
-              <p className="text-xs font-medium" style={{ color: '#F87171' }}>Fotoğraf ekle</p>
-              <p className="text-[10px] mt-0.5" style={{ color: '#475569' }}>JPG, PNG • Maks. 10MB</p>
-            </div>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={e => handleFotoSec(e.target.files?.[0])}
-          />
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 export default function SahaPage() {
-  const { ekipmanlar, updateEkipman, addToast, ekipmanKontrolBildirimi, currentUser, dataLoading, org } = useApp();
+  const { ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, addToast, ekipmanKontrolBildirimi, currentUser, dataLoading } = useApp();
 
   const [showQr, setShowQr] = useState(false);
   const [showUygunsuzlukForm, setShowUygunsuzlukForm] = useState(false);
@@ -1528,10 +1350,6 @@ export default function SahaPage() {
   const [showFirmaModal, setShowFirmaModal] = useState(false);
   const [selectedFirmaId, setSelectedFirmaId] = useState<string | null>(null);
   const [qrFoundEkipman, setQrFoundEkipman] = useState<Ekipman | null>(null);
-
-  // Uygun Değil modal state
-  const [showUygunDegliModal, setShowUygunDegliModal] = useState(false);
-  const [uygunDegliEkipman, setUygunDegliEkipman] = useState<Ekipman | null>(null);
 
   // QR redirect'ten gelen ekipman ID'sini sessionStorage'dan oku
   // dataLoading false olunca tekrar kontrol et — veriler yüklenmeden önce gelmiş olabilir
@@ -1593,8 +1411,7 @@ export default function SahaPage() {
     addToast(`QR içeriği: ${text.slice(0, 60)}${text.length > 60 ? '...' : ''}`, 'info');
   }, [ekipmanlar, addToast]);
 
-  // Uygun kontrolü — direkt kaydet
-  const handleKontrolUygun = useCallback(async (ekipmanId: string) => {
+  const handleKontrolYapildi = useCallback(async (ekipmanId: string) => {
     const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
     if (!ekipman) return;
     const now = new Date().toISOString();
@@ -1603,24 +1420,20 @@ export default function SahaPage() {
     sonraki.setMonth(sonraki.getMonth() + 1);
     const sonrakiStr = sonraki.toISOString().split('T')[0];
     const gecikmisDi = ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi) < new Date() : false;
+    const updates = { sonKontrolTarihi: today, sonrakiKontrolTarihi: sonrakiStr, durum: 'Uygun' as const };
 
-    const yeniKayit: import('@/types').EkipmanKontrolKaydi = {
-      id: crypto.randomUUID(),
+    // Kontrol geçmişine kayıt ekle — hem QR hem manuel kontrol için
+    addEkipmanKontrolKaydi(ekipmanId, {
       tarih: now,
       kontrolEden: currentUser?.ad || 'Saha Kullanıcısı',
       kontrolEdenId: currentUser?.id || '',
       durum: 'Uygun',
       kaynak: 'qr',
-    };
-
-    const updates = {
-      sonKontrolTarihi: today,
-      sonrakiKontrolTarihi: sonrakiStr,
-      durum: 'Uygun' as const,
-      kontrolGecmisi: [yeniKayit, ...(ekipman.kontrolGecmisi ?? [])],
-    };
+    });
 
     if (!isOnline) {
+      // Çevrimdışı: sadece offline queue'ya ekle — updateEkipman DB'ye yazmaya çalışır, başarısız olur
+      // Önce UI'yi optimistik güncelle
       updateEkipman(ekipmanId, updates);
       ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
       setQrFoundEkipman(null);
@@ -1631,74 +1444,13 @@ export default function SahaPage() {
       });
       addToast('Kontrol kaydedildi! Bağlantı gelince sunucuya gönderilecek.', 'success');
     } else {
+      // Çevrimiçi: direkt updateEkipman — hem state'i hem DB'yi günceller, realtime karşı tarafı tetikler
       updateEkipman(ekipmanId, updates);
       ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
       setQrFoundEkipman(null);
       addToast('Kontrol kaydedildi! Durum "Uygun" olarak güncellendi.', 'success');
     }
-  }, [ekipmanlar, updateEkipman, currentUser, ekipmanKontrolBildirimi, isOnline, addToQueue, addToast]);
-
-  // Uygun Değil modal aç
-  const handleKontrolYapildi = useCallback((ekipmanId: string) => {
-    const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
-    if (!ekipman) return;
-    // Seçim modalı açmak yerine direkt uygun kaydeder — eski davranış korunur
-    // Uygun Değil için ayrı buton var (handleAcUygunDegliModal)
-    void handleKontrolUygun(ekipmanId);
-  }, [ekipmanlar, handleKontrolUygun]);
-
-  // Uygun Değil modal aç
-  const handleAcUygunDegliModal = useCallback((ekipmanId: string) => {
-    const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
-    if (!ekipman) return;
-    setUygunDegliEkipman(ekipman);
-    setShowUygunDegliModal(true);
-  }, [ekipmanlar]);
-
-  // Uygun Değil kaydet
-  const handleUygunDegliKaydet = useCallback(async (ekipmanId: string, notlar: string, fotoUrl: string | null) => {
-    const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
-    if (!ekipman) return;
-    const now = new Date().toISOString();
-    const today = now.split('T')[0];
-    const gecikmisDi = ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi) < new Date() : false;
-
-    const yeniKayit: import('@/types').EkipmanKontrolKaydi = {
-      id: crypto.randomUUID(),
-      tarih: now,
-      kontrolEden: currentUser?.ad || 'Saha Kullanıcısı',
-      kontrolEdenId: currentUser?.id || '',
-      durum: 'Uygun Değil',
-      notlar: notlar || undefined,
-      fotoUrl: fotoUrl || undefined,
-      kaynak: 'qr',
-    };
-
-    const updates: Partial<Ekipman> = {
-      sonKontrolTarihi: today,
-      durum: 'Uygun Değil' as const,
-      kontrolGecmisi: [yeniKayit, ...(ekipman.kontrolGecmisi ?? [])],
-    };
-
-    // Fotoğraf varsa sahaFotolari'na ekle
-    if (fotoUrl) {
-      const yeniFoto: import('@/types').EkipmanSahaFoto = {
-        id: crypto.randomUUID(),
-        url: fotoUrl,
-        aciklama: notlar || 'Uygun Değil kontrolü',
-        tarih: now,
-        yukleyenKisi: currentUser?.ad || 'Saha Kullanıcısı',
-      };
-      updates.sahaFotolari = [yeniFoto, ...(ekipman.sahaFotolari ?? [])];
-    }
-
-    updateEkipman(ekipmanId, updates);
-    ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun Değil', gecikmisDi);
-    setQrFoundEkipman(null);
-    setShowUygunDegliModal(false);
-    setUygunDegliEkipman(null);
-    addToast('Uygun Değil kontrolü kaydedildi!', 'warning');
-  }, [ekipmanlar, updateEkipman, currentUser, ekipmanKontrolBildirimi, addToast]);
+  }, [ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, currentUser, ekipmanKontrolBildirimi, isOnline, addToQueue, addToast]);
 
   const handleDurumDegistir = useCallback(async (ekipmanId: string, yeniDurum: EkipmanStatus) => {
     const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
@@ -1773,7 +1525,6 @@ export default function SahaPage() {
           ekipman={qrFoundEkipman}
           onClose={() => setQrFoundEkipman(null)}
           onKontrolYapildi={handleKontrolYapildi}
-          onUygunDegliAc={handleAcUygunDegliModal}
           onDurumDegistir={handleDurumDegistir}
           isOnline={isOnline}
         />
@@ -1862,7 +1613,6 @@ export default function SahaPage() {
         open={showEkipmanModal}
         onClose={() => setShowEkipmanModal(false)}
         onKontrolYapildi={handleKontrolYapildi}
-        onUygunDegliAc={handleAcUygunDegliModal}
         onDurumDegistir={handleDurumDegistir}
         isOnline={isOnline}
       />
@@ -1872,23 +1622,12 @@ export default function SahaPage() {
         firmaId={selectedFirmaId}
         onClose={() => { setShowFirmaModal(false); setSelectedFirmaId(null); }}
         onKontrolYapildi={handleKontrolYapildi}
-        onUygunDegliAc={handleAcUygunDegliModal}
         onDurumDegistir={handleDurumDegistir}
         isOnline={isOnline}
       />
 
       <NonconformityForm isOpen={showUygunsuzlukForm} onClose={() => setShowUygunsuzlukForm(false)} editRecord={null} />
       <PendingModal open={showPendingModal} onClose={() => setShowPendingModal(false)} items={pendingItems} isOnline={isOnline} isSyncing={isSyncing} onSyncNow={syncNow} onClear={clearQueue} />
-
-      {/* Uygun Değil Modal */}
-      <UygunDegliModal
-        open={showUygunDegliModal}
-        ekipman={uygunDegliEkipman}
-        onClose={() => { setShowUygunDegliModal(false); setUygunDegliEkipman(null); }}
-        onKaydet={handleUygunDegliKaydet}
-        isOnline={isOnline}
-        org={org}
-      />
     </div>
   );
 }
