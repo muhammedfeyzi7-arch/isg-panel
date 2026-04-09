@@ -49,19 +49,41 @@ Deno.serve(async (req) => {
               content: [
                 {
                   type: "text",
-                  text: `Bu görsel bir eğitim katılım listesi veya imza listesidir. Görseldeki TÜM kişi isimlerini çıkar.
+                  text: `Bu görsel bir eğitim katılım formu veya imza listesidir. Görseli dikkatlice analiz et ve aşağıdaki bilgileri çıkar.
+
+ÇIKARILACAK BİLGİLER:
+
+1. META BİLGİLER (formun üst kısmındaki genel bilgiler):
+   - egitimTarihi: Eğitim tarihi (varsa, GG.AA.YYYY formatında veya yazılı haliyle)
+   - egitimYeri: Eğitimin yapıldığı yer/mekan (varsa)
+   - egitimSuresi: Toplam eğitim süresi (varsa, "X saat", "X dakika" formatında)
+   - egitmen: Eğitimi veren kişinin adı soyadı (varsa)
+   - egitmenGorev: Eğitmeni veren kişinin görevi/ünvanı (varsa)
+   - projeAdi: Proje adı veya eğitim konusu/başlığı (varsa, örn: "THY-OCO PROJESİ ETAP-2", "Yangın Güvenliği Eğitimi" vb.)
+   - firmaAdi: Belgedeki firma/kurum adı (varsa)
+
+2. KATILIMCI İSİMLERİ: Tablodaki TÜM kişi isimlerini listele
+
+YANIT FORMAT (sadece JSON, başka hiçbir şey yazma):
+{
+  "meta": {
+    "egitimTarihi": "...",
+    "egitimYeri": "...",
+    "egitimSuresi": "...",
+    "egitmen": "...",
+    "egitmenGorev": "...",
+    "projeAdi": "...",
+    "firmaAdi": "..."
+  },
+  "isimler": ["İsim Soyisim", "İsim Soyisim", ...]
+}
 
 KURALLAR:
-- Sadece kişi isimlerini listele (Ad Soyad formatında)
-- Numara, imza, tarih, unvan gibi bilgileri dahil etme
-- Her ismi ayrı satırda yaz
-- Eğer isim bulamazsan sadece "İSİM_YOK" yaz
-- Başka hiçbir açıklama ekleme, sadece isimler
-
-Örnek çıktı:
-Mehmet Yılmaz
-Ahmet Demir
-Ali Kaya`,
+- Bulunamayan bilgileri null olarak bırak (boş string değil)
+- İsimleri Ad Soyad formatında yaz
+- Numara, imza, tarih gibi bilgileri isimler listesine ekleme
+- Eğer hiç isim yoksa isimler dizisini boş bırak []
+- SADECE JSON döndür`,
                 },
                 {
                   type: "image_url",
@@ -73,7 +95,7 @@ Ali Kaya`,
             },
           ],
           temperature: 0.1,
-          max_tokens: 1000,
+          max_tokens: 2000,
         }),
       });
 
@@ -89,26 +111,46 @@ Ali Kaya`,
       const visionResult = await visionRes.json();
       const content = visionResult.choices?.[0]?.message?.content ?? "";
 
-      if (!content || content.trim() === "İSİM_YOK" || content.trim() === "") {
-        return new Response(JSON.stringify({ success: true, isimler: [] }), {
+      if (!content || content.trim() === "") {
+        return new Response(JSON.stringify({ success: true, isimler: [], meta: {} }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Satır satır parse et, boş satırları ve "İSİM_YOK" olanları filtrele
-      const isimler = content
-        .split("\n")
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 1 && line !== "İSİM_YOK" && !line.startsWith("-") === false
-          ? line.replace(/^[-•*\d.)\s]+/, "").trim()
-          : line.replace(/^[-•*\d.)\s]+/, "").trim()
-        )
-        .map((line: string) => line.replace(/^[-•*\d.)\s]+/, "").trim())
-        .filter((line: string) => line.length > 2 && !/^\d+$/.test(line));
+      // JSON parse dene
+      try {
+        // Bazen model markdown code block içinde döndürebilir
+        const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        
+        const isimler = (parsed.isimler ?? [])
+          .map((line: string) => line.trim())
+          .filter((line: string) => line.length > 2 && !/^\d+$/.test(line));
 
-      return new Response(JSON.stringify({ success: true, isimler }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        // Meta bilgileri temizle: null olmayanları döndür
+        const meta: Record<string, string> = {};
+        const rawMeta = parsed.meta ?? {};
+        for (const [key, val] of Object.entries(rawMeta)) {
+          if (val && typeof val === "string" && val.trim() !== "" && val !== "null") {
+            meta[key] = (val as string).trim();
+          }
+        }
+
+        return new Response(JSON.stringify({ success: true, isimler, meta }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (_parseErr) {
+        // JSON parse başarısız → eski yöntem: sadece isimleri satır satır oku
+        console.warn("JSON parse failed, falling back to line parse:", content.substring(0, 300));
+        const isimler = content
+          .split("\n")
+          .map((line: string) => line.replace(/^[-•*\d.)\s]+/, "").trim())
+          .filter((line: string) => line.length > 2 && !/^\d+$/.test(line) && line !== "İSİM_YOK");
+
+        return new Response(JSON.stringify({ success: true, isimler, meta: {} }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (mode === "tutanak") {
