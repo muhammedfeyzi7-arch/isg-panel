@@ -13,17 +13,32 @@ interface Organization {
   created_at: string;
   member_count: number;
   creator_email: string | null;
+  last_activity: string | null;
+  total_actions: number;
 }
 
 interface Member {
+  id: string;
   user_id: string;
   email: string;
+  display_name: string | null;
   role: string;
   is_active: boolean;
   joined_at: string | null;
+  last_activity: string | null;
+  last_action: string | null;
+  action_count: number;
+}
+
+interface ActivityLog {
+  id: string;
+  user_email: string | null;
+  user_name: string | null;
+  action_type: string | null;
+  module: string | null;
+  description: string | null;
   created_at: string;
-  full_name: string | null;
-  avatar_url: string | null;
+  severity: string | null;
 }
 
 interface EditForm {
@@ -33,11 +48,48 @@ interface EditForm {
 }
 
 type AccessState = 'loading' | 'forbidden' | 'granted';
+type ModalType = 'members' | 'activity' | null;
 
-// ─── Subscription Warning Banner ───────────────────────────────────────────
-function SubscriptionWarningBanner({ orgs }: { orgs: Organization[] }) {
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function formatDate(d: string | null, withTime = false) {
+  if (!d) return '—';
+  const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' };
+  if (withTime) { opts.hour = '2-digit'; opts.minute = '2-digit'; }
+  return new Date(d).toLocaleDateString('tr-TR', opts);
+}
+
+function timeAgo(d: string | null) {
+  if (!d) return '—';
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Az önce';
+  if (mins < 60) return `${mins} dk önce`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} sa önce`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days} gün önce`;
+  return formatDate(d);
+}
+
+function initials(name: string | null, email: string) {
+  if (name) {
+    const parts = name.trim().split(' ');
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : parts[0].slice(0, 2).toUpperCase();
+  }
+  return email.slice(0, 2).toUpperCase();
+}
+
+// ─── Subscription Warning Banner ────────────────────────────────────────────
+function SubscriptionWarningBanner({
+  orgs,
+  onSendAlert,
+}: {
+  orgs: Organization[];
+  onSendAlert: (org: Organization) => void;
+}) {
   const now = new Date();
-
   const warnings = orgs
     .filter(org => org.is_active && org.subscription_end)
     .map(org => {
@@ -58,13 +110,11 @@ function SubscriptionWarningBanner({ orgs }: { orgs: Organization[] }) {
         return (
           <div
             key={org.id}
-            className={`flex items-start gap-3 px-5 py-4 rounded-xl border ${
-              isCritical
-                ? 'bg-red-50 border-red-200'
-                : 'bg-amber-50 border-amber-200'
+            className={`flex items-center gap-3 px-5 py-4 rounded-xl border ${
+              isCritical ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
             }`}
           >
-            <div className={`w-5 h-5 flex items-center justify-center shrink-0 mt-0.5 ${isCritical ? 'text-red-500' : 'text-amber-500'}`}>
+            <div className={`w-5 h-5 flex items-center justify-center shrink-0 ${isCritical ? 'text-red-500' : 'text-amber-500'}`}>
               <i className={isCritical ? 'ri-alarm-warning-line' : 'ri-time-line'} />
             </div>
             <div className="flex-1 min-w-0">
@@ -77,11 +127,24 @@ function SubscriptionWarningBanner({ orgs }: { orgs: Organization[] }) {
                 Üyeliğiniz hakkında bilgi almak için hizmet sağlayıcınızla iletişime geçin.
               </p>
             </div>
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
-              isCritical ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-            }`}>
-              {diffDays} gün
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                isCritical ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+              }`}>
+                {diffDays} gün
+              </span>
+              <button
+                onClick={() => onSendAlert(org)}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                  isCritical
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                }`}
+              >
+                <i className="ri-mail-send-line" />
+                Uyarı Gönder
+              </button>
+            </div>
           </div>
         );
       })}
@@ -89,8 +152,8 @@ function SubscriptionWarningBanner({ orgs }: { orgs: Organization[] }) {
   );
 }
 
-// ─── Members Modal ──────────────────────────────────────────────────────────
-function MembersModal({
+// ─── Activity Modal ──────────────────────────────────────────────────────────
+function ActivityModal({
   org,
   onClose,
   getAuthHeader,
@@ -99,7 +162,7 @@ function MembersModal({
   onClose: () => void;
   getAuthHeader: () => Promise<string | null>;
 }) {
-  const [members, setMembers] = useState<Member[]>([]);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,12 +173,12 @@ function MembersModal({
       try {
         const token = await getAuthHeader();
         if (!token) throw new Error('Oturum bulunamadı');
-        const res = await fetch(`${EDGE_URL}?op=get_members&orgId=${org.id}`, {
+        const res = await fetch(`${EDGE_URL}?op=org_activity&orgId=${org.id}`, {
           headers: { Authorization: token },
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Hata');
-        setMembers(json.data ?? []);
+        setLogs(json.data ?? []);
       } catch (e) {
         setError(String(e));
       } finally {
@@ -125,100 +188,71 @@ function MembersModal({
     load();
   }, [org.id, getAuthHeader]);
 
-  const roleLabel = (role: string) => {
-    if (role === 'admin') return { label: 'Yönetici', color: 'bg-gray-900 text-white' };
-    if (role === 'manager') return { label: 'Müdür', color: 'bg-gray-700 text-white' };
-    return { label: 'Üye', color: 'bg-gray-100 text-gray-600' };
-  };
-
-  const initials = (m: Member) => {
-    if (m.full_name) {
-      const parts = m.full_name.trim().split(' ');
-      return parts.length >= 2
-        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-        : parts[0].slice(0, 2).toUpperCase();
-    }
-    return m.email.slice(0, 2).toUpperCase();
+  const severityColor = (s: string | null) => {
+    if (s === 'high') return 'text-red-500';
+    if (s === 'medium') return 'text-amber-500';
+    return 'text-gray-400';
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
-        {/* Modal Header */}
+      <div className="relative bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-bold text-gray-900">{org.name}</h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {loading ? 'Yükleniyor...' : `${members.length} üye`}
-            </p>
+            <h2 className="text-base font-bold text-gray-900">{org.name} — Aktivite Logları</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Son 30 işlem · Toplam {org.total_actions} işlem</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors cursor-pointer text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors cursor-pointer text-gray-400">
             <i className="ri-close-line text-lg" />
           </button>
         </div>
 
-        {/* Modal Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
-              <p className="text-sm text-gray-400">Üyeler yükleniyor...</p>
+              <p className="text-sm text-gray-400">Loglar yükleniyor...</p>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <div className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-full">
-                <i className="ri-error-warning-line text-red-500" />
-              </div>
               <p className="text-sm text-red-500">{error}</p>
             </div>
-          ) : members.length === 0 ? (
+          ) : logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded-full">
-                <i className="ri-user-line text-gray-400 text-xl" />
+                <i className="ri-file-list-line text-gray-400 text-xl" />
               </div>
-              <p className="text-sm text-gray-400">Bu organizasyonda üye bulunmuyor</p>
+              <p className="text-sm text-gray-400">Henüz aktivite kaydı yok</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {members.map((m) => {
-                const role = roleLabel(m.role);
-                return (
-                  <div
-                    key={m.user_id}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/60 transition-colors"
-                  >
-                    {/* Avatar */}
-                    <div className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-200 shrink-0 text-xs font-bold text-gray-600">
-                      {initials(m)}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      {m.full_name && (
-                        <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
-                      )}
-                      <p className="text-xs text-gray-400 truncate">{m.email}</p>
-                    </div>
-
-                    {/* Role + Status */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${role.color}`}>
-                        {role.label}
-                      </span>
-                      <span className={`w-2 h-2 rounded-full ${m.is_active ? 'bg-green-400' : 'bg-gray-300'}`} title={m.is_active ? 'Aktif' : 'Pasif'} />
-                    </div>
+            <div className="space-y-1">
+              {logs.map(log => (
+                <div key={log.id} className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0">
+                  <div className={`w-5 h-5 flex items-center justify-center shrink-0 mt-0.5 ${severityColor(log.severity)}`}>
+                    <i className="ri-circle-fill text-[6px]" />
                   </div>
-                );
-              })}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-medium text-gray-700">{log.user_name ?? log.user_email ?? '—'}</span>
+                      {log.module && (
+                        <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">{log.module}</span>
+                      )}
+                      {log.action_type && (
+                        <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">{log.action_type}</span>
+                      )}
+                    </div>
+                    {log.description && (
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">{log.description}</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400 shrink-0 whitespace-nowrap">{timeAgo(log.created_at)}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Modal Footer */}
         <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/60">
           <p className="text-xs text-gray-400 text-center">
             Üyeliğiniz hakkında bilgi almak için hizmet sağlayıcınızla iletişime geçin.
@@ -229,7 +263,371 @@ function MembersModal({
   );
 }
 
-// ─── Main Page ──────────────────────────────────────────────────────────────
+// ─── Members Modal ───────────────────────────────────────────────────────────
+function MembersModal({
+  org,
+  onClose,
+  getAuthHeader,
+  showToast,
+}: {
+  org: Organization;
+  onClose: () => void;
+  getAuthHeader: () => Promise<string | null>;
+  showToast: (msg: string, type?: 'success' | 'error') => void;
+}) {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editRole, setEditRole] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
+
+  const loadMembers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await getAuthHeader();
+      if (!token) throw new Error('Oturum bulunamadı');
+      const res = await fetch(`${EDGE_URL}?op=get_members&orgId=${org.id}`, {
+        headers: { Authorization: token },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Hata');
+      setMembers(json.data ?? []);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [org.id, getAuthHeader]);
+
+  useEffect(() => { loadMembers(); }, [loadMembers]);
+
+  const startEditRole = (m: Member) => {
+    setEditingMemberId(m.id);
+    setEditRole(m.role);
+  };
+
+  const saveRole = async (m: Member) => {
+    setSaving(true);
+    try {
+      const token = await getAuthHeader();
+      if (!token) throw new Error('No token');
+      const res = await fetch(`${EDGE_URL}?op=update_member`, {
+        method: 'POST',
+        headers: { Authorization: token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: m.id, role: editRole }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Hata');
+      showToast('Rol güncellendi', 'success');
+      setEditingMemberId(null);
+      await loadMembers();
+    } catch (e) {
+      showToast('Hata: ' + String(e), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeMember = async (m: Member) => {
+    setSaving(true);
+    try {
+      const token = await getAuthHeader();
+      if (!token) throw new Error('No token');
+      const res = await fetch(`${EDGE_URL}?op=remove_member`, {
+        method: 'POST',
+        headers: { Authorization: token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: m.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Hata');
+      showToast('Üye çıkarıldı', 'success');
+      setConfirmRemove(null);
+      await loadMembers();
+    } catch (e) {
+      showToast('Hata: ' + String(e), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const roleLabel = (role: string) => {
+    if (role === 'admin') return { label: 'Yönetici', color: 'bg-gray-900 text-white' };
+    if (role === 'manager') return { label: 'Müdür', color: 'bg-gray-700 text-white' };
+    return { label: 'Üye', color: 'bg-gray-100 text-gray-600' };
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+
+      {/* Confirm Remove Dialog */}
+      {confirmRemove && (
+        <div className="relative z-10 bg-white rounded-2xl p-6 w-full max-w-sm">
+          <div className="w-12 h-12 flex items-center justify-center bg-red-100 rounded-full mx-auto mb-4">
+            <i className="ri-user-unfollow-line text-red-500 text-xl" />
+          </div>
+          <h3 className="text-base font-bold text-gray-900 text-center mb-2">Üyeyi Çıkar</h3>
+          <p className="text-sm text-gray-500 text-center mb-6">
+            <strong>{confirmRemove.display_name ?? confirmRemove.email}</strong> adlı üyeyi organizasyondan çıkarmak istediğinize emin misiniz?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setConfirmRemove(null)}
+              className="flex-1 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              İptal
+            </button>
+            <button
+              onClick={() => removeMember(confirmRemove)}
+              disabled={saving}
+              className="flex-1 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+            >
+              {saving ? 'Çıkarılıyor...' : 'Çıkar'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!confirmRemove && (
+        <div className="relative bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">{org.name} — Üyeler</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {loading ? 'Yükleniyor...' : `${members.length} üye`}
+              </p>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors cursor-pointer text-gray-400">
+              <i className="ri-close-line text-lg" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+                <p className="text-sm text-gray-400">Üyeler yükleniyor...</p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-full">
+                  <i className="ri-error-warning-line text-red-500" />
+                </div>
+                <p className="text-sm text-red-500">{error}</p>
+              </div>
+            ) : members.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded-full">
+                  <i className="ri-user-line text-gray-400 text-xl" />
+                </div>
+                <p className="text-sm text-gray-400">Bu organizasyonda üye bulunmuyor</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {members.map(m => {
+                  const role = roleLabel(m.role);
+                  const isEditing = editingMemberId === m.id;
+                  return (
+                    <div key={m.id} className={`rounded-xl border p-4 transition-colors ${isEditing ? 'border-gray-300 bg-gray-50' : 'border-gray-100 hover:bg-gray-50/60'}`}>
+                      <div className="flex items-start gap-3">
+                        {/* Avatar */}
+                        <div className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-200 shrink-0 text-xs font-bold text-gray-600">
+                          {initials(m.display_name, m.email)}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {m.display_name && (
+                              <span className="text-sm font-medium text-gray-900">{m.display_name}</span>
+                            )}
+                            <span className="text-xs text-gray-400 truncate">{m.email}</span>
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${m.is_active ? 'bg-green-400' : 'bg-gray-300'}`} title={m.is_active ? 'Aktif' : 'Pasif'} />
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            <span className="text-xs text-gray-400">
+                              <i className="ri-calendar-line mr-1" />
+                              Katılım: {formatDate(m.joined_at)}
+                            </span>
+                            {m.last_activity && (
+                              <span className="text-xs text-gray-400">
+                                <i className="ri-time-line mr-1" />
+                                Son: {timeAgo(m.last_activity)}
+                              </span>
+                            )}
+                            <span className="text-xs text-gray-400">
+                              <i className="ri-bar-chart-line mr-1" />
+                              {m.action_count} işlem
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Role + Actions */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isEditing ? (
+                            <>
+                              <select
+                                value={editRole}
+                                onChange={e => setEditRole(e.target.value)}
+                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-200 cursor-pointer"
+                              >
+                                <option value="member">Üye</option>
+                                <option value="manager">Müdür</option>
+                                <option value="admin">Yönetici</option>
+                              </select>
+                              <button
+                                onClick={() => saveRole(m)}
+                                disabled={saving}
+                                className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+                              >
+                                {saving ? '...' : 'Kaydet'}
+                              </button>
+                              <button
+                                onClick={() => setEditingMemberId(null)}
+                                className="text-xs px-2 py-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                              >
+                                İptal
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${role.color}`}>
+                                {role.label}
+                              </span>
+                              <button
+                                onClick={() => startEditRole(m)}
+                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                                title="Rolü Değiştir"
+                              >
+                                <i className="ri-edit-line text-xs" />
+                              </button>
+                              <button
+                                onClick={() => setConfirmRemove(m)}
+                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                title="Üyeyi Çıkar"
+                              >
+                                <i className="ri-user-unfollow-line text-xs" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/60">
+            <p className="text-xs text-gray-400 text-center">
+              Üyeliğiniz hakkında bilgi almak için hizmet sağlayıcınızla iletişime geçin.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Alert Confirm Modal ─────────────────────────────────────────────────────
+function AlertConfirmModal({
+  org,
+  onClose,
+  onConfirm,
+  sending,
+  result,
+}: {
+  org: Organization;
+  onClose: () => void;
+  onConfirm: () => void;
+  sending: boolean;
+  result: { success: boolean; message: string; members?: { email: string }[] } | null;
+}) {
+  const now = new Date();
+  const end = org.subscription_end ? new Date(org.subscription_end) : null;
+  end?.setHours(23, 59, 59, 999);
+  const diffDays = end ? Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl p-6 w-full max-w-md">
+        {result ? (
+          <>
+            <div className={`w-12 h-12 flex items-center justify-center rounded-full mx-auto mb-4 ${result.success ? 'bg-green-100' : 'bg-amber-100'}`}>
+              <i className={`text-xl ${result.success ? 'ri-mail-check-line text-green-600' : 'ri-mail-line text-amber-600'}`} />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 text-center mb-2">
+              {result.success ? 'E-postalar Gönderildi' : 'Bilgi'}
+            </h3>
+            <p className="text-sm text-gray-500 text-center mb-4">{result.message}</p>
+            {result.members && result.members.length > 0 && (
+              <div className="bg-gray-50 rounded-xl p-3 mb-4 max-h-40 overflow-y-auto">
+                <p className="text-xs font-medium text-gray-600 mb-2">Etkilenen üyeler:</p>
+                {result.members.map(m => (
+                  <p key={m.email} className="text-xs text-gray-500 py-0.5">{m.email}</p>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 text-sm bg-gray-900 text-white rounded-xl hover:bg-gray-700 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Tamam
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="w-12 h-12 flex items-center justify-center bg-amber-100 rounded-full mx-auto mb-4">
+              <i className="ri-mail-send-line text-amber-600 text-xl" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 text-center mb-2">Abonelik Uyarısı Gönder</h3>
+            <p className="text-sm text-gray-500 text-center mb-1">
+              <strong>{org.name}</strong> organizasyonunun tüm aktif üyelerine abonelik uyarısı gönderilecek.
+            </p>
+            {diffDays !== null && (
+              <p className="text-sm text-center font-semibold text-amber-700 mb-6">
+                Kalan süre: {diffDays} gün
+              </p>
+            )}
+            <p className="text-xs text-gray-400 text-center mb-6">
+              Üyeliğiniz hakkında bilgi almak için hizmet sağlayıcınızla iletişime geçin.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                İptal
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={sending}
+                className="flex-1 py-2.5 text-sm bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+              >
+                {sending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
+                    Gönderiliyor...
+                  </span>
+                ) : 'Uyarı Gönder'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ───────────────────────────────────────────────────────────────
 export default function SuperAdminPage() {
   const [access, setAccess] = useState<AccessState>('loading');
   const [currentEmail, setCurrentEmail] = useState('');
@@ -241,12 +639,16 @@ export default function SuperAdminPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [search, setSearch] = useState('');
   const [membersOrg, setMembersOrg] = useState<Organization | null>(null);
+  const [activityOrg, setActivityOrg] = useState<Organization | null>(null);
+  const [alertOrg, setAlertOrg] = useState<Organization | null>(null);
+  const [alertSending, setAlertSending] = useState(false);
+  const [alertResult, setAlertResult] = useState<{ success: boolean; message: string; members?: { email: string }[] } | null>(null);
   const [forbiddenReason, setForbiddenReason] = useState('');
 
-  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+  const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
-  };
+  }, []);
 
   const getAuthHeader = useCallback(async (): Promise<string | null> => {
     const { data } = await supabase.auth.getSession();
@@ -257,29 +659,12 @@ export default function SuperAdminPage() {
     setAccess('loading');
     try {
       const token = await getAuthHeader();
-      if (!token) {
-        setForbiddenReason('Oturum bulunamadı. Lütfen önce giriş yapın.');
-        setAccess('forbidden');
-        return;
-      }
-
-      const res = await fetch(`${EDGE_URL}?op=check_admin`, {
-        headers: { Authorization: token },
-      });
-
+      if (!token) { setForbiddenReason('Oturum bulunamadı. Lütfen önce giriş yapın.'); setAccess('forbidden'); return; }
+      const res = await fetch(`${EDGE_URL}?op=check_admin`, { headers: { Authorization: token } });
       const json = await res.json();
-
-      if (res.status === 200) {
-        setCurrentEmail(json.email ?? '');
-        setAccess('granted');
-      } else {
-        setForbiddenReason(json.error ?? `HTTP ${res.status}`);
-        setAccess('forbidden');
-      }
-    } catch (e) {
-      setForbiddenReason(String(e));
-      setAccess('forbidden');
-    }
+      if (res.status === 200) { setCurrentEmail(json.email ?? ''); setAccess('granted'); }
+      else { setForbiddenReason(json.error ?? `HTTP ${res.status}`); setAccess('forbidden'); }
+    } catch (e) { setForbiddenReason(String(e)); setAccess('forbidden'); }
   }, [getAuthHeader]);
 
   const loadOrgs = useCallback(async () => {
@@ -287,10 +672,7 @@ export default function SuperAdminPage() {
     try {
       const token = await getAuthHeader();
       if (!token) throw new Error('No token');
-
-      const res = await fetch(`${EDGE_URL}?op=list`, {
-        headers: { Authorization: token },
-      });
+      const res = await fetch(`${EDGE_URL}?op=list`, { headers: { Authorization: token } });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Hata');
       setOrgs(json.data ?? []);
@@ -299,15 +681,10 @@ export default function SuperAdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [getAuthHeader]);
+  }, [getAuthHeader, showToast]);
 
-  useEffect(() => {
-    checkAccess();
-  }, [checkAccess]);
-
-  useEffect(() => {
-    if (access === 'granted') loadOrgs();
-  }, [access, loadOrgs]);
+  useEffect(() => { checkAccess(); }, [checkAccess]);
+  useEffect(() => { if (access === 'granted') loadOrgs(); }, [access, loadOrgs]);
 
   const startEdit = (org: Organization) => {
     setEditingId(org.id);
@@ -318,23 +695,15 @@ export default function SuperAdminPage() {
     });
   };
 
-  const cancelEdit = () => setEditingId(null);
-
   const saveEdit = async (orgId: string) => {
     setSaving(true);
     try {
       const token = await getAuthHeader();
       if (!token) throw new Error('No token');
-
       const res = await fetch(`${EDGE_URL}?op=update`, {
         method: 'POST',
         headers: { Authorization: token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orgId,
-          is_active: editForm.is_active,
-          subscription_start: editForm.subscription_start || null,
-          subscription_end: editForm.subscription_end || null,
-        }),
+        body: JSON.stringify({ orgId, is_active: editForm.is_active, subscription_start: editForm.subscription_start || null, subscription_end: editForm.subscription_end || null }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Hata');
@@ -345,6 +714,35 @@ export default function SuperAdminPage() {
       showToast('Kayıt hatası: ' + String(e), 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const sendAlert = async () => {
+    if (!alertOrg) return;
+    setAlertSending(true);
+    try {
+      const token = await getAuthHeader();
+      if (!token) throw new Error('No token');
+      const res = await fetch(`${EDGE_URL}?op=send_subscription_alerts`, {
+        method: 'POST',
+        headers: { Authorization: token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: alertOrg.id }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setAlertResult({ success: true, message: `${json.results?.length ?? 0} üyeye e-posta başarıyla gönderildi.` });
+      } else {
+        // No email service - show member list
+        setAlertResult({
+          success: false,
+          message: json.error ?? 'E-posta servisi yapılandırılmamış. Aşağıdaki üyelerle manuel iletişime geçebilirsiniz.',
+          members: json.members ?? [],
+        });
+      }
+    } catch (e) {
+      setAlertResult({ success: false, message: 'Hata: ' + String(e) });
+    } finally {
+      setAlertSending(false);
     }
   };
 
@@ -371,10 +769,7 @@ export default function SuperAdminPage() {
     total: orgs.length,
     active: orgs.filter(o => getStatus(o).label === 'Aktif').length,
     expired: orgs.filter(o => getStatus(o).label === 'Süresi Doldu').length,
-    expiringSoon: orgs.filter(o => {
-      const s = getStatus(o);
-      return s.label.includes('gün');
-    }).length,
+    expiringSoon: orgs.filter(o => getStatus(o).label.includes('gün')).length,
     passive: orgs.filter(o => !o.is_active).length,
   };
 
@@ -408,18 +803,35 @@ export default function SuperAdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Members Modal */}
+      {/* Modals */}
       {membersOrg && (
         <MembersModal
           org={membersOrg}
           onClose={() => setMembersOrg(null)}
           getAuthHeader={getAuthHeader}
+          showToast={showToast}
+        />
+      )}
+      {activityOrg && (
+        <ActivityModal
+          org={activityOrg}
+          onClose={() => setActivityOrg(null)}
+          getAuthHeader={getAuthHeader}
+        />
+      )}
+      {alertOrg && (
+        <AlertConfirmModal
+          org={alertOrg}
+          onClose={() => { setAlertOrg(null); setAlertResult(null); }}
+          onConfirm={sendAlert}
+          sending={alertSending}
+          result={alertResult}
         />
       )}
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-lg text-sm font-medium transition-all shadow-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-lg text-sm font-medium shadow-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
           {toast.type === 'success' ? <i className="ri-check-line mr-2" /> : <i className="ri-error-warning-line mr-2" />}
           {toast.msg}
         </div>
@@ -427,7 +839,7 @@ export default function SuperAdminPage() {
 
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 flex items-center justify-center bg-gray-900 rounded-lg">
               <i className="ri-shield-keyhole-line text-white text-sm" />
@@ -439,8 +851,7 @@ export default function SuperAdminPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded-full font-medium">
-              <i className="ri-shield-check-line mr-1" />
-              Yetkili Erişim
+              <i className="ri-shield-check-line mr-1" />Yetkili Erişim
             </span>
             <button
               onClick={loadOrgs}
@@ -454,10 +865,13 @@ export default function SuperAdminPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 py-8">
+      <div className="max-w-7xl mx-auto px-8 py-8">
 
-        {/* Subscription Warning Banners */}
-        <SubscriptionWarningBanner orgs={orgs} />
+        {/* Warning Banners */}
+        <SubscriptionWarningBanner
+          orgs={orgs}
+          onSendAlert={org => { setAlertOrg(org); setAlertResult(null); }}
+        />
 
         {/* Stats */}
         <div className="grid grid-cols-5 gap-4 mb-8">
@@ -515,6 +929,7 @@ export default function SuperAdminPage() {
                   <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Durum</th>
                   <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Başlangıç</th>
                   <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Bitiş</th>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Aktivite</th>
                   <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 py-3">Üye</th>
                   <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">İşlem</th>
                 </tr>
@@ -585,6 +1000,18 @@ export default function SuperAdminPage() {
                         )}
                       </td>
 
+                      {/* Activity column */}
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => setActivityOrg(org)}
+                          className="flex flex-col gap-0.5 text-left hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <span className="text-xs text-gray-500 font-medium">{org.total_actions} işlem</span>
+                          <span className="text-xs text-gray-400">{timeAgo(org.last_activity)}</span>
+                        </button>
+                      </td>
+
+                      {/* Members column */}
                       <td className="px-4 py-4">
                         <button
                           onClick={() => setMembersOrg(org)}
@@ -595,6 +1022,7 @@ export default function SuperAdminPage() {
                           </div>
                           <span className="font-medium">{org.member_count}</span>
                           <span className="text-gray-400">üye</span>
+                          <i className="ri-arrow-right-s-line text-gray-300" />
                         </button>
                       </td>
 
@@ -602,7 +1030,7 @@ export default function SuperAdminPage() {
                         {isEditing ? (
                           <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={cancelEdit}
+                              onClick={() => setEditingId(null)}
                               className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
                             >
                               İptal
@@ -621,13 +1049,22 @@ export default function SuperAdminPage() {
                             </button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => startEdit(org)}
-                            className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
-                          >
-                            <i className="ri-edit-line mr-1" />
-                            Düzenle
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => { setAlertOrg(org); setAlertResult(null); }}
+                              className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                              title="Abonelik Uyarısı Gönder"
+                            >
+                              <i className="ri-mail-send-line text-sm" />
+                            </button>
+                            <button
+                              onClick={() => startEdit(org)}
+                              className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer whitespace-nowrap"
+                            >
+                              <i className="ri-edit-line mr-1" />
+                              Düzenle
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -649,8 +1086,9 @@ export default function SuperAdminPage() {
               <li>• <strong>Bitiş tarihi</strong> geçmiş organizasyonlar bir sonraki girişte sisteme giremez</li>
               <li>• <strong>Pasif</strong> yapılan organizasyonlar bir sonraki girişte anında engellenir</li>
               <li>• Tarih boş bırakılırsa o organizasyon süresiz aktif sayılır</li>
-              <li>• Erişim yalnızca <strong>veritabanında yetkili</strong> olarak işaretlenmiş kullanıcılara açıktır</li>
               <li>• Abonelik uyarıları <strong>14 gün</strong> ve <strong>3 gün</strong> kala otomatik gösterilir</li>
+              <li>• <strong>Üye modalından</strong> rol değiştirme ve üye çıkarma yapılabilir</li>
+              <li>• <strong>Aktivite sütununa</strong> tıklayarak son 30 işlemi görebilirsiniz</li>
             </ul>
           </div>
         </div>
