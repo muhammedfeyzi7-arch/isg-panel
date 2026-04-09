@@ -69,6 +69,7 @@ function AppContent() {
 
   // activeModule değişince URL'yi güncelle (sidebar tıklamaları için)
   useEffect(() => {
+    if (location.pathname === '/superadmin') return;
     const expectedPath = `/${activeModule}`;
     if (location.pathname !== expectedPath && PATH_TO_MODULE[expectedPath] !== undefined) {
       navigate(expectedPath, { replace: true });
