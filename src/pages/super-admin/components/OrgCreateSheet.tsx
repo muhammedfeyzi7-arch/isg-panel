@@ -49,12 +49,17 @@ export default function OrgCreateSheet({ open, onClose, onSuccess }: Props) {
       });
 
       const data = await res.json();
-      if (!res.ok || !data.success) { setError(data.error || 'Bir hata oluştu.'); setLoading(false); return; }
+      if (!res.ok || !data.success) {
+        setError(data.error || `Hata (${res.status}): Sunucudan yanıt alınamadı.`);
+        setLoading(false);
+        return;
+      }
 
       setSuccess({ org_name: data.organization.name, invite_code: data.organization.invite_code, admin_email: data.admin_user.email });
       onSuccess();
-    } catch {
-      setError('Bağlantı hatası oluştu.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Bağlantı hatası: ${msg}`);
     } finally {
       setLoading(false);
     }

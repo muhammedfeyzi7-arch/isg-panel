@@ -24,6 +24,7 @@ export default function SupportModal({ open, onClose }: SupportModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,11 +62,22 @@ export default function SupportModal({ open, onClose }: SupportModalProps) {
     if (message.length > 500) return;
 
     setStatus('sending');
+    setErrorMsg('');
     try {
+      // Oturumu doğrudan al — user prop'u bazen geç yüklenebilir
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id ?? user?.id ?? null;
+
+      if (!currentUserId) {
+        setErrorMsg('Oturum bulunamadı. Lütfen sayfayı yenileyip tekrar deneyin.');
+        setStatus('error');
+        return;
+      }
+
       const { error } = await supabase.from('support_tickets').insert({
         organization_id: org?.id ?? null,
-        user_id: user?.id ?? null,
-        user_email: user?.email ?? currentUser.email ?? '',
+        user_id: currentUserId,
+        user_email: session?.user?.email ?? user?.email ?? currentUser.email ?? '',
         user_name: currentUser.ad ?? 'Kullanıcı',
         issue_type: issueType,
         subject: subject.trim(),
@@ -74,11 +86,14 @@ export default function SupportModal({ open, onClose }: SupportModalProps) {
       });
 
       if (error) {
+        setErrorMsg(`Hata: ${error.message}`);
         setStatus('error');
       } else {
         setStatus('success');
       }
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(`Bağlantı hatası: ${msg}`);
       setStatus('error');
     }
   };
@@ -232,11 +247,11 @@ export default function SupportModal({ open, onClose }: SupportModalProps) {
             {/* Error */}
             {status === 'error' && (
               <div
-                className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-[12px]"
+                className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-[12px]"
                 style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}
               >
-                <i className="ri-error-warning-line text-sm" />
-                Gönderim başarısız. Lütfen tekrar deneyin.
+                <i className="ri-error-warning-line text-sm flex-shrink-0 mt-0.5" />
+                <span>{errorMsg || 'Gönderim başarısız. Lütfen tekrar deneyin.'}</span>
               </div>
             )}
 

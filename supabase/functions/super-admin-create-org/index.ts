@@ -39,24 +39,36 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '').trim();
+
+    // Service role client — RLS bypass eder
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${serviceKey}` } },
     });
 
-    // Caller'ı doğrula
-    const { data: { user: callerUser }, error: authErr } = await adminClient.auth.getUser(token);
+    // Caller'ı doğrula (user token ile ayrı client)
+    const userClient = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: { user: callerUser }, error: authErr } = await userClient.auth.getUser(token);
     if (authErr || !callerUser) {
-      return new Response(JSON.stringify({ error: 'Geçersiz oturum.' }), {
+      return new Response(JSON.stringify({ error: 'Geçersiz oturum: ' + (authErr?.message ?? 'user not found') }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     // Super admin kontrolü
-    const { data: profile } = await adminClient
+    const { data: profile, error: profileErr } = await adminClient
       .from('profiles')
       .select('is_super_admin')
       .eq('user_id', callerUser.id)
       .maybeSingle();
+
+    if (profileErr) {
+      return new Response(JSON.stringify({ error: 'Profil sorgu hatası: ' + profileErr.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!profile?.is_super_admin) {
       return new Response(JSON.stringify({ error: 'Bu işlem için süper admin yetkisi gereklidir.' }), {
@@ -81,7 +93,6 @@ Deno.serve(async (req) => {
       admin_display_name: string;
     };
 
-    // Validasyon
     if (!org_name?.trim()) {
       return new Response(JSON.stringify({ error: 'Organizasyon adı zorunludur.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -102,8 +113,7 @@ Deno.serve(async (req) => {
 
     // Benzersiz davet kodu üret
     let inviteCode = generateInviteCode();
-    let attempts = 0;
-    while (attempts < 5) {
+    for (let i = 0; i < 5; i++) {
       const { data: existing } = await adminClient
         .from('organizations')
         .select('id')
@@ -111,10 +121,9 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!existing) break;
       inviteCode = generateInviteCode();
-      attempts++;
     }
 
-    // 1. Organizasyonu oluştur
+    // 1. Organizasyonu oluştur (service role — RLS bypass)
     const { data: newOrg, error: orgErr } = await adminClient
       .from('organizations')
       .insert({
@@ -134,7 +143,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Admin kullanıcıyı oluştur (veya mevcut kullanıcıyı bul)
+    // 2. Admin kullanıcıyı oluştur veya mevcut bul
     let adminUserId: string;
 
     const { data: existingUsers } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
@@ -156,7 +165,6 @@ Deno.serve(async (req) => {
       });
 
       if (createErr || !newUser?.user) {
-        // Org'u geri al
         await adminClient.from('organizations').delete().eq('id', newOrg.id);
         return new Response(JSON.stringify({ error: 'Admin kullanıcı oluşturulamadı: ' + (createErr?.message ?? 'Bilinmeyen hata') }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -179,14 +187,13 @@ Deno.serve(async (req) => {
       });
 
     if (memberErr) {
-      // Org'u geri al
       await adminClient.from('organizations').delete().eq('id', newOrg.id);
       return new Response(JSON.stringify({ error: 'Kullanıcı organizasyona eklenemedi: ' + memberErr.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // 4. Profiles kaydı oluştur
+    // 4. Profiles kaydı oluştur (yoksa)
     const { data: existingProfile } = await adminClient
       .from('profiles')
       .select('id')
@@ -223,7 +230,8 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     console.error('[FATAL]', err);
-    return new Response(JSON.stringify({ error: 'Sunucu hatası oluştu.' }), {
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: 'Sunucu hatası: ' + msg }), {
       status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }

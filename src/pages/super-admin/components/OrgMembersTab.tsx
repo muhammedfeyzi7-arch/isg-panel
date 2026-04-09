@@ -32,8 +32,11 @@ export default function OrgMembersTab({ orgId }: { orgId: string }) {
         .eq('organization_id', orgId)
         .order('joined_at', { ascending: true });
 
-      if (err) { setError(err.message); }
-      else { setMembers(data || []); }
+      if (err) {
+        setError(`Hata: ${err.message} (kod: ${err.code})`);
+      } else {
+        setMembers(data || []);
+      }
       setLoading(false);
     })();
   }, [orgId]);
