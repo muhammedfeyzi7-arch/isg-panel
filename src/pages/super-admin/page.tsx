@@ -15,6 +15,17 @@ interface Organization {
   creator_email: string | null;
 }
 
+interface Member {
+  user_id: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  joined_at: string | null;
+  created_at: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
 interface EditForm {
   is_active: boolean;
   subscription_start: string;
@@ -23,6 +34,202 @@ interface EditForm {
 
 type AccessState = 'loading' | 'forbidden' | 'granted';
 
+// ─── Subscription Warning Banner ───────────────────────────────────────────
+function SubscriptionWarningBanner({ orgs }: { orgs: Organization[] }) {
+  const now = new Date();
+
+  const warnings = orgs
+    .filter(org => org.is_active && org.subscription_end)
+    .map(org => {
+      const end = new Date(org.subscription_end!);
+      end.setHours(23, 59, 59, 999);
+      const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return { org, diffDays };
+    })
+    .filter(({ diffDays }) => diffDays > 0 && diffDays <= 14)
+    .sort((a, b) => a.diffDays - b.diffDays);
+
+  if (warnings.length === 0) return null;
+
+  return (
+    <div className="mb-6 space-y-2">
+      {warnings.map(({ org, diffDays }) => {
+        const isCritical = diffDays <= 3;
+        return (
+          <div
+            key={org.id}
+            className={`flex items-start gap-3 px-5 py-4 rounded-xl border ${
+              isCritical
+                ? 'bg-red-50 border-red-200'
+                : 'bg-amber-50 border-amber-200'
+            }`}
+          >
+            <div className={`w-5 h-5 flex items-center justify-center shrink-0 mt-0.5 ${isCritical ? 'text-red-500' : 'text-amber-500'}`}>
+              <i className={isCritical ? 'ri-alarm-warning-line' : 'ri-time-line'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-semibold ${isCritical ? 'text-red-800' : 'text-amber-800'}`}>
+                {isCritical ? 'Kritik Uyarı' : 'Abonelik Uyarısı'}
+              </p>
+              <p className={`text-xs mt-0.5 ${isCritical ? 'text-red-700' : 'text-amber-700'}`}>
+                <strong>{org.name}</strong> organizasyonunun aboneliği{' '}
+                <strong>{diffDays} gün</strong> içinde sona erecek.
+                Üyeliğiniz hakkında bilgi almak için hizmet sağlayıcınızla iletişime geçin.
+              </p>
+            </div>
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
+              isCritical ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+            }`}>
+              {diffDays} gün
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Members Modal ──────────────────────────────────────────────────────────
+function MembersModal({
+  org,
+  onClose,
+  getAuthHeader,
+}: {
+  org: Organization;
+  onClose: () => void;
+  getAuthHeader: () => Promise<string | null>;
+}) {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = await getAuthHeader();
+        if (!token) throw new Error('Oturum bulunamadı');
+        const res = await fetch(`${EDGE_URL}?op=get_members&orgId=${org.id}`, {
+          headers: { Authorization: token },
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? 'Hata');
+        setMembers(json.data ?? []);
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [org.id, getAuthHeader]);
+
+  const roleLabel = (role: string) => {
+    if (role === 'admin') return { label: 'Yönetici', color: 'bg-gray-900 text-white' };
+    if (role === 'manager') return { label: 'Müdür', color: 'bg-gray-700 text-white' };
+    return { label: 'Üye', color: 'bg-gray-100 text-gray-600' };
+  };
+
+  const initials = (m: Member) => {
+    if (m.full_name) {
+      const parts = m.full_name.trim().split(' ');
+      return parts.length >= 2
+        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+        : parts[0].slice(0, 2).toUpperCase();
+    }
+    return m.email.slice(0, 2).toUpperCase();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">{org.name}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {loading ? 'Yükleniyor...' : `${members.length} üye`}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors cursor-pointer text-gray-400 hover:text-gray-600"
+          >
+            <i className="ri-close-line text-lg" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+              <p className="text-sm text-gray-400">Üyeler yükleniyor...</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-10 h-10 flex items-center justify-center bg-red-100 rounded-full">
+                <i className="ri-error-warning-line text-red-500" />
+              </div>
+              <p className="text-sm text-red-500">{error}</p>
+            </div>
+          ) : members.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded-full">
+                <i className="ri-user-line text-gray-400 text-xl" />
+              </div>
+              <p className="text-sm text-gray-400">Bu organizasyonda üye bulunmuyor</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {members.map((m) => {
+                const role = roleLabel(m.role);
+                return (
+                  <div
+                    key={m.user_id}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/60 transition-colors"
+                  >
+                    {/* Avatar */}
+                    <div className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-200 shrink-0 text-xs font-bold text-gray-600">
+                      {initials(m)}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      {m.full_name && (
+                        <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
+                      )}
+                      <p className="text-xs text-gray-400 truncate">{m.email}</p>
+                    </div>
+
+                    {/* Role + Status */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${role.color}`}>
+                        {role.label}
+                      </span>
+                      <span className={`w-2 h-2 rounded-full ${m.is_active ? 'bg-green-400' : 'bg-gray-300'}`} title={m.is_active ? 'Aktif' : 'Pasif'} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/60">
+          <p className="text-xs text-gray-400 text-center">
+            Üyeliğiniz hakkında bilgi almak için hizmet sağlayıcınızla iletişime geçin.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────
 export default function SuperAdminPage() {
   const [access, setAccess] = useState<AccessState>('loading');
   const [currentEmail, setCurrentEmail] = useState('');
@@ -33,18 +240,18 @@ export default function SuperAdminPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [search, setSearch] = useState('');
+  const [membersOrg, setMembersOrg] = useState<Organization | null>(null);
+  const [forbiddenReason, setForbiddenReason] = useState('');
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  const getAuthHeader = async (): Promise<string | null> => {
+  const getAuthHeader = useCallback(async (): Promise<string | null> => {
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token ? `Bearer ${data.session.access_token}` : null;
-  };
-
-  const [forbiddenReason, setForbiddenReason] = useState('');
+  }, []);
 
   const checkAccess = useCallback(async () => {
     setAccess('loading');
@@ -73,7 +280,7 @@ export default function SuperAdminPage() {
       setForbiddenReason(String(e));
       setAccess('forbidden');
     }
-  }, []);
+  }, [getAuthHeader]);
 
   const loadOrgs = useCallback(async () => {
     setLoading(true);
@@ -92,7 +299,7 @@ export default function SuperAdminPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getAuthHeader]);
 
   useEffect(() => {
     checkAccess();
@@ -149,13 +356,9 @@ export default function SuperAdminPage() {
     const now = new Date();
     const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     if (end < now) return { label: 'Süresi Doldu', color: 'bg-red-50 text-red-700', dot: 'bg-red-500' };
-    if (diffDays <= 30) return { label: `${diffDays} gün kaldı`, color: 'bg-amber-50 text-amber-700', dot: 'bg-amber-500' };
+    if (diffDays <= 3) return { label: `${diffDays} gün kaldı`, color: 'bg-red-50 text-red-700', dot: 'bg-red-500' };
+    if (diffDays <= 14) return { label: `${diffDays} gün kaldı`, color: 'bg-amber-50 text-amber-700', dot: 'bg-amber-500' };
     return { label: 'Aktif', color: 'bg-green-50 text-green-700', dot: 'bg-green-500' };
-  };
-
-  const formatDate = (d: string | null) => {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const filtered = orgs.filter(o =>
@@ -168,11 +371,13 @@ export default function SuperAdminPage() {
     total: orgs.length,
     active: orgs.filter(o => getStatus(o).label === 'Aktif').length,
     expired: orgs.filter(o => getStatus(o).label === 'Süresi Doldu').length,
-    expiringSoon: orgs.filter(o => getStatus(o).label.includes('gün')).length,
+    expiringSoon: orgs.filter(o => {
+      const s = getStatus(o);
+      return s.label.includes('gün');
+    }).length,
     passive: orgs.filter(o => !o.is_active).length,
   };
 
-  // Loading screen
   if (access === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -184,7 +389,6 @@ export default function SuperAdminPage() {
     );
   }
 
-  // Forbidden screen
   if (access === 'forbidden') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -204,6 +408,16 @@ export default function SuperAdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Members Modal */}
+      {membersOrg && (
+        <MembersModal
+          org={membersOrg}
+          onClose={() => setMembersOrg(null)}
+          getAuthHeader={getAuthHeader}
+        />
+      )}
+
+      {/* Toast */}
       {toast && (
         <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-lg text-sm font-medium transition-all shadow-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
           {toast.type === 'success' ? <i className="ri-check-line mr-2" /> : <i className="ri-error-warning-line mr-2" />}
@@ -241,6 +455,9 @@ export default function SuperAdminPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-8 py-8">
+
+        {/* Subscription Warning Banners */}
+        <SubscriptionWarningBanner orgs={orgs} />
 
         {/* Stats */}
         <div className="grid grid-cols-5 gap-4 mb-8">
@@ -347,7 +564,9 @@ export default function SuperAdminPage() {
                             className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-200 w-36"
                           />
                         ) : (
-                          <span className="text-sm text-gray-600">{formatDate(org.subscription_start)}</span>
+                          <span className="text-sm text-gray-600">
+                            {org.subscription_start ? new Date(org.subscription_start).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                          </span>
                         )}
                       </td>
 
@@ -360,17 +579,23 @@ export default function SuperAdminPage() {
                             className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-200 w-36"
                           />
                         ) : (
-                          <span className="text-sm text-gray-600">{formatDate(org.subscription_end)}</span>
+                          <span className="text-sm text-gray-600">
+                            {org.subscription_end ? new Date(org.subscription_end).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                          </span>
                         )}
                       </td>
 
                       <td className="px-4 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 flex items-center justify-center">
-                            <i className="ri-user-line text-gray-400 text-xs" />
+                        <button
+                          onClick={() => setMembersOrg(org)}
+                          className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+                        >
+                          <div className="w-4 h-4 flex items-center justify-center">
+                            <i className="ri-user-line text-xs" />
                           </div>
-                          <span className="text-sm text-gray-600">{org.member_count}</span>
-                        </div>
+                          <span className="font-medium">{org.member_count}</span>
+                          <span className="text-gray-400">üye</span>
+                        </button>
                       </td>
 
                       <td className="px-6 py-4 text-right">
@@ -425,6 +650,7 @@ export default function SuperAdminPage() {
               <li>• <strong>Pasif</strong> yapılan organizasyonlar bir sonraki girişte anında engellenir</li>
               <li>• Tarih boş bırakılırsa o organizasyon süresiz aktif sayılır</li>
               <li>• Erişim yalnızca <strong>veritabanında yetkili</strong> olarak işaretlenmiş kullanıcılara açıktır</li>
+              <li>• Abonelik uyarıları <strong>14 gün</strong> ve <strong>3 gün</strong> kala otomatik gösterilir</li>
             </ul>
           </div>
         </div>

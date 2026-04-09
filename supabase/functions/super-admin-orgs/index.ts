@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: no auth header' }), {
+      return new Response(JSON.stringify({ error: 'Oturum bulunamadı. Lütfen önce giriş yapın.' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -23,15 +23,15 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Caller client - get user from JWT
+    // Caller client - verify user token
     const callerClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
     const { data: { user }, error: userError } = await callerClient.auth.getUser();
-    
+
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: invalid token', detail: userError?.message }), {
+      return new Response(JSON.stringify({ error: 'Geçersiz oturum. Lütfen tekrar giriş yapın.', detail: userError?.message }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -50,14 +50,14 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (profileError) {
-      return new Response(JSON.stringify({ error: 'Profile query error', detail: profileError.message }), {
+      return new Response(JSON.stringify({ error: 'Profil sorgu hatası: ' + profileError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     if (!profile || !profile.is_super_admin) {
-      return new Response(JSON.stringify({ error: 'Forbidden: not a super admin', userId: user.id, profile }), {
+      return new Response(JSON.stringify({ error: 'Bu sayfaya erişim yetkiniz yok.' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -107,12 +107,50 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (operation === 'get_members') {
+      const orgId = url.searchParams.get('orgId');
+      if (!orgId) {
+        return new Response(JSON.stringify({ error: 'orgId gerekli' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: members, error: membersError } = await adminClient
+        .from('user_organizations')
+        .select('user_id, email, role, is_active, joined_at, created_at')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: true });
+
+      if (membersError) throw membersError;
+
+      // Enrich with profile names
+      const enriched = await Promise.all(
+        (members ?? []).map(async (m) => {
+          const { data: p } = await adminClient
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('user_id', m.user_id)
+            .maybeSingle();
+          return {
+            ...m,
+            full_name: p?.full_name ?? null,
+            avatar_url: p?.avatar_url ?? null,
+          };
+        })
+      );
+
+      return new Response(JSON.stringify({ data: enriched }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (operation === 'update' && req.method === 'POST') {
       const body = await req.json();
       const { orgId, is_active, subscription_start, subscription_end } = body;
 
       if (!orgId) {
-        return new Response(JSON.stringify({ error: 'orgId required' }), {
+        return new Response(JSON.stringify({ error: 'orgId gerekli' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -135,7 +173,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Unknown operation' }), {
+    return new Response(JSON.stringify({ error: 'Bilinmeyen işlem' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
