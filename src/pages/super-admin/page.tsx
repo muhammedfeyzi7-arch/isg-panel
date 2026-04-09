@@ -44,24 +44,33 @@ export default function SuperAdminPage() {
     return data.session?.access_token ? `Bearer ${data.session.access_token}` : null;
   };
 
+  const [forbiddenReason, setForbiddenReason] = useState('');
+
   const checkAccess = useCallback(async () => {
     setAccess('loading');
     try {
       const token = await getAuthHeader();
-      if (!token) { setAccess('forbidden'); return; }
+      if (!token) {
+        setForbiddenReason('Oturum bulunamadı. Lütfen önce giriş yapın.');
+        setAccess('forbidden');
+        return;
+      }
 
       const res = await fetch(`${EDGE_URL}?op=check_admin`, {
         headers: { Authorization: token },
       });
 
+      const json = await res.json();
+
       if (res.status === 200) {
-        const json = await res.json();
         setCurrentEmail(json.email ?? '');
         setAccess('granted');
       } else {
+        setForbiddenReason(json.error ?? `HTTP ${res.status}`);
         setAccess('forbidden');
       }
-    } catch {
+    } catch (e) {
+      setForbiddenReason(String(e));
       setAccess('forbidden');
     }
   }, []);
@@ -185,7 +194,9 @@ export default function SuperAdminPage() {
           </div>
           <h1 className="text-xl font-semibold text-gray-800 mb-2">Erişim Reddedildi</h1>
           <p className="text-gray-500 text-sm">Bu sayfaya erişim yetkiniz bulunmamaktadır.</p>
-          <p className="text-gray-400 text-xs mt-2">Hata kodu: 403 Forbidden</p>
+          {forbiddenReason && (
+            <p className="text-gray-400 text-xs mt-2 bg-gray-100 px-3 py-2 rounded-lg font-mono">{forbiddenReason}</p>
+          )}
         </div>
       </div>
     );
