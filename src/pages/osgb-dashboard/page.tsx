@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../../store/AuthContext';
 import { useApp } from '../../store/AppContext';
 import { supabase } from '../../lib/supabase';
+import { downloadOsgbReportPdf } from './utils/osgbReportPdf';
+import { downloadOsgbReportExcel } from './utils/osgbReportExcel';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -28,7 +30,18 @@ interface Uzman {
   active_firm_name: string | null;
 }
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'raporlar';
+
+interface FirmaDetay {
+  id: string;
+  name: string;
+  personelSayisi: number;
+  uzmanAd: string | null;
+  uygunsuzluk: number;
+  kapatilan: number;
+  tutanakSayisi: number;
+  egitimSayisi: number;
+}
 
 export default function OsgbDashboardPage() {
   const { logout, user } = useAuth();
@@ -41,7 +54,17 @@ export default function OsgbDashboardPage() {
   // Data
   const [altFirmalar, setAltFirmalar] = useState<AltFirma[]>([]);
   const [uzmanlar, setUzmanlar] = useState<Uzman[]>([]);
+  const [firmaDetaylar, setFirmaDetaylar] = useState<FirmaDetay[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+
+  // Rapor
+  const [raporDonem, setRaporDonem] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [raporExporting, setRaporExporting] = useState<'pdf' | 'excel' | null>(null);
+  const [raporFirmaFilter, setRaporFirmaFilter] = useState('');
+
 
   // Firma Ekle Modal
   const [showFirmaModal, setShowFirmaModal] = useState(false);
@@ -76,19 +99,32 @@ export default function OsgbDashboardPage() {
         .eq('organization_id', org.id)
         .eq('osgb_role', 'gezici_uzman');
 
-      // Her alt firma için personel sayısı ve uygunsuzluk çek
-      const enrichedFirmalar: AltFirma[] = await Promise.all(
+      // Her alt firma için personel, uygunsuzluk, tutanak, eğitim say
+      const enrichedFirmalar: AltFirma[] = [];
+      const detaylar: FirmaDetay[] = [];
+
+      await Promise.all(
         (firmData ?? []).map(async (f) => {
-          const [{ count: personelCount }, { count: uygunsuzlukCount }] = await Promise.all([
+          const [
+            { count: personelCount },
+            { count: uygunsuzlukCount },
+            { count: kapatılanCount },
+            { count: tutanakCount },
+            { count: egitimCount },
+          ] = await Promise.all([
             supabase.from('personeller').select('id', { count: 'exact', head: true }).eq('organization_id', f.id),
             supabase.from('uygunsuzluklar').select('id', { count: 'exact', head: true })
               .eq('organization_id', f.id).neq('durum', 'Kapatıldı'),
+            supabase.from('uygunsuzluklar').select('id', { count: 'exact', head: true })
+              .eq('organization_id', f.id).eq('durum', 'Kapatıldı'),
+            supabase.from('tutanaklar').select('id', { count: 'exact', head: true }).eq('organization_id', f.id),
+            supabase.from('egitimler').select('id', { count: 'exact', head: true }).eq('organization_id', f.id),
           ]);
 
           // Bu firmaya atanmış uzmanı bul
           const atananUzman = (uzmanData ?? []).find(u => u.active_firm_id === f.id);
 
-          return {
+          const base: AltFirma = {
             id: f.id,
             name: f.name,
             invite_code: f.invite_code,
@@ -97,8 +133,23 @@ export default function OsgbDashboardPage() {
             uzmanAd: atananUzman?.display_name ?? null,
             uygunsuzluk: uygunsuzlukCount ?? 0,
           };
+          enrichedFirmalar.push(base);
+          detaylar.push({
+            id: f.id,
+            name: f.name,
+            personelSayisi: personelCount ?? 0,
+            uzmanAd: atananUzman?.display_name ?? null,
+            uygunsuzluk: uygunsuzlukCount ?? 0,
+            kapatilan: kapatılanCount ?? 0,
+            tutanakSayisi: tutanakCount ?? 0,
+            egitimSayisi: egitimCount ?? 0,
+          });
         })
       );
+
+      // Sıralama koru (created_at desc)
+      enrichedFirmalar.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      detaylar.sort((a, b) => enrichedFirmalar.findIndex(x => x.id === a.id) - enrichedFirmalar.findIndex(x => x.id === b.id));
 
       // Uzmanlar için aktif firma adını çek
       const enrichedUzmanlar: Uzman[] = await Promise.all(
@@ -117,6 +168,7 @@ export default function OsgbDashboardPage() {
       );
 
       setAltFirmalar(enrichedFirmalar);
+      setFirmaDetaylar(detaylar);
       setUzmanlar(enrichedUzmanlar);
     } catch (err) {
       console.error('[OSGB] fetchData error:', err);
@@ -241,7 +293,44 @@ export default function OsgbDashboardPage() {
     { id: 'dashboard', icon: 'ri-dashboard-line', label: 'Genel Bakış' },
     { id: 'firmalar', icon: 'ri-building-2-line', label: 'Müşteri Firmalar' },
     { id: 'uzmanlar', icon: 'ri-user-star-line', label: 'Gezici Uzmanlar' },
+    { id: 'raporlar', icon: 'ri-file-chart-line', label: 'Raporlar' },
   ];
+
+  const donemLabel = () => {
+    if (!raporDonem) return 'Tüm Dönemler';
+    const [y, m] = raporDonem.split('-');
+    const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    return `${months[parseInt(m) - 1]} ${y}`;
+  };
+
+  const filteredRaporFirmalar = firmaDetaylar.filter(f =>
+    !raporFirmaFilter || f.id === raporFirmaFilter
+  );
+
+  const buildRaporData = () => ({
+    orgName: org?.name ?? 'OSGB',
+    donem: donemLabel(),
+    firmalar: filteredRaporFirmalar,
+    uzmanlar: uzmanlar.map(u => ({
+      user_id: u.user_id,
+      display_name: u.display_name,
+      email: u.email,
+      active_firm_name: u.active_firm_name,
+      is_active: u.is_active,
+    })),
+  });
+
+  const handlePdfExport = async () => {
+    setRaporExporting('pdf');
+    try { downloadOsgbReportPdf(buildRaporData()); }
+    finally { setRaporExporting(null); }
+  };
+
+  const handleExcelExport = async () => {
+    setRaporExporting('excel');
+    try { await downloadOsgbReportExcel(buildRaporData()); }
+    finally { setRaporExporting(null); }
+  };
 
   const inputStyle: React.CSSProperties = {
     background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px',
@@ -330,7 +419,7 @@ export default function OsgbDashboardPage() {
           style={{ background: '#fff', borderBottom: '1px solid #f1f5f9' }}>
           <div>
             <h1 className="text-base font-bold" style={{ color: '#0f172a' }}>
-              {activeTab === 'dashboard' ? 'Genel Bakış' : activeTab === 'firmalar' ? 'Müşteri Firmalar' : 'Gezici Uzmanlar'}
+              {activeTab === 'dashboard' ? 'Genel Bakış' : activeTab === 'firmalar' ? 'Müşteri Firmalar' : activeTab === 'uzmanlar' ? 'Gezici Uzmanlar' : 'Raporlar'}
             </h1>
             <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>
               {new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -622,6 +711,195 @@ export default function OsgbDashboardPage() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+              {/* ── RAPORLAR TAB ── */}
+              {activeTab === 'raporlar' && (
+                <div className="space-y-5">
+                  {/* Filtre bar */}
+                  <div className="rounded-2xl p-5" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Rapor Oluştur</h3>
+                        <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>Dönem ve firma seçerek PDF veya Excel raporu indirin</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3 items-end">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#475569' }}>Dönem</label>
+                        <input
+                          type="month"
+                          value={raporDonem}
+                          onChange={e => setRaporDonem(e.target.value)}
+                          className="text-sm px-3 py-2 rounded-xl"
+                          style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#1e293b', outline: 'none' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#475569' }}>Firma Filtresi</label>
+                        <select
+                          value={raporFirmaFilter}
+                          onChange={e => setRaporFirmaFilter(e.target.value)}
+                          className="text-sm px-3 py-2 rounded-xl cursor-pointer"
+                          style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#1e293b', outline: 'none', minWidth: '200px' }}
+                        >
+                          <option value="">Tüm Firmalar</option>
+                          {altFirmalar.map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex gap-2 ml-auto">
+                        <button
+                          onClick={handlePdfExport}
+                          disabled={raporExporting !== null}
+                          className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+                          style={{
+                            background: 'rgba(239,68,68,0.08)',
+                            border: '1.5px solid rgba(239,68,68,0.25)',
+                            color: '#DC2626',
+                            opacity: raporExporting === 'pdf' ? 0.7 : 1,
+                          }}
+                        >
+                          {raporExporting === 'pdf'
+                            ? <><i className="ri-loader-4-line animate-spin" />Hazırlanıyor...</>
+                            : <><i className="ri-file-pdf-line" />PDF İndir</>}
+                        </button>
+                        <button
+                          onClick={handleExcelExport}
+                          disabled={raporExporting !== null}
+                          className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+                          style={{
+                            background: 'rgba(16,185,129,0.08)',
+                            border: '1.5px solid rgba(16,185,129,0.25)',
+                            color: '#059669',
+                            opacity: raporExporting === 'excel' ? 0.7 : 1,
+                          }}
+                        >
+                          {raporExporting === 'excel'
+                            ? <><i className="ri-loader-4-line animate-spin" />Hazırlanıyor...</>
+                            : <><i className="ri-file-excel-line" />Excel İndir</>}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Özet KPI'lar */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Seçili Firma', value: filteredRaporFirmalar.length, icon: 'ri-building-2-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
+                      { label: 'Toplam Personel', value: filteredRaporFirmalar.reduce((s, f) => s + f.personelSayisi, 0), icon: 'ri-group-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.08)' },
+                      { label: 'Açık Uygunsuzluk', value: filteredRaporFirmalar.reduce((s, f) => s + f.uygunsuzluk, 0), icon: 'ri-alert-line', color: '#EF4444', bg: 'rgba(239,68,68,0.08)' },
+                      { label: 'Toplam Tutanak', value: filteredRaporFirmalar.reduce((s, f) => s + f.tutanakSayisi, 0), icon: 'ri-file-list-3-line', color: '#6366F1', bg: 'rgba(99,102,241,0.08)' },
+                    ].map(s => (
+                      <div key={s.label} className="rounded-2xl p-5" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
+                          <i className={`${s.icon} text-lg`} style={{ color: s.color }} />
+                        </div>
+                        <p className="text-2xl font-extrabold mb-1" style={{ color: '#0f172a' }}>{s.value}</p>
+                        <p className="text-xs" style={{ color: '#94a3b8' }}>{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Firma detay tablosu */}
+                  <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                    <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Firma Detay Tablosu</h3>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
+                        {donemLabel()}
+                      </span>
+                    </div>
+                    {filteredRaporFirmalar.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-3">
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)' }}>
+                          <i className="ri-file-chart-line text-xl" style={{ color: '#10B981' }} />
+                        </div>
+                        <p className="text-sm" style={{ color: '#94a3b8' }}>Rapor için firma bulunamadı</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[700px]">
+                          <thead>
+                            <tr style={{ background: '#f8fafc' }}>
+                              {['Firma Adı', 'Sorumlu Uzman', 'Personel', 'Açık Uyg.', 'Kapatılan', 'Tutanak', 'Eğitim', 'Kapanma %'].map(h => (
+                                <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#64748b' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredRaporFirmalar.map((f, i) => {
+                              const kapanmaOran = f.uygunsuzluk > 0 ? Math.round((f.kapatilan / f.uygunsuzluk) * 100) : 100;
+                              const rowBg = i % 2 === 0 ? '#fff' : '#f8fafc';
+                              const uyColor = f.uygunsuzluk > 5 ? '#DC2626' : f.uygunsuzluk > 2 ? '#D97706' : '#16A34A';
+                              const uyBg = f.uygunsuzluk > 5 ? 'rgba(220,38,38,0.08)' : f.uygunsuzluk > 2 ? 'rgba(217,119,6,0.08)' : 'rgba(22,163,74,0.08)';
+                              return (
+                                <tr key={f.id} style={{ background: rowBg, borderTop: '1px solid #f1f5f9' }}>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                                        <i className="ri-building-2-line text-xs" style={{ color: '#059669' }} />
+                                      </div>
+                                      <span className="text-xs font-semibold" style={{ color: '#0f172a' }}>{f.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-xs" style={{ color: f.uzmanAd ? '#64748b' : '#94a3b8' }}>
+                                    {f.uzmanAd ?? '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#0f172a' }}>{f.personelSayisi}</td>
+                                  <td className="px-4 py-3">
+                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: uyBg, color: uyColor }}>
+                                      {f.uygunsuzluk}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#16A34A' }}>{f.kapatilan}</td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#6366F1' }}>{f.tutanakSayisi}</td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#0891B2' }}>{f.egitimSayisi}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#e2e8f0', minWidth: '48px' }}>
+                                        <div
+                                          className="h-full rounded-full"
+                                          style={{ width: `${kapanmaOran}%`, background: kapanmaOran >= 80 ? '#10B981' : kapanmaOran >= 50 ? '#F59E0B' : '#EF4444' }}
+                                        />
+                                      </div>
+                                      <span className="text-xs font-bold flex-shrink-0" style={{ color: kapanmaOran >= 80 ? '#059669' : kapanmaOran >= 50 ? '#D97706' : '#DC2626' }}>
+                                        {kapanmaOran}%
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr style={{ background: '#f0fdf4', borderTop: '2px solid rgba(16,185,129,0.2)' }}>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#0f172a' }}>TOPLAM</td>
+                              <td className="px-4 py-3 text-xs" style={{ color: '#94a3b8' }}>—</td>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#0f172a' }}>
+                                {filteredRaporFirmalar.reduce((s, f) => s + f.personelSayisi, 0)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(220,38,38,0.1)', color: '#DC2626' }}>
+                                  {filteredRaporFirmalar.reduce((s, f) => s + f.uygunsuzluk, 0)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#16A34A' }}>
+                                {filteredRaporFirmalar.reduce((s, f) => s + f.kapatilan, 0)}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#6366F1' }}>
+                                {filteredRaporFirmalar.reduce((s, f) => s + f.tutanakSayisi, 0)}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#0891B2' }}>
+                                {filteredRaporFirmalar.reduce((s, f) => s + f.egitimSayisi, 0)}
+                              </td>
+                              <td className="px-4 py-3" />
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </>
