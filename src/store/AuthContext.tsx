@@ -98,7 +98,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
-      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN' && s?.user) {
+        // Giriş yapılınca org kontrolü yap — pasif/süresi dolmuşsa anında çıkar
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_super_admin')
+          .eq('user_id', s.user.id)
+          .maybeSingle();
+
+        if (!profile?.is_super_admin) {
+          const { data: membership } = await supabase
+            .from('user_organizations')
+            .select('organization_id, is_active')
+            .eq('user_id', s.user.id)
+            .maybeSingle();
+
+          if (!membership || !membership.is_active) {
+            await supabase.auth.signOut({ scope: 'local' });
+            clearAuthStorage();
+            return;
+          }
+
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('is_active, subscription_end')
+            .eq('id', membership.organization_id)
+            .maybeSingle();
+
+          if (!org || !org.is_active) {
+            await supabase.auth.signOut({ scope: 'local' });
+            clearAuthStorage();
+            return;
+          }
+
+          if (org.subscription_end) {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const endStr = String(org.subscription_end).substring(0, 10);
+            if (endStr < todayStr) {
+              await supabase.auth.signOut({ scope: 'local' });
+              clearAuthStorage();
+              return;
+            }
+          }
+        }
+
+        // Kontroller geçti — session'ı set et
+        setSession(s);
+      } else if (event === 'TOKEN_REFRESHED') {
         setSession(s);
       } else if (event === 'SIGNED_OUT') {
         setSession(null);

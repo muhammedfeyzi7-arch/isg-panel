@@ -18,16 +18,16 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { user_id, org_id } = body;
 
-    // Tek kullanıcı kick
     if (user_id) {
-      await serviceClient.auth.admin.signOut(user_id, 'global');
+      // Tek kullanıcının tüm session + refresh token'larını direkt DB'den sil
+      await serviceClient.rpc('delete_user_sessions', { target_user_id: user_id });
       return new Response(JSON.stringify({ success: true, kicked: user_id }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Org'daki tüm kullanıcıları kick
     if (org_id) {
+      // Org'daki tüm kullanıcıları bul
       const { data: members } = await serviceClient
         .from('user_organizations')
         .select('user_id')
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
       if (members) {
         for (const m of members) {
           try {
-            await serviceClient.auth.admin.signOut(m.user_id, 'global');
+            await serviceClient.rpc('delete_user_sessions', { target_user_id: m.user_id });
             kicked.push(m.user_id);
           } catch { /* devam */ }
         }

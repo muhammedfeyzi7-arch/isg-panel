@@ -21,7 +21,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Token sahibini doğrula
     const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -32,7 +31,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Super admin kontrolü
     const serviceClient = createClient(supabaseUrl, serviceKey);
     const { data: profile } = await serviceClient
       .from('profiles')
@@ -53,7 +51,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Organizasyonu güncelle (service role = RLS bypass)
+    // Organizasyonu güncelle
     const { data, error } = await serviceClient
       .from('organizations')
       .update({ ...fields, updated_at: new Date().toISOString() })
@@ -66,29 +64,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Eğer is_active = false yapıldıysa veya subscription_end geçmişe çekildiyse
-    // o org'daki TÜM kullanıcıların session'larını zorla öldür
-    const shouldKickUsers = fields.is_active === false || (
-      fields.subscription_end && new Date(fields.subscription_end) < new Date()
+    // Pasife alındıysa veya tarih geçmişe çekildiyse — tüm session'ları direkt DB'den sil
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const shouldKick = fields.is_active === false || (
+      fields.subscription_end && fields.subscription_end < todayStr
     );
 
-    if (shouldKickUsers) {
-      // O org'daki tüm aktif üyeleri bul
+    if (shouldKick) {
       const { data: members } = await serviceClient
         .from('user_organizations')
         .select('user_id')
         .eq('organization_id', org_id);
 
       if (members && members.length > 0) {
-        // Her kullanıcının session'ını zorla sonlandır
-        const kickPromises = members.map(async (m) => {
+        for (const m of members) {
           try {
-            await serviceClient.auth.admin.signOut(m.user_id, 'global');
-          } catch {
-            // Sessizce devam et
-          }
-        });
-        await Promise.allSettled(kickPromises);
+            // Direkt DB'den session sil — en kesin yöntem
+            await serviceClient.rpc('delete_user_sessions', { target_user_id: m.user_id });
+          } catch { /* devam */ }
+        }
       }
     }
 

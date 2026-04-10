@@ -15,16 +15,15 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
-    // Bugünün tarihi (YYYY-MM-DD) — UTC değil, string karşılaştırma
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-    // 1. Süresi dolmuş ama hâlâ aktif olan organizasyonları bul
+    // Süresi dolmuş ama hâlâ aktif organizasyonları bul
     const { data: expiredOrgs, error: fetchError } = await serviceClient
       .from('organizations')
       .select('id, name, subscription_end')
       .eq('is_active', true)
-      .lt('subscription_end', todayStr); // subscription_end < bugün
+      .lt('subscription_end', todayStr);
 
     if (fetchError) {
       return new Response(JSON.stringify({ error: fetchError.message }), {
@@ -42,24 +41,24 @@ Deno.serve(async (req) => {
 
     for (const org of expiredOrgs) {
       try {
-        // 2. Organizasyonu pasife al
+        // Organizasyonu pasife al
         await serviceClient
           .from('organizations')
           .update({ is_active: false, updated_at: new Date().toISOString() })
           .eq('id', org.id);
 
-        // 3. O org'daki tüm kullanıcıları bul
+        // O org'daki tüm kullanıcıları bul
         const { data: members } = await serviceClient
           .from('user_organizations')
           .select('user_id')
           .eq('organization_id', org.id);
 
-        // 4. Hepsinin session'ını zorla öldür
+        // Direkt DB'den session sil — en kesin yöntem
         let kickedCount = 0;
         if (members && members.length > 0) {
           for (const m of members) {
             try {
-              await serviceClient.auth.admin.signOut(m.user_id, 'global');
+              await serviceClient.rpc('delete_user_sessions', { target_user_id: m.user_id });
               kickedCount++;
             } catch { /* devam */ }
           }
@@ -73,21 +72,11 @@ Deno.serve(async (req) => {
           kicked_users: kickedCount,
         });
       } catch (err) {
-        results.push({
-          org_id: org.id,
-          org_name: org.name,
-          status: 'error',
-          error: String(err),
-        });
+        results.push({ org_id: org.id, status: 'error', error: String(err) });
       }
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      today: todayStr,
-      processed: results.length,
-      results,
-    }), {
+    return new Response(JSON.stringify({ success: true, today: todayStr, processed: results.length, results }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
