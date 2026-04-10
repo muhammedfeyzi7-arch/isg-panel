@@ -111,6 +111,8 @@ FREKANS DEĞERLERİ: 0.5=Çok nadir (yılda bir), 1=Oldukça nadir, 2=Nadir (ayd
 
 RİSK SEVİYELERİ: R≥400=Tolerans Gösterilemez, 200≤R<400=Esaslı, 70≤R<200=Önemli, 20≤R<70=Olası, R<20=Önemsiz
 
+ÖNEMLİ: Kullanıcının istediği kadar risk satırı üret. Sayıyı asla kısıtlama. Eğer 50 risk isteniyorsa tam 50 risk üret.
+
 SADECE JSON formatında yanıt ver:
 {
   "rows": [
@@ -131,7 +133,7 @@ SADECE JSON formatında yanıt ver:
       userPrompt = `Sektör: ${sektor}
 İstek: ${prompt}
 
-Bu sektör ve istek için Fine-Kinney risk analizi tablosu oluştur.`;
+Bu sektör ve istek için Fine-Kinney risk analizi tablosu oluştur. Kullanıcının belirttiği sayıda risk üret, sayıyı düşürme.`;
     }
 
     // ── RİSK ANALİZİ V2 (Fine-Kinney — Tam Profesyonel Format) ──
@@ -146,6 +148,8 @@ OLASILIK DEĞERLERİ: 0.2=Beklenmez, 0.5=Beklenmesi fakat mümkün, 1=Mümkün f
 FREKANS DEĞERLERİ: 0.5=Çok seyrek, 1=Seyrek, 2=Sık değil, 3=Ara sıra, 6=Sık, 10=Hemen hemen sürekli
 
 RİSK SEVİYELERİ: R>=400=Tolerans Gösterilemez, 200<=R<400=Esaslı, 70<=R<200=Önemli, 20<=R<70=Olası, R<20=Önemsiz
+
+KRİTİK KURAL: Kullanıcının istediği kadar risk satırı üret. Sayıyı ASLA kısıtlama veya azaltma. Eğer kullanıcı 50 risk istiyorsa tam olarak 50 farklı risk satırı üret. Her risk birbirinden farklı ve gerçekçi olsun. Farklı bölümler, farklı faaliyetler ve farklı tehlike kaynakları kullan.
 
 SADECE JSON formatında yanıt ver:
 {
@@ -184,7 +188,7 @@ Her satır için: r1 = o1 * s1 * f1, r2 = o2 * s2 * f2 hesapla. Sonraki risk (r2
 Sektör: ${sektor}
 İstek: ${prompt}
 
-Bu sektör ve istek için kapsamlı Fine-Kinney risk değerlendirme tablosu oluştur. Her risk için gerçekçi değerler ata, somut düzeltici tedbirler öner.`;
+Bu sektör ve istek için kapsamlı Fine-Kinney risk değerlendirme tablosu oluştur. Kullanıcının belirttiği sayıda risk üret — sayıyı düşürme, tam istenen kadar risk satırı yaz. Her risk için gerçekçi değerler ata, somut düzeltici tedbirler öner.`;
     }
 
     // ── ACİL DURUM EYLEM PLANI ──
@@ -438,7 +442,7 @@ Bu verilere göre İSG yöneticisine kısa ve net bir analiz sun.`;
           { role: "user", content: userPrompt },
         ],
         temperature: 0.7,
-        max_tokens: 6000,
+        max_tokens: 32000,
         response_format: { type: "json_object" },
       }),
     });

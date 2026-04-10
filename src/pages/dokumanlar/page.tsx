@@ -23,7 +23,7 @@ const tools: DocTool[] = [
   {
     id: 'acil-durum-eylem-plani',
     title: 'Acil Durum Eylem Planı',
-    description: 'Resmi Acil Durum Planı oluşturun. Firma bilgilerini girin, ADEP-EM-01 numaralı belge tüm yasal içerikle Word formatında hazırlanır.',
+    description: 'Resmi Acil Durum Planı oluşturun. Firma bilgilerini girin, ADEP-İSGDENETİM-01 numaralı belge tüm yasal içerikle Word formatında hazırlanır.',
     icon: 'ri-alarm-warning-line',
     color: '#DC2626',
     bgColor: 'rgba(220,38,38,0.08)',
@@ -34,12 +34,12 @@ const tools: DocTool[] = [
   {
     id: 'saglik-guvenlik-plani',
     title: 'Sağlık Güvenlik Planı',
-    description: 'Yapı işleri mevzuatına uygun, 15 bölümlü kapsamlı Sağlık ve Güvenlik Planı oluşturun. Tüm yasal referanslar ve tablolar dahil.',
+    description: 'Yapı işleri mevzuatına uygun, kapsamlı Sağlık ve Güvenlik Planı oluşturun. Tüm yasal referanslar ve tablolar dahil. Word belgesi olarak indirilir.',
     icon: 'ri-shield-check-line',
     color: '#059669',
     bgColor: 'rgba(5,150,105,0.08)',
     borderColor: 'rgba(5,150,105,0.18)',
-    badge: '15 Bölüm',
+    badge: 'Word Belgesi',
     badgeBg: 'rgba(5,150,105,0.1)',
   },
   {

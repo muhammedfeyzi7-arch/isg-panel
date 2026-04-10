@@ -171,7 +171,7 @@ export default function AcilDurumEylemPlaniModal({ onClose }: Props) {
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
                     spacing: { before: 0, after: 60 },
-                    children: [new TextRun({ text: 'ADEP-EM-01', bold: true, size: 20, font: FONT, color: 'FFFFFF' })],
+                    children: [new TextRun({ text: 'ADEP-İSGDENETİM-01', bold: true, size: 20, font: FONT, color: 'FFFFFF' })],
                   }),
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
@@ -621,7 +621,7 @@ export default function AcilDurumEylemPlaniModal({ onClose }: Props) {
             new TextRun({ text: 'Bu belge ', size: 16, font: FONT, color: '9CA3AF' }),
             new TextRun({ text: 'isgdenetim.com.tr', size: 16, font: FONT, color: ACCENT, bold: true }),
             new TextRun({ text: ' tarafından oluşturulmuştur.', size: 16, font: FONT, color: '9CA3AF' }),
-            new TextRun({ text: `   ·   ADEP-EM-01   ·   ${form.hazirlanmaTarihi}`, size: 16, font: FONT, color: '9CA3AF' }),
+            new TextRun({ text: `   ·   ADEP-İSGDENETİM-01   ·   ${form.hazirlanmaTarihi}`, size: 16, font: FONT, color: '9CA3AF' }),
           ],
         }),
       ];
@@ -661,7 +661,7 @@ export default function AcilDurumEylemPlaniModal({ onClose }: Props) {
             </div>
             <div>
               <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Acil Durum Eylem Planı</h2>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>ADEP-EM-01 — Word Belgesi</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>ADEP-İSGDENETİM-01 — Word Belgesi</p>
             </div>
           </div>
           <button
@@ -685,7 +685,7 @@ export default function AcilDurumEylemPlaniModal({ onClose }: Props) {
               <div>
                 <p className="text-xs font-semibold mb-1" style={{ color: '#1B3A6B' }}>Oluşturulacak Belge</p>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  ADEP-EM-01 numaralı resmi Acil Durum Planı; genel esaslar, amaç, kapsam, dayanak, organizasyon, ekipler, acil durum talimatları (yangın, deprem, sel, fırtına, sabotaj, yaralanma, patlama, elektrik çarpması, uzuv kopması, gıda zehirlenmesi) ve imza alanlarıyla Word formatında oluşturulacaktır.
+                  ADEP-İSGDENETİM-01 numaralı resmi Acil Durum Planı; genel esaslar, amaç, kapsam, dayanak, organizasyon, ekipler, acil durum talimatları (yangın, deprem, sel, fırtına, sabotaj, yaralanma, patlama, elektrik çarpması, uzuv kopması, gıda zehirlenmesi) ve imza alanlarıyla Word formatında oluşturulacaktır.
                 </p>
               </div>
             </div>

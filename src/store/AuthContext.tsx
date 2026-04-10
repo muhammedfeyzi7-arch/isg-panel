@@ -113,20 +113,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
       }
 
-      // Giriş başarılı — kullanıcının aktif org üyeliği var mı kontrol et
+      // Giriş başarılı — kullanıcının aktif org üyeliği ve organizasyon durumu kontrol et
       if (signInData?.user) {
-        const { data: membership } = await supabase
-          .from('user_organizations')
-          .select('user_id, is_active')
+        // Super admin kontrolü — super admin her zaman girebilir
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_super_admin')
           .eq('user_id', signInData.user.id)
-          .eq('is_active', true)
-          .limit(1)
           .maybeSingle();
 
-        if (!membership) {
-          await supabase.auth.signOut({ scope: 'local' });
-          clearAuthStorage();
-          return { error: 'Hesabınız devre dışı bırakılmış veya organizasyondan çıkarılmış. Lütfen yöneticinizle iletişime geçin.' };
+        if (!profile?.is_super_admin) {
+          // 1. user_organizations kaydı aktif mi?
+          const { data: membership } = await supabase
+            .from('user_organizations')
+            .select('organization_id, is_active')
+            .eq('user_id', signInData.user.id)
+            .maybeSingle();
+
+          if (!membership || !membership.is_active) {
+            await supabase.auth.signOut({ scope: 'local' });
+            clearAuthStorage();
+            return { error: 'Hesabınız devre dışı bırakılmış veya organizasyondan çıkarılmış. Lütfen yöneticinizle iletişime geçin.' };
+          }
+
+          // 2. Organizasyonun kendisi aktif mi?
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('is_active, subscription_end')
+            .eq('id', membership.organization_id)
+            .maybeSingle();
+
+          if (!org || !org.is_active) {
+            await supabase.auth.signOut({ scope: 'local' });
+            clearAuthStorage();
+            return { error: 'Organizasyonunuz pasife alınmış. Lütfen yöneticinizle iletişime geçin.' };
+          }
+
+          // 3. Abonelik süresi dolmuş mu?
+          if (org.subscription_end && new Date(org.subscription_end) < new Date()) {
+            await supabase.auth.signOut({ scope: 'local' });
+            clearAuthStorage();
+            return { error: 'Abonelik süreniz dolmuş. Lütfen yöneticinizle iletişime geçin.' };
+          }
         }
       }
 

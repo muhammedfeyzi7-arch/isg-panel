@@ -937,7 +937,7 @@ export default function SaglikGuvenlikPlaniModal({ onClose }: Props) {
               <div>
                 <p className="text-xs font-semibold mb-1" style={{ color: '#1B3A6B' }}>Oluşturulacak Belge</p>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  İSG-SGP-01 numaralı 15 bölümlü Sağlık ve Güvenlik Planı; tüm yasal referanslar, eğitim tablosu, izleme/ölçme tablosu ve KKD standartlarıyla Word formatında oluşturulacaktır.
+                  İSG-SGP-01 numaralı Sağlık ve Güvenlik Planı; tüm yasal referanslar, eğitim tablosu, izleme/ölçme tablosu ve KKD standartlarıyla Word formatında oluşturulacaktır.
                 </p>
               </div>
             </div>
