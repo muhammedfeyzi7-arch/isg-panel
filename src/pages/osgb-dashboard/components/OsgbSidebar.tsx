@@ -22,9 +22,7 @@ interface OsgbSidebarProps {
 const navGroups = [
   {
     label: 'GENEL',
-    items: [
-      { id: 'dashboard' as Tab, label: 'Genel Bakış', icon: 'ri-layout-grid-line' },
-    ],
+    items: [{ id: 'dashboard' as Tab, label: 'Genel Bakış', icon: 'ri-layout-grid-line' }],
   },
   {
     label: 'YÖNETİM',
@@ -74,7 +72,6 @@ export default function OsgbSidebar({
 
   return (
     <>
-      {/* ── Sidebar ── */}
       <aside
         className={[
           'fixed left-0 top-0 h-screen flex flex-col z-[42]',
@@ -83,61 +80,68 @@ export default function OsgbSidebar({
           isMounted ? 'opacity-100' : 'opacity-0',
         ].join(' ')}
         style={{
-          background: 'linear-gradient(180deg, #0c1420 0%, #0a1628 50%, #080f1e 100%)',
-          borderRight: '1px solid rgba(255,255,255,0.05)',
-          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease',
-          boxShadow: '4px 0 32px rgba(0,0,0,0.4)',
+          background: 'var(--bg-sidebar)',
+          borderRight: '1px solid var(--border-subtle)',
+          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, background 0.3s ease',
+          boxShadow: '2px 0 16px rgba(0,0,0,0.08)',
         }}
       >
         {/* ── Top: Logo + Org ── */}
         <div
           className={`flex items-center flex-shrink-0 ${collapsed ? 'justify-center px-0 h-[56px]' : 'px-4 h-[56px] gap-3'}`}
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}
         >
-          {/* Logo mark */}
+          {/* Logo */}
           <div
             className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
             style={{
-              background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.08) 100%)',
-              border: '1px solid rgba(16,185,129,0.3)',
-              boxShadow: '0 0 12px rgba(16,185,129,0.15)',
+              background: 'rgba(16,185,129,0.12)',
+              border: '1px solid rgba(16,185,129,0.22)',
             }}
           >
             <img
               src={LOGO_URL}
               alt="ISG"
-              style={{ height: '16px', width: 'auto', objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 6px rgba(16,185,129,0.5))' }}
+              style={{ height: '16px', width: 'auto', objectFit: 'contain' }}
             />
           </div>
 
-          {/* Org info */}
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p
                 className="text-[12.5px] font-bold truncate leading-tight"
-                style={{ color: '#e2e8f0', letterSpacing: '-0.02em' }}
+                style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}
               >
                 ISG Denetim
               </p>
               <p
                 className="text-[9.5px] font-semibold mt-0.5 truncate"
-                style={{ color: 'rgba(52,211,153,0.65)', letterSpacing: '0.04em' }}
+                style={{ color: '#10B981', letterSpacing: '0.04em' }}
               >
                 OSGB PANELİ
               </p>
             </div>
           )}
 
-          {/* Collapse toggle — desktop only */}
+          {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? 'Genişlet' : 'Daralt'}
             className="hidden lg:flex items-center justify-center w-6 h-6 rounded-md cursor-pointer flex-shrink-0 transition-all duration-150"
-            style={{ color: 'rgba(52,211,153,0.45)', background: 'transparent' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(52,211,153,0.1)'; (e.currentTarget as HTMLElement).style.color = '#34D399'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(52,211,153,0.45)'; }}
+            style={{ color: 'var(--text-faint)', background: 'transparent' }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)';
+              (e.currentTarget as HTMLElement).style.color = '#10B981';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+              (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+            }}
           >
-            <i className={`${collapsed ? 'ri-side-bar-line' : 'ri-side-bar-line'} text-[11px]`} style={{ transform: collapsed ? 'scaleX(-1)' : 'none' }} />
+            <i
+              className="ri-side-bar-line text-[11px]"
+              style={{ transform: collapsed ? 'scaleX(-1)' : 'none' }}
+            />
           </button>
         </div>
 
@@ -152,10 +156,23 @@ export default function OsgbSidebar({
               }}
             >
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#10B981', boxShadow: '0 0 5px rgba(16,185,129,0.6)' }} />
-                <p className="text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color: 'rgba(52,211,153,0.55)' }}>Organizasyon</p>
+                <div
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ background: '#10B981', boxShadow: '0 0 5px rgba(16,185,129,0.6)' }}
+                />
+                <p
+                  className="text-[9px] font-bold uppercase tracking-[0.12em]"
+                  style={{ color: 'rgba(16,185,129,0.65)' }}
+                >
+                  Organizasyon
+                </p>
               </div>
-              <p className="text-[12px] font-bold mt-1 truncate" style={{ color: '#6EE7B7' }}>{orgName}</p>
+              <p
+                className="text-[12px] font-bold mt-1 truncate"
+                style={{ color: '#10B981' }}
+              >
+                {orgName}
+              </p>
             </div>
           </div>
         )}
@@ -164,16 +181,15 @@ export default function OsgbSidebar({
         <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-1" style={{ scrollbarWidth: 'none' }}>
           {navGroups.map((group, gi) => (
             <div key={group.label} className={gi > 0 ? 'mt-4' : ''}>
-              {/* Group label */}
               {!collapsed ? (
                 <p
                   className="text-[9px] font-bold uppercase px-2 mb-1.5 select-none tracking-[0.14em]"
-                  style={{ color: 'rgba(255,255,255,0.22)' }}
+                  style={{ color: 'var(--text-faint)' }}
                 >
                   {group.label}
                 </p>
               ) : (
-                <div className="h-px my-2" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                <div className="h-px my-2" style={{ background: 'var(--border-subtle)' }} />
               )}
 
               <ul className="space-y-0.5">
@@ -195,12 +211,12 @@ export default function OsgbSidebar({
                           justifyContent: collapsed ? 'center' : undefined,
                           gap: collapsed ? undefined : '10px',
                           background: isActive
-                            ? 'linear-gradient(135deg, rgba(16,185,129,0.16) 0%, rgba(16,185,129,0.07) 100%)'
+                            ? 'rgba(16,185,129,0.1)'
                             : isHovered
-                            ? 'rgba(255,255,255,0.05)'
+                            ? 'var(--bg-hover)'
                             : 'transparent',
                           border: isActive
-                            ? '1px solid rgba(16,185,129,0.28)'
+                            ? '1px solid rgba(16,185,129,0.2)'
                             : '1px solid transparent',
                           transition: 'all 0.18s ease',
                         }}
@@ -213,18 +229,7 @@ export default function OsgbSidebar({
                               width: '3px',
                               height: '55%',
                               background: 'linear-gradient(180deg, #34D399, #059669)',
-                              boxShadow: '0 0 6px rgba(16,185,129,0.5)',
-                            }}
-                          />
-                        )}
-
-                        {/* Neon glow on active */}
-                        {isActive && (
-                          <span
-                            className="absolute inset-0 pointer-events-none"
-                            style={{
-                              background: 'radial-gradient(ellipse at 30% 50%, rgba(16,185,129,0.06) 0%, transparent 70%)',
-                              borderRadius: '10px',
+                              boxShadow: '0 0 6px rgba(16,185,129,0.4)',
                             }}
                           />
                         )}
@@ -243,9 +248,12 @@ export default function OsgbSidebar({
                           <i
                             className={`${item.icon} text-[14px]`}
                             style={{
-                              color: isActive ? '#34D399' : isHovered ? 'rgba(52,211,153,0.7)' : 'rgba(148,163,184,0.5)',
+                              color: isActive
+                                ? '#10B981'
+                                : isHovered
+                                ? 'var(--text-secondary)'
+                                : 'var(--text-faint)',
                               transition: 'color 0.18s ease',
-                              filter: isActive ? 'drop-shadow(0 0 4px rgba(52,211,153,0.4))' : 'none',
                             }}
                           />
                         </span>
@@ -255,7 +263,11 @@ export default function OsgbSidebar({
                           <span
                             className="flex-1 leading-none text-[12px] truncate"
                             style={{
-                              color: isActive ? '#A7F3D0' : isHovered ? 'rgba(226,232,240,0.8)' : 'rgba(148,163,184,0.6)',
+                              color: isActive
+                                ? '#10B981'
+                                : isHovered
+                                ? 'var(--text-primary)'
+                                : 'var(--text-muted)',
                               fontWeight: isActive ? 600 : 500,
                               transition: 'color 0.18s ease',
                             }}
@@ -270,7 +282,7 @@ export default function OsgbSidebar({
                             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                             style={{
                               background: '#10B981',
-                              boxShadow: '0 0 5px rgba(16,185,129,0.7)',
+                              boxShadow: '0 0 5px rgba(16,185,129,0.6)',
                             }}
                           />
                         )}
@@ -289,17 +301,20 @@ export default function OsgbSidebar({
             <div
               className="rounded-xl p-3"
               style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.07)',
+                background: 'var(--bg-item)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
-              <p className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2.5" style={{ color: 'rgba(255,255,255,0.22)' }}>
+              <p
+                className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2.5"
+                style={{ color: 'var(--text-faint)' }}
+              >
                 İstatistikler
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { value: firmaCount, label: 'Toplam Firma', color: '#34D399', icon: 'ri-building-3-line' },
-                  { value: uzmanCount, label: 'Toplam Uzman', color: '#6EE7B7', icon: 'ri-shield-user-line' },
+                  { value: firmaCount, label: 'Toplam Firma', color: '#10B981', icon: 'ri-building-3-line' },
+                  { value: uzmanCount, label: 'Toplam Uzman', color: '#10B981', icon: 'ri-shield-user-line' },
                 ].map(stat => (
                   <div
                     key={stat.label}
@@ -311,13 +326,22 @@ export default function OsgbSidebar({
                   >
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                        <i className={`${stat.icon} text-[10px]`} style={{ color: 'rgba(52,211,153,0.5)' }} />
+                        <i
+                          className={`${stat.icon} text-[10px]`}
+                          style={{ color: 'rgba(16,185,129,0.55)' }}
+                        />
                       </div>
                     </div>
-                    <p className="text-[17px] font-extrabold leading-none" style={{ color: stat.color }}>
+                    <p
+                      className="text-[17px] font-extrabold leading-none"
+                      style={{ color: stat.color }}
+                    >
                       {stat.value}
                     </p>
-                    <p className="text-[9px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                    <p
+                      className="text-[9px] font-medium mt-0.5"
+                      style={{ color: 'var(--text-faint)' }}
+                    >
                       {stat.label}
                     </p>
                   </div>
@@ -351,7 +375,9 @@ export default function OsgbSidebar({
             </div>
             {!collapsed && (
               <>
-                <span className="text-[11.5px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>Destek</span>
+                <span className="text-[11.5px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>
+                  Destek
+                </span>
                 <i className="ri-arrow-right-s-line text-xs" style={{ color: 'rgba(16,185,129,0.4)' }} />
               </>
             )}
@@ -362,16 +388,14 @@ export default function OsgbSidebar({
         <div
           className={`mx-2.5 mb-3 rounded-xl flex items-center ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2.5'}`}
           style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.07)',
+            background: 'var(--bg-item)',
+            border: '1px solid var(--border-subtle)',
           }}
         >
-          {/* Avatar */}
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
             style={{
               background: 'linear-gradient(135deg, #10B981, #059669)',
-              boxShadow: '0 0 8px rgba(16,185,129,0.3)',
             }}
           >
             {userInitial}
@@ -380,25 +404,33 @@ export default function OsgbSidebar({
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <p className="text-[11.5px] font-semibold truncate leading-tight" style={{ color: '#e2e8f0' }}>
+                <p
+                  className="text-[11.5px] font-semibold truncate leading-tight"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {userName}
                 </p>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981', boxShadow: '0 0 4px rgba(16,185,129,0.6)' }} />
-                  <p className="text-[9.5px] font-semibold" style={{ color: '#10B981' }}>OSGB Admin</p>
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: '#10B981', boxShadow: '0 0 4px rgba(16,185,129,0.6)' }}
+                  />
+                  <p className="text-[9.5px] font-semibold" style={{ color: '#10B981' }}>
+                    OSGB Admin
+                  </p>
                 </div>
               </div>
               <button
                 onClick={logout}
                 title="Çıkış Yap"
                 className="flex items-center justify-center cursor-pointer rounded-md w-6 h-6 flex-shrink-0 transition-all duration-150"
-                style={{ color: 'rgba(255,255,255,0.25)', background: 'transparent' }}
+                style={{ color: 'var(--text-faint)', background: 'transparent' }}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.color = '#F87171';
-                  (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)';
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)';
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.25)';
+                  (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
                   (e.currentTarget as HTMLElement).style.background = 'transparent';
                 }}
               >

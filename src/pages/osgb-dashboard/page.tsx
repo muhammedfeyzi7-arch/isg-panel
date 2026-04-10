@@ -11,6 +11,7 @@ import OsgbSidebar from './components/OsgbSidebar';
 import OsgbHeader from './components/OsgbHeader';
 import OsgbSettings from './components/OsgbSettings';
 import ZiyaretlerTab from './components/ZiyaretlerTab';
+import OsgbQuickActions from './components/OsgbQuickActions';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -440,6 +441,14 @@ export default function OsgbDashboardPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Hızlı İşlemler Modülü */}
+                  <OsgbQuickActions
+                    onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); setFirmaAd(''); }}
+                    onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' }); }}
+                    onZiyaretGit={() => setActiveTab('ziyaretler')}
+                    onRaporGit={() => setActiveTab('raporlar')}
+                  />
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Firmalar özet */}
