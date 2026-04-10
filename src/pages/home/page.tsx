@@ -7,6 +7,7 @@ import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import OnboardingTour from '../../components/feature/OnboardingTour';
 import KvkkPopup from '../../components/feature/KvkkPopup';
 import ToastContainer from '../../components/base/ToastContainer';
+import GeziciUzmanBanner from '../../components/feature/GeziciUzmanBanner';
 import DashboardPage from '../dashboard/page';
 import FirmalarPage from '../companies/page';
 import PersonellerPage from '../personnel/page';
@@ -112,6 +113,8 @@ function AppContent() {
   // firma_user yasak modüllere erişmeye çalışırsa dashboard'a yönlendir
   const FIRMA_USER_ALLOWED = new Set(['dashboard', 'personeller', 'evraklar', 'egitimler', 'uygunsuzluklar']);
 
+  const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
+
   const renderPage = () => {
     // firma_user için modul kısıtlaması
     if (isFirmaUser && !FIRMA_USER_ALLOWED.has(activeModule)) {
@@ -139,11 +142,14 @@ function AppContent() {
   };
 
   return (
-    <Layout>
-      <ToastContainer />
-      <OnboardingTour />
-      {renderPage()}
-    </Layout>
+    <div style={isGeziciUzman ? { paddingTop: '36px' } : undefined}>
+      {isGeziciUzman && <GeziciUzmanBanner />}
+      <Layout>
+        <ToastContainer />
+        <OnboardingTour />
+        {renderPage()}
+      </Layout>
+    </div>
   );
 }
 

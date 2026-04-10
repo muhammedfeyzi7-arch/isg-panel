@@ -161,7 +161,7 @@ export function useOrganization(user: User | null) {
       // PRIMARY: Try direct Supabase query first (fast path)
       const { data, error } = await supabase
         .from('user_organizations')
-        .select('role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
+        .select('role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_id, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -185,6 +185,70 @@ export function useOrganization(user: User | null) {
       if (data && data.organizations) {
         const rawOrg = data.organizations;
         const o = (Array.isArray(rawOrg) ? rawOrg[0] : rawOrg) as { id: string; name: string; invite_code: string; org_type?: string };
+
+        // Gezici uzman için: active_firm_id varsa, o firmanın bilgilerini çek ve org.id olarak kullan
+        if (data.osgb_role === 'gezici_uzman' && data.active_firm_id) {
+          const { data: firmaOrg } = await supabase
+            .from('organizations')
+            .select('id, name, invite_code, org_type')
+            .eq('id', data.active_firm_id)
+            .maybeSingle();
+
+          if (firmaOrg) {
+            setOrg({
+              id: firmaOrg.id,
+              name: firmaOrg.name,
+              invite_code: firmaOrg.invite_code,
+              role: 'member',
+              isActive: data.is_active !== false,
+              mustChangePassword: data.must_change_password === true,
+              kvkkAccepted: true,
+              displayName: data.display_name ?? undefined,
+              email: data.email ?? undefined,
+              orgType: 'firma',
+              osgbRole: 'gezici_uzman',
+            });
+            setLoading(false);
+            return;
+          }
+          // active_firm_id var ama firma bulunamadı — uzman henüz firma atanmamış
+          // OSGB org ID'siyle devam et, gezici uzman sayfasına yönlendirilecek
+          setOrg({
+            id: o.id,
+            name: o.name,
+            invite_code: o.invite_code,
+            role: data.role ?? 'member',
+            isActive: data.is_active !== false,
+            mustChangePassword: data.must_change_password === true,
+            kvkkAccepted: true,
+            displayName: data.display_name ?? undefined,
+            email: data.email ?? undefined,
+            orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
+            osgbRole: 'gezici_uzman',
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Gezici uzman ama henüz firma atanmamış (active_firm_id yok)
+        if (data.osgb_role === 'gezici_uzman' && !data.active_firm_id) {
+          setOrg({
+            id: o.id,
+            name: o.name,
+            invite_code: o.invite_code,
+            role: data.role ?? 'member',
+            isActive: data.is_active !== false,
+            mustChangePassword: data.must_change_password === true,
+            kvkkAccepted: true,
+            displayName: data.display_name ?? undefined,
+            email: data.email ?? undefined,
+            orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
+            osgbRole: 'gezici_uzman',
+          });
+          setLoading(false);
+          return;
+        }
+
         setOrg({
           id: o.id,
           name: o.name,

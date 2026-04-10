@@ -16,6 +16,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [subStatus, setSubStatus] = useState<'checking' | 'ok' | 'expired'>('checking');
   const [orgType, setOrgType] = useState<OrgType>('firma');
   const [osgbRole, setOsgbRole] = useState<OsgbRole>(null);
+  const [hasActiveFirm, setHasActiveFirm] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (loading || !session) {
@@ -26,7 +27,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       // Tüm aktif kayıtları çek — osgb_role olan kaydı önceliklendir
       const { data: uoList } = await supabase
         .from('user_organizations')
-        .select('organization_id, osgb_role')
+        .select('organization_id, osgb_role, active_firm_id')
         .eq('user_id', session.user.id)
         .eq('is_active', true);
 
@@ -64,6 +65,13 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       setOrgType((hasOsgbRole || org.org_type === 'osgb' ? 'osgb' : 'firma') as OrgType);
       setOsgbRole((uo.osgb_role as OsgbRole) ?? null);
 
+      // Gezici uzman için active_firm_id kontrolü
+      if (uo.osgb_role === 'gezici_uzman') {
+        setHasActiveFirm(!!uo.active_firm_id);
+      } else {
+        setHasActiveFirm(null);
+      }
+
       if (!org.is_active || isExpired) {
         setSubStatus('expired');
       } else {
@@ -76,12 +84,31 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!session) return <Navigate to="/login" replace />;
   if (subStatus === 'expired') return <Navigate to="/subscription-expired" replace />;
 
-  // OSGB kullanıcısı firma paneline girmeye çalışıyorsa → OSGB paneline yönlendir
   const isOsgbPath = location.pathname.startsWith('/osgb');
-  if (orgType === 'osgb' && !isOsgbPath) {
-    if (osgbRole === 'gezici_uzman') {
-      return <Navigate to="/osgb-uzman" replace />;
+
+  // Gezici uzman yönlendirme
+  if (osgbRole === 'gezici_uzman') {
+    if (hasActiveFirm === null) {
+      // Henüz kontrol edilmedi, bekle
+      return null;
     }
+    if (!hasActiveFirm) {
+      // Firma atanmamış → uzman bekleme sayfasına
+      if (location.pathname !== '/osgb-uzman') {
+        return <Navigate to="/osgb-uzman" replace />;
+      }
+      return <>{children}</>;
+    }
+    // Firma atanmış → /osgb-uzman veya osgb path'lerine gitmeye çalışırsa /dashboard'a yönlendir
+    if (isOsgbPath) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    // Normal firma panelinde çalışsın
+    return <>{children}</>;
+  }
+
+  // OSGB admin kullanıcısı firma paneline girmeye çalışıyorsa → OSGB paneline yönlendir
+  if (orgType === 'osgb' && !isOsgbPath) {
     return <Navigate to="/osgb-dashboard" replace />;
   }
 
