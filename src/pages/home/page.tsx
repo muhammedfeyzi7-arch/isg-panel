@@ -45,7 +45,7 @@ const PATH_TO_MODULE: Record<string, string> = {
 };
 
 function AppContent() {
-  const { activeModule, orgError, org, mustChangePassword, setActiveModule, kvkkAccepted, setKvkkAccepted, pageLoading } = useApp();
+  const { activeModule, orgError, org, orgLoading, mustChangePassword, setActiveModule, kvkkAccepted, setKvkkAccepted, pageLoading } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   const [loadingDone, setLoadingDone] = useState(false);
@@ -84,8 +84,9 @@ function AppContent() {
     return <ForcePasswordChange />;
   }
 
-  // KVKK: sadece kvkk_accepted=false olan kullanıcılara göster
-  if (org && !kvkkAccepted) {
+  // KVKK: org yüklendi, admin rolü, ve kvkk_accepted=false ise göster
+  // orgLoading bitene kadar bekliyoruz — yükleme sırasında false gelebilir
+  if (org && !orgLoading && !kvkkAccepted) {
     return <KvkkPopup onAccepted={setKvkkAccepted} />;
   }
 

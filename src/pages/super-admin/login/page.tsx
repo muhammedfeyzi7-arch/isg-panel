@@ -1,6 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+
+// Super admin login — Supabase client kullanmadan direkt REST API ile doğrulama
+// Bu sayede normal kullanıcı session'ı hiç etkilenmiyor
+
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
+
+async function saSignIn(email: string, password: string) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) return { data: null, error: 'E-posta veya şifre hatalı.' };
+  const data = await res.json();
+  return { data, error: null };
+}
+
+async function saGetProfile(userId: string, accessToken: string) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=is_super_admin&limit=1`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    }
+  );
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return rows?.[0] ?? null;
+}
 
 export default function SuperAdminLoginPage() {
   const navigate = useNavigate();
@@ -10,18 +44,15 @@ export default function SuperAdminLoginPage() {
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
 
+  // Zaten giriş yapılmışsa direkt yönlendir
   useEffect(() => {
-    // Sadece sessionStorage'daki SA token'ını kontrol et
     const saToken = sessionStorage.getItem('sa_access_token');
     const saUserId = sessionStorage.getItem('sa_user_id');
     if (saToken && saUserId) {
-      // Token var, doğrula
-      supabase.auth.getUser(saToken).then(({ data: { user }, error }) => {
-        if (!error && user && user.id === saUserId) {
-          supabase.from('profiles').select('is_super_admin').eq('user_id', user.id).maybeSingle()
-            .then(({ data }) => {
-              if (data?.is_super_admin) navigate('/super-admin', { replace: true });
-            });
+      // Token var — profil kontrolü yap
+      saGetProfile(saUserId, saToken).then(profile => {
+        if (profile?.is_super_admin) {
+          navigate('/super-admin', { replace: true });
         } else {
           sessionStorage.removeItem('sa_access_token');
           sessionStorage.removeItem('sa_user_id');
@@ -33,44 +64,33 @@ export default function SuperAdminLoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!email.trim() || !password) { setError('E-posta ve şifre gereklidir.'); return; }
+    if (!email.trim() || !password) {
+      setError('E-posta ve şifre gereklidir.');
+      return;
+    }
     setLoading(true);
     try {
-      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-      if (signInErr || !data.user || !data.session) {
-        setError('E-posta veya şifre hatalı.');
+      // 1. REST API ile giriş — Supabase client'a dokunmuyoruz
+      const { data, error: signInErr } = await saSignIn(email.trim().toLowerCase(), password);
+      if (signInErr || !data?.access_token || !data?.user?.id) {
+        setError(signInErr || 'E-posta veya şifre hatalı.');
         setLoading(false);
         return;
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_super_admin')
-        .eq('user_id', data.user.id)
-        .maybeSingle();
-
+      // 2. Super admin kontrolü
+      const profile = await saGetProfile(data.user.id, data.access_token);
       if (!profile?.is_super_admin) {
-        // Super admin değil — Supabase session'ını temizle, token kaydetme
-        await supabase.auth.signOut({ scope: 'local' });
         setError('Bu panele erişim yetkiniz bulunmuyor.');
         setLoading(false);
         return;
       }
 
-      // Sadece sessionStorage'a kaydet — localStorage'daki normal kullanıcı session'ına dokunma
-      // Tarayıcı kapanınca sessionStorage temizlenir (güvenli)
-      sessionStorage.setItem('sa_access_token', data.session.access_token);
+      // 3. Sadece sessionStorage'a kaydet — localStorage'a hiç dokunmuyoruz
+      sessionStorage.setItem('sa_access_token', data.access_token);
       sessionStorage.setItem('sa_user_id', data.user.id);
 
-      // signOut yerine localStorage'daki Supabase tokenlarını manuel temizle
-      // signOut kullanmak SIGNED_OUT eventi fırlatır ve AuthContext akışını bozabilir
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('sb-')) localStorage.removeItem(key);
-      });
-
+      // 4. Yönlendir
       navigate('/super-admin', { replace: true });
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
@@ -83,7 +103,6 @@ export default function SuperAdminLoginPage() {
     <div className="min-h-screen flex bg-slate-50">
       {/* Sol panel - sadece desktop */}
       <div className="hidden lg:flex w-[460px] flex-shrink-0 flex-col relative overflow-hidden bg-slate-900">
-        {/* Subtle grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{
@@ -91,12 +110,9 @@ export default function SuperAdminLoginPage() {
             backgroundSize: '24px 24px',
           }}
         />
-        {/* Top accent line */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-indigo-500" />
 
-        {/* İçerik */}
         <div className="relative z-10 flex flex-col h-full px-10 py-10">
-          {/* Logo */}
           <div className="flex items-center gap-3 mb-auto">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-600">
               <i className="ri-shield-keyhole-fill text-white text-sm"></i>
@@ -107,7 +123,6 @@ export default function SuperAdminLoginPage() {
             </div>
           </div>
 
-          {/* Ana içerik */}
           <div className="py-12">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
@@ -121,7 +136,6 @@ export default function SuperAdminLoginPage() {
             </p>
           </div>
 
-          {/* Özellik listesi */}
           <div className="space-y-2.5 mb-auto">
             {[
               { icon: 'ri-building-2-line', title: 'Organizasyon Yönetimi', desc: 'Tüm müşterileri görüntüle ve yönet' },
@@ -144,7 +158,6 @@ export default function SuperAdminLoginPage() {
             ))}
           </div>
 
-          {/* Footer */}
           <div className="mt-8 pt-6 border-t border-white/[0.07]">
             <p className="text-slate-600 text-xs">
               Yalnızca yetkili sistem yöneticileri erişebilir
@@ -157,7 +170,6 @@ export default function SuperAdminLoginPage() {
       <div className="flex-1 flex items-center justify-center px-5 py-10 sm:px-8">
         <div className="w-full max-w-[400px]">
 
-          {/* Mobil logo */}
           <div className="lg:hidden flex items-center gap-3 mb-10">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-600">
               <i className="ri-shield-keyhole-fill text-white text-sm"></i>
@@ -168,14 +180,12 @@ export default function SuperAdminLoginPage() {
             </div>
           </div>
 
-          {/* Başlık */}
           <div className="mb-8">
             <h1 className="text-2xl font-black text-slate-900 mb-1.5 tracking-tight">Giriş Yap</h1>
             <p className="text-slate-500 text-sm">Süper admin hesabınızla devam edin</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* E-posta */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">E-posta</label>
               <div className="relative">
@@ -191,7 +201,6 @@ export default function SuperAdminLoginPage() {
               </div>
             </div>
 
-            {/* Şifre */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">Şifre</label>
               <div className="relative">
@@ -214,7 +223,6 @@ export default function SuperAdminLoginPage() {
               </div>
             </div>
 
-            {/* Hata */}
             {error && (
               <div className="flex items-center gap-2.5 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
                 <i className="ri-error-warning-line flex-shrink-0"></i>
@@ -222,7 +230,6 @@ export default function SuperAdminLoginPage() {
               </div>
             )}
 
-            {/* Giriş butonu */}
             <button
               type="submit"
               disabled={loading}

@@ -19,7 +19,7 @@ interface TourStep {
 const ADMIN_STEPS: TourStep[] = [
   {
     title: 'ISG Denetim\'e Hoş Geldiniz!',
-    description: 'Türkiye\'nin en kapsamlı İş Sağlığı & Güvenliği yönetim platformuna hoş geldiniz. Tüm modülleri birkaç adımda tanıyalım.',
+    description: 'ISG Denetim platformuna hoş geldiniz. Firma, personel, evrak, ekipman ve saha denetim süreçlerinizi tek yerden yönetin. Tüm modülleri birkaç adımda tanıyalım.',
     icon: 'ri-shield-star-fill',
     iconColor: '#818CF8',
     iconBg: 'rgba(99,102,241,0.15)',

@@ -41,10 +41,17 @@ export default function KvkkPopup({ onAccepted }: KvkkPopupProps) {
         })
         .eq('user_id', user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        // DB yazma başarısız — hata göster, onAccepted çağırma
+        console.error('[KVKK] DB update error:', updateError);
+        setError('Onay kaydedilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+        return;
+      }
+      // Başarılı — local state'i güncelle
       onAccepted();
-    } catch {
-      setError('Onay kaydedilemedi. Lütfen tekrar deneyin.');
+    } catch (err) {
+      console.error('[KVKK] Unexpected error:', err);
+      setError('Beklenmeyen bir hata oluştu. Lütfen sayfayı yenileyip tekrar deneyin.');
     } finally {
       setLoading(false);
     }

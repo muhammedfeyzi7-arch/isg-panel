@@ -1,6 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+// Super admin auth — Supabase client kullanmıyor, direkt REST API
+// Bu sayede normal kullanıcı session'ı hiç etkilenmiyor
+
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
+
+async function saVerifyToken(userId: string, accessToken: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=is_super_admin&limit=1`,
+      {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+    if (!res.ok) return false;
+    const rows = await res.json();
+    return rows?.[0]?.is_super_admin === true;
+  } catch {
+    return false;
+  }
+}
 import { useOrganizationAdmin, type OrgAdmin } from './hooks/useOrganizationAdmin';
 import OrgTable from './components/OrgTable';
 import OrgDetailSheet from './components/OrgDetailSheet';
@@ -24,16 +47,13 @@ export default function SuperAdminPage() {
       try {
         const saToken = sessionStorage.getItem('sa_access_token');
         const saUserId = sessionStorage.getItem('sa_user_id');
-        if (!saToken || !saUserId) { navigate('/super-admin/login', { replace: true }); return; }
-        const { data: { user }, error: userErr } = await supabase.auth.getUser(saToken);
-        if (userErr || !user || user.id !== saUserId) {
-          sessionStorage.removeItem('sa_access_token');
-          sessionStorage.removeItem('sa_user_id');
+        if (!saToken || !saUserId) {
           navigate('/super-admin/login', { replace: true });
           return;
         }
-        const { data: profile } = await supabase.from('profiles').select('is_super_admin').eq('user_id', user.id).maybeSingle();
-        if (!profile?.is_super_admin) {
+        // Supabase client yerine direkt REST API — normal kullanıcı session'ına dokunmaz
+        const isSA = await saVerifyToken(saUserId, saToken);
+        if (!isSA) {
           sessionStorage.removeItem('sa_access_token');
           sessionStorage.removeItem('sa_user_id');
           navigate('/super-admin/login', { replace: true });

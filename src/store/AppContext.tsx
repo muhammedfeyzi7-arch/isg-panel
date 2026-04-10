@@ -596,7 +596,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,
       // KVKK sadece admin rolündeki kullanıcıya gösterilir — ekip üyeleri (evrakçı, sahacı vb.) görmez
-      kvkkAccepted: org?.role !== 'admin' ? true : (org?.kvkkAccepted ?? true),
+      // ?? false: DB'den henüz yüklenmediyse false kabul et, yüklenince gerçek değer gelir
+      kvkkAccepted: org?.role !== 'admin' ? true : (org?.kvkkAccepted ?? false),
       setKvkkAccepted,
       createOrg,
       joinOrg,
