@@ -30,6 +30,7 @@ interface Uzman {
   email: string;
   is_active: boolean;
   active_firm_id: string | null;
+  active_firm_ids: string[] | null;
   active_firm_name: string | null;
 }
 
@@ -121,7 +122,7 @@ export default function OsgbDashboardPage() {
       // Uzmanlar (osgb_role = 'gezici_uzman' olan user_organizations kayıtları)
       const { data: uzmanData } = await supabase
         .from('user_organizations')
-        .select('user_id, display_name, email, is_active, active_firm_id')
+        .select('user_id, display_name, email, is_active, active_firm_id, active_firm_ids')
         .eq('organization_id', org.id)
         .eq('osgb_role', 'gezici_uzman');
 
@@ -177,19 +178,30 @@ export default function OsgbDashboardPage() {
       enrichedFirmalar.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       detaylar.sort((a, b) => enrichedFirmalar.findIndex(x => x.id === a.id) - enrichedFirmalar.findIndex(x => x.id === b.id));
 
-      // Uzmanlar için aktif firma adını çek
+      // Uzmanlar için aktif firma adını/adlarını çek
       const enrichedUzmanlar: Uzman[] = await Promise.all(
         (uzmanData ?? []).map(async (u) => {
+          // active_firm_ids varsa tüm firma adlarını çek
+          const firmIds: string[] = (u.active_firm_ids && u.active_firm_ids.length > 0)
+            ? u.active_firm_ids
+            : u.active_firm_id ? [u.active_firm_id] : [];
+
           let active_firm_name: string | null = null;
-          if (u.active_firm_id) {
-            const { data: firmRow } = await supabase
+          if (firmIds.length > 0) {
+            const { data: firmRows } = await supabase
               .from('organizations')
-              .select('name')
-              .eq('id', u.active_firm_id)
-              .maybeSingle();
-            active_firm_name = firmRow?.name ?? null;
+              .select('id, name')
+              .in('id', firmIds);
+            if (firmRows && firmRows.length > 0) {
+              // Birden fazla firma varsa isimlerini virgülle birleştir
+              active_firm_name = firmRows.map(r => r.name).join(', ');
+            }
           }
-          return { ...u, active_firm_name };
+          return {
+            ...u,
+            active_firm_ids: u.active_firm_ids ?? null,
+            active_firm_name,
+          };
         })
       );
 
@@ -291,7 +303,7 @@ export default function OsgbDashboardPage() {
       if (json.error) { setUzmanError(json.error); return; }
       addToast(`${fullName} gezici uzman olarak eklendi!`, 'success');
       setShowUzmanModal(false);
-      setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaId: '' });
+      setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaIds: [] });
       setUzmanFormTab(0);
       await fetchData();
     } catch (err) {

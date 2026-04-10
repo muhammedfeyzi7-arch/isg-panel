@@ -28,6 +28,14 @@ const ROLE_MODULES: Record<string, string[]> = {
   ],
 };
 
+// Gezici uzman için izin verilen modüller — firma yönetimi dahil, ayarlar hariç
+const GEZICI_UZMAN_MODULES = [
+  'dashboard', 'firmalar', 'personeller',
+  'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
+  'uygunsuzluklar', 'ekipmanlar', 'is-izinleri',
+  'saha', 'raporlar', 'dokumanlar', 'copkutusu',
+];
+
 function getAllowedModules(role: string): string[] {
   return ROLE_MODULES[role] ?? ROLE_MODULES.member;
 }
@@ -92,8 +100,13 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
   const [supportOpen, setSupportOpen] = useState(false);
 
   const userRole = org?.role ?? 'member';
+  const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
   // org yüklenene kadar (loading veya null) tüm modüllere izin ver — yanlış kısıtlama olmasın
-  const allowedModules = (orgLoading || !org) ? getAllowedModules('admin') : getAllowedModules(userRole);
+  const allowedModules = (orgLoading || !org)
+    ? getAllowedModules('admin')
+    : isGeziciUzman
+      ? GEZICI_UZMAN_MODULES
+      : getAllowedModules(userRole);
   const roleInfo = ROLE_LABELS[userRole] ?? ROLE_LABELS.member;
 
   useEffect(() => {

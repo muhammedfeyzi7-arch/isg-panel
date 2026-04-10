@@ -196,25 +196,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Gezici uzman için atanmış tüm firmaları Supabase'den çekip firmalar listesine inject et
   const [geziciFirmalar, setGeziciFirmalar] = useState<Firma[]>([]);
+  // Gezici uzman için ek firma ID'lerinin verilerini (primary firma dışındaki) store verisine merge et
+  const [extraFirmaVeriler, setExtraFirmaVeriler] = useState<{
+    personeller: import('../types').Personel[];
+    evraklar: import('../types').Evrak[];
+    egitimler: import('../types').Egitim[];
+    muayeneler: import('../types').Muayene[];
+    uygunsuzluklar: import('../types').Uygunsuzluk[];
+    ekipmanlar: import('../types').Ekipman[];
+    tutanaklar: import('../types').Tutanak[];
+    isIzinleri: import('../types').IsIzni[];
+  }>({
+    personeller: [], evraklar: [], egitimler: [], muayeneler: [],
+    uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [],
+  });
+
   useEffect(() => {
     if (org?.osgbRole !== 'gezici_uzman') {
       setGeziciFirmalar([]);
+      setExtraFirmaVeriler({ personeller: [], evraklar: [], egitimler: [], muayeneler: [], uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [] });
       return;
     }
-    // activeFirmIds varsa hepsini çek, yoksa org.id (ilk/tek firma) kullan
-    const firmIds = org.activeFirmIds && org.activeFirmIds.length > 0
+
+    const allFirmIds = org.activeFirmIds && org.activeFirmIds.length > 0
       ? org.activeFirmIds
       : org.id ? [org.id] : [];
 
-    if (firmIds.length === 0) {
+    if (allFirmIds.length === 0) {
       setGeziciFirmalar([]);
       return;
     }
 
+    // Supabase'den firma adlarını çek
     supabase
       .from('organizations')
       .select('id, name')
-      .in('id', firmIds)
+      .in('id', allFirmIds)
       .then(({ data }) => {
         if (data && data.length > 0) {
           setGeziciFirmalar(
@@ -232,7 +249,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
           );
         }
       });
-  }, [org?.osgbRole, org?.id, org?.activeFirmIds]);
+
+    // Primary firma (org.id) zaten useStore tarafından yükleniyor
+    // Ek firmalar için ayrıca veri çek ve merge et
+    const extraIds = allFirmIds.filter(id => id !== org.id);
+    if (extraIds.length === 0) return;
+
+    const fetchTableForOrg = async (table: string, orgId: string): Promise<unknown[]> => {
+      const { data } = await supabase
+        .from(table)
+        .select('id, data')
+        .eq('organization_id', orgId)
+        .is('deleted_at', null);
+      return (data ?? []).map(r => r.data as unknown);
+    };
+
+    Promise.all(
+      extraIds.map(async (firmId) => {
+        const [personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri] = await Promise.all([
+          fetchTableForOrg('personeller', firmId),
+          fetchTableForOrg('evraklar', firmId),
+          fetchTableForOrg('egitimler', firmId),
+          fetchTableForOrg('muayeneler', firmId),
+          fetchTableForOrg('uygunsuzluklar', firmId),
+          fetchTableForOrg('ekipmanlar', firmId),
+          fetchTableForOrg('tutanaklar', firmId),
+          fetchTableForOrg('is_izinleri', firmId),
+        ]);
+        return { personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri };
+      })
+    ).then(results => {
+      const merged = results.reduce(
+        (acc, r) => ({
+          personeller: [...acc.personeller, ...(r.personeller as import('../types').Personel[])],
+          evraklar: [...acc.evraklar, ...(r.evraklar as import('../types').Evrak[])],
+          egitimler: [...acc.egitimler, ...(r.egitimler as import('../types').Egitim[])],
+          muayeneler: [...acc.muayeneler, ...(r.muayeneler as import('../types').Muayene[])],
+          uygunsuzluklar: [...acc.uygunsuzluklar, ...(r.uygunsuzluklar as import('../types').Uygunsuzluk[])],
+          ekipmanlar: [...acc.ekipmanlar, ...(r.ekipmanlar as import('../types').Ekipman[])],
+          tutanaklar: [...acc.tutanaklar, ...(r.tutanaklar as import('../types').Tutanak[])],
+          isIzinleri: [...acc.isIzinleri, ...(r.isIzinleri as import('../types').IsIzni[])],
+        }),
+        { personeller: [], evraklar: [], egitimler: [], muayeneler: [], uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [] } as typeof extraFirmaVeriler
+      );
+      setExtraFirmaVeriler(merged);
+    });
+  }, [org?.osgbRole, org?.id, org?.activeFirmIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTable = useCallback(async (table: string) => {
     const orgId = org?.id;
@@ -480,16 +542,73 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const mergedFirmalar = useMemo<Firma[]>(() => {
     if (org?.osgbRole !== 'gezici_uzman') return store.firmalar;
     if (geziciFirmalar.length === 0) return store.firmalar;
-    // store.firmalar'da olmayanları başa ekle
     const mevcutIds = new Set(store.firmalar.map(f => f.id));
     const yeniFirmalar = geziciFirmalar.filter(f => !mevcutIds.has(f.id));
     return [...yeniFirmalar, ...store.firmalar];
   }, [org?.osgbRole, geziciFirmalar, store.firmalar]);
 
+  // Gezici uzman için tüm firmaların verilerini merge et
+  const isGezici = org?.osgbRole === 'gezici_uzman';
+  const mergedPersoneller = useMemo(() =>
+    isGezici && extraFirmaVeriler.personeller.length > 0
+      ? [...store.personeller, ...extraFirmaVeriler.personeller.filter(e => !store.personeller.some(s => s.id === e.id))]
+      : store.personeller,
+  [isGezici, store.personeller, extraFirmaVeriler.personeller]);
+
+  const mergedEvraklar = useMemo(() =>
+    isGezici && extraFirmaVeriler.evraklar.length > 0
+      ? [...store.evraklar, ...extraFirmaVeriler.evraklar.filter(e => !store.evraklar.some(s => s.id === e.id))]
+      : store.evraklar,
+  [isGezici, store.evraklar, extraFirmaVeriler.evraklar]);
+
+  const mergedEgitimler = useMemo(() =>
+    isGezici && extraFirmaVeriler.egitimler.length > 0
+      ? [...store.egitimler, ...extraFirmaVeriler.egitimler.filter(e => !store.egitimler.some(s => s.id === e.id))]
+      : store.egitimler,
+  [isGezici, store.egitimler, extraFirmaVeriler.egitimler]);
+
+  const mergedMuayeneler = useMemo(() =>
+    isGezici && extraFirmaVeriler.muayeneler.length > 0
+      ? [...store.muayeneler, ...extraFirmaVeriler.muayeneler.filter(e => !store.muayeneler.some(s => s.id === e.id))]
+      : store.muayeneler,
+  [isGezici, store.muayeneler, extraFirmaVeriler.muayeneler]);
+
+  const mergedUygunsuzluklar = useMemo(() =>
+    isGezici && extraFirmaVeriler.uygunsuzluklar.length > 0
+      ? [...store.uygunsuzluklar, ...extraFirmaVeriler.uygunsuzluklar.filter(e => !store.uygunsuzluklar.some(s => s.id === e.id))]
+      : store.uygunsuzluklar,
+  [isGezici, store.uygunsuzluklar, extraFirmaVeriler.uygunsuzluklar]);
+
+  const mergedEkipmanlar = useMemo(() =>
+    isGezici && extraFirmaVeriler.ekipmanlar.length > 0
+      ? [...store.ekipmanlar, ...extraFirmaVeriler.ekipmanlar.filter(e => !store.ekipmanlar.some(s => s.id === e.id))]
+      : store.ekipmanlar,
+  [isGezici, store.ekipmanlar, extraFirmaVeriler.ekipmanlar]);
+
+  const mergedTutanaklar = useMemo(() =>
+    isGezici && extraFirmaVeriler.tutanaklar.length > 0
+      ? [...store.tutanaklar, ...extraFirmaVeriler.tutanaklar.filter(e => !store.tutanaklar.some(s => s.id === e.id))]
+      : store.tutanaklar,
+  [isGezici, store.tutanaklar, extraFirmaVeriler.tutanaklar]);
+
+  const mergedIsIzinleri = useMemo(() =>
+    isGezici && extraFirmaVeriler.isIzinleri.length > 0
+      ? [...store.isIzinleri, ...extraFirmaVeriler.isIzinleri.filter(e => !store.isIzinleri.some(s => s.id === e.id))]
+      : store.isIzinleri,
+  [isGezici, store.isIzinleri, extraFirmaVeriler.isIzinleri]);
+
   return (
     <AppContext.Provider value={{
       ...store,
       firmalar: mergedFirmalar,
+      personeller: mergedPersoneller,
+      evraklar: mergedEvraklar,
+      egitimler: mergedEgitimler,
+      muayeneler: mergedMuayeneler,
+      uygunsuzluklar: mergedUygunsuzluklar,
+      ekipmanlar: mergedEkipmanlar,
+      tutanaklar: mergedTutanaklar,
+      isIzinleri: mergedIsIzinleri,
       toasts, addToast, removeToast,
       activeModule, setActiveModule,
       sidebarCollapsed, setSidebarCollapsed,

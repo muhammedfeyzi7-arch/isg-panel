@@ -14,6 +14,7 @@ interface UzmanDetayModalProps {
     email: string;
     is_active: boolean;
     active_firm_id: string | null;
+    active_firm_ids: string[] | null;
     active_firm_name: string | null;
   };
   orgId: string;
@@ -46,8 +47,8 @@ export default function UzmanDetayModal({
   const [activeTab, setActiveTab] = useState<'ozet' | 'uygunsuzluk' | 'ayarlar'>('ozet');
   const [isActive, setIsActive] = useState(uzman.is_active);
   const [secilenFirmaIds, setSecilenFirmaIds] = useState<string[]>(
-    (uzman as typeof uzman & { active_firm_ids?: string[] }).active_firm_ids?.length
-      ? (uzman as typeof uzman & { active_firm_ids?: string[] }).active_firm_ids!
+    uzman.active_firm_ids?.length
+      ? uzman.active_firm_ids
       : uzman.active_firm_id ? [uzman.active_firm_id] : []
   );
   const [loading, setLoading] = useState(false);
@@ -179,15 +180,32 @@ export default function UzmanDetayModal({
           <div className="flex-1 overflow-auto">
             {/* Firma Bilgi Bandı */}
             <div className="px-6 py-4" style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-start gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
                   <i className="ri-building-2-line text-sm" style={{ color: '#10B981' }} />
-                  <span className="text-xs font-semibold" style={{ color: '#475569' }}>Atandığı Firma:</span>
+                  <span className="text-xs font-semibold" style={{ color: '#475569' }}>
+                    Atandığı {secilenFirmaIds.length > 1 ? 'Firmalar' : 'Firma'}:
+                  </span>
                 </div>
-                <span className="text-xs font-bold" style={{ color: uzman.active_firm_name ? '#0f172a' : '#94a3b8' }}>
-                  {uzman.active_firm_name ?? 'Henüz firma atanmadı'}
-                </span>
-                <span className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0"
+                <div className="flex-1 flex flex-wrap gap-1.5">
+                  {secilenFirmaIds.length > 0
+                    ? secilenFirmaIds.map((id, idx) => {
+                        const f = altFirmalar.find(af => af.id === id);
+                        return f ? (
+                          <span key={id} className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                            style={{
+                              background: idx === 0 ? 'rgba(16,185,129,0.12)' : 'rgba(99,102,241,0.1)',
+                              color: idx === 0 ? '#059669' : '#6366F1',
+                              border: `1px solid ${idx === 0 ? 'rgba(16,185,129,0.25)' : 'rgba(99,102,241,0.2)'}`,
+                            }}>
+                            {idx === 0 ? '★ ' : ''}{f.name}
+                          </span>
+                        ) : null;
+                      })
+                    : <span className="text-xs" style={{ color: '#94a3b8' }}>Henüz firma atanmadı</span>
+                  }
+                </div>
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0"
                   style={{
                     background: isActive ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
                     color: isActive ? '#10B981' : '#64748b',

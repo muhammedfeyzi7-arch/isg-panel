@@ -11,6 +11,8 @@ export interface Permissions {
   canAccessSettings: boolean;
   canAccessModule: (moduleId: string) => boolean;
   canViewSensitiveData: boolean;
+  /** Firma ekleyip düzenleyip silebilir mi? Gezici uzman için false. */
+  canManageFirma: boolean;
 }
 
 // Saha Personeli (denetci) için izin verilen modüller
@@ -53,7 +55,7 @@ export function usePermissions(): Permissions {
     return true;
   };
 
-  // Gezici uzman → firmalar sekmesi hariç normal firma kullanıcısı gibi tam yetkili
+  // Gezici uzman → firma yönetimi (ekle/düzenle/sil) dışında tam yetkili
   return {
     canCreate: isAdmin || isMember || isFirmaUser || isGeziciUzman,
     canEdit:   isAdmin || isMember || isFirmaUser || isGeziciUzman,
@@ -65,5 +67,7 @@ export function usePermissions(): Permissions {
     canAccessSettings: isAdmin,
     canAccessModule,
     canViewSensitiveData: !isDenetci,
+    // Gezici uzman firma ekleyemez/düzenleyemez/silemez
+    canManageFirma: isAdmin || isMember || isFirmaUser,
   };
 }

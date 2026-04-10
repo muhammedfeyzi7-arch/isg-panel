@@ -154,7 +154,7 @@ export function useOrganization(user: User | null) {
     try {
       const { data, error } = await supabase
         .from('user_organizations')
-        .select('role, is_active, must_change_password, display_name, email, osgb_role, active_firm_id, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
+        .select('role, is_active, must_change_password, display_name, email, osgb_role, active_firm_id, active_firm_ids, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -180,8 +180,9 @@ export function useOrganization(user: User | null) {
 
         if (data.osgb_role === 'gezici_uzman') {
           // active_firm_ids (çoklu) veya active_firm_id (tekli legacy) destekle
-          const firmIds: string[] = (data as Record<string, unknown>).active_firm_ids as string[] | undefined
-            ? ((data as Record<string, unknown>).active_firm_ids as string[]).filter(Boolean)
+          const rawIds = (data as Record<string, unknown>).active_firm_ids;
+          const firmIds: string[] = Array.isArray(rawIds) && rawIds.length > 0
+            ? (rawIds as string[]).filter(Boolean)
             : data.active_firm_id ? [data.active_firm_id] : [];
 
           // İlk firmayı "aktif" org olarak kullan (store'un organizasyon bazlı veri çekmesi için)
