@@ -379,6 +379,7 @@ export default function OsgbDashboardPage() {
 
       <OsgbHeader
         activeTab={activeTab}
+        setActiveTab={setActiveTab}
         collapsed={sidebarCollapsed}
         orgName={org?.name ?? 'OSGB'}
         onMobileMenuToggle={() => setMobileOpen(v => !v)}
