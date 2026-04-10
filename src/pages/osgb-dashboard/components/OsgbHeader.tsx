@@ -498,23 +498,6 @@ export default function OsgbHeader({
                   <i className="ri-arrow-right-s-line text-xs" style={{ color: '#475569' }} />
                 </button>
 
-                {/* Tema toggle */}
-                {onToggleTheme && (
-                  <button
-                    onClick={() => { onToggleTheme(); setProfileOpen(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
-                    onMouseEnter={e => { e.currentTarget.style.background = dropdownHover; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(245,158,11,0.1)' }}>
-                      <i className={`${isDark ? 'ri-sun-line' : 'ri-moon-line'} text-xs`} style={{ color: '#F59E0B' }} />
-                    </div>
-                    <span className="text-[12.5px] font-medium flex-1" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>
-                      {isDark ? 'Açık Tema' : 'Koyu Tema'}
-                    </span>
-                  </button>
-                )}
-
                 <div className="mx-3 my-1.5" style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)' }} />
 
                 {/* Çıkış */}

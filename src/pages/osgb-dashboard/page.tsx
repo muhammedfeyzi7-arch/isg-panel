@@ -51,7 +51,20 @@ export default function OsgbDashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [osgbTheme, setOsgbTheme] = useState<'dark' | 'light'>('dark');
+  const [osgbTheme, setOsgbTheme] = useState<'dark' | 'light'>(() => {
+    try { return (localStorage.getItem('isg_theme') as 'dark' | 'light') ?? 'dark'; } catch { return 'dark'; }
+  });
+
+  // ── Tema: document class + localStorage sync ──
+  useEffect(() => {
+    const root = document.documentElement;
+    if (osgbTheme === 'light') {
+      root.classList.add('light-mode');
+    } else {
+      root.classList.remove('light-mode');
+    }
+    try { localStorage.setItem('isg_theme', osgbTheme); } catch { /* ignore */ }
+  }, [osgbTheme]);
   const [searchFirma, setSearchFirma] = useState('');
   const [searchUzman, setSearchUzman] = useState('');
 
@@ -340,13 +353,22 @@ export default function OsgbDashboardPage() {
     finally { setRaporExporting(null); }
   };
 
+  const isDark = osgbTheme === 'dark';
+
   const inputStyle: React.CSSProperties = {
-    background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px',
-    color: '#1e293b', outline: 'none', width: '100%', padding: '10px 12px', fontSize: '13px',
+    background: 'var(--bg-input)', border: '1.5px solid var(--border-input)', borderRadius: '10px',
+    color: 'var(--text-primary)', outline: 'none', width: '100%', padding: '10px 12px', fontSize: '13px',
   };
   const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '6px', color: '#475569',
+    display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)',
   };
+  const cardStyle: React.CSSProperties = {
+    background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderRadius: '16px',
+  };
+  const rowBgBase = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)';
+  const rowBgHover = isDark ? 'rgba(16,185,129,0.07)' : '#f0fdf4';
+  const textPrimary = 'var(--text-primary)';
+  const textMuted = 'var(--text-muted)';
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-app)' }}>
@@ -402,40 +424,50 @@ export default function OsgbDashboardPage() {
             <>
               {/* ── DASHBOARD ── */}
               {activeTab === 'dashboard' && (
-                <div className="space-y-6">
+                <div className="space-y-5 page-enter">
                   {/* Stats */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { label: 'Müşteri Firma', value: altFirmalar.length, icon: 'ri-building-2-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-                      { label: 'Toplam Personel', value: totalPersonel, icon: 'ri-group-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.08)' },
-                      { label: 'Açık Uygunsuzluk', value: totalUygunsuzluk, icon: 'ri-alert-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
-                      { label: 'Aktif Uzman', value: aktifUzman, icon: 'ri-user-star-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)' },
-                    ].map(s => (
-                      <div key={s.label} className="rounded-2xl p-5" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
-                          <i className={`${s.icon} text-lg`} style={{ color: s.color }} />
+                      { label: 'Müşteri Firma', value: altFirmalar.length, icon: 'ri-building-2-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.15)' },
+                      { label: 'Toplam Personel', value: totalPersonel, icon: 'ri-group-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.15)' },
+                      { label: 'Açık Uygunsuzluk', value: totalUygunsuzluk, icon: 'ri-alert-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.15)' },
+                      { label: 'Aktif Uzman', value: aktifUzman, icon: 'ri-user-star-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.15)' },
+                    ].map((s, i) => (
+                      <div key={s.label} className="rounded-2xl p-5 stat-card stagger-item" style={{ ...cardStyle, animationDelay: `${i * 0.06}s` }}>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
+                            <i className={`${s.icon} text-lg`} style={{ color: s.color }} />
+                          </div>
+                          <div className="w-8 h-8 flex items-center justify-center rounded-lg" style={{ background: s.bg }}>
+                            <i className="ri-arrow-right-up-line text-xs" style={{ color: s.color }} />
+                          </div>
                         </div>
-                        <p className="text-2xl font-extrabold mb-1" style={{ color: '#0f172a' }}>{s.value}</p>
-                        <p className="text-xs" style={{ color: '#94a3b8' }}>{s.label}</p>
+                        <p className="text-2xl font-extrabold mb-1" style={{ color: textPrimary }}>{s.value}</p>
+                        <p className="text-xs font-medium" style={{ color: textMuted }}>{s.label}</p>
                       </div>
                     ))}
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Firmalar özet */}
-                    <div className="rounded-2xl p-5" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                    <div className="rounded-2xl p-5" style={cardStyle}>
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Müşteri Firmalar</h3>
-                        <button onClick={() => setActiveTab('firmalar')} className="text-xs font-semibold cursor-pointer" style={{ color: '#059669' }}>
-                          Tümünü Gör →
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                            <i className="ri-building-2-line text-xs" style={{ color: '#10B981' }} />
+                          </div>
+                          <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Müşteri Firmalar</h3>
+                        </div>
+                        <button onClick={() => setActiveTab('firmalar')} className="text-xs font-semibold cursor-pointer flex items-center gap-1" style={{ color: '#10B981' }}>
+                          Tümünü Gör <i className="ri-arrow-right-line text-xs" />
                         </button>
                       </div>
                       {altFirmalar.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 gap-3">
-                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)' }}>
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
                             <i className="ri-building-2-line text-xl" style={{ color: '#10B981' }} />
                           </div>
-                          <p className="text-xs" style={{ color: '#94a3b8' }}>Henüz firma eklenmedi</p>
+                          <p className="text-xs" style={{ color: textMuted }}>Henüz firma eklenmedi</p>
                           <button onClick={() => setShowFirmaModal(true)}
                             className="whitespace-nowrap flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
                             style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
@@ -443,21 +475,21 @@ export default function OsgbDashboardPage() {
                           </button>
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           {altFirmalar.slice(0, 5).map(f => (
                             <div key={f.id}
                               onClick={() => setSecilenFirma({ id: f.id, name: f.name })}
                               className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                              style={{ background: '#f8fafc' }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f0fdf4'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                              style={{ background: rowBgBase }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowBgHover; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBgBase; }}
                             >
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
                                 <i className="ri-building-2-line text-sm" style={{ color: '#059669' }} />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold truncate" style={{ color: '#0f172a' }}>{f.name}</p>
-                                <p className="text-[10px]" style={{ color: '#94a3b8' }}>
+                                <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{f.name}</p>
+                                <p className="text-[10px]" style={{ color: textMuted }}>
                                   {f.uzmanAd ?? 'Uzman atanmadı'} · {f.personelSayisi} personel
                                 </p>
                               </div>
@@ -468,7 +500,7 @@ export default function OsgbDashboardPage() {
                                     {f.uygunsuzluk}
                                   </span>
                                 )}
-                                <i className="ri-arrow-right-s-line text-sm" style={{ color: '#cbd5e1' }} />
+                                <i className="ri-arrow-right-s-line text-sm" style={{ color: textMuted }} />
                               </div>
                             </div>
                           ))}
@@ -477,19 +509,24 @@ export default function OsgbDashboardPage() {
                     </div>
 
                     {/* Uzmanlar özet */}
-                    <div className="rounded-2xl p-5" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                    <div className="rounded-2xl p-5" style={cardStyle}>
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Gezici Uzmanlar</h3>
-                        <button onClick={() => setActiveTab('uzmanlar')} className="text-xs font-semibold cursor-pointer" style={{ color: '#059669' }}>
-                          Tümünü Gör →
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(139,92,246,0.1)' }}>
+                            <i className="ri-user-star-line text-xs" style={{ color: '#8B5CF6' }} />
+                          </div>
+                          <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Gezici Uzmanlar</h3>
+                        </div>
+                        <button onClick={() => setActiveTab('uzmanlar')} className="text-xs font-semibold cursor-pointer flex items-center gap-1" style={{ color: '#10B981' }}>
+                          Tümünü Gör <i className="ri-arrow-right-line text-xs" />
                         </button>
                       </div>
                       {uzmanlar.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 gap-3">
-                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)' }}>
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
                             <i className="ri-user-star-line text-xl" style={{ color: '#8B5CF6' }} />
                           </div>
-                          <p className="text-xs" style={{ color: '#94a3b8' }}>Henüz uzman eklenmedi</p>
+                          <p className="text-xs" style={{ color: textMuted }}>Henüz uzman eklenmedi</p>
                           <button onClick={() => setShowUzmanModal(true)}
                             className="whitespace-nowrap flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
                             style={{ background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)' }}>
@@ -497,26 +534,26 @@ export default function OsgbDashboardPage() {
                           </button>
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           {uzmanlar.slice(0, 5).map(u => (
                             <div key={u.user_id}
                               onClick={() => setSecilenUzman(u)}
                               className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                              style={{ background: '#f8fafc' }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f0fdf4'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                              style={{ background: rowBgBase }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowBgHover; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBgBase; }}
                             >
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                                style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : '#94a3b8' }}>
+                                style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
                                 {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold truncate" style={{ color: '#0f172a' }}>{u.display_name ?? u.email}</p>
-                                <p className="text-[10px] truncate" style={{ color: '#94a3b8' }}>{u.active_firm_name ?? 'Firma atanmadı'}</p>
+                                <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{u.display_name ?? u.email}</p>
+                                <p className="text-[10px] truncate" style={{ color: textMuted }}>{u.active_firm_name ?? 'Firma atanmadı'}</p>
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="w-2 h-2 rounded-full" style={{ background: u.is_active ? '#10B981' : '#94a3b8' }} />
-                                <i className="ri-arrow-right-s-line text-sm" style={{ color: '#cbd5e1' }} />
+                                <span className="w-2 h-2 rounded-full" style={{ background: u.is_active ? '#10B981' : '#64748b' }} />
+                                <i className="ri-arrow-right-s-line text-sm" style={{ color: textMuted }} />
                               </div>
                             </div>
                           ))}
@@ -528,23 +565,23 @@ export default function OsgbDashboardPage() {
                   {/* Uyarı Bandı — uzman atanmamış firmalar */}
                   {altFirmalar.filter(f => !f.uzmanAd).length > 0 && (
                     <div className="rounded-2xl p-4 flex items-start gap-4"
-                      style={{ background: 'rgba(245,158,11,0.05)', border: '1.5px solid rgba(245,158,11,0.2)' }}>
+                      style={{ background: 'rgba(245,158,11,0.06)', border: '1.5px solid rgba(245,158,11,0.2)' }}>
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(245,158,11,0.1)' }}>
-                        <i className="ri-alert-line text-base" style={{ color: '#D97706' }} />
+                        style={{ background: 'rgba(245,158,11,0.12)' }}>
+                        <i className="ri-alert-line text-base" style={{ color: '#F59E0B' }} />
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs font-semibold" style={{ color: '#92400E' }}>
+                        <p className="text-xs font-semibold" style={{ color: '#F59E0B' }}>
                           {altFirmalar.filter(f => !f.uzmanAd).length} firmaya uzman atanmadı
                         </p>
-                        <p className="text-[10px] mt-1" style={{ color: '#B45309' }}>
+                        <p className="text-[10px] mt-1" style={{ color: textMuted }}>
                           {altFirmalar.filter(f => !f.uzmanAd).map(f => f.name).join(', ')} — hemen atama yapın.
                         </p>
                       </div>
                       <button
                         onClick={() => setActiveTab('firmalar')}
                         className="whitespace-nowrap text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer flex-shrink-0"
-                        style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#D97706' }}
+                        style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#F59E0B' }}
                       >
                         Firmalara Git →
                       </button>
@@ -555,13 +592,13 @@ export default function OsgbDashboardPage() {
 
               {/* ── FİRMALAR TAB ── */}
               {activeTab === 'firmalar' && (
-                <div className="space-y-4">
+                <div className="space-y-4 page-enter">
                   <div className="flex items-center gap-3 flex-wrap">
                     <div className="relative max-w-sm w-full sm:w-auto">
-                      <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: '#94a3b8' }} />
+                      <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)', zIndex: 2 }} />
                       <input value={searchFirma} onChange={e => setSearchFirma(e.target.value)}
-                        placeholder="Firma ara..." className="text-sm pl-9 pr-4 py-2.5 rounded-xl w-full"
-                        style={{ background: '#fff', border: '1px solid #e2e8f0', outline: 'none', color: '#0f172a' }} />
+                        placeholder="Firma ara..." className="text-sm pl-9 pr-4 py-2.5 rounded-xl w-full outline-none"
+                        style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: 'var(--text-primary)' }} />
                     </div>
                     <button onClick={() => { setShowFirmaModal(true); setFirmaError(null); setFirmaAd(''); }}
                       className="whitespace-nowrap ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
@@ -571,13 +608,13 @@ export default function OsgbDashboardPage() {
                   </div>
 
                   {filteredFirmalar.length === 0 ? (
-                    <div className="rounded-2xl p-12 flex flex-col items-center gap-4" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
-                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)' }}>
+                    <div className="rounded-2xl p-12 flex flex-col items-center gap-4" style={cardStyle}>
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
                         <i className="ri-building-2-line text-2xl" style={{ color: '#10B981' }} />
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-semibold mb-1" style={{ color: '#0f172a' }}>Henüz firma eklenmedi</p>
-                        <p className="text-xs" style={{ color: '#94a3b8' }}>Müşteri firmalarınızı ekleyerek ISG süreçlerini yönetmeye başlayın.</p>
+                        <p className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>Henüz firma eklenmedi</p>
+                        <p className="text-xs" style={{ color: textMuted }}>Müşteri firmalarınızı ekleyerek ISG süreçlerini yönetmeye başlayın.</p>
                       </div>
                       <button onClick={() => setShowFirmaModal(true)}
                         className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
@@ -586,33 +623,37 @@ export default function OsgbDashboardPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                    <div className="rounded-2xl overflow-hidden" style={cardStyle}>
                       <table className="w-full">
                         <thead>
-                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--table-head-bg)' }}>
                             {['Firma Adı', 'Sorumlu Uzman', 'Personel', 'Uygunsuzluk', 'Eklenme Tarihi', ''].map(h => (
-                              <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#94a3b8' }}>{h}</th>
+                              <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: textMuted }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {filteredFirmalar.map((f, i) => (
-                            <tr key={f.id} style={{ borderBottom: i < filteredFirmalar.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                            <tr key={f.id}
+                              style={{ borderBottom: i < filteredFirmalar.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-row-hover)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                            >
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">
                                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
                                     <i className="ri-building-2-line text-xs" style={{ color: '#059669' }} />
                                   </div>
-                                  <span className="text-xs font-semibold" style={{ color: '#0f172a' }}>{f.name}</span>
+                                  <span className="text-xs font-semibold" style={{ color: textPrimary }}>{f.name}</span>
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-xs" style={{ color: f.uzmanAd ? '#64748b' : '#94a3b8' }}>
+                                <span className="text-xs" style={{ color: f.uzmanAd ? 'var(--text-secondary)' : textMuted }}>
                                   {f.uzmanAd ?? '—'}
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-xs font-semibold" style={{ color: '#0f172a' }}>{f.personelSayisi}</span>
+                                <span className="text-xs font-semibold" style={{ color: textPrimary }}>{f.personelSayisi}</span>
                               </td>
                               <td className="px-4 py-3">
                                 <span className="text-xs font-bold px-2 py-0.5 rounded-full"
@@ -624,7 +665,7 @@ export default function OsgbDashboardPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-xs" style={{ color: '#94a3b8' }}>
+                                <span className="text-xs" style={{ color: textMuted }}>
                                   {new Date(f.created_at).toLocaleDateString('tr-TR')}
                                 </span>
                               </td>
@@ -634,8 +675,7 @@ export default function OsgbDashboardPage() {
                                   className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
                                   style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669' }}
                                 >
-                                  <i className="ri-eye-line text-xs" />
-                                  Detay
+                                  <i className="ri-eye-line text-xs" />Detay
                                 </button>
                               </td>
                             </tr>
@@ -649,13 +689,13 @@ export default function OsgbDashboardPage() {
 
               {/* ── UZMANLAR TAB ── */}
               {activeTab === 'uzmanlar' && (
-                <div className="space-y-4">
+                <div className="space-y-4 page-enter">
                   <div className="flex items-center gap-3 flex-wrap">
                     <div className="relative max-w-sm w-full sm:w-auto">
-                      <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: '#94a3b8' }} />
+                      <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)', zIndex: 2 }} />
                       <input value={searchUzman} onChange={e => setSearchUzman(e.target.value)}
-                        placeholder="Uzman ara..." className="text-sm pl-9 pr-4 py-2.5 rounded-xl w-full"
-                        style={{ background: '#fff', border: '1px solid #e2e8f0', outline: 'none', color: '#0f172a' }} />
+                        placeholder="Uzman ara..." className="text-sm pl-9 pr-4 py-2.5 rounded-xl w-full outline-none"
+                        style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: 'var(--text-primary)' }} />
                     </div>
                     <button onClick={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' }); }}
                       className="whitespace-nowrap ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
@@ -665,13 +705,13 @@ export default function OsgbDashboardPage() {
                   </div>
 
                   {filteredUzmanlar.length === 0 ? (
-                    <div className="rounded-2xl p-12 flex flex-col items-center gap-4" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
-                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)' }}>
+                    <div className="rounded-2xl p-12 flex flex-col items-center gap-4" style={cardStyle}>
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
                         <i className="ri-user-star-line text-2xl" style={{ color: '#8B5CF6' }} />
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-semibold mb-1" style={{ color: '#0f172a' }}>Henüz gezici uzman eklenmedi</p>
-                        <p className="text-xs" style={{ color: '#94a3b8' }}>Gezici uzmanlarınızı ekleyip firmalara atayın.</p>
+                        <p className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>Henüz gezici uzman eklenmedi</p>
+                        <p className="text-xs" style={{ color: textMuted }}>Gezici uzmanlarınızı ekleyip firmalara atayın.</p>
                       </div>
                       <button onClick={() => setShowUzmanModal(true)}
                         className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
@@ -682,44 +722,44 @@ export default function OsgbDashboardPage() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredUzmanlar.map(u => (
-                        <div key={u.user_id} className="rounded-2xl p-5" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                        <div key={u.user_id} className="rounded-2xl p-5 isg-card-hover" style={cardStyle}>
                           <div className="flex items-start gap-3 mb-4">
                             <div className="w-12 h-12 rounded-xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
-                              style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
+                              style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)', boxShadow: u.is_active ? '0 4px 12px rgba(16,185,129,0.35)' : 'none' }}>
                               {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold truncate" style={{ color: '#0f172a' }}>{u.display_name}</p>
-                              <p className="text-xs truncate" style={{ color: '#94a3b8' }}>{u.email}</p>
+                              <p className="text-sm font-bold truncate" style={{ color: textPrimary }}>{u.display_name}</p>
+                              <p className="text-xs truncate" style={{ color: textMuted }}>{u.email}</p>
                             </div>
-                            <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1"
-                              style={{ background: u.is_active ? '#10B981' : '#94a3b8' }} />
+                            <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1 animate-pulse"
+                              style={{ background: u.is_active ? '#10B981' : '#64748b' }} />
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-xs" style={{ color: '#64748b' }}>
+                          <div className="space-y-2 mb-4">
+                            <div className="flex items-center gap-2 text-xs rounded-lg px-3 py-2" style={{ background: rowBgBase }}>
                               <i className="ri-building-2-line text-xs" style={{ color: '#059669' }} />
-                              <span className="truncate">{u.active_firm_name ?? 'Firma atanmadı'}</span>
+                              <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{u.active_firm_name ?? 'Firma atanmadı'}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs" style={{ color: '#64748b' }}>
+                            <div className="flex items-center gap-2 text-xs rounded-lg px-3 py-2" style={{ background: rowBgBase }}>
                               <i className="ri-user-star-line text-xs" style={{ color: '#8B5CF6' }} />
-                              <span>Gezici Uzman</span>
+                              <span style={{ color: 'var(--text-secondary)' }}>Gezici Uzman</span>
                             </div>
                           </div>
-                          <div className="mt-4 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid #f1f5f9' }}>
-                            <span className="text-[10px] font-bold px-2 py-1 rounded-full"
+                          <div className="pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
                               style={{
                                 background: u.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
-                                color: u.is_active ? '#10B981' : '#94a3b8',
+                                color: u.is_active ? '#10B981' : '#64748b',
+                                border: `1px solid ${u.is_active ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)'}`,
                               }}>
-                              {u.is_active ? 'Aktif' : 'Pasif'}
+                              {u.is_active ? '● Aktif' : '○ Pasif'}
                             </span>
                             <button
                               onClick={() => setSecilenUzman(u)}
                               className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
                               style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669' }}
                             >
-                              <i className="ri-settings-3-line text-xs" />
-                              Düzenle
+                              <i className="ri-settings-3-line text-xs" />Düzenle
                             </button>
                           </div>
                         </div>
@@ -740,33 +780,33 @@ export default function OsgbDashboardPage() {
 
               {/* ── RAPORLAR TAB ── */}
               {activeTab === 'raporlar' && (
-                <div className="space-y-5">
+                <div className="space-y-5 page-enter">
                   {/* Filtre bar */}
-                  <div className="rounded-2xl p-5" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                  <div className="rounded-2xl p-5" style={cardStyle}>
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Rapor Oluştur</h3>
-                        <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>Dönem ve firma seçerek PDF veya Excel raporu indirin</p>
+                        <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Rapor Oluştur</h3>
+                        <p className="text-xs mt-0.5" style={{ color: textMuted }}>Dönem ve firma seçerek PDF veya Excel raporu indirin</p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-3 items-end">
                       <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#475569' }}>Dönem</label>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: textMuted }}>Dönem</label>
                         <input
                           type="month"
                           value={raporDonem}
                           onChange={e => setRaporDonem(e.target.value)}
-                          className="text-sm px-3 py-2 rounded-xl"
-                          style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#1e293b', outline: 'none' }}
+                          className="text-sm px-3 py-2 rounded-xl outline-none"
+                          style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-input)', color: 'var(--text-primary)' }}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#475569' }}>Firma Filtresi</label>
+                        <label className="block text-xs font-semibold mb-1.5" style={{ color: textMuted }}>Firma Filtresi</label>
                         <select
                           value={raporFirmaFilter}
                           onChange={e => setRaporFirmaFilter(e.target.value)}
-                          className="text-sm px-3 py-2 rounded-xl cursor-pointer"
-                          style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#1e293b', outline: 'none', minWidth: '200px' }}
+                          className="text-sm px-3 py-2 rounded-xl cursor-pointer outline-none"
+                          style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-input)', color: 'var(--text-primary)', minWidth: '200px' }}
                         >
                           <option value="">Tüm Firmalar</option>
                           {altFirmalar.map(f => (
@@ -812,83 +852,85 @@ export default function OsgbDashboardPage() {
                   {/* Özet KPI'lar */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
-                      { label: 'Seçili Firma', value: filteredRaporFirmalar.length, icon: 'ri-building-2-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-                      { label: 'Toplam Personel', value: filteredRaporFirmalar.reduce((s, f) => s + f.personelSayisi, 0), icon: 'ri-group-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.08)' },
-                      { label: 'Açık Uygunsuzluk', value: filteredRaporFirmalar.reduce((s, f) => s + f.uygunsuzluk, 0), icon: 'ri-alert-line', color: '#EF4444', bg: 'rgba(239,68,68,0.08)' },
-                      { label: 'Toplam Tutanak', value: filteredRaporFirmalar.reduce((s, f) => s + f.tutanakSayisi, 0), icon: 'ri-file-list-3-line', color: '#6366F1', bg: 'rgba(99,102,241,0.08)' },
+                      { label: 'Seçili Firma', value: filteredRaporFirmalar.length, icon: 'ri-building-2-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+                      { label: 'Toplam Personel', value: filteredRaporFirmalar.reduce((s, f) => s + f.personelSayisi, 0), icon: 'ri-group-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)' },
+                      { label: 'Açık Uygunsuzluk', value: filteredRaporFirmalar.reduce((s, f) => s + f.uygunsuzluk, 0), icon: 'ri-alert-line', color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
+                      { label: 'Toplam Tutanak', value: filteredRaporFirmalar.reduce((s, f) => s + f.tutanakSayisi, 0), icon: 'ri-file-list-3-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
                     ].map(s => (
-                      <div key={s.label} className="rounded-2xl p-5" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
+                      <div key={s.label} className="rounded-2xl p-5" style={cardStyle}>
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
                           <i className={`${s.icon} text-lg`} style={{ color: s.color }} />
                         </div>
-                        <p className="text-2xl font-extrabold mb-1" style={{ color: '#0f172a' }}>{s.value}</p>
-                        <p className="text-xs" style={{ color: '#94a3b8' }}>{s.label}</p>
+                        <p className="text-2xl font-extrabold mb-1" style={{ color: textPrimary }}>{s.value}</p>
+                        <p className="text-xs font-medium" style={{ color: textMuted }}>{s.label}</p>
                       </div>
                     ))}
                   </div>
 
                   {/* Firma detay tablosu */}
-                  <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
-                    <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Firma Detay Tablosu</h3>
+                  <div className="rounded-2xl overflow-hidden" style={cardStyle}>
+                    <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Firma Detay Tablosu</h3>
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
                         {donemLabel()}
                       </span>
                     </div>
                     {filteredRaporFirmalar.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-3">
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)' }}>
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
                           <i className="ri-file-chart-line text-xl" style={{ color: '#10B981' }} />
                         </div>
-                        <p className="text-sm" style={{ color: '#94a3b8' }}>Rapor için firma bulunamadı</p>
+                        <p className="text-sm" style={{ color: textMuted }}>Rapor için firma bulunamadı</p>
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[700px]">
                           <thead>
-                            <tr style={{ background: '#f8fafc' }}>
+                            <tr style={{ background: 'var(--table-head-bg)', borderBottom: '1px solid var(--border-subtle)' }}>
                               {['Firma Adı', 'Sorumlu Uzman', 'Personel', 'Açık Uyg.', 'Kapatılan', 'Tutanak', 'Eğitim', 'Kapanma %'].map(h => (
-                                <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#64748b' }}>{h}</th>
+                                <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: textMuted }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {filteredRaporFirmalar.map((f, i) => {
                               const kapanmaOran = f.uygunsuzluk > 0 ? Math.round((f.kapatilan / f.uygunsuzluk) * 100) : 100;
-                              const rowBg = i % 2 === 0 ? '#fff' : '#f8fafc';
-                              const uyColor = f.uygunsuzluk > 5 ? '#DC2626' : f.uygunsuzluk > 2 ? '#D97706' : '#16A34A';
-                              const uyBg = f.uygunsuzluk > 5 ? 'rgba(220,38,38,0.08)' : f.uygunsuzluk > 2 ? 'rgba(217,119,6,0.08)' : 'rgba(22,163,74,0.08)';
+                              const uyColor = f.uygunsuzluk > 5 ? '#EF4444' : f.uygunsuzluk > 2 ? '#F59E0B' : '#10B981';
+                              const uyBg = f.uygunsuzluk > 5 ? 'rgba(239,68,68,0.1)' : f.uygunsuzluk > 2 ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
                               return (
-                                <tr key={f.id} style={{ background: rowBg, borderTop: '1px solid #f1f5f9' }}>
+                                <tr key={f.id} style={{ borderTop: i > 0 ? '1px solid var(--border-subtle)' : 'none' }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-row-hover)'; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                                >
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
                                       <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
                                         <i className="ri-building-2-line text-xs" style={{ color: '#059669' }} />
                                       </div>
-                                      <span className="text-xs font-semibold" style={{ color: '#0f172a' }}>{f.name}</span>
+                                      <span className="text-xs font-semibold" style={{ color: textPrimary }}>{f.name}</span>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 text-xs" style={{ color: f.uzmanAd ? '#64748b' : '#94a3b8' }}>
+                                  <td className="px-4 py-3 text-xs" style={{ color: f.uzmanAd ? 'var(--text-secondary)' : textMuted }}>
                                     {f.uzmanAd ?? '—'}
                                   </td>
-                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#0f172a' }}>{f.personelSayisi}</td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: textPrimary }}>{f.personelSayisi}</td>
                                   <td className="px-4 py-3">
                                     <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: uyBg, color: uyColor }}>
                                       {f.uygunsuzluk}
                                     </span>
                                   </td>
-                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#16A34A' }}>{f.kapatilan}</td>
-                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#6366F1' }}>{f.tutanakSayisi}</td>
-                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#0891B2' }}>{f.egitimSayisi}</td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#10B981' }}>{f.kapatilan}</td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#8B5CF6' }}>{f.tutanakSayisi}</td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#06B6D4' }}>{f.egitimSayisi}</td>
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
-                                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#e2e8f0', minWidth: '48px' }}>
+                                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border-main)', minWidth: '48px' }}>
                                         <div
                                           className="h-full rounded-full"
                                           style={{ width: `${kapanmaOran}%`, background: kapanmaOran >= 80 ? '#10B981' : kapanmaOran >= 50 ? '#F59E0B' : '#EF4444' }}
                                         />
                                       </div>
-                                      <span className="text-xs font-bold flex-shrink-0" style={{ color: kapanmaOran >= 80 ? '#059669' : kapanmaOran >= 50 ? '#D97706' : '#DC2626' }}>
+                                      <span className="text-xs font-bold flex-shrink-0" style={{ color: kapanmaOran >= 80 ? '#10B981' : kapanmaOran >= 50 ? '#F59E0B' : '#EF4444' }}>
                                         {kapanmaOran}%
                                       </span>
                                     </div>
@@ -898,24 +940,24 @@ export default function OsgbDashboardPage() {
                             })}
                           </tbody>
                           <tfoot>
-                            <tr style={{ background: '#f0fdf4', borderTop: '2px solid rgba(16,185,129,0.2)' }}>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#0f172a' }}>TOPLAM</td>
-                              <td className="px-4 py-3 text-xs" style={{ color: '#94a3b8' }}>—</td>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#0f172a' }}>
+                            <tr style={{ background: isDark ? 'rgba(16,185,129,0.08)' : '#f0fdf4', borderTop: '2px solid rgba(16,185,129,0.2)' }}>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#10B981' }}>TOPLAM</td>
+                              <td className="px-4 py-3 text-xs" style={{ color: textMuted }}>—</td>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: textPrimary }}>
                                 {filteredRaporFirmalar.reduce((s, f) => s + f.personelSayisi, 0)}
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(220,38,38,0.1)', color: '#DC2626' }}>
+                                <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
                                   {filteredRaporFirmalar.reduce((s, f) => s + f.uygunsuzluk, 0)}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#16A34A' }}>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#10B981' }}>
                                 {filteredRaporFirmalar.reduce((s, f) => s + f.kapatilan, 0)}
                               </td>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#6366F1' }}>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#8B5CF6' }}>
                                 {filteredRaporFirmalar.reduce((s, f) => s + f.tutanakSayisi, 0)}
                               </td>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#0891B2' }}>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#06B6D4' }}>
                                 {filteredRaporFirmalar.reduce((s, f) => s + f.egitimSayisi, 0)}
                               </td>
                               <td className="px-4 py-3" />
@@ -935,10 +977,10 @@ export default function OsgbDashboardPage() {
       {/* ── FİRMA EKLE MODAL ── */}
       {showFirmaModal && createPortal(
         <div className="fixed inset-0 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(16px)', zIndex: 99999 }}
           onClick={e => { if (e.target === e.currentTarget) setShowFirmaModal(false); }}>
-          <div className="w-full max-w-md rounded-2xl p-6 space-y-5"
-            style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="w-full max-w-md rounded-2xl p-6 space-y-5 animate-modal-in"
+            style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 flex items-center justify-center rounded-xl"
@@ -952,7 +994,7 @@ export default function OsgbDashboardPage() {
               </div>
               <button onClick={() => setShowFirmaModal(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                style={{ background: 'rgba(15,23,42,0.06)', color: '#64748b' }}>
+                style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}>
                 <i className="ri-close-line" />
               </button>
             </div>
@@ -1028,10 +1070,10 @@ export default function OsgbDashboardPage() {
       {/* ── UZMAN EKLE MODAL ── */}
       {showUzmanModal && createPortal(
         <div className="fixed inset-0 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(16px)', zIndex: 99999 }}
           onClick={e => { if (e.target === e.currentTarget) setShowUzmanModal(false); }}>
-          <div className="w-full max-w-md rounded-2xl p-6 space-y-4"
-            style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="w-full max-w-md rounded-2xl p-6 space-y-4 animate-modal-in"
+            style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 flex items-center justify-center rounded-xl"
@@ -1045,7 +1087,7 @@ export default function OsgbDashboardPage() {
               </div>
               <button onClick={() => setShowUzmanModal(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                style={{ background: 'rgba(15,23,42,0.06)', color: '#64748b' }}>
+                style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}>
                 <i className="ri-close-line" />
               </button>
             </div>
