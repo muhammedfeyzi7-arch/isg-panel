@@ -23,12 +23,12 @@ const tools: DocTool[] = [
   {
     id: 'acil-durum-eylem-plani',
     title: 'Acil Durum Eylem Planı',
-    description: 'AI destekli acil durum eylem planı oluşturun. Sektörünüze özel tahliye prosedürleri, müdahale adımları ve sorumluluk dağılımı otomatik hazırlanır.',
+    description: 'Resmi Acil Durum Planı oluşturun. Firma bilgilerini girin, ADEP-EM-01 numaralı belge tüm yasal içerikle Word formatında hazırlanır.',
     icon: 'ri-alarm-warning-line',
     color: '#DC2626',
     bgColor: 'rgba(220,38,38,0.08)',
     borderColor: 'rgba(220,38,38,0.18)',
-    badge: 'AI Destekli',
+    badge: 'Word Belgesi',
     badgeBg: 'rgba(220,38,38,0.1)',
   },
   {

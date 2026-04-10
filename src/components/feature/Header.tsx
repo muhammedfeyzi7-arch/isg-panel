@@ -248,9 +248,9 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           HEADER — Mobile-First
       ══════════════════════════════════════════════════════ */}
       <header
-        className={`fixed top-0 right-0 z-30 flex items-center left-0 ${sidebarCollapsed ? 'lg:left-[56px]' : 'lg:left-[220px]'}`}
+        className={`fixed top-0 right-0 z-30 flex items-center left-0 ${sidebarCollapsed ? 'lg:left-[48px]' : 'lg:left-[168px]'}`}
         style={{
-          height: '52px',
+          height: '46px',
           background: headerBg,
           backdropFilter: 'blur(28px)',
           WebkitBackdropFilter: 'blur(28px)',

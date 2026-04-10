@@ -18,6 +18,7 @@ export default function KoordinatorAtamasiModal({ onClose }: Props) {
   const [projeAdresi, setProjeAdresi] = useState('');
   const [sgkSicilNo, setSgkSicilNo] = useState('');
   const [isverenAdi, setIsverenAdi] = useState('');
+  const [isverenFirmaAdi, setIsverenFirmaAdi] = useState('');
   const [koordinatorAdi, setKoordinatorAdi] = useState('');
   const [koordinatorTc, setKoordinatorTc] = useState('');
   const [koordinatorFirma, setKoordinatorFirma] = useState('');
@@ -150,7 +151,7 @@ export default function KoordinatorAtamasiModal({ onClose }: Props) {
             alignment: AlignmentType.CENTER,
             spacing: { before: 0, after: 60 },
             children: [
-              new TextRun({ text: 'İSG-FR-05', bold: true, size: 20, font: FONT, color: 'FFFFFF' }),
+              new TextRun({ text: 'İSG-DENETİM10', bold: true, size: 20, font: FONT, color: 'FFFFFF' }),
             ],
           }),
           new Paragraph({
@@ -261,7 +262,7 @@ export default function KoordinatorAtamasiModal({ onClose }: Props) {
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
                     border: { top: { style: BorderStyle.SINGLE, size: 6, color: '9CA3AF' } },
-                    children: [new TextRun({ text: isverenAdi, size: 18, font: FONT, color: '6B7280' })],
+                    children: [new TextRun({ text: isverenFirmaAdi || isverenAdi, size: 18, font: FONT, color: '6B7280' })],
                   }),
                 ],
               }),
@@ -374,7 +375,7 @@ export default function KoordinatorAtamasiModal({ onClose }: Props) {
           new TextRun({ text: 'Bu belge ', size: 16, font: FONT, color: '9CA3AF' }),
           new TextRun({ text: 'isgdenetim.com.tr', size: 16, font: FONT, color: ACCENT2, bold: true }),
           new TextRun({ text: ' tarafından oluşturulmuştur.', size: 16, font: FONT, color: '9CA3AF' }),
-          new TextRun({ text: `   ·   İSG-FR-05   ·   ${today}`, size: 16, font: FONT, color: '9CA3AF' }),
+          new TextRun({ text: `   ·   İSG-DENETİM10   ·   ${today}`, size: 16, font: FONT, color: '9CA3AF' }),
         ],
       });
 
@@ -502,6 +503,19 @@ export default function KoordinatorAtamasiModal({ onClose }: Props) {
                   style={{ background: 'var(--bg-app)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
                 />
               </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                  İşveren Firma Adı
+                  <span className="ml-1.5 text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>(İmza alanında görünür)</span>
+                </label>
+                <input
+                  value={isverenFirmaAdi}
+                  onChange={e => setIsverenFirmaAdi(e.target.value)}
+                  placeholder="Firma adı girilmezse işveren adı kullanılır"
+                  className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                  style={{ background: 'var(--bg-app)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
+                />
+              </div>
             </div>
           </div>
 
@@ -548,7 +562,7 @@ export default function KoordinatorAtamasiModal({ onClose }: Props) {
               <div>
                 <p className="text-xs font-semibold mb-1" style={{ color: '#1B3A6B' }}>Oluşturulacak Belge</p>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  İSG-FR-05 numaralı resmi atama formu; proje bilgileri, yasal atama metni, koordinatör bilgileri ve imza alanlarıyla Word formatında oluşturulacaktır.
+                  İSG-DENETİM10 numaralı resmi atama formu; proje bilgileri, yasal atama metni, koordinatör bilgileri ve imza alanlarıyla Word formatında oluşturulacaktır.
                 </p>
               </div>
             </div>

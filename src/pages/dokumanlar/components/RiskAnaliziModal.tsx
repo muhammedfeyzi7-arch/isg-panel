@@ -1,7 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
-import { exportToPDF } from '../utils/pdfExport';
 import { exportRiskToExcel } from '../utils/excelExport';
 
 interface RiskRow {
@@ -148,13 +147,12 @@ export default function RiskAnaliziModal({ onClose }: Props) {
   const [firmaAdi, setFirmaAdi] = useState('');
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
   const [rows, setRows] = useState<RiskRow[]>([]);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'form' | 'result'>('form');
   const [showRefTables, setShowRefTables] = useState(true);
-  const tableRef = useRef<HTMLDivElement>(null);
+
 
   const todayStr = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const [firmaBilgileri, setFirmaBilgileri] = useState<FirmaBilgileri>({
@@ -234,17 +232,6 @@ export default function RiskAnaliziModal({ onClose }: Props) {
 
   const removeRow = (i: number) => {
     setRows(prev => prev.filter((_, idx) => idx !== i).map((r, idx) => ({ ...r, no: idx + 1 })));
-  };
-
-  const handlePDF = async () => {
-    if (!tableRef.current) return;
-    setPdfLoading(true);
-    try {
-      await exportToPDF(
-        tableRef.current,
-        `Risk-Analizi-${firmaBilgileri.firmaAdi || firmaAdi || sektor}`,
-      );
-    } finally { setPdfLoading(false); }
   };
 
   const handleExcel = () => {
@@ -349,7 +336,7 @@ export default function RiskAnaliziModal({ onClose }: Props) {
           ) : (
             <div className="p-4">
             {/* PDF export wrapper — beyaz arka plan, sabit renkler */}
-            <div ref={tableRef} style={{ background: '#fff', color: '#111', fontFamily: 'Arial, sans-serif' }}>
+            <div style={{ background: '#fff', color: '#111', fontFamily: 'Arial, sans-serif' }}>
               {/* Referans Tablolar */}
               {showRefTables && (
                 <div className="mb-5 grid grid-cols-4 gap-3">
@@ -610,10 +597,6 @@ export default function RiskAnaliziModal({ onClose }: Props) {
                 <button onClick={handleExcel} disabled={excelLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
                   style={{ background: excelLoading ? 'rgba(22,163,74,0.4)' : '#16A34A', color: '#fff', opacity: excelLoading ? 0.7 : 1 }}>
                   {excelLoading ? <><i className="ri-loader-4-line animate-spin" /> Hazırlanıyor...</> : <><i className="ri-file-excel-2-line" /> Excel İndir</>}
-                </button>
-                <button onClick={handlePDF} disabled={pdfLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
-                  style={{ background: pdfLoading ? 'rgba(2,132,199,0.4)' : '#0284C7', color: '#fff', opacity: pdfLoading ? 0.7 : 1 }}>
-                  {pdfLoading ? <><i className="ri-loader-4-line animate-spin" /> Hazırlanıyor...</> : <><i className="ri-file-pdf-line" /> PDF İndir</>}
                 </button>
               </div>
             </>

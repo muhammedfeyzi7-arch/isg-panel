@@ -143,14 +143,14 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
     <aside
       className={`
         fixed left-0 top-0 h-screen flex flex-col z-[42]
-        ${collapsed ? 'w-[56px]' : 'w-[220px]'}
+        ${collapsed ? 'w-[48px]' : 'w-[168px]'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}
       style={{
         background: sidebarBg,
         borderRight: sidebarBorder,
         transition: 'width 0.26s cubic-bezier(0.4,0,0.2,1), transform 0.26s cubic-bezier(0.4,0,0.2,1)',
-        maxWidth: '260px',
+        maxWidth: '200px',
       }}
     >
       {/* ── Logo ── */}
@@ -158,8 +158,8 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         className={`flex items-center ${collapsed ? 'justify-center px-2' : 'px-3.5 gap-2'}`}
         style={{
           borderBottom: logoBorderBottom,
-          height: '52px',
-          minHeight: '52px',
+          height: '46px',
+          minHeight: '46px',
           flexShrink: 0,
         }}
       >
@@ -192,13 +192,13 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <p
-              className="text-[12px] font-bold leading-tight truncate"
+              className="text-[11px] font-bold leading-tight truncate"
               style={{ color: logoTitleColor, letterSpacing: '-0.02em' }}
             >
               ISG Denetim
             </p>
             <p
-              className="text-[9px] mt-0.5 font-semibold truncate"
+              className="text-[8px] mt-0.5 font-semibold truncate"
               style={{ color: logoSubColor, letterSpacing: '0.01em' }}
             >
               Yönetim Sistemi
@@ -301,7 +301,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                       {!collapsed && (
                         <>
                           <span
-                            className="text-[11.5px] flex-1 leading-none truncate"
+                            className="text-[11px] flex-1 leading-none truncate"
                             style={{
                               color: isActive ? activeTextColor : inactiveTextColor,
                               fontWeight: isActive ? 600 : 500,
