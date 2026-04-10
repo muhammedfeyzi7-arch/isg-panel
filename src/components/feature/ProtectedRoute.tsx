@@ -78,12 +78,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/osgb-dashboard" replace />;
   }
 
-  // OSGB onboarding: OSGB login'den gelip henüz org'u olmayan kullanıcı
-  // (org_type firma ama /osgb-dashboard'a gitmeye çalışıyor = yeni OSGB kullanıcısı)
+  // Firma kullanıcısı /osgb-dashboard veya /osgb-uzman'a erişmeye çalışıyorsa → /dashboard'a yönlendir
   const isOsgbDashboard = location.pathname === '/osgb-dashboard';
+  const isOsgbUzman = location.pathname === '/osgb-uzman';
   const isOsgbOnboarding = location.pathname === '/osgb-onboarding';
-  if (isOsgbDashboard && orgType === 'firma' && !isOsgbOnboarding) {
-    return <Navigate to="/osgb-onboarding" replace />;
+  if ((isOsgbDashboard || isOsgbUzman) && orgType === 'firma' && !isOsgbOnboarding) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

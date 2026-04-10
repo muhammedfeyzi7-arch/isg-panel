@@ -34,16 +34,28 @@ export default function OsgbLoginPage() {
     if (loginError) {
       setError(loginError);
     } else {
-      // osgb_role'ü sorgula → gezici uzmanı doğrudan /osgb-uzman'a at
       try {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) { setError('Kullanıcı bulunamadı.'); setLoading(false); return; }
+
         const { data: uo } = await supabase
           .from('user_organizations')
-          .select('osgb_role')
-          .eq('user_id', currentUser?.id ?? '')
+          .select('osgb_role, organization_id')
+          .eq('user_id', currentUser.id)
           .eq('is_active', true)
           .maybeSingle();
-        if (uo?.osgb_role === 'gezici_uzman') {
+
+        const role = uo?.osgb_role;
+
+        if (!role || (role !== 'osgb_admin' && role !== 'gezici_uzman')) {
+          // Bu kişi OSGB kullanıcısı değil — oturumu kapat ve uyar
+          await supabase.auth.signOut();
+          setError('Bu hesap OSGB paneli için yetkili değil. Lütfen normal giriş sayfasını kullanın.');
+          setLoading(false);
+          return;
+        }
+
+        if (role === 'gezici_uzman') {
           navigate('/osgb-uzman', { replace: true });
         } else {
           navigate('/osgb-dashboard', { replace: true });
