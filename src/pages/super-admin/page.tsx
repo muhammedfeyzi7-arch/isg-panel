@@ -21,20 +21,39 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate('/super-admin/login', { replace: true }); return; }
-      const { data: profile } = await supabase
-        .from('profiles').select('is_super_admin').eq('user_id', session.user.id).maybeSingle();
-      if (!profile?.is_super_admin) { navigate('/super-admin/login', { replace: true }); return; }
-      setIsSuperAdmin(true);
-      setAuthChecked(true);
+      try {
+        const saToken = sessionStorage.getItem('sa_access_token');
+        const saUserId = sessionStorage.getItem('sa_user_id');
+        if (!saToken || !saUserId) { navigate('/super-admin/login', { replace: true }); return; }
+        const { data: { user }, error: userErr } = await supabase.auth.getUser(saToken);
+        if (userErr || !user || user.id !== saUserId) {
+          sessionStorage.removeItem('sa_access_token');
+          sessionStorage.removeItem('sa_user_id');
+          navigate('/super-admin/login', { replace: true });
+          return;
+        }
+        const { data: profile } = await supabase.from('profiles').select('is_super_admin').eq('user_id', user.id).maybeSingle();
+        if (!profile?.is_super_admin) {
+          sessionStorage.removeItem('sa_access_token');
+          sessionStorage.removeItem('sa_user_id');
+          navigate('/super-admin/login', { replace: true });
+          return;
+        }
+        setIsSuperAdmin(true);
+        setAuthChecked(true);
+      } catch {
+        sessionStorage.removeItem('sa_access_token');
+        sessionStorage.removeItem('sa_user_id');
+        navigate('/super-admin/login', { replace: true });
+      }
     })();
   }, [navigate]);
 
   useEffect(() => { if (authChecked) fetchOrgs(); }, [authChecked, fetchOrgs]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut({ scope: 'local' });
+  const handleLogout = () => {
+    sessionStorage.removeItem('sa_access_token');
+    sessionStorage.removeItem('sa_user_id');
     navigate('/super-admin/login', { replace: true });
   };
 
@@ -60,10 +79,10 @@ export default function SuperAdminPage() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-slate-400">
-          <i className="ri-loader-4-line animate-spin text-xl"></i>
-          <span className="text-sm font-medium">Yetki kontrol ediliyor...</span>
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+        <div className="flex items-center gap-2.5 text-slate-400">
+          <i className="ri-loader-4-line animate-spin text-lg"></i>
+          <span className="text-sm">Yetki kontrol ediliyor...</span>
         </div>
       </div>
     );
@@ -72,38 +91,37 @@ export default function SuperAdminPage() {
   if (!isSuperAdmin) return null;
 
   const statCards = [
-    { icon: 'ri-building-2-line',   label: 'Toplam Org.',    value: stats.total,        key: 'all' as const,     color: '#6366F1', bg: '#EEF2FF' },
-    { icon: 'ri-checkbox-circle-line', label: 'Aktif',        value: stats.active,       key: 'active' as const,  color: '#10B981', bg: '#ECFDF5' },
-    { icon: 'ri-pause-circle-line', label: 'Pasif',           value: stats.passive,      key: 'passive' as const, color: '#EF4444', bg: '#FEF2F2' },
-    { icon: 'ri-timer-flash-line',  label: 'Süresi Doldu',   value: stats.expired,      key: 'expired' as const, color: '#F97316', bg: '#FFF7ED' },
-    { icon: 'ri-alarm-warning-line',label: '14 Günde Doluyor',value: stats.expiringSoon, key: null,               color: '#F59E0B', bg: '#FFFBEB' },
-    { icon: 'ri-team-line',         label: 'Toplam Üye',     value: stats.totalMembers, key: null,               color: '#64748B', bg: '#F8FAFC' },
+    { label: 'Toplam',        value: stats.total,         key: 'all' as const,     dot: '#94a3b8' },
+    { label: 'Aktif',         value: stats.active,        key: 'active' as const,  dot: '#10b981' },
+    { label: 'Pasif',         value: stats.passive,       key: 'passive' as const, dot: '#f87171' },
+    { label: 'Süresi Doldu',  value: stats.expired,       key: 'expired' as const, dot: '#fb923c' },
+    { label: '14 Günde Doluyor', value: stats.expiringSoon, key: null,             dot: '#fbbf24' },
+    { label: 'Toplam Üye',   value: stats.totalMembers,  key: null,               dot: '#94a3b8' },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#f8fafc]">
       {/* Navbar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-14 md:h-16 flex items-center justify-between">
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30">
+        <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-600">
-              <i className="ri-shield-keyhole-fill text-white text-xs md:text-sm"></i>
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-900">
+              <i className="ri-shield-keyhole-fill text-white text-xs"></i>
             </div>
-            <div>
-              <p className="text-slate-900 font-bold text-xs md:text-sm leading-none">Admin Panel</p>
-              <p className="text-slate-400 text-xs mt-0.5 hidden sm:block">isgdenetim.com.tr</p>
-            </div>
+            <span className="text-slate-800 font-semibold text-sm">Admin Panel</span>
+            <span className="hidden sm:block text-slate-300 text-sm">·</span>
+            <span className="hidden sm:block text-slate-400 text-xs">isgdenetim.com.tr</span>
           </div>
 
-          {/* Sağ aksiyonlar */}
-          <div className="flex items-center gap-1.5 md:gap-2">
+          {/* Sağ */}
+          <div className="flex items-center gap-2">
             {activeTab === 'orgs' && (
               <button
                 onClick={() => setCreateOpen(true)}
-                className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl text-white text-xs md:text-sm font-semibold cursor-pointer whitespace-nowrap transition-all bg-indigo-600 hover:bg-indigo-700"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer whitespace-nowrap transition-colors"
               >
-                <i className="ri-add-line"></i>
+                <i className="ri-add-line text-sm"></i>
                 <span className="hidden sm:inline">Yeni Organizasyon</span>
                 <span className="sm:hidden">Yeni</span>
               </button>
@@ -111,13 +129,15 @@ export default function SuperAdminPage() {
             <button
               onClick={fetchOrgs}
               disabled={loading}
-              className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 cursor-pointer transition-all"
+              title="Yenile"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 cursor-pointer transition-colors"
             >
               <i className={`ri-refresh-line text-sm ${loading ? 'animate-spin' : ''}`}></i>
             </button>
             <button
               onClick={handleLogout}
-              className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 hover:text-red-500 text-slate-500 cursor-pointer transition-all"
+              title="Çıkış"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 hover:text-red-500 text-slate-400 cursor-pointer transition-colors"
             >
               <i className="ri-logout-box-line text-sm"></i>
             </button>
@@ -125,18 +145,18 @@ export default function SuperAdminPage() {
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-4 md:px-8 py-4 md:py-8 space-y-4 md:space-y-6">
+      <main className="max-w-screen-xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
 
-        {/* Tab switcher */}
-        <div className="flex gap-1 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit">
+        {/* Tab bar */}
+        <div className="flex items-center gap-1">
           {(['orgs', 'support'] as const).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`flex-1 sm:flex-none px-4 md:px-5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 activeTab === t
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                  ? 'bg-white border border-slate-200 text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-white/60'
               }`}
             >
               {t === 'orgs' ? 'Organizasyonlar' : 'Destek Talepleri'}
@@ -149,41 +169,47 @@ export default function SuperAdminPage() {
         {activeTab === 'orgs' && (
           <>
             {/* Stat kartları */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {statCards.map((s, i) => {
                 const isActive = s.key !== null && filter === s.key;
                 return (
                   <button
                     key={i}
                     onClick={() => s.key && setFilter(s.key)}
-                    className={`p-3 md:p-5 rounded-2xl border text-left transition-all ${s.key ? 'cursor-pointer' : 'cursor-default'} ${
+                    className={`p-4 rounded-xl border text-left transition-all ${
+                      s.key ? 'cursor-pointer' : 'cursor-default'
+                    } ${
                       isActive
-                        ? 'border-slate-900 bg-slate-900'
+                        ? 'bg-slate-900 border-slate-900'
                         : 'bg-white border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <div
-                      className="w-7 h-7 md:w-9 md:h-9 rounded-xl flex items-center justify-center mb-2 md:mb-4"
-                      style={{ background: isActive ? 'rgba(255,255,255,0.15)' : s.bg }}
-                    >
-                      <i className={`${s.icon} text-xs md:text-sm`} style={{ color: isActive ? '#fff' : s.color }}></i>
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ background: isActive ? 'rgba(255,255,255,0.5)' : s.dot }}
+                      />
+                      <span className={`text-xs font-medium truncate ${isActive ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {s.label}
+                      </span>
                     </div>
-                    <p className={`text-xl md:text-2xl font-black mb-0.5 md:mb-1 ${isActive ? 'text-white' : 'text-slate-900'}`}>{s.value}</p>
-                    <p className={`text-xs font-medium leading-tight ${isActive ? 'text-slate-400' : 'text-slate-500'}`}>{s.label}</p>
+                    <p className={`text-2xl font-semibold tracking-tight ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                      {s.value}
+                    </p>
                   </button>
                 );
               })}
             </div>
 
             {/* Tablo kartı */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
               {/* Tablo başlığı */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 gap-3">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-slate-900 font-bold text-sm">
-                    {filter === 'all' ? 'Tüm Organizasyonlar' : filter === 'active' ? 'Aktif Organizasyonlar' : filter === 'passive' ? 'Pasif Organizasyonlar' : 'Süresi Dolmuş'}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between px-5 py-4 border-b border-slate-100 gap-3">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-slate-800 font-semibold text-sm">
+                    {filter === 'all' ? 'Tüm Organizasyonlar' : filter === 'active' ? 'Aktif' : filter === 'passive' ? 'Pasif' : 'Süresi Dolmuş'}
                   </h2>
-                  <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs font-medium rounded-md">
                     {filteredOrgs.length}
                   </span>
                 </div>
@@ -193,22 +219,22 @@ export default function SuperAdminPage() {
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="Organizasyon ara..."
-                    className="w-full sm:w-56 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 transition-all"
+                    placeholder="Ara..."
+                    className="w-full sm:w-52 pl-8 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition-all"
                   />
                 </div>
               </div>
 
               {loading && !orgs.length ? (
-                <div className="flex items-center justify-center py-24 text-slate-400">
-                  <i className="ri-loader-4-line animate-spin text-2xl mr-3"></i>
+                <div className="flex items-center justify-center py-20 text-slate-400">
+                  <i className="ri-loader-4-line animate-spin text-xl mr-2.5"></i>
                   <span className="text-sm">Yükleniyor...</span>
                 </div>
               ) : error ? (
-                <div className="flex flex-col items-center justify-center py-24 gap-3">
-                  <i className="ri-error-warning-line text-3xl text-red-400"></i>
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                  <i className="ri-error-warning-line text-2xl text-red-400"></i>
                   <p className="text-sm text-slate-500">{error}</p>
-                  <button onClick={fetchOrgs} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-xl cursor-pointer font-medium">
+                  <button onClick={fetchOrgs} className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-lg cursor-pointer font-medium transition-colors">
                     Tekrar Dene
                   </button>
                 </div>

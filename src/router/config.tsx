@@ -27,6 +27,7 @@ const MODULE_SLUGS = [
   'is-izinleri',
   'saha',
   'raporlar',
+  'dokumanlar',
   'copkutusu',
   'ayarlar',
 ];

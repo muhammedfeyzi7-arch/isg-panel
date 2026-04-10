@@ -11,15 +11,23 @@ export default function SuperAdminLoginPage() {
   const [showPw, setShowPw] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('is_super_admin')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-      if (data?.is_super_admin) navigate('/super-admin', { replace: true });
-    });
+    // Sadece sessionStorage'daki SA token'ını kontrol et
+    const saToken = sessionStorage.getItem('sa_access_token');
+    const saUserId = sessionStorage.getItem('sa_user_id');
+    if (saToken && saUserId) {
+      // Token var, doğrula
+      supabase.auth.getUser(saToken).then(({ data: { user }, error }) => {
+        if (!error && user && user.id === saUserId) {
+          supabase.from('profiles').select('is_super_admin').eq('user_id', user.id).maybeSingle()
+            .then(({ data }) => {
+              if (data?.is_super_admin) navigate('/super-admin', { replace: true });
+            });
+        } else {
+          sessionStorage.removeItem('sa_access_token');
+          sessionStorage.removeItem('sa_user_id');
+        }
+      });
+    }
   }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -32,18 +40,34 @@ export default function SuperAdminLoginPage() {
         email: email.trim().toLowerCase(),
         password,
       });
-      if (signInErr || !data.user) { setError('E-posta veya şifre hatalı.'); setLoading(false); return; }
+      if (signInErr || !data.user || !data.session) {
+        setError('E-posta veya şifre hatalı.');
+        setLoading(false);
+        return;
+      }
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_super_admin')
         .eq('user_id', data.user.id)
         .maybeSingle();
+
       if (!profile?.is_super_admin) {
+        // Super admin değil — Supabase session'ını temizle, token kaydetme
         await supabase.auth.signOut({ scope: 'local' });
         setError('Bu panele erişim yetkiniz bulunmuyor.');
         setLoading(false);
         return;
       }
+
+      // Sadece sessionStorage'a kaydet — localStorage'daki normal kullanıcı session'ına dokunma
+      // Tarayıcı kapanınca sessionStorage temizlenir (güvenli)
+      sessionStorage.setItem('sa_access_token', data.session.access_token);
+      sessionStorage.setItem('sa_user_id', data.user.id);
+
+      // Supabase'in kendi localStorage session'ını temizle (normal kullanıcıyla karışmasın)
+      await supabase.auth.signOut({ scope: 'local' });
+
       navigate('/super-admin', { replace: true });
     } catch {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
