@@ -5,6 +5,8 @@ import { useApp } from '../../store/AppContext';
 import { supabase } from '../../lib/supabase';
 import { downloadOsgbReportPdf } from './utils/osgbReportPdf';
 import { downloadOsgbReportExcel } from './utils/osgbReportExcel';
+import FirmaDetayModal from './components/FirmaDetayModal';
+import UzmanDetayModal from './components/UzmanDetayModal';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -56,6 +58,10 @@ export default function OsgbDashboardPage() {
   const [uzmanlar, setUzmanlar] = useState<Uzman[]>([]);
   const [firmaDetaylar, setFirmaDetaylar] = useState<FirmaDetay[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+
+  // Detay modalları
+  const [secilenFirma, setSecilenFirma] = useState<{ id: string; name: string } | null>(null);
+  const [secilenUzman, setSecilenUzman] = useState<Uzman | null>(null);
 
   // Rapor
   const [raporDonem, setRaporDonem] = useState(() => {
@@ -491,7 +497,13 @@ export default function OsgbDashboardPage() {
                       ) : (
                         <div className="space-y-2">
                           {altFirmalar.slice(0, 5).map(f => (
-                            <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: '#f8fafc' }}>
+                            <div key={f.id}
+                              onClick={() => setSecilenFirma({ id: f.id, name: f.name })}
+                              className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                              style={{ background: '#f8fafc' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f0fdf4'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                            >
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
                                 <i className="ri-building-2-line text-sm" style={{ color: '#059669' }} />
                               </div>
@@ -501,12 +513,15 @@ export default function OsgbDashboardPage() {
                                   {f.uzmanAd ?? 'Uzman atanmadı'} · {f.personelSayisi} personel
                                 </p>
                               </div>
-                              {f.uygunsuzluk > 0 && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                                  style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                                  {f.uygunsuzluk} uygunsuzluk
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {f.uygunsuzluk > 0 && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                    style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                                    {f.uygunsuzluk}
+                                  </span>
+                                )}
+                                <i className="ri-arrow-right-s-line text-sm" style={{ color: '#cbd5e1' }} />
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -536,7 +551,13 @@ export default function OsgbDashboardPage() {
                       ) : (
                         <div className="space-y-2">
                           {uzmanlar.slice(0, 5).map(u => (
-                            <div key={u.user_id} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: '#f8fafc' }}>
+                            <div key={u.user_id}
+                              onClick={() => setSecilenUzman(u)}
+                              className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                              style={{ background: '#f8fafc' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f0fdf4'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                            >
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                                 style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : '#94a3b8' }}>
                                 {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
@@ -545,14 +566,42 @@ export default function OsgbDashboardPage() {
                                 <p className="text-xs font-semibold truncate" style={{ color: '#0f172a' }}>{u.display_name ?? u.email}</p>
                                 <p className="text-[10px] truncate" style={{ color: '#94a3b8' }}>{u.active_firm_name ?? 'Firma atanmadı'}</p>
                               </div>
-                              <span className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{ background: u.is_active ? '#10B981' : '#94a3b8' }} />
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="w-2 h-2 rounded-full" style={{ background: u.is_active ? '#10B981' : '#94a3b8' }} />
+                                <i className="ri-arrow-right-s-line text-sm" style={{ color: '#cbd5e1' }} />
+                              </div>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
                   </div>
+
+                  {/* Uyarı Bandı — uzman atanmamış firmalar */}
+                  {altFirmalar.filter(f => !f.uzmanAd).length > 0 && (
+                    <div className="rounded-2xl p-4 flex items-start gap-4"
+                      style={{ background: 'rgba(245,158,11,0.05)', border: '1.5px solid rgba(245,158,11,0.2)' }}>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(245,158,11,0.1)' }}>
+                        <i className="ri-alert-line text-base" style={{ color: '#D97706' }} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold" style={{ color: '#92400E' }}>
+                          {altFirmalar.filter(f => !f.uzmanAd).length} firmaya uzman atanmadı
+                        </p>
+                        <p className="text-[10px] mt-1" style={{ color: '#B45309' }}>
+                          {altFirmalar.filter(f => !f.uzmanAd).map(f => f.name).join(', ')} — hemen atama yapın.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('firmalar')}
+                        className="whitespace-nowrap text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer flex-shrink-0"
+                        style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#D97706' }}
+                      >
+                        Firmalara Git →
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -593,7 +642,7 @@ export default function OsgbDashboardPage() {
                       <table className="w-full">
                         <thead>
                           <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            {['Firma Adı', 'Sorumlu Uzman', 'Personel', 'Uygunsuzluk', 'Eklenme Tarihi'].map(h => (
+                            {['Firma Adı', 'Sorumlu Uzman', 'Personel', 'Uygunsuzluk', 'Eklenme Tarihi', ''].map(h => (
                               <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: '#94a3b8' }}>{h}</th>
                             ))}
                           </tr>
@@ -630,6 +679,16 @@ export default function OsgbDashboardPage() {
                                 <span className="text-xs" style={{ color: '#94a3b8' }}>
                                   {new Date(f.created_at).toLocaleDateString('tr-TR')}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => setSecilenFirma({ id: f.id, name: f.name })}
+                                  className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                                  style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669' }}
+                                >
+                                  <i className="ri-eye-line text-xs" />
+                                  Detay
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -706,6 +765,14 @@ export default function OsgbDashboardPage() {
                               }}>
                               {u.is_active ? 'Aktif' : 'Pasif'}
                             </span>
+                            <button
+                              onClick={() => setSecilenUzman(u)}
+                              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
+                              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669' }}
+                            >
+                              <i className="ri-settings-3-line text-xs" />
+                              Düzenle
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -973,6 +1040,31 @@ export default function OsgbDashboardPage() {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* ── FİRMA DETAY MODAL ── */}
+      {secilenFirma && org?.id && (
+        <FirmaDetayModal
+          firmaId={secilenFirma.id}
+          firmaAdi={secilenFirma.name}
+          orgId={org.id}
+          uzmanlar={uzmanlar}
+          onClose={() => setSecilenFirma(null)}
+          onRefresh={fetchData}
+          addToast={addToast}
+        />
+      )}
+
+      {/* ── UZMAN DETAY MODAL ── */}
+      {secilenUzman && org?.id && (
+        <UzmanDetayModal
+          uzman={secilenUzman}
+          orgId={org.id}
+          altFirmalar={altFirmalar}
+          onClose={() => setSecilenUzman(null)}
+          onRefresh={fetchData}
+          addToast={addToast}
+        />
       )}
 
       {/* ── UZMAN EKLE MODAL ── */}
