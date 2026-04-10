@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../../store/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -32,12 +33,35 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     const { error: loginError } = await login(email.trim(), password);
-    setLoading(false);
     if (loginError) {
+      setLoading(false);
       setError(loginError);
-    } else {
-      navigate('/', { replace: true });
+      return;
     }
+
+    // OSGB kullanıcısı firma girişi yapıyorsa engelle
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (currentSession) {
+      const { data: uoList } = await supabase
+        .from('user_organizations')
+        .select('osgb_role')
+        .eq('user_id', currentSession.user.id)
+        .eq('is_active', true);
+
+      const hasOsgbRole = (uoList ?? []).some(
+        r => r.osgb_role === 'osgb_admin' || r.osgb_role === 'gezici_uzman'
+      );
+
+      if (hasOsgbRole) {
+        await supabase.auth.signOut();
+        setLoading(false);
+        setError('Bu hesap OSGB girişine aittir. Lütfen OSGB Girişi bölümünü kullanın.');
+        return;
+      }
+    }
+
+    setLoading(false);
+    navigate('/', { replace: true });
   };
 
   return (
