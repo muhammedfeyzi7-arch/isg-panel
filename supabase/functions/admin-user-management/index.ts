@@ -141,6 +141,7 @@ async function handleRequest(
   const action = body.action as string;
   const requestedOrgId = body.organization_id as string | undefined;
 
+  // Caller'ın üyeliğini bul — OSGB admin için osgb_role kontrolü de yap
   let membershipQuery = adminClient
     .from('user_organizations')
     .select('role, organization_id, display_name, email, is_active, osgb_role')
@@ -152,6 +153,7 @@ async function handleRequest(
   const { data: memberships, error: membershipError } = await membershipQuery;
 
   if (membershipError || !memberships || memberships.length === 0) {
+    console.error('[AUTH] Membership not found for userId:', userId, 'orgId:', requestedOrgId, 'error:', membershipError?.message);
     return new Response(JSON.stringify({ error: 'Organizasyon üyeliği bulunamadı.' }), {
       status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -164,6 +166,7 @@ async function handleRequest(
   const isOsgbAdmin = callerMembership.osgb_role === 'osgb_admin';
 
   if (!isAdmin && !isOsgbAdmin) {
+    console.error('[AUTH] Not admin. role:', callerMembership.role, 'osgb_role:', callerMembership.osgb_role);
     return new Response(JSON.stringify({ error: 'Bu işlem için admin yetkisi gereklidir.' }), {
       status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -313,6 +316,7 @@ async function handleRequest(
 
     const { error: memberError } = await adminClient.from('user_organizations').insert(insertPayload);
     if (memberError) {
+      console.error('[CREATE] member insert error:', memberError.message, memberError.code);
       if (memberError.code === '23505') {
         return new Response(JSON.stringify({ error: 'Bu kullanıcı zaten organizasyonda kayıtlı.' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -349,6 +353,8 @@ async function handleRequest(
       });
     }
 
+    console.log('[ASSIGN_FIRM] orgId:', orgId, 'firma_id:', firma_id, 'uzman_user_id:', uzman_user_id);
+
     // Önce bu firmaya atanmış diğer uzmanları temizle (service role ile RLS bypass)
     const { error: clearErr } = await adminClient
       .from('user_organizations')
@@ -357,6 +363,7 @@ async function handleRequest(
       .eq('active_firm_id', firma_id);
 
     if (clearErr) {
+      console.error('[ASSIGN_FIRM] clear error:', clearErr.message);
       return new Response(JSON.stringify({ error: 'Mevcut atama temizlenemedi: ' + clearErr.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -371,6 +378,7 @@ async function handleRequest(
         .eq('user_id', uzman_user_id);
 
       if (assignErr) {
+        console.error('[ASSIGN_FIRM] assign error:', assignErr.message);
         return new Response(JSON.stringify({ error: 'Uzman ataması yapılamadı: ' + assignErr.message }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

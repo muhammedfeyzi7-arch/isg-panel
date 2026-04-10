@@ -252,6 +252,13 @@ export function useOrganization(user: User | null) {
           return;
         }
 
+        // KVKK: sadece firma admin'ine göster.
+        // OSGB org ise, osgb_role varsa, ya da role admin değilse → KVKK atla
+        const isOsgbOrg = o.org_type === 'osgb';
+        const hasOsgbRole = !!data.osgb_role;
+        const isNonAdmin = (data.role ?? 'admin') !== 'admin';
+        const shouldSkipKvkk = isOsgbOrg || hasOsgbRole || isNonAdmin;
+
         setOrg({
           id: o.id,
           name: o.name,
@@ -259,7 +266,7 @@ export function useOrganization(user: User | null) {
           role: data.role ?? 'admin',
           isActive: data.is_active !== false,
           mustChangePassword: data.must_change_password === true,
-          kvkkAccepted: (data.role ?? 'admin') !== 'admin' ? true : data.kvkk_accepted === true,
+          kvkkAccepted: shouldSkipKvkk ? true : data.kvkk_accepted === true,
           displayName: data.display_name ?? undefined,
           email: data.email ?? undefined,
           orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',

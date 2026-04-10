@@ -3,7 +3,7 @@ import { useAuth } from '@/store/AuthContext';
 import { supabase } from '@/lib/supabase';
 import SupportModal from '@/components/feature/SupportModal';
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'raporlar' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'ayarlar';
 
 interface OsgbHeaderProps {
   activeTab: Tab;
@@ -18,11 +18,12 @@ interface OsgbHeaderProps {
 }
 
 const tabMeta: Record<Tab, { label: string; icon: string }> = {
-  dashboard: { label: 'Genel Bakış', icon: 'ri-dashboard-3-line' },
-  firmalar:  { label: 'Müşteri Firmalar', icon: 'ri-building-2-line' },
-  uzmanlar:  { label: 'Gezici Uzmanlar', icon: 'ri-user-star-line' },
-  raporlar:  { label: 'Raporlar', icon: 'ri-bar-chart-2-line' },
-  ayarlar:   { label: 'Ayarlar', icon: 'ri-settings-4-line' },
+  dashboard:  { label: 'Genel Bakış', icon: 'ri-layout-grid-line' },
+  firmalar:   { label: 'Firmalar', icon: 'ri-building-3-line' },
+  uzmanlar:   { label: 'Uzmanlar', icon: 'ri-shield-user-line' },
+  ziyaretler: { label: 'Ziyaretler', icon: 'ri-map-pin-2-line' },
+  raporlar:   { label: 'Raporlar', icon: 'ri-bar-chart-grouped-line' },
+  ayarlar:    { label: 'Ayarlar', icon: 'ri-settings-3-line' },
 };
 
 interface SupportNotification {
@@ -141,7 +142,7 @@ export default function OsgbHeader({
   return (
     <>
       <header
-        className={`fixed top-0 right-0 z-30 flex items-center ${collapsed ? 'lg:left-[48px]' : 'lg:left-[168px]'} left-0`}
+        className={`fixed top-0 right-0 z-30 flex items-center ${collapsed ? 'lg:left-[64px]' : 'lg:left-[220px]'} left-0`}
         style={{
           height: '46px',
           background: headerBg,

@@ -10,6 +10,7 @@ import UzmanDetayModal from './components/UzmanDetayModal';
 import OsgbSidebar from './components/OsgbSidebar';
 import OsgbHeader from './components/OsgbHeader';
 import OsgbSettings from './components/OsgbSettings';
+import ZiyaretlerTab from './components/ZiyaretlerTab';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -32,7 +33,7 @@ interface Uzman {
   active_firm_name: string | null;
 }
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'raporlar' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'ayarlar';
 
 interface FirmaDetay {
   id: string;
@@ -404,7 +405,7 @@ export default function OsgbDashboardPage() {
       />
 
       <main
-        className={`transition-all duration-300 pt-[46px] min-h-screen ${sidebarCollapsed ? 'lg:pl-[48px]' : 'lg:pl-[168px]'}`}
+        className={`transition-all duration-300 pt-[46px] min-h-screen ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
       >
         <div className="px-2 sm:px-3 md:px-5 py-3 max-w-[1680px]">
           {dataLoading ? (
@@ -781,6 +782,11 @@ export default function OsgbDashboardPage() {
                   )}
                 </div>
               )}
+              {/* ── ZİYARETLER TAB ── */}
+              {activeTab === 'ziyaretler' && (
+                <ZiyaretlerTab isDark={isDark} />
+              )}
+
               {/* ── AYARLAR TAB ── */}
               {activeTab === 'ayarlar' && org?.id && (
                 <OsgbSettings

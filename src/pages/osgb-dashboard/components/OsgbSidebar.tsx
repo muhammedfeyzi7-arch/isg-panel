@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/store/AuthContext';
 import SupportModal from '@/components/feature/SupportModal';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'raporlar' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'ayarlar';
 
 interface OsgbSidebarProps {
   activeTab: Tab;
@@ -23,280 +23,393 @@ const navGroups = [
   {
     label: 'GENEL',
     items: [
-      { id: 'dashboard' as Tab, label: 'Genel Bakış', icon: 'ri-dashboard-3-line' },
+      { id: 'dashboard' as Tab, label: 'Genel Bakış', icon: 'ri-layout-grid-line' },
     ],
   },
   {
     label: 'YÖNETİM',
     items: [
-      { id: 'firmalar' as Tab, label: 'Müşteri Firmalar', icon: 'ri-building-2-line' },
-      { id: 'uzmanlar' as Tab, label: 'Gezici Uzmanlar', icon: 'ri-user-star-line' },
+      { id: 'firmalar' as Tab, label: 'Firmalar', icon: 'ri-building-3-line' },
+      { id: 'uzmanlar' as Tab, label: 'Uzmanlar', icon: 'ri-shield-user-line' },
+      { id: 'ziyaretler' as Tab, label: 'Ziyaretler', icon: 'ri-map-pin-2-line' },
     ],
   },
   {
     label: 'SİSTEM',
     items: [
-      { id: 'raporlar' as Tab, label: 'Raporlar', icon: 'ri-bar-chart-2-line' },
-      { id: 'ayarlar' as Tab, label: 'Ayarlar', icon: 'ri-settings-4-line' },
+      { id: 'raporlar' as Tab, label: 'Raporlar', icon: 'ri-bar-chart-grouped-line' },
+      { id: 'ayarlar' as Tab, label: 'Ayarlar', icon: 'ri-settings-3-line' },
     ],
   },
 ];
 
 export default function OsgbSidebar({
-  activeTab, setActiveTab, orgName, collapsed, setCollapsed, mobileOpen = false, onMobileClose,
-  firmaCount = 0, uzmanCount = 0,
+  activeTab,
+  setActiveTab,
+  orgName,
+  collapsed,
+  setCollapsed,
+  mobileOpen = false,
+  onMobileClose,
+  firmaCount = 0,
+  uzmanCount = 0,
 }: OsgbSidebarProps) {
   const { logout, user } = useAuth();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const sidebarBg = 'var(--bg-sidebar, #0f172a)';
-  const borderRight = '1px solid var(--border-subtle, rgba(255,255,255,0.07))';
-  const groupLabelColor = 'rgba(255,255,255,0.32)';
-  const groupDividerBg = 'rgba(255,255,255,0.08)';
+  useEffect(() => {
+    const t = setTimeout(() => setIsMounted(true), 60);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleNav = (tab: Tab) => {
     setActiveTab(tab);
     onMobileClose?.();
   };
 
+  const userInitial = (user?.email ?? 'O').charAt(0).toUpperCase();
+  const userName = user?.email?.split('@')[0] ?? 'OSGB Admin';
+
   return (
     <>
-    <aside
-      className={`
-        fixed left-0 top-0 h-screen flex flex-col z-[42]
-        ${collapsed ? 'w-[48px]' : 'w-[168px]'}
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}
-      style={{
-        background: sidebarBg,
-        borderRight,
-        transition: 'width 0.26s cubic-bezier(0.4,0,0.2,1), transform 0.26s cubic-bezier(0.4,0,0.2,1)',
-      }}
-    >
-      {/* ── Logo ── */}
-      <div
-        className={`flex items-center ${collapsed ? 'justify-center px-2' : 'px-3.5 gap-2'}`}
+      {/* ── Sidebar ── */}
+      <aside
+        className={[
+          'fixed left-0 top-0 h-screen flex flex-col z-[42]',
+          collapsed ? 'w-[64px]' : 'w-[220px]',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          isMounted ? 'opacity-100' : 'opacity-0',
+        ].join(' ')}
         style={{
-          borderBottom: '1px solid var(--border-main, rgba(255,255,255,0.07))',
-          height: '46px',
-          minHeight: '46px',
-          flexShrink: 0,
+          background: 'linear-gradient(180deg, #0c1420 0%, #0a1628 50%, #080f1e 100%)',
+          borderRight: '1px solid rgba(255,255,255,0.05)',
+          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease',
+          boxShadow: '4px 0 32px rgba(0,0,0,0.4)',
         }}
       >
+        {/* ── Top: Logo + Org ── */}
         <div
-          className="flex items-center justify-center flex-shrink-0"
-          style={{
-            width: '26px', height: '26px', borderRadius: '8px',
-            background: 'linear-gradient(135deg, rgba(16,185,129,0.25), rgba(16,185,129,0.1))',
-            border: '1px solid rgba(16,185,129,0.3)',
-          }}
+          className={`flex items-center flex-shrink-0 ${collapsed ? 'justify-center px-0 h-[56px]' : 'px-4 h-[56px] gap-3'}`}
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <img
-            src={LOGO_URL}
-            alt="ISG Logo"
-            style={{ height: '15px', width: 'auto', objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 5px rgba(16,185,129,0.4))' }}
-          />
+          {/* Logo mark */}
+          <div
+            className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.08) 100%)',
+              border: '1px solid rgba(16,185,129,0.3)',
+              boxShadow: '0 0 12px rgba(16,185,129,0.15)',
+            }}
+          >
+            <img
+              src={LOGO_URL}
+              alt="ISG"
+              style={{ height: '16px', width: 'auto', objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 6px rgba(16,185,129,0.5))' }}
+            />
+          </div>
+
+          {/* Org info */}
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-[12.5px] font-bold truncate leading-tight"
+                style={{ color: '#e2e8f0', letterSpacing: '-0.02em' }}
+              >
+                ISG Denetim
+              </p>
+              <p
+                className="text-[9.5px] font-semibold mt-0.5 truncate"
+                style={{ color: 'rgba(52,211,153,0.65)', letterSpacing: '0.04em' }}
+              >
+                OSGB PANELİ
+              </p>
+            </div>
+          )}
+
+          {/* Collapse toggle — desktop only */}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? 'Genişlet' : 'Daralt'}
+            className="hidden lg:flex items-center justify-center w-6 h-6 rounded-md cursor-pointer flex-shrink-0 transition-all duration-150"
+            style={{ color: 'rgba(52,211,153,0.45)', background: 'transparent' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(52,211,153,0.1)'; (e.currentTarget as HTMLElement).style.color = '#34D399'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(52,211,153,0.45)'; }}
+          >
+            <i className={`${collapsed ? 'ri-side-bar-line' : 'ri-side-bar-line'} text-[11px]`} style={{ transform: collapsed ? 'scaleX(-1)' : 'none' }} />
+          </button>
         </div>
+
+        {/* ── Org Badge ── */}
         {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold leading-tight truncate" style={{ color: '#f1f5f9', letterSpacing: '-0.02em' }}>
-              ISG Denetim
-            </p>
-            <p className="text-[8px] mt-0.5 font-semibold truncate" style={{ color: 'rgba(52,211,153,0.7)' }}>
-              OSGB Paneli
-            </p>
+          <div className="mx-3 mt-3">
+            <div
+              className="px-3 py-2.5 rounded-xl"
+              style={{
+                background: 'rgba(16,185,129,0.06)',
+                border: '1px solid rgba(16,185,129,0.12)',
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#10B981', boxShadow: '0 0 5px rgba(16,185,129,0.6)' }} />
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color: 'rgba(52,211,153,0.55)' }}>Organizasyon</p>
+              </div>
+              <p className="text-[12px] font-bold mt-1 truncate" style={{ color: '#6EE7B7' }}>{orgName}</p>
+            </div>
           </div>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto w-6 h-6 hidden lg:flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
-          style={{ color: 'rgba(52,211,153,0.6)', background: 'transparent' }}
-        >
-          <i className={`${collapsed ? 'ri-menu-unfold-line' : 'ri-menu-fold-line'} text-xs`} />
-        </button>
-      </div>
 
-      {/* OSGB org adı */}
-      {!collapsed && (
-        <div
-          className="mx-2 mt-2 px-3 py-2 rounded-xl"
-          style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.12)' }}
-        >
-          <p className="text-[8.5px] font-bold uppercase tracking-widest" style={{ color: 'rgba(52,211,153,0.6)' }}>OSGB</p>
-          <p className="text-[11px] font-bold truncate mt-0.5" style={{ color: '#6EE7B7' }}>{orgName}</p>
-        </div>
-      )}
+        {/* ── Navigation ── */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-1" style={{ scrollbarWidth: 'none' }}>
+          {navGroups.map((group, gi) => (
+            <div key={group.label} className={gi > 0 ? 'mt-4' : ''}>
+              {/* Group label */}
+              {!collapsed ? (
+                <p
+                  className="text-[9px] font-bold uppercase px-2 mb-1.5 select-none tracking-[0.14em]"
+                  style={{ color: 'rgba(255,255,255,0.22)' }}
+                >
+                  {group.label}
+                </p>
+              ) : (
+                <div className="h-px my-2" style={{ background: 'rgba(255,255,255,0.06)' }} />
+              )}
 
-      {/* ── Navigation ── */}
-      <nav className="flex-1 overflow-y-auto py-2 px-1.5 space-y-3 mt-1">
-        {navGroups.map(group => (
-          <div key={group.label}>
-            {!collapsed && (
-              <p
-                className="text-[8.5px] font-bold uppercase px-2 mb-1 select-none tracking-[0.14em]"
-                style={{ color: groupLabelColor }}
-              >
-                {group.label}
-              </p>
-            )}
-            {collapsed && (
-              <div className="h-px mx-1.5 mb-2" style={{ background: groupDividerBg }} />
-            )}
-            <ul className="space-y-0.5">
-              {group.items.map(item => {
-                const isActive = activeTab === item.id;
-                const isHovered = hoveredItem === item.id && !isActive;
-                return (
-                  <li key={item.id}>
-                    <button
-                      title={collapsed ? item.label : ''}
-                      onClick={() => handleNav(item.id)}
-                      onMouseEnter={() => setHoveredItem(item.id)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      className="w-full flex items-center gap-2 text-left cursor-pointer relative"
-                      style={{
-                        padding: collapsed ? '7px 0' : '6.5px 8px',
-                        borderRadius: '8px',
-                        justifyContent: collapsed ? 'center' : undefined,
-                        background: isActive
-                          ? 'linear-gradient(135deg, rgba(16,185,129,0.18), rgba(16,185,129,0.08))'
-                          : isHovered ? 'rgba(255,255,255,0.06)' : 'transparent',
-                        border: isActive
-                          ? '1px solid rgba(16,185,129,0.35)'
-                          : isHovered ? '1px solid rgba(255,255,255,0.055)' : '1px solid transparent',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {isActive && !collapsed && (
-                        <span
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full"
-                          style={{ height: '60%', background: 'linear-gradient(180deg, #34D399, #10B981)' }}
-                        />
-                      )}
-                      <span
-                        className="flex items-center justify-center flex-shrink-0"
+              <ul className="space-y-0.5">
+                {group.items.map(item => {
+                  const isActive = activeTab === item.id;
+                  const isHovered = hoveredItem === item.id;
+
+                  return (
+                    <li key={item.id}>
+                      <button
+                        title={collapsed ? item.label : undefined}
+                        onClick={() => handleNav(item.id)}
+                        onMouseEnter={() => setHoveredItem(item.id)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        className="w-full flex items-center text-left cursor-pointer relative overflow-hidden"
                         style={{
-                          width: '16px', height: '16px',
-                          color: isActive ? '#34D399' : '#4a8a6a',
-                          transition: 'color 0.15s ease',
-                          marginLeft: isActive && !collapsed ? '5px' : undefined,
+                          padding: collapsed ? '9px 0' : '8px 10px',
+                          borderRadius: '10px',
+                          justifyContent: collapsed ? 'center' : undefined,
+                          gap: collapsed ? undefined : '10px',
+                          background: isActive
+                            ? 'linear-gradient(135deg, rgba(16,185,129,0.16) 0%, rgba(16,185,129,0.07) 100%)'
+                            : isHovered
+                            ? 'rgba(255,255,255,0.05)'
+                            : 'transparent',
+                          border: isActive
+                            ? '1px solid rgba(16,185,129,0.28)'
+                            : '1px solid transparent',
+                          transition: 'all 0.18s ease',
                         }}
                       >
-                        <i className={`${item.icon} text-[13px]`} />
-                      </span>
-                      {!collapsed && (
+                        {/* Active accent bar */}
+                        {isActive && !collapsed && (
+                          <span
+                            className="absolute left-0 top-1/2 -translate-y-1/2 rounded-r-full"
+                            style={{
+                              width: '3px',
+                              height: '55%',
+                              background: 'linear-gradient(180deg, #34D399, #059669)',
+                              boxShadow: '0 0 6px rgba(16,185,129,0.5)',
+                            }}
+                          />
+                        )}
+
+                        {/* Neon glow on active */}
+                        {isActive && (
+                          <span
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              background: 'radial-gradient(ellipse at 30% 50%, rgba(16,185,129,0.06) 0%, transparent 70%)',
+                              borderRadius: '10px',
+                            }}
+                          />
+                        )}
+
+                        {/* Icon */}
                         <span
-                          className="text-[11px] flex-1 leading-none truncate"
+                          className="flex items-center justify-center flex-shrink-0"
                           style={{
-                            color: isActive ? '#A7F3D0' : '#4a8a6a',
-                            fontWeight: isActive ? 600 : 500,
-                            transition: 'color 0.15s ease',
+                            width: '17px',
+                            height: '17px',
+                            marginLeft: isActive && !collapsed ? '6px' : undefined,
+                            transition: 'transform 0.18s ease',
+                            transform: isHovered && !isActive ? 'translateX(1px)' : 'none',
                           }}
                         >
-                          {item.label}
+                          <i
+                            className={`${item.icon} text-[14px]`}
+                            style={{
+                              color: isActive ? '#34D399' : isHovered ? 'rgba(52,211,153,0.7)' : 'rgba(148,163,184,0.5)',
+                              transition: 'color 0.18s ease',
+                              filter: isActive ? 'drop-shadow(0 0 4px rgba(52,211,153,0.4))' : 'none',
+                            }}
+                          />
                         </span>
-                      )}
-                      {!collapsed && isActive && (
-                        <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#10B981' }} />
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
 
-      {/* ── Mini Stats ── */}
-      {!collapsed && (
-        <div className="px-2 pb-1.5">
-          <div
-            className="rounded-lg p-2.5 flex gap-0"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-          >
-            {[
-              { value: firmaCount, label: 'Firma', color: '#34D399' },
-              { value: uzmanCount, label: 'Uzman', color: '#6EE7B7' },
-            ].map((stat, i) => (
-              <div key={stat.label} className="flex-1 flex items-center">
-                {i > 0 && (
-                  <div className="w-px self-stretch mx-1.5" style={{ background: 'rgba(255,255,255,0.08)' }} />
-                )}
-                <div className="flex-1 text-center">
-                  <p className="text-[12px] font-bold leading-none" style={{ color: stat.color }}>{stat.value}</p>
-                  <p className="text-[8.5px] font-semibold mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>{stat.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+                        {/* Label */}
+                        {!collapsed && (
+                          <span
+                            className="flex-1 leading-none text-[12px] truncate"
+                            style={{
+                              color: isActive ? '#A7F3D0' : isHovered ? 'rgba(226,232,240,0.8)' : 'rgba(148,163,184,0.6)',
+                              fontWeight: isActive ? 600 : 500,
+                              transition: 'color 0.18s ease',
+                            }}
+                          >
+                            {item.label}
+                          </span>
+                        )}
 
-      {/* ── Destek Butonu ── */}
-      <div className="px-2 pb-1.5">
-        <button
-          onClick={() => setSupportOpen(true)}
-          title={collapsed ? 'Destek / Sorun Bildir' : ''}
-          className={`w-full flex items-center cursor-pointer rounded-lg transition-all duration-150 ${collapsed ? 'justify-center p-1.5' : 'gap-2 px-2.5 py-1.5'}`}
-          style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.18)' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.13)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.32)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.07)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.18)'; }}
-        >
-          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-            <i className="ri-customer-service-2-line text-xs" style={{ color: '#10B981' }} />
-          </div>
-          {!collapsed && (
-            <>
-              <span className="text-[11px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>Destek</span>
-              <i className="ri-arrow-right-s-line text-xs" style={{ color: 'rgba(16,185,129,0.5)' }} />
-            </>
-          )}
-        </button>
-      </div>
+                        {/* Active dot */}
+                        {!collapsed && isActive && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{
+                              background: '#10B981',
+                              boxShadow: '0 0 5px rgba(16,185,129,0.7)',
+                            }}
+                          />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
 
-      {/* ── Profile + Logout ── */}
-      <div
-        className={`mx-2 mb-2.5 rounded-lg flex items-center gap-2 ${collapsed ? 'justify-center p-1.5' : 'px-2.5 py-2'}`}
-        style={{
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.055)',
-        }}
-      >
-        <div
-          className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
-          style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
-        >
-          {(user?.email ?? 'O').charAt(0).toUpperCase()}
-        </div>
+        {/* ── Stats Box ── */}
         {!collapsed && (
-          <>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold truncate leading-tight" style={{ color: '#e2e8f0' }}>
-                {user?.email?.split('@')[0] ?? 'OSGB Admin'}
+          <div className="px-3 pb-2">
+            <div
+              className="rounded-xl p-3"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}
+            >
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2.5" style={{ color: 'rgba(255,255,255,0.22)' }}>
+                İstatistikler
               </p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#10B981' }} />
-                <p className="text-[9px] font-semibold truncate" style={{ color: '#10B981' }}>OSGB Admin</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: firmaCount, label: 'Toplam Firma', color: '#34D399', icon: 'ri-building-3-line' },
+                  { value: uzmanCount, label: 'Toplam Uzman', color: '#6EE7B7', icon: 'ri-shield-user-line' },
+                ].map(stat => (
+                  <div
+                    key={stat.label}
+                    className="rounded-lg p-2.5"
+                    style={{
+                      background: 'rgba(16,185,129,0.05)',
+                      border: '1px solid rgba(16,185,129,0.1)',
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                        <i className={`${stat.icon} text-[10px]`} style={{ color: 'rgba(52,211,153,0.5)' }} />
+                      </div>
+                    </div>
+                    <p className="text-[17px] font-extrabold leading-none" style={{ color: stat.color }}>
+                      {stat.value}
+                    </p>
+                    <p className="text-[9px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                      {stat.label}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
-            <button
-              onClick={logout}
-              title="Çıkış Yap"
-              className="flex items-center justify-center cursor-pointer rounded-md w-5 h-5 flex-shrink-0"
-              style={{ color: 'rgba(255,255,255,0.35)', transition: 'all 0.15s ease' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; e.currentTarget.style.background = 'transparent'; }}
-            >
-              <i className="ri-logout-box-r-line text-xs" />
-            </button>
-          </>
+          </div>
         )}
-      </div>
-    </aside>
 
-    <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+        {/* ── Support ── */}
+        <div className={`px-2.5 pb-2 ${collapsed ? 'flex justify-center' : ''}`}>
+          <button
+            onClick={() => setSupportOpen(true)}
+            title={collapsed ? 'Destek' : undefined}
+            className={`cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'w-10 h-10 flex items-center justify-center' : 'w-full flex items-center gap-2.5 px-3 py-2'}`}
+            style={{
+              background: 'rgba(16,185,129,0.06)',
+              border: '1px solid rgba(16,185,129,0.14)',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.12)';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.28)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.06)';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.14)';
+            }}
+          >
+            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+              <i className="ri-customer-service-2-line text-xs" style={{ color: '#10B981' }} />
+            </div>
+            {!collapsed && (
+              <>
+                <span className="text-[11.5px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>Destek</span>
+                <i className="ri-arrow-right-s-line text-xs" style={{ color: 'rgba(16,185,129,0.4)' }} />
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* ── Profile ── */}
+        <div
+          className={`mx-2.5 mb-3 rounded-xl flex items-center ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2.5'}`}
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.07)',
+          }}
+        >
+          {/* Avatar */}
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
+            style={{
+              background: 'linear-gradient(135deg, #10B981, #059669)',
+              boxShadow: '0 0 8px rgba(16,185,129,0.3)',
+            }}
+          >
+            {userInitial}
+          </div>
+
+          {!collapsed && (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11.5px] font-semibold truncate leading-tight" style={{ color: '#e2e8f0' }}>
+                  {userName}
+                </p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981', boxShadow: '0 0 4px rgba(16,185,129,0.6)' }} />
+                  <p className="text-[9.5px] font-semibold" style={{ color: '#10B981' }}>OSGB Admin</p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                title="Çıkış Yap"
+                className="flex items-center justify-center cursor-pointer rounded-md w-6 h-6 flex-shrink-0 transition-all duration-150"
+                style={{ color: 'rgba(255,255,255,0.25)', background: 'transparent' }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.color = '#F87171';
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.25)';
+                  (e.currentTarget as HTMLElement).style.background = 'transparent';
+                }}
+              >
+                <i className="ri-logout-box-r-line text-xs" />
+              </button>
+            </>
+          )}
+        </div>
+      </aside>
+
+      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
     </>
   );
 }
