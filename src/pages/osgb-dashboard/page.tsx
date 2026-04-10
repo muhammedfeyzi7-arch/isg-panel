@@ -7,9 +7,8 @@ import { downloadOsgbReportPdf } from './utils/osgbReportPdf';
 import { downloadOsgbReportExcel } from './utils/osgbReportExcel';
 import FirmaDetayModal from './components/FirmaDetayModal';
 import UzmanDetayModal from './components/UzmanDetayModal';
-
-const LOGO_URL =
-  'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
+import OsgbSidebar from './components/OsgbSidebar';
+import OsgbHeader from './components/OsgbHeader';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -46,10 +45,11 @@ interface FirmaDetay {
 }
 
 export default function OsgbDashboardPage() {
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const { org, addToast } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [searchFirma, setSearchFirma] = useState('');
   const [searchUzman, setSearchUzman] = useState('');
 
@@ -347,104 +347,45 @@ export default function OsgbDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#f8fafc', fontFamily: "'Inter', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');`}</style>
+    <div className="min-h-screen" style={{ background: 'var(--bg-app)' }}>
 
-      {/* ── SIDEBAR ── */}
-      <aside
-        className="flex-shrink-0 flex flex-col transition-all duration-300"
+      {/* Mobile overlay */}
+      <div
+        className="fixed inset-0 lg:hidden"
         style={{
-          width: sidebarOpen ? '240px' : '64px',
-          background: 'linear-gradient(180deg, #071f14 0%, #0a2e1c 100%)',
-          borderRight: '1px solid rgba(16,185,129,0.1)',
-          minHeight: '100vh',
+          zIndex: 41,
+          background: 'rgba(0,0,0,0.62)',
+          backdropFilter: 'blur(3px)',
+          opacity: mobileOpen ? 1 : 0,
+          pointerEvents: mobileOpen ? 'auto' : 'none',
+          transition: 'opacity 0.25s ease',
         }}
+        onClick={() => setMobileOpen(false)}
+      />
+
+      <OsgbSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        orgName={org?.name ?? 'OSGB'}
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
+      />
+
+      <OsgbHeader
+        activeTab={activeTab}
+        collapsed={sidebarCollapsed}
+        orgName={org?.name ?? 'OSGB'}
+        onMobileMenuToggle={() => setMobileOpen(v => !v)}
+        onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); setFirmaAd(''); }}
+        onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' }); }}
+      />
+
+      <main
+        className={`transition-all duration-300 pt-[46px] min-h-screen ${sidebarCollapsed ? 'lg:pl-[48px]' : 'lg:pl-[168px]'}`}
       >
-        <div className="flex items-center gap-3 px-4 py-5" style={{ borderBottom: '1px solid rgba(16,185,129,0.08)' }}>
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <img src={LOGO_URL} alt="ISG" className="w-6 h-6 object-contain" />
-          </div>
-          {sidebarOpen && (
-            <div className="min-w-0">
-              <p className="text-xs font-bold truncate" style={{ color: '#e2fbf0' }}>ISG Denetim</p>
-              <p className="text-[10px] truncate" style={{ color: '#3a8a60' }}>OSGB Paneli</p>
-            </div>
-          )}
-          <button onClick={() => setSidebarOpen(p => !p)}
-            className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
-            style={{ color: '#3a8a60' }}>
-            <i className={`${sidebarOpen ? 'ri-arrow-left-s-line' : 'ri-arrow-right-s-line'} text-base`} />
-          </button>
-        </div>
-
-        {sidebarOpen && (
-          <div className="mx-3 mt-3 px-3 py-2.5 rounded-xl"
-            style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.1)' }}>
-            <p className="text-[10px] font-semibold mb-0.5" style={{ color: '#3a8a60' }}>OSGB</p>
-            <p className="text-xs font-bold truncate" style={{ color: '#6EE7B7' }}>{org?.name ?? 'OSGB'}</p>
-          </div>
-        )}
-
-        <nav className="flex-1 px-2 py-4 space-y-1">
-          {navItems.map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all whitespace-nowrap"
-              style={{
-                background: activeTab === item.id ? 'rgba(16,185,129,0.15)' : 'transparent',
-                border: activeTab === item.id ? '1px solid rgba(16,185,129,0.25)' : '1px solid transparent',
-                color: activeTab === item.id ? '#6EE7B7' : '#3a8a60',
-              }}>
-              <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                <i className={`${item.icon} text-sm`} />
-              </div>
-              {sidebarOpen && <span className="text-xs font-semibold">{item.label}</span>}
-              {sidebarOpen && activeTab === item.id && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#10B981' }} />
-              )}
-            </button>
-          ))}
-        </nav>
-
-        <div className="px-2 py-4" style={{ borderTop: '1px solid rgba(16,185,129,0.08)' }}>
-          <button onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer whitespace-nowrap"
-            style={{ color: '#ef4444' }}>
-            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-              <i className="ri-logout-box-line text-sm" />
-            </div>
-            {sidebarOpen && <span className="text-xs font-semibold">Çıkış Yap</span>}
-          </button>
-        </div>
-      </aside>
-
-      {/* ── MAIN ── */}
-      <main className="flex-1 min-w-0 flex flex-col">
-        {/* Topbar */}
-        <header className="flex items-center justify-between px-6 py-4 flex-shrink-0"
-          style={{ background: '#fff', borderBottom: '1px solid #f1f5f9' }}>
-          <div>
-            <h1 className="text-base font-bold" style={{ color: '#0f172a' }}>
-              {activeTab === 'dashboard' ? 'Genel Bakış' : activeTab === 'firmalar' ? 'Müşteri Firmalar' : activeTab === 'uzmanlar' ? 'Gezici Uzmanlar' : 'Raporlar'}
-            </h1>
-            <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>
-              {new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669' }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-              OSGB Admin
-            </div>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: '#fff' }}>
-              {(org?.displayName ?? 'A').charAt(0).toUpperCase()}
-            </div>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-auto p-6">
+        <div className="px-2 sm:px-3 md:px-5 py-3 max-w-[1680px]">
           {dataLoading ? (
             <div className="flex items-center justify-center py-20 gap-3" style={{ color: '#94a3b8' }}>
               <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#10B981' }} />
