@@ -19,13 +19,6 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Login sayfasına gelince eski/bozuk token'ları temizle
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('sb-')) localStorage.removeItem(key);
-    });
-    Object.keys(sessionStorage).forEach((key) => {
-      if (key.startsWith('sb-')) sessionStorage.removeItem(key);
-    });
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
