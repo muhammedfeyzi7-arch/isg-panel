@@ -59,7 +59,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         ? new Date(org.subscription_end) < new Date()
         : false;
 
-      setOrgType((org.org_type === 'osgb' ? 'osgb' : 'firma') as OrgType);
+      // osgb_role varsa → OSGB kullanıcısı (org_type'tan bağımsız)
+      const hasOsgbRole = uo.osgb_role === 'osgb_admin' || uo.osgb_role === 'gezici_uzman';
+      setOrgType((hasOsgbRole || org.org_type === 'osgb' ? 'osgb' : 'firma') as OrgType);
       setOsgbRole((uo.osgb_role as OsgbRole) ?? null);
 
       if (!org.is_active || isExpired) {
