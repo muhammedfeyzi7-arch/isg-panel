@@ -128,6 +128,7 @@ export default function FirmalarPage() {
   const logoRef = useRef<HTMLInputElement>(null);
   const [personelDetailId, setPersonelDetailId] = useState<string | null>(null);
   const [personelDetailTab, setPersonelDetailTab] = useState('bilgiler');
+  const [saving, setSaving] = useState(false);
 
   // Toplu silme state
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -207,23 +208,33 @@ export default function FirmalarPage() {
 
   const handleSave = async () => {
     if (!form.ad.trim()) { addToast('Firma adı zorunludur.', 'error'); return; }
+    if (saving) return;
+    setSaving(true);
+    try {
+      // logoUrl'yi form'dan ayır — ayrı olarak yönetilir
+      const { logoUrl: _logoUrl, ...formData } = form as typeof form & { logoUrl?: string };
 
-    if (editingId) {
-      updateFirma(editingId, form);
-      if (pendingLogoFile) {
-        // setFirmaLogo artık filePath döndürür — önizleme için object URL'yi koru
-        await setFirmaLogo(editingId, pendingLogoFile);
+      if (editingId) {
+        updateFirma(editingId, formData);
+        if (pendingLogoFile) {
+          await setFirmaLogo(editingId, pendingLogoFile);
+        }
+        addToast('Firma başarıyla güncellendi.', 'success');
+      } else {
+        const yeniFirma = addFirma(formData);
+        if (pendingLogoFile) {
+          await setFirmaLogo(yeniFirma.id, pendingLogoFile);
+        }
+        addToast('Firma başarıyla eklendi.', 'success');
       }
-      addToast('Firma başarıyla güncellendi.', 'success');
-    } else {
-      const yeniFirma = addFirma(form);
-      if (pendingLogoFile) {
-        await setFirmaLogo(yeniFirma.id, pendingLogoFile);
-      }
-      addToast('Firma başarıyla eklendi.', 'success');
+      setPendingLogoFile(null);
+      setFormOpen(false);
+    } catch (err) {
+      console.error('[FirmalarPage] handleSave error:', err);
+      addToast('Kaydetme sırasında bir hata oluştu.', 'error');
+    } finally {
+      setSaving(false);
     }
-    setPendingLogoFile(null);
-    setFormOpen(false);
   };
 
   const handleDelete = (id: string) => {
@@ -498,15 +509,19 @@ export default function FirmalarPage() {
       {/* Add/Edit Modal */}
       <Modal
         open={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={() => { if (!saving) setFormOpen(false); }}
         title={editingId ? 'Firma Düzenle' : 'Yeni Firma Ekle'}
         size="lg"
         icon="ri-building-2-line"
         footer={
           <>
-            <button onClick={() => setFormOpen(false)} className="btn-secondary">İptal</button>
-            <button onClick={handleSave} className="btn-primary">
-              <i className="ri-save-line" /> Kaydet
+            <button onClick={() => setFormOpen(false)} className="btn-secondary" disabled={saving}>İptal</button>
+            <button onClick={handleSave} className="btn-primary" disabled={saving}>
+              {saving ? (
+                <><i className="ri-loader-4-line animate-spin" /> Kaydediliyor...</>
+              ) : (
+                <><i className="ri-save-line" /> Kaydet</>
+              )}
             </button>
           </>
         }
@@ -528,7 +543,6 @@ export default function FirmalarPage() {
               <FormField label="Yetkili Kişi" value={f('yetkiliKisi')} onChange={v => set('yetkiliKisi', v)} placeholder="Yetkili kişi adı" />
               <FormField label="Telefon" value={f('telefon')} onChange={v => set('telefon', v)} placeholder="0212 000 00 00" />
               <FormField label="E-posta" value={f('email')} onChange={v => set('email', v)} placeholder="info@firma.com" type="email" />
-              <FormField label="Vergi No" value={f('vergiNo')} onChange={v => set('vergiNo', v)} placeholder="Vergi numarası" />
               <FormField label="SGK Sicil No" value={f('sgkSicil')} onChange={v => set('sgkSicil', v)} placeholder="SGK sicil numarası" />
               <div className="col-span-2">
                 <FormField label="Adres" value={f('adres')} onChange={v => set('adres', v)} placeholder="Firma adresi" />
@@ -634,7 +648,6 @@ export default function FirmalarPage() {
               <InfoRow label="Yetkili Kişi" value={detailFirma.yetkiliKisi} />
               <InfoRow label="Telefon" value={detailFirma.telefon} />
               <InfoRow label="E-posta" value={detailFirma.email} />
-              <InfoRow label="Vergi No" value={detailFirma.vergiNo} />
               <InfoRow label="SGK Sicil" value={detailFirma.sgkSicil} />
               <InfoRow label="Sözleşme Başlangıç" value={detailFirma.sozlesmeBas ? new Date(detailFirma.sozlesmeBas).toLocaleDateString('tr-TR') : '—'} />
               <InfoRow label="Sözleşme Bitiş" value={detailFirma.sozlesmeBit ? new Date(detailFirma.sozlesmeBit).toLocaleDateString('tr-TR') : '—'} />
