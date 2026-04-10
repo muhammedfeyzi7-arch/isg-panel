@@ -1,5 +1,33 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+
+// Super admin hook — Supabase client kullanmıyor, direkt REST API
+// sessionStorage'daki sa_access_token ile istek atıyor
+
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
+
+function saHeaders() {
+  const token = sessionStorage.getItem('sa_access_token') ?? '';
+  return {
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  };
+}
+
+async function saFetch(path: string, options?: Parameters<typeof fetch>[1]) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: { ...saHeaders(), ...(options?.headers ?? {}) },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
 
 export interface OrgAdmin {
   id: string;
@@ -24,40 +52,14 @@ export function useOrganizationAdmin() {
     setError(null);
     try {
       // Tüm organizasyonları çek
-      const { data: orgData, error: orgErr } = await supabase
-        .from('organizations')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (orgErr) throw orgErr;
+      const orgData: OrgAdmin[] = await saFetch(
+        'organizations?select=*&order=created_at.desc'
+      );
 
       // Üye sayılarını çek
-      const { data: memberData } = await supabase
-        .from('user_organizations')
-        .select('organization_id')
-        .eq('is_active', true);
-
-      // Kurucuların email'lerini çek
-      const founderIds = (orgData || [])
-        .map(o => o.created_by)
-        .filter(Boolean) as string[];
-
-      let founderMap: Record<string, string> = {};
-      if (founderIds.length > 0) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('user_id')
-          .in('user_id', founderIds);
-
-        // Auth users email'lerini edge function üzerinden alamıyoruz,
-        // user_id -> email için auth.users'a RPC ile gidiyoruz
-        if (profileData) {
-          // Sadece user_id gösterebiliriz, email için ayrı bir yol gerekir
-          profileData.forEach(p => {
-            founderMap[p.user_id] = p.user_id;
-          });
-        }
-      }
+      const memberData: { organization_id: string }[] = await saFetch(
+        'user_organizations?select=organization_id&is_active=eq.true'
+      );
 
       // Üye sayısı map
       const memberCountMap: Record<string, number> = {};
@@ -68,7 +70,7 @@ export function useOrganizationAdmin() {
       const enriched: OrgAdmin[] = (orgData || []).map(org => ({
         ...org,
         member_count: memberCountMap[org.id] || 0,
-        founder_email: founderMap[org.created_by] || null,
+        founder_email: null,
       }));
 
       setOrgs(enriched);
@@ -83,20 +85,21 @@ export function useOrganizationAdmin() {
     orgId: string,
     fields: { subscription_end?: string; is_active?: boolean }
   ) => {
-    const { error: updateErr } = await supabase
-      .from('organizations')
-      .update({ ...fields, updated_at: new Date().toISOString() })
-      .eq('id', orgId);
-    if (updateErr) throw updateErr;
+    await saFetch(
+      `organizations?id=eq.${orgId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ ...fields, updated_at: new Date().toISOString() }),
+      }
+    );
     await fetchOrgs();
   }, [fetchOrgs]);
 
   const deleteOrg = useCallback(async (orgId: string) => {
-    const { error: delErr } = await supabase
-      .from('organizations')
-      .delete()
-      .eq('id', orgId);
-    if (delErr) throw delErr;
+    await saFetch(
+      `organizations?id=eq.${orgId}`,
+      { method: 'DELETE' }
+    );
     await fetchOrgs();
   }, [fetchOrgs]);
 

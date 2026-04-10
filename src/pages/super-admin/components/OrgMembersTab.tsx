@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
+
+function saHeaders() {
+  const token = sessionStorage.getItem('sa_access_token') ?? '';
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` };
+}
 
 interface Member {
   user_id: string;
@@ -26,18 +33,19 @@ export default function OrgMembersTab({ orgId }: { orgId: string }) {
     (async () => {
       setLoading(true);
       setError('');
-      const { data, error: err } = await supabase
-        .from('user_organizations')
-        .select('user_id, display_name, email, role, is_active, joined_at')
-        .eq('organization_id', orgId)
-        .order('joined_at', { ascending: true });
-
-      if (err) {
-        setError(`Hata: ${err.message} (kod: ${err.code})`);
-      } else {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/user_organizations?organization_id=eq.${orgId}&select=user_id,display_name,email,role,is_active,joined_at&order=joined_at.asc`,
+          { headers: saHeaders() }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
         setMembers(data || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Hata oluştu');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
   }, [orgId]);
 
@@ -69,21 +77,17 @@ export default function OrgMembersTab({ orgId }: { orgId: string }) {
         const roleCfg = ROLE_LABELS[m.role] ?? { label: m.role, cls: 'bg-slate-100 text-slate-600 border-slate-200' };
         const initials = (m.display_name || m.email || '?').charAt(0).toUpperCase();
         return (
-          <div key={m.user_id} className="flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            {/* Avatar */}
+          <div key={m.user_id} className="flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-slate-200">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 text-slate-700 text-sm font-black flex-shrink-0">
               {initials}
             </div>
-            {/* Bilgi */}
             <div className="flex-1 min-w-0">
               <p className="text-slate-900 text-sm font-semibold truncate">{m.display_name || '—'}</p>
               <p className="text-slate-400 text-xs truncate">{m.email || '—'}</p>
             </div>
-            {/* Rol */}
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border flex-shrink-0 ${roleCfg.cls}`}>
               {roleCfg.label}
             </span>
-            {/* Durum */}
             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${m.is_active ? 'bg-emerald-500' : 'bg-red-400'}`}></div>
           </div>
         );

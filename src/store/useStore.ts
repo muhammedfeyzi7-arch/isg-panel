@@ -790,6 +790,16 @@ export function useStore(
 
           // INSERT / UPDATE: payload.new.data içinde tam kayıt var
           const newData = payload.new?.data;
+          const deletedAt = payload.new?.deleted_at;
+
+          // deleted_at dolu ise bu kayıt soft-delete edilmiş — state'den çıkar
+          if (deletedAt && recordId) {
+            console.log(`[ISG] Realtime soft-delete: ${table}/${recordId} deleted_at=${deletedAt}`);
+            applyPatch(table, null, 'DELETE', recordId);
+            onRemoteChangeRef.current?.(MODULE_NAMES[table] ?? table);
+            return;
+          }
+
           if (newData && recordId) {
             // Anında patch — DB'ye tekrar sorgu atmadan
             applyPatch(table, newData, payload.eventType, recordId);
@@ -1487,11 +1497,11 @@ export function useStore(
     if (updated) {
       const now = new Date().toISOString();
       const orgId = orgIdRef.current;
-      const uid = userIdRef.current;
-      // Denetçi için direkt UPDATE — upsert with_check'i bypass eder
+      // Denetçi için direkt UPDATE — organization_id payload'a yazılmıyor (RLS sorunu önlenir)
+      // device_id mutlaka yazılsın — realtime sync için kritik
       supabase
         .from('ekipmanlar')
-        .update({ data: updated, updated_at: now, organization_id: orgId, user_id: uid, device_id: getDeviceId() })
+        .update({ data: updated, updated_at: now, device_id: getDeviceId() })
         .eq('id', id)
         .eq('organization_id', orgId)
         .then(({ error }) => {
@@ -1702,14 +1712,13 @@ export function useStore(
 
         console.log(`[ISG] updateIsIzni: id=${id} org=${orgId} device=${deviceId} durum=${(updated as IsIzni).durum}`);
 
-        // Direkt UPDATE kullan — device_id mutlaka yazılsın (realtime sync için kritik)
+        // Direkt UPDATE — organization_id payload'a YAZILMIYOR (RLS bypass sorunu önlenir)
+        // device_id mutlaka yazılsın — realtime sync için kritik (karşı cihaz skip etmesin)
         const { data: updatedRows, error } = await supabase
           .from('is_izinleri')
           .update({
             data: updated,
             updated_at: now,
-            organization_id: orgId,
-            user_id: uid,
             device_id: deviceId,
           })
           .eq('id', id)
@@ -1730,33 +1739,23 @@ export function useStore(
           throw new Error(errMsg);
         }
 
-        // Eğer update hiçbir satırı etkilememişse — RLS veya yanlış orgId
         if (!updatedRows || updatedRows.length === 0) {
-          console.warn(`[ISG] updateIsIzni: 0 rows updated for id=${id} org=${orgId} — trying without org filter`);
-          // OrgId filtresi olmadan tekrar dene (bazı RLS politikalarında gerekebilir)
+          // orgId filtresi olmadan tekrar dene — kayıt başka orgId ile kaydedilmiş olabilir
+          console.warn(`[ISG] updateIsIzni: 0 rows — retrying without org filter`);
           const { data: fallbackRows, error: err2 } = await supabase
             .from('is_izinleri')
-            .update({
-              data: updated,
-              updated_at: now,
-              device_id: deviceId,
-            })
+            .update({ data: updated, updated_at: now, device_id: deviceId })
             .eq('id', id)
             .select('id');
 
-          if (err2) {
-            console.error('[ISG] updateIsIzni fallback error:', err2.message);
+          if (err2 || !fallbackRows?.length) {
+            console.error(`[ISG] updateIsIzni fallback failed:`, err2?.message);
             if (snapshot) setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
-            throw new Error(err2.message);
-          }
-          if (!fallbackRows || fallbackRows.length === 0) {
-            console.error(`[ISG] updateIsIzni: STILL 0 rows — record may not exist or RLS blocking`);
-            if (snapshot) setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
-            throw new Error('İş izni güncellenemedi. Kayıt bulunamadı veya yetki hatası.');
+            throw new Error(err2?.message ?? 'İş izni güncellenemedi.');
           }
           console.log(`[ISG] updateIsIzni fallback OK: ${id}`);
         } else {
-          console.log(`[ISG] updateIsIzni OK: ${id} (${updatedRows.length} rows updated)`);
+          console.log(`[ISG] updateIsIzni OK: ${id} (${updatedRows.length} rows)`);
         }
       } catch (err) {
         if (snapshot) {

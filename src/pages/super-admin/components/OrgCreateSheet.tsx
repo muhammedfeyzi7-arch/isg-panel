@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase } from '@/lib/supabase';
 
 interface Props {
   open: boolean;
