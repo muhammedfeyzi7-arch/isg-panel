@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
-interface Uzman { user_id: string; display_name: string; email: string; active_firm_id: string | null; }
+interface Uzman { user_id: string; display_name: string; email: string; active_firm_id: string | null; active_firm_ids?: string[] | null; }
 interface FirmaDetayModalProps {
   firmaId: string; firmaAdi: string; orgId: string; uzmanlar: Uzman[];
   onClose: () => void; onRefresh: () => void;
@@ -23,7 +23,7 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
   const [uygunsuzluklar, setUygunsuzluklar] = useState<UygunsuzlukRow[]>([]);
   const [atamaGecmisi, setAtamaGecmisi] = useState<AtamaGecmisi[]>([]);
   const [loading, setLoading] = useState(true);
-  const [atananUzmanId, setAtananUzmanId] = useState<string>('');
+  const [atananUzmanIds, setAtananUzmanIds] = useState<string[]>([]);
   const [atanmaLoading, setAtanmaLoading] = useState(false);
   const [firmaDurum, setFirmaDurum] = useState<'aktif' | 'pasif'>('aktif');
   const [durumLoading, setDurumLoading] = useState(false);
@@ -63,23 +63,74 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
     setUygunsuzluklar(uygunsuzlukData ?? []);
     setAtamaGecmisi((ziyaretData ?? []) as AtamaGecmisi[]);
     setFirmaDurum((orgData as { is_active?: boolean } | null)?.is_active !== false ? 'aktif' : 'pasif');
-    const atanan = uzmanlar.find(u => u.active_firm_id === firmaId);
-    setAtananUzmanId(atanan?.user_id ?? '');
+    // Bu firmaya atanmış uzmanları bul (active_firm_ids içinde firmaId geçenler)
+    const atananlar = uzmanlar.filter(u =>
+      (u.active_firm_ids && u.active_firm_ids.includes(firmaId)) ||
+      u.active_firm_id === firmaId
+    );
+    setAtananUzmanIds(atananlar.map(u => u.user_id));
     setLoading(false);
   }, [firmaId, uzmanlar]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  const toggleUzman = (userId: string) => {
+    setAtananUzmanIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
   const handleUzmanAta = async () => {
     setAtanmaLoading(true);
     try {
-      const { data: s } = await supabase.auth.getSession();
-      const token = s.session?.access_token;
-      if (!token) { addToast('Oturum bulunamadı.', 'error'); return; }
-      const res = await fetch(EDGE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: 'assign_firm', organization_id: orgId, firma_id: firmaId, uzman_user_id: atananUzmanId || null }) });
-      const json = await res.json() as { error?: string };
-      if (json.error) throw new Error(json.error);
-      addToast(atananUzmanId ? 'Uzman başarıyla atandı!' : 'Uzman ataması kaldırıldı.', 'success');
+      // Her uzman için active_firm_ids'i güncelle
+      // 1. Önce bu firmaya atanmış ama artık listede olmayan uzmanlardan firmayi çıkar
+      const eskiAtananlar = uzmanlar.filter(u =>
+        (u.active_firm_ids && u.active_firm_ids.includes(firmaId)) ||
+        u.active_firm_id === firmaId
+      );
+
+      const kaldirilacaklar = eskiAtananlar.filter(u => !atananUzmanIds.includes(u.user_id));
+      const eklenecekler = atananUzmanIds.filter(id => !eskiAtananlar.some(u => u.user_id === id));
+
+      // Kaldırılacak uzmanlardan bu firmayı çıkar
+      for (const uzman of kaldirilacaklar) {
+        const mevcutIds = uzman.active_firm_ids ?? (uzman.active_firm_id ? [uzman.active_firm_id] : []);
+        const yeniIds = mevcutIds.filter(id => id !== firmaId);
+        const { error } = await supabase
+          .from('user_organizations')
+          .update({
+            active_firm_ids: yeniIds.length > 0 ? yeniIds : null,
+            active_firm_id: yeniIds[0] ?? null,
+          })
+          .eq('user_id', uzman.user_id)
+          .eq('organization_id', orgId);
+        if (error) throw error;
+      }
+
+      // Eklenecek uzmanların active_firm_ids'ine bu firmayı ekle
+      for (const userId of eklenecekler) {
+        const uzman = uzmanlar.find(u => u.user_id === userId);
+        if (!uzman) continue;
+        const mevcutIds = uzman.active_firm_ids ?? (uzman.active_firm_id ? [uzman.active_firm_id] : []);
+        const yeniIds = mevcutIds.includes(firmaId) ? mevcutIds : [...mevcutIds, firmaId];
+        const { error } = await supabase
+          .from('user_organizations')
+          .update({
+            active_firm_ids: yeniIds,
+            active_firm_id: yeniIds[0],
+          })
+          .eq('user_id', userId)
+          .eq('organization_id', orgId);
+        if (error) throw error;
+      }
+
+      addToast(
+        atananUzmanIds.length > 0
+          ? `${atananUzmanIds.length} uzman bu firmaya atandı!`
+          : 'Uzman ataması kaldırıldı.',
+        'success'
+      );
       onRefresh();
     } catch (err) {
       addToast(`Uzman ataması yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
@@ -178,23 +229,68 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
           <div className="flex-1 overflow-auto">
             {/* Uzman Atama */}
             <div className="px-6 py-4" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc', borderBottom: `1px solid ${cardBorder}` }}>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(139,92,246,0.1)' }}><i className="ri-user-star-line text-[10px]" style={{ color: '#8B5CF6' }} /></div>
-                  <span className="text-xs font-semibold" style={{ color: textMuted }}>Sorumlu Uzman:</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(139,92,246,0.1)' }}>
+                    <i className="ri-user-star-line text-[10px]" style={{ color: '#8B5CF6' }} />
+                  </div>
+                  <span className="text-xs font-semibold" style={{ color: textMuted }}>
+                    Atanmış Uzmanlar
+                    <span className="ml-1.5 font-normal" style={{ color: textFaint }}>({atananUzmanIds.length} seçili)</span>
+                  </span>
                 </div>
-                <select value={atananUzmanId} onChange={e => setAtananUzmanId(e.target.value)}
-                  className="text-xs px-3 py-2 rounded-xl cursor-pointer flex-1 outline-none"
-                  style={{ background: inputBg, border: `1.5px solid ${inputBorder}`, color: textPrimary, minWidth: '160px' }}>
-                  <option value="">— Uzman Atanmadı —</option>
-                  {uzmanlar.map(u => <option key={u.user_id} value={u.user_id}>{u.display_name}{u.active_firm_id && u.active_firm_id !== firmaId ? ' (başka firmada)' : ''}</option>)}
-                </select>
                 <button onClick={handleUzmanAta} disabled={atanmaLoading}
-                  className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer flex-shrink-0"
+                  className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
                   style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: atanmaLoading ? 0.7 : 1 }}>
-                  {atanmaLoading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-save-line" />Kaydet</>}
+                  {atanmaLoading ? <><i className="ri-loader-4-line animate-spin text-xs" />Kaydediliyor...</> : <><i className="ri-save-line text-xs" />Kaydet</>}
                 </button>
               </div>
+              {uzmanlar.length === 0 ? (
+                <p className="text-xs" style={{ color: textFaint }}>Henüz uzman eklenmedi.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {uzmanlar.map(u => {
+                    const secili = atananUzmanIds.includes(u.user_id);
+                    const baskaBirFirmada = !secili &&
+                      ((u.active_firm_ids && u.active_firm_ids.length > 0) || u.active_firm_id) &&
+                      u.active_firm_id !== firmaId &&
+                      !(u.active_firm_ids ?? []).includes(firmaId);
+                    return (
+                      <button key={u.user_id} type="button" onClick={() => toggleUzman(u.user_id)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all text-left"
+                        style={{
+                          background: secili ? 'rgba(16,185,129,0.08)' : inputBg,
+                          border: secili ? `1.5px solid rgba(16,185,129,0.3)` : `1.5px solid ${inputBorder}`,
+                        }}>
+                        <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                          style={secili
+                            ? { background: 'linear-gradient(135deg, #10B981, #059669)' }
+                            : { background: isDark ? 'rgba(255,255,255,0.08)' : '#fff', border: `1.5px solid ${inputBorder}` }}>
+                          {secili && <i className="ri-check-line text-white text-[10px]" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: secili ? '#059669' : textPrimary }}>
+                            {u.display_name}
+                          </p>
+                          <p className="text-[10px] truncate" style={{ color: textFaint }}>{u.email}</p>
+                        </div>
+                        {baskaBirFirmada && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
+                            style={{ background: 'rgba(245,158,11,0.1)', color: '#D97706' }}>
+                            Başka firmada
+                          </span>
+                        )}
+                        {secili && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>
+                            ✓ Atandı
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Stats Grid */}
@@ -258,19 +354,37 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
                     })()}
                   </div>
                   <div className="rounded-xl p-4" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-                    <p className="text-xs font-semibold mb-2" style={{ color: textMuted }}>Atanmış Uzman</p>
-                    {(() => {
-                      const uzman = uzmanlar.find(u => u.active_firm_id === firmaId);
-                      return uzman ? (
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>{uzman.display_name.charAt(0).toUpperCase()}</div>
-                          <div>
-                            <p className="text-xs font-bold" style={{ color: textPrimary }}>{uzman.display_name}</p>
-                            <p className="text-[10px]" style={{ color: textFaint }}>{uzman.email}</p>
-                          </div>
-                        </div>
-                      ) : <p className="text-xs" style={{ color: textFaint }}>Bu firmaya henüz uzman atanmadı.</p>;
-                    })()}
+                    <p className="text-xs font-semibold mb-2" style={{ color: textMuted }}>
+                      Atanmış Uzmanlar
+                      {atananUzmanIds.length > 0 && (
+                        <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>
+                          {atananUzmanIds.length}
+                        </span>
+                      )}
+                    </p>
+                    {atananUzmanIds.length === 0 ? (
+                      <p className="text-xs" style={{ color: textFaint }}>Bu firmaya henüz uzman atanmadı.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {atananUzmanIds.map(uid => {
+                          const u = uzmanlar.find(x => x.user_id === uid);
+                          if (!u) return null;
+                          return (
+                            <div key={uid} className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                                {u.display_name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold" style={{ color: textPrimary }}>{u.display_name}</p>
+                                <p className="text-[10px]" style={{ color: textFaint }}>{u.email}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
