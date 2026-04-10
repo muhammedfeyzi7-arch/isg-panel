@@ -23,13 +23,18 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       return;
     }
     (async () => {
-      const { data: uo } = await supabase
+      // Tüm aktif kayıtları çek — osgb_role olan kaydı önceliklendir
+      const { data: uoList } = await supabase
         .from('user_organizations')
         .select('organization_id, osgb_role')
         .eq('user_id', session.user.id)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+        .eq('is_active', true);
+
+      const uoAll = uoList ?? [];
+      // osgb_admin veya gezici_uzman rolü olan kaydı bul, yoksa ilk kaydı al
+      const uo = uoAll.find(r => r.osgb_role === 'osgb_admin' || r.osgb_role === 'gezici_uzman')
+        ?? uoAll[0]
+        ?? null;
 
       if (!uo) { setSubStatus('ok'); return; }
 
