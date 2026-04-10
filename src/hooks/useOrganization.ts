@@ -135,6 +135,8 @@ export function useOrganization(user: User | null) {
           osgb_role?: string | null;
         };
         if (resData?.organization) {
+          const isOsgbUser = resData.osgb_role != null || resData.organization.org_type === 'osgb';
+          const isNonAdminRole = (resData.role ?? 'admin') !== 'admin';
           setOrg({
             id: resData.organization.id,
             name: resData.organization.name,
@@ -142,7 +144,8 @@ export function useOrganization(user: User | null) {
             role: resData.role ?? 'admin',
             isActive: resData.is_active !== false,
             mustChangePassword: resData.must_change_password === true,
-            kvkkAccepted: (resData.role ?? 'admin') !== 'admin' ? true : resData.kvkk_accepted !== false,
+            // OSGB kullanıcıları ve admin olmayan roller KVKK'yı atlasın
+            kvkkAccepted: (isNonAdminRole || isOsgbUser) ? true : (resData.kvkk_accepted === true),
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
             orgType: (resData.organization.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',

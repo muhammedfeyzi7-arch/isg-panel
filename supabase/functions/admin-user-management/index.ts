@@ -336,6 +336,64 @@ async function handleRequest(
     });
   }
 
+  // ── ASSIGN FIRM (firma uzman ataması — RLS bypass) ──
+  if (action === 'assign_firm') {
+    const { firma_id, uzman_user_id } = body as {
+      firma_id: string;
+      uzman_user_id: string | null;
+    };
+
+    if (!firma_id) {
+      return new Response(JSON.stringify({ error: 'firma_id zorunludur.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Önce bu firmaya atanmış diğer uzmanları temizle (service role ile RLS bypass)
+    const { error: clearErr } = await adminClient
+      .from('user_organizations')
+      .update({ active_firm_id: null })
+      .eq('organization_id', orgId)
+      .eq('active_firm_id', firma_id);
+
+    if (clearErr) {
+      return new Response(JSON.stringify({ error: 'Mevcut atama temizlenemedi: ' + clearErr.message }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Yeni uzmanı ata (eğer seçildiyse)
+    if (uzman_user_id) {
+      const { error: assignErr } = await adminClient
+        .from('user_organizations')
+        .update({ active_firm_id: firma_id })
+        .eq('organization_id', orgId)
+        .eq('user_id', uzman_user_id);
+
+      if (assignErr) {
+        return new Response(JSON.stringify({ error: 'Uzman ataması yapılamadı: ' + assignErr.message }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Uzman adını al log için
+      const { data: uzmanData } = await adminClient
+        .from('user_organizations')
+        .select('display_name, email')
+        .eq('user_id', uzman_user_id)
+        .eq('organization_id', orgId)
+        .maybeSingle();
+
+      const uzmanName = uzmanData?.display_name || uzmanData?.email || uzman_user_id;
+      await logActivity('firm_assigned', 'Uzman Yönetimi', uzman_user_id, uzmanName,
+        `${uzmanName} kullanıcısı firmaya atandı.`);
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   // ── UPDATE MEMBER ──
   if (action === 'update') {
     const { target_user_id, is_active, role, display_name, osgb_role, active_firm_id } = body as {

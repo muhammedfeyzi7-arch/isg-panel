@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 
+const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
+
 interface Uzman {
   user_id: string;
   display_name: string;
@@ -101,30 +103,28 @@ export default function FirmaDetayModal({
   const handleUzmanAta = async () => {
     setAtanmaLoading(true);
     try {
-      // Önce bu firmaya atanmış diğer uzmanları temizle
-      const { error: clearErr } = await supabase
-        .from('user_organizations')
-        .update({ active_firm_id: null })
-        .eq('organization_id', orgId)
-        .eq('active_firm_id', firmaId);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) { addToast('Oturum bulunamadı.', 'error'); return; }
 
-      if (clearErr) throw clearErr;
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: 'assign_firm',
+          organization_id: orgId,
+          firma_id: firmaId,
+          uzman_user_id: atananUzmanId || null,
+        }),
+      });
 
-      // Yeni uzmanı ata (eğer seçildiyse)
-      if (atananUzmanId) {
-        const { error: assignErr } = await supabase
-          .from('user_organizations')
-          .update({ active_firm_id: firmaId })
-          .eq('organization_id', orgId)
-          .eq('user_id', atananUzmanId);
-
-        if (assignErr) throw assignErr;
-      }
+      const json = await res.json() as { error?: string; success?: boolean };
+      if (json.error) throw new Error(json.error);
 
       addToast(atananUzmanId ? 'Uzman başarıyla atandı!' : 'Uzman ataması kaldırıldı.', 'success');
       onRefresh();
     } catch (err) {
-      addToast('Uzman ataması yapılamadı.', 'error');
+      addToast(`Uzman ataması yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
     } finally {
       setAtanmaLoading(false);
     }
