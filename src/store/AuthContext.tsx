@@ -146,14 +146,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!org || !org.is_active) {
             await supabase.auth.signOut({ scope: 'local' });
             clearAuthStorage();
-            return { error: 'Organizasyonunuz pasife alınmış. Lütfen yöneticinizle iletişime geçin.' };
+            return { error: 'ABONELİĞİNİZ SONLANMIŞTIR. Lütfen hizmet sağlayıcınızla iletişime geçin.' };
           }
 
           // 3. Abonelik süresi dolmuş mu?
           if (org.subscription_end && new Date(org.subscription_end) < new Date()) {
             await supabase.auth.signOut({ scope: 'local' });
             clearAuthStorage();
-            return { error: 'Abonelik süreniz dolmuş. Lütfen yöneticinizle iletişime geçin.' };
+            return { error: 'ABONELİĞİNİZ SONLANMIŞTIR. Lütfen hizmet sağlayıcınızla iletişime geçin.' };
           }
         }
       }

@@ -57,7 +57,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
       return 'ok';
     } catch {
-      return 'ok'; // Hata durumunda bloklamıyoruz
+      return 'inactive'; // Hata durumunda güvenli taraf — erişimi engelle
     }
   }, []);
 
