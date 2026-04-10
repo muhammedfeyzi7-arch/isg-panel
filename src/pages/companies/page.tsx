@@ -177,7 +177,7 @@ export default function FirmalarPage() {
     setForm({ ...f });
     setEditingId(f.id);
     setPendingLogoFile(null);
-    const rawLogoUrl = (f as Firma & { logoUrl?: string }).logoUrl || '';
+    const rawLogoUrl = f.logoUrl || '';
     if (rawLogoUrl) {
       // Path ise signed URL çevir, URL ise direkt kullan
       if (
@@ -211,15 +211,14 @@ export default function FirmalarPage() {
     if (editingId) {
       updateFirma(editingId, form);
       if (pendingLogoFile) {
-        const newUrl = await setFirmaLogo(editingId, pendingLogoFile);
-        if (newUrl) setLogoVeri(newUrl);
+        // setFirmaLogo artık filePath döndürür — önizleme için object URL'yi koru
+        await setFirmaLogo(editingId, pendingLogoFile);
       }
       addToast('Firma başarıyla güncellendi.', 'success');
     } else {
       const yeniFirma = addFirma(form);
       if (pendingLogoFile) {
-        const newUrl = await setFirmaLogo(yeniFirma.id, pendingLogoFile);
-        if (newUrl) setLogoVeri(newUrl);
+        await setFirmaLogo(yeniFirma.id, pendingLogoFile);
       }
       addToast('Firma başarıyla eklendi.', 'success');
     }
@@ -374,7 +373,7 @@ export default function FirmalarPage() {
           {/* Mobil kart görünümü */}
           <div className="md:hidden space-y-3">
             {filtered.map((firma) => {
-              const logoUrl = (firma as Firma & { logoUrl?: string }).logoUrl;
+              const logoUrl = firma.logoUrl;
               return (
                 <div key={firma.id} className="isg-card rounded-xl p-4" style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
                   <div className="flex items-start gap-3">
@@ -435,7 +434,7 @@ export default function FirmalarPage() {
                 </thead>
                 <tbody>
                   {filtered.map((firma) => {
-                    const logoUrl = (firma as Firma & { logoUrl?: string }).logoUrl;
+                    const logoUrl = firma.logoUrl;
                     return (
                       <tr key={firma.id} style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
                         {canDelete && (

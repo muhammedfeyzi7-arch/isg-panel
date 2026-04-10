@@ -837,7 +837,7 @@ export default function TutanaklarPage() {
       const firma = firmalar.find(f => f.id === t.firmaId);
       const fileVeri = await resolveFileVeri(t);
       // Firma logosu artık firma.logoUrl'den gelir (Storage URL)
-      const firmaLogoUrl = (firma as Firma & { logoUrl?: string })?.logoUrl;
+      const firmaLogoUrl = firma?.logoUrl;
       let firmaLogoVeri: string | undefined;
       if (firmaLogoUrl) {
         try {

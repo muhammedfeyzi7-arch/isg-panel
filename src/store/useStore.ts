@@ -1840,20 +1840,18 @@ export function useStore(
    */
   const setFirmaLogo = useCallback(async (firmaId: string, fileOrUrl: File | string): Promise<string | null> => {
     if (typeof fileOrUrl === 'string') {
-      // Zaten bir URL — sadece DB'ye kaydet
+      // Zaten bir URL/path — sadece DB'ye kaydet
       updateFirma(firmaId, { logoUrl: fileOrUrl } as Partial<Firma>);
       return fileOrUrl;
     }
     const orgId = orgIdRef.current ?? 'unknown';
-    // uploadFileToStorage → filePath döner (path, URL değil)
+    // uploadFileToStorage → filePath döner (path, URL değil) — DB'ye path kaydediyoruz
+    // Görüntüleme anında FirmaLogoImg bileşeni signed URL üretir (expire olmaz)
     const filePath = await uploadFileToStorage(fileOrUrl, orgId, 'firma-logo', firmaId);
     if (filePath) {
-      // filePath'i signed URL'ye çevir (24 saat geçerli) — böylece <img src> direkt çalışır
-      const { getSignedUrl } = await import('../utils/fileUpload');
-      const signedUrl = await getSignedUrl(filePath);
-      const urlToSave = signedUrl ?? filePath;
-      updateFirma(firmaId, { logoUrl: urlToSave } as Partial<Firma>);
-      return urlToSave;
+      // DB'ye filePath kaydet — signed URL değil, böylece expire olmaz
+      updateFirma(firmaId, { logoUrl: filePath } as Partial<Firma>);
+      return filePath;
     }
     return null;
   }, [updateFirma]);

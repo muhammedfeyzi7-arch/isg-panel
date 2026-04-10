@@ -16,6 +16,7 @@ export interface Firma {
   id: string;
   ad: string;
   yetkiliKisi: string;
+  logoUrl?: string;
   telefon: string;
   email: string;
   vergiNo: string;
