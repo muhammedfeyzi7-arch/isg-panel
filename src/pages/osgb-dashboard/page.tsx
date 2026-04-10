@@ -269,6 +269,7 @@ export default function OsgbDashboardPage() {
           display_name: uzmanForm.ad.trim(),
           role: 'member',
           osgb_role: 'gezici_uzman',
+          active_firm_id: uzmanForm.atananFirmaId || null,
         }),
       });
 
@@ -276,15 +277,6 @@ export default function OsgbDashboardPage() {
       if (json.error) {
         setUzmanError(json.error);
         return;
-      }
-
-      // Atanan firma varsa active_firm_id güncelle
-      if (uzmanForm.atananFirmaId && json.user_id) {
-        await supabase
-          .from('user_organizations')
-          .update({ active_firm_id: uzmanForm.atananFirmaId })
-          .eq('user_id', json.user_id)
-          .eq('organization_id', org.id);
       }
 
       addToast(`${uzmanForm.ad.trim()} gezici uzman olarak eklendi!`, 'success');

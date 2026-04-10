@@ -597,9 +597,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       org, orgLoading, orgError: loadError,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,
-      // KVKK sadece admin rolündeki kullanıcıya gösterilir — ekip üyeleri (evrakçı, sahacı vb.) görmez
+      // KVKK sadece admin rolündeki firma kullanıcısına gösterilir
+      // OSGB kullanıcıları (osgb_admin, gezici_uzman), ekip üyeleri (evrakçı, sahacı vb.) görmez
       // ?? false: DB'den henüz yüklenmediyse false kabul et, yüklenince gerçek değer gelir
-      kvkkAccepted: org?.role !== 'admin' ? true : (org?.kvkkAccepted ?? false),
+      kvkkAccepted: (org?.role !== 'admin' || org?.osgbRole != null) ? true : (org?.kvkkAccepted ?? false),
       setKvkkAccepted,
       createOrg,
       joinOrg,
