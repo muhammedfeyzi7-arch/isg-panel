@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../../store/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -28,12 +29,28 @@ export default function OsgbLoginPage() {
     }
     setLoading(true);
     setError(null);
-    const { error: loginError } = await login(email.trim(), password, true);
+    const { error: loginError } = await login(email.trim(), password);
     setLoading(false);
     if (loginError) {
       setError(loginError);
     } else {
-      navigate('/osgb-dashboard', { replace: true });
+      // osgb_role'ü sorgula → gezici uzmanı doğrudan /osgb-uzman'a at
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const { data: uo } = await supabase
+          .from('user_organizations')
+          .select('osgb_role')
+          .eq('user_id', currentUser?.id ?? '')
+          .eq('is_active', true)
+          .maybeSingle();
+        if (uo?.osgb_role === 'gezici_uzman') {
+          navigate('/osgb-uzman', { replace: true });
+        } else {
+          navigate('/osgb-dashboard', { replace: true });
+        }
+      } catch {
+        navigate('/osgb-dashboard', { replace: true });
+      }
     }
   };
 
