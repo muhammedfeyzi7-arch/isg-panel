@@ -83,47 +83,33 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
   const handleUzmanAta = async () => {
     setAtanmaLoading(true);
     try {
-      // Her uzman için active_firm_ids'i güncelle
-      // 1. Önce bu firmaya atanmış ama artık listede olmayan uzmanlardan firmayi çıkar
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Oturum bulunamadı.');
+
+      // Mevcut atananları hesapla
       const eskiAtananlar = uzmanlar.filter(u =>
         (u.active_firm_ids && u.active_firm_ids.includes(firmaId)) ||
         u.active_firm_id === firmaId
       );
-
-      const kaldirilacaklar = eskiAtananlar.filter(u => !atananUzmanIds.includes(u.user_id));
       const eklenecekler = atananUzmanIds.filter(id => !eskiAtananlar.some(u => u.user_id === id));
+      const kaldirilacaklar = eskiAtananlar
+        .filter(u => !atananUzmanIds.includes(u.user_id))
+        .map(u => u.user_id);
 
-      // Kaldırılacak uzmanlardan bu firmayı çıkar
-      for (const uzman of kaldirilacaklar) {
-        const mevcutIds = uzman.active_firm_ids ?? (uzman.active_firm_id ? [uzman.active_firm_id] : []);
-        const yeniIds = mevcutIds.filter(id => id !== firmaId);
-        const { error } = await supabase
-          .from('user_organizations')
-          .update({
-            active_firm_ids: yeniIds.length > 0 ? yeniIds : null,
-            active_firm_id: yeniIds[0] ?? null,
-          })
-          .eq('user_id', uzman.user_id)
-          .eq('organization_id', orgId);
-        if (error) throw error;
-      }
-
-      // Eklenecek uzmanların active_firm_ids'ine bu firmayı ekle
-      for (const userId of eklenecekler) {
-        const uzman = uzmanlar.find(u => u.user_id === userId);
-        if (!uzman) continue;
-        const mevcutIds = uzman.active_firm_ids ?? (uzman.active_firm_id ? [uzman.active_firm_id] : []);
-        const yeniIds = mevcutIds.includes(firmaId) ? mevcutIds : [...mevcutIds, firmaId];
-        const { error } = await supabase
-          .from('user_organizations')
-          .update({
-            active_firm_ids: yeniIds,
-            active_firm_id: yeniIds[0],
-          })
-          .eq('user_id', userId)
-          .eq('organization_id', orgId);
-        if (error) throw error;
-      }
+      const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: 'assign_firms',
+          organization_id: orgId,
+          firma_id: firmaId,
+          eklenecek_user_ids: eklenecekler,
+          kaldirilacak_user_ids: kaldirilacaklar,
+        }),
+      });
+      const json = await res.json() as { error?: string; success?: boolean };
+      if (json.error) throw new Error(json.error);
 
       addToast(
         atananUzmanIds.length > 0

@@ -141,7 +141,6 @@ async function handleRequest(
   const action = body.action as string;
   const requestedOrgId = body.organization_id as string | undefined;
 
-  // Caller'ın üyeliğini bul — OSGB admin için osgb_role kontrolü de yap
   let membershipQuery = adminClient
     .from('user_organizations')
     .select('role, organization_id, display_name, email, is_active, osgb_role')
@@ -160,8 +159,6 @@ async function handleRequest(
   }
 
   const callerMembership = memberships[0];
-
-  // Admin veya OSGB admin olabilir
   const isAdmin = callerMembership.role === 'admin';
   const isOsgbAdmin = callerMembership.osgb_role === 'osgb_admin';
 
@@ -218,9 +215,9 @@ async function handleRequest(
 
   // ── CREATE USER ──
   if (action === 'create') {
-    const { email: newEmail, password, display_name, role, firm_id, osgb_role, active_firm_id } = body as {
+    const { email: newEmail, password, display_name, role, firm_id, osgb_role, active_firm_id, active_firm_ids } = body as {
       email: string; password: string; display_name: string;
-      role: string; firm_id?: string; osgb_role?: string; active_firm_id?: string | null;
+      role: string; firm_id?: string; osgb_role?: string; active_firm_id?: string | null; active_firm_ids?: string[] | null;
     };
 
     if (!newEmail || !password || !display_name) {
@@ -309,9 +306,14 @@ async function handleRequest(
     };
     if (assignedRole === 'firma_user' && firm_id) insertPayload.firm_id = firm_id;
     if (assignedOsgbRole) insertPayload.osgb_role = assignedOsgbRole;
-    // Gezici uzman için active_firm_id direkt insert'e ekle
-    if (assignedOsgbRole === 'gezici_uzman' && active_firm_id) {
-      insertPayload.active_firm_id = active_firm_id;
+    if (assignedOsgbRole === 'gezici_uzman') {
+      if (active_firm_ids && active_firm_ids.length > 0) {
+        insertPayload.active_firm_ids = active_firm_ids;
+        insertPayload.active_firm_id = active_firm_ids[0];
+      } else if (active_firm_id) {
+        insertPayload.active_firm_id = active_firm_id;
+        insertPayload.active_firm_ids = [active_firm_id];
+      }
     }
 
     const { error: memberError } = await adminClient.from('user_organizations').insert(insertPayload);
@@ -340,7 +342,106 @@ async function handleRequest(
     });
   }
 
-  // ── ASSIGN FIRM (firma uzman ataması — RLS bypass) ──
+  // ── ASSIGN FIRM (çoklu uzman atama — RLS bypass) ──
+  if (action === 'assign_firms') {
+    const { firma_id, uzman_user_ids, eklenecek_user_ids, kaldirilacak_user_ids } = body as {
+      firma_id: string;
+      uzman_user_ids?: string[];
+      eklenecek_user_ids?: string[];
+      kaldirilacak_user_ids?: string[];
+    };
+
+    if (!firma_id) {
+      return new Response(JSON.stringify({ error: 'firma_id zorunludur.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Kaldırılacakları işle
+    const toRemove = kaldirilacak_user_ids ?? [];
+    for (const uid of toRemove) {
+      const { data: uzman } = await adminClient
+        .from('user_organizations')
+        .select('active_firm_id, active_firm_ids')
+        .eq('user_id', uid)
+        .eq('organization_id', orgId)
+        .maybeSingle();
+      if (!uzman) continue;
+      const mevcutIds: string[] = (uzman.active_firm_ids as string[] | null) ??
+        (uzman.active_firm_id ? [uzman.active_firm_id as string] : []);
+      const yeniIds = mevcutIds.filter((id: string) => id !== firma_id);
+      await adminClient
+        .from('user_organizations')
+        .update({
+          active_firm_ids: yeniIds.length > 0 ? yeniIds : null,
+          active_firm_id: yeniIds[0] ?? null,
+        })
+        .eq('user_id', uid)
+        .eq('organization_id', orgId);
+    }
+
+    // Eklenecekleri işle
+    const toAdd = eklenecek_user_ids ?? [];
+    for (const uid of toAdd) {
+      const { data: uzman } = await adminClient
+        .from('user_organizations')
+        .select('active_firm_id, active_firm_ids')
+        .eq('user_id', uid)
+        .eq('organization_id', orgId)
+        .maybeSingle();
+      if (!uzman) continue;
+      const mevcutIds: string[] = (uzman.active_firm_ids as string[] | null) ??
+        (uzman.active_firm_id ? [uzman.active_firm_id as string] : []);
+      const yeniIds = mevcutIds.includes(firma_id) ? mevcutIds : [...mevcutIds, firma_id];
+      await adminClient
+        .from('user_organizations')
+        .update({
+          active_firm_ids: yeniIds,
+          active_firm_id: yeniIds[0],
+        })
+        .eq('user_id', uid)
+        .eq('organization_id', orgId);
+    }
+
+    // Legacy: eğer uzman_user_ids geldiyse tüm listeyi set et
+    if (uzman_user_ids !== undefined) {
+      // Mevcut atanmışları bul
+      const { data: mevcutUzmanlar } = await adminClient
+        .from('user_organizations')
+        .select('user_id, active_firm_id, active_firm_ids')
+        .eq('organization_id', orgId)
+        .eq('osgb_role', 'gezici_uzman');
+
+      for (const u of mevcutUzmanlar ?? []) {
+        const uid = u.user_id as string;
+        const mevcutIds: string[] = (u.active_firm_ids as string[] | null) ??
+          (u.active_firm_id ? [u.active_firm_id as string] : []);
+        const shouldBeAssigned = uzman_user_ids.includes(uid);
+        const isAssigned = mevcutIds.includes(firma_id);
+        if (shouldBeAssigned && !isAssigned) {
+          const yeniIds = [...mevcutIds, firma_id];
+          await adminClient.from('user_organizations').update({
+            active_firm_ids: yeniIds, active_firm_id: yeniIds[0],
+          }).eq('user_id', uid).eq('organization_id', orgId);
+        } else if (!shouldBeAssigned && isAssigned) {
+          const yeniIds = mevcutIds.filter((id: string) => id !== firma_id);
+          await adminClient.from('user_organizations').update({
+            active_firm_ids: yeniIds.length > 0 ? yeniIds : null,
+            active_firm_id: yeniIds[0] ?? null,
+          }).eq('user_id', uid).eq('organization_id', orgId);
+        }
+      }
+    }
+
+    await logActivity('firms_assigned', 'Uzman Yönetimi', firma_id, firma_id,
+      `Firma uzman atamaları güncellendi.`);
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // ── LEGACY ASSIGN FIRM (tekli — geriye dönük uyumluluk) ──
   if (action === 'assign_firm') {
     const { firma_id, uzman_user_id } = body as {
       firma_id: string;
@@ -353,9 +454,6 @@ async function handleRequest(
       });
     }
 
-    console.log('[ASSIGN_FIRM] orgId:', orgId, 'firma_id:', firma_id, 'uzman_user_id:', uzman_user_id);
-
-    // Önce bu firmaya atanmış diğer uzmanları temizle (service role ile RLS bypass)
     const { error: clearErr } = await adminClient
       .from('user_organizations')
       .update({ active_firm_id: null })
@@ -363,13 +461,11 @@ async function handleRequest(
       .eq('active_firm_id', firma_id);
 
     if (clearErr) {
-      console.error('[ASSIGN_FIRM] clear error:', clearErr.message);
       return new Response(JSON.stringify({ error: 'Mevcut atama temizlenemedi: ' + clearErr.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Yeni uzmanı ata (eğer seçildiyse)
     if (uzman_user_id) {
       const { error: assignErr } = await adminClient
         .from('user_organizations')
@@ -378,13 +474,11 @@ async function handleRequest(
         .eq('user_id', uzman_user_id);
 
       if (assignErr) {
-        console.error('[ASSIGN_FIRM] assign error:', assignErr.message);
         return new Response(JSON.stringify({ error: 'Uzman ataması yapılamadı: ' + assignErr.message }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Uzman adını al log için
       const { data: uzmanData } = await adminClient
         .from('user_organizations')
         .select('display_name, email')
@@ -402,10 +496,11 @@ async function handleRequest(
     });
   }
 
-  // ── UPDATE MEMBER ──
+  // ── UPDATE MEMBER (active_firm_ids dahil) ──
   if (action === 'update') {
-    const { target_user_id, is_active, role, display_name, osgb_role, active_firm_id } = body as {
-      target_user_id: string; is_active?: boolean; role?: string; display_name?: string; osgb_role?: string; active_firm_id?: string | null;
+    const { target_user_id, is_active, role, display_name, osgb_role, active_firm_id, active_firm_ids } = body as {
+      target_user_id: string; is_active?: boolean; role?: string; display_name?: string;
+      osgb_role?: string; active_firm_id?: string | null; active_firm_ids?: string[] | null;
     };
 
     if (!target_user_id) {
@@ -438,6 +533,7 @@ async function handleRequest(
     if (display_name !== undefined) updates.display_name = display_name;
     if (osgb_role !== undefined) updates.osgb_role = VALID_OSGB_ROLES.includes(osgb_role) ? osgb_role : null;
     if (active_firm_id !== undefined) updates.active_firm_id = active_firm_id;
+    if (active_firm_ids !== undefined) updates.active_firm_ids = active_firm_ids;
 
     const { error: updateError } = await adminClient
       .from('user_organizations')
@@ -467,13 +563,9 @@ async function handleRequest(
       await logActivity(is_active ? 'user_activated' : 'user_deactivated', 'Kullanıcı Yönetimi',
         target_user_id, memberName, `${memberName} kullanıcısı ${is_active ? 'aktif' : 'pasif'} yapıldı.`);
     }
-    if (role !== undefined) {
-      await logActivity('user_role_changed', 'Kullanıcı Yönetimi', target_user_id, memberName,
-        `${memberName} kullanıcısının rolü ${getRoleLabel(normalizeRole(role))} olarak değiştirildi.`);
-    }
-    if (active_firm_id !== undefined) {
+    if (active_firm_ids !== undefined || active_firm_id !== undefined) {
       await logActivity('firm_assigned', 'Kullanıcı Yönetimi', target_user_id, memberName,
-        `${memberName} kullanıcısına firma atandı.`);
+        `${memberName} kullanıcısına firma ataması güncellendi.`);
     }
 
     return new Response(JSON.stringify({ success: true }), {

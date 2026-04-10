@@ -107,22 +107,30 @@ export default function UzmanDetayModal({
   const handleKaydet = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('user_organizations')
-        .update({
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Oturum bulunamadı.');
+
+      const res = await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: 'update',
+          organization_id: orgId,
+          target_user_id: uzman.user_id,
           is_active: isActive,
           active_firm_id: secilenFirmaIds[0] ?? null,
           active_firm_ids: secilenFirmaIds.length > 0 ? secilenFirmaIds : null,
-        })
-        .eq('user_id', uzman.user_id)
-        .eq('organization_id', orgId);
+        }),
+      });
+      const json = await res.json() as { error?: string; success?: boolean };
+      if (json.error) throw new Error(json.error);
 
-      if (error) throw error;
       addToast('Uzman bilgileri güncellendi!', 'success');
       onRefresh();
       onClose();
-    } catch {
-      addToast('Güncelleme yapılamadı.', 'error');
+    } catch (err) {
+      addToast(`Güncelleme yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
     } finally {
       setLoading(false);
     }
