@@ -171,17 +171,48 @@ export default function RiskAnaliziModal({ onClose }: Props) {
     if (!sektor || !prompt.trim()) return;
     setLoading(true); setError('');
     try {
-      const { data: fnData, error: fnErr } = await supabase.functions.invoke('openai-assistant', {
-        body: { mode: 'risk-analizi-v2', data: { sektor, firmaAdi, prompt } },
+      // Direkt fetch ile çağır — gerçek hata mesajını görmek için
+      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+      const supabaseKey = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/openai-assistant`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey,
+        },
+        body: JSON.stringify({ mode: 'risk-analizi-v2', data: { sektor, firmaAdi, prompt } }),
       });
-      if (fnErr) throw new Error(fnErr.message);
-      if (!fnData?.success) throw new Error(fnData?.error || 'Bilinmeyen hata');
-      setRows(fnData.data.rows || []);
-      // Firma adını form'dan al
+
+      const responseText = await res.text();
+      let fnData: { success?: boolean; error?: string; data?: { rows?: RiskRow[] } };
+      try {
+        fnData = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Sunucu yanıtı okunamadı: ${responseText.substring(0, 200)}`);
+      }
+
+      if (!res.ok) {
+        const errMsg = fnData?.error || `HTTP ${res.status}`;
+        if (errMsg.includes('GROQ_API_KEY')) {
+          throw new Error('AI servisi yapılandırılmamış. Lütfen sistem yöneticisiyle iletişime geçin.');
+        }
+        throw new Error(errMsg);
+      }
+
+      if (!fnData?.success) {
+        throw new Error(fnData?.error || 'Bilinmeyen hata');
+      }
+
+      setRows(fnData.data?.rows || []);
       setFirmaBilgileri(prev => ({ ...prev, firmaAdi: firmaAdi || prev.firmaAdi }));
       setStep('result');
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Bir hata oluştu'); }
-    finally { setLoading(false); }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateRow = (i: number, field: keyof RiskRow, val: string) => {
