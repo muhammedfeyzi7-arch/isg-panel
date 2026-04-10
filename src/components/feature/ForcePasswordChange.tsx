@@ -72,6 +72,8 @@ export default function ForcePasswordChange() {
     }
     await clearMustChangePassword();
     setLoading(false);
+    // Kısa bir bekleme sonrası sayfayı yenile — edge function cache'ini bypass et
+    setTimeout(() => window.location.reload(), 400);
   };
 
   const inputStyle: React.CSSProperties = {

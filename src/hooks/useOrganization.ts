@@ -391,17 +391,23 @@ export function useOrganization(user: User | null) {
     if (!user) return;
     try {
       // user_id ile tüm aktif kayıtları güncelle —
-      // gezici uzman için org.id atanan firma ID'si olabilir, 
+      // gezici uzman için org.id atanan firma ID'si olabilir,
       // user_organizations.organization_id ise OSGB org ID'si olduğundan
       // organization_id filtresi kullanmıyoruz.
-      await supabase
+      const { error } = await supabase
         .from('user_organizations')
         .update({ must_change_password: false })
         .eq('user_id', user.id)
         .eq('is_active', true);
+
+      if (error) {
+        console.error('[clearMustChangePassword] DB update failed:', error.message);
+        return;
+      }
+      // Local state'i güncelle — sayfa yenilemede tekrar çıkmasın
       setOrg(prev => prev ? { ...prev, mustChangePassword: false } : null);
-    } catch {
-      // silent
+    } catch (e) {
+      console.error('[clearMustChangePassword] exception:', e);
     }
   };
 

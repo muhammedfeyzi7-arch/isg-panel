@@ -39,6 +39,13 @@ const statusConfig = {
 
 export default function EvraklarPage() {
   const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, addToast, quickCreate, setQuickCreate, org, refreshData, pageLoading } = useApp();
+  const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
+  // Gezici uzman için atanan firmayı listeye ekle (firmalar listesi boş olabilir)
+  const firmaListesiEvrak = isGeziciUzman && org?.id
+    ? (firmalar.some(f => !f.silinmis && f.id === org.id)
+        ? firmalar.filter(f => !f.silinmis)
+        : [{ id: org.id, ad: org.name, silinmis: false } as typeof firmalar[0], ...firmalar.filter(f => !f.silinmis)])
+    : firmalar.filter(f => !f.silinmis);
   const location = useLocation();
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -150,7 +157,13 @@ export default function EvraklarPage() {
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
   const getPersonelAd = (id?: string) => id ? (personeller.find(p => p.id === id)?.adSoyad || '—') : 'Firma Evrakı';
 
-  const openAdd = () => { setForm({ ...emptyEvrak }); setEditingId(null); setPendingFile(null); setFormOpen(true); };
+  const openAdd = () => {
+    const defaultFirmaId = isGeziciUzman && org?.id ? org.id : '';
+    setForm({ ...emptyEvrak, firmaId: defaultFirmaId });
+    setEditingId(null);
+    setPendingFile(null);
+    setFormOpen(true);
+  };
   const openEdit = (e: Evrak) => { setForm({ ...e }); setEditingId(e.id); setPendingFile(null); setFormOpen(true); };
 
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -314,7 +327,7 @@ export default function EvraklarPage() {
         </div>
         <select value={firmaFilter} onChange={e => setFirmaFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '150px' }}>
           <option value="">Tüm Firmalar</option>
-          {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
+          {firmaListesiEvrak.map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '150px' }}>
           <option value="">Tüm Durumlar</option>
@@ -479,10 +492,20 @@ export default function EvraklarPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Firma *</label>
-            <select value={f('firmaId')} onChange={e => set('firmaId', e.target.value)} className="input-premium cursor-pointer">
+            <select
+              value={f('firmaId')}
+              onChange={e => set('firmaId', e.target.value)}
+              disabled={isGeziciUzman}
+              className="input-premium cursor-pointer disabled:opacity-70"
+            >
               <option value="">Firma Seçin...</option>
-              {firmalar.filter(fi => !fi.silinmis).map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
+              {firmaListesiEvrak.map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
             </select>
+            {isGeziciUzman && (
+              <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: '#64748B' }}>
+                <i className="ri-lock-line" /> Atanan firma otomatik seçildi
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Personel (Opsiyonel)</label>
