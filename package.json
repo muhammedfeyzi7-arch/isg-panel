@@ -2,8 +2,10 @@
   "dependencies": {
     "@stripe/react-stripe-js": "4.0.2",
     "@supabase/supabase-js": "2.57.4",
+    "@types/file-saver": "^2.0.7",
     "docx": "^8.5.0",
     "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
     "firebase": "12.0.0",
     "html2canvas": "^1.4.1",
     "i18next": "25.4.1",

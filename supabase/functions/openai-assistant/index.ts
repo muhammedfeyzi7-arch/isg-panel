@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── RİSK ANALİZİ (Fine-Kinney) ──
+    // ── RİSK ANALİZİ (Fine-Kinney — Eski format, geriye dönük uyumluluk) ──
     if (mode === "risk-analizi") {
       const { sektor, prompt } = data || {};
       systemPrompt = `Sen deneyimli bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Fine-Kinney metoduyla risk analizi yapıyorsun.
@@ -131,7 +131,60 @@ SADECE JSON formatında yanıt ver:
       userPrompt = `Sektör: ${sektor}
 İstek: ${prompt}
 
-Bu sektör ve istek için Fine-Kinney risk analizi tablosu oluştur. Her risk için gerçekçi İ, F, Ş değerleri ata ve R = İ × F × Ş formülüyle risk skorunu hesapla. Önleyici faaliyetler somut ve uygulanabilir olsun.`;
+Bu sektör ve istek için Fine-Kinney risk analizi tablosu oluştur.`;
+    }
+
+    // ── RİSK ANALİZİ V2 (Fine-Kinney — Tam Profesyonel Format) ──
+    else if (mode === "risk-analizi-v2") {
+      const { sektor, firmaAdi, prompt } = data || {};
+      systemPrompt = `Sen deneyimli bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. Fine-Kinney metoduyla kapsamlı risk değerlendirme raporu hazırlıyorsun.
+
+Fine-Kinney Formülü: R = Olasılık (O) × Şiddet (Ş) × Frekans (F)
+
+OLASILIK DEĞERLERİ: 0.2=Beklenmez, 0.5=Beklenmesi fakat mümkün, 1=Mümkün fakat düşük, 3=Olası, 6=Yüksek oldukça mümkün, 10=Beklenir kesin
+ŞİDDET DEĞERLERİ: 1=Ucuz atlatma, 3=Küçük hasar/yaralanma, 7=Önemli yaralanma, 15=Kalıcı hasar/iş kaybı, 40=Ölümlü kaza, 100=Birden fazla ölümlü kaza
+FREKANS DEĞERLERİ: 0.5=Çok seyrek, 1=Seyrek, 2=Sık değil, 3=Ara sıra, 6=Sık, 10=Hemen hemen sürekli
+
+RİSK SEVİYELERİ: R>=400=Tolerans Gösterilemez, 200<=R<400=Esaslı, 70<=R<200=Önemli, 20<=R<70=Olası, R<20=Önemsiz
+
+SADECE JSON formatında yanıt ver:
+{
+  "rows": [
+    {
+      "no": 1,
+      "bolum": "Bölüm/Alan adı",
+      "faaliyet": "Yapılan faaliyet",
+      "tehlikeKaynagi": "Tehlike kaynağı",
+      "tehlikeler": "Tehlike tanımı",
+      "riskler": "Risk tanımı",
+      "kimlerEtkilenir": "Etkilenecek kişiler",
+      "mevcutDurum": "Mevcut durum açıklaması",
+      "o1": 3,
+      "s1": 7,
+      "f1": 3,
+      "r1": 63,
+      "riskTanimi1": "Önemli",
+      "planlamaAnalizSonucu": "Planlama ve analiz sonucu",
+      "duzelticiTedbirler": "Düzeltici/önleyici kontrol tedbirleri",
+      "sorumluluk": "Sorumlu kişi/birim",
+      "gerceklestirilenTedbirler": "Gerçekleştirilen tedbirler",
+      "gercTarih": "",
+      "o2": 0.5,
+      "s2": 7,
+      "f2": 3,
+      "r2": 11,
+      "riskTanimi2": "Önemsiz",
+      "aciklama": "Ek açıklama"
+    }
+  ]
+}
+
+Her satır için: r1 = o1 * s1 * f1, r2 = o2 * s2 * f2 hesapla. Sonraki risk (r2) her zaman mevcut riskten (r1) dusuk olsun.`;
+      userPrompt = `Firma: ${firmaAdi || "Belirtilmemiş"}
+Sektör: ${sektor}
+İstek: ${prompt}
+
+Bu sektör ve istek için kapsamlı Fine-Kinney risk değerlendirme tablosu oluştur. Her risk için gerçekçi değerler ata, somut düzeltici tedbirler öner.`;
     }
 
     // ── ACİL DURUM EYLEM PLANI ──
@@ -161,28 +214,105 @@ Bu firmaya özel, sektöre uygun acil durum eylem planı hazırla.`;
 
     // ── SAĞLIK GÜVENLİK PLANI ──
     else if (mode === "saglik-guvenlik-plani") {
-      const { sektor, firmaAdi, calisanSayisi, riskSeviyesi, prompt } = data || {};
-      systemPrompt = `Sen deneyimli bir İSG uzmanısın. 6331 sayılı İSG Kanunu ve ilgili yönetmeliklere uygun Sağlık ve Güvenlik Planı hazırlıyorsun.
+      const { sektor, firmaAdi, projeAdi, projeAdresi, isverenAdi, isgUzmani, isyeriHekimi, koordinator, calisanSayisi, riskSeviyesi, prompt } = data || {};
+      systemPrompt = `Sen deneyimli bir İş Sağlığı ve Güvenliği (İSG) uzmanısın. 6331 sayılı İSG Kanunu, Yapı İşlerinde İş Sağlığı ve Güvenliği Yönetmeliği (28786) ve ilgili tüm mevzuata uygun, kapsamlı ve profesyonel bir Sağlık ve Güvenlik Planı hazırlıyorsun.
 
-SADECE JSON formatında yanıt ver:
+SADECE JSON formatında yanıt ver. Her bölüm için en az 5-8 madde yaz, maddeler detaylı ve uygulanabilir olsun:
 {
-  "ozet": "Planın kısa özeti 2-3 cümle",
+  "ozet": "Planın kapsamlı özeti 3-4 cümle, yasal dayanak ve firma bilgilerini içersin",
   "basliklar": [
     {
       "baslik": "Bölüm başlığı",
-      "icerik": ["Madde 1", "Madde 2", "Madde 3"]
+      "icerik": ["Detaylı madde 1", "Detaylı madde 2", ...]
     }
   ]
 }
 
-Plan şu bölümleri içermeli: 1) Genel Bilgiler ve Kapsam, 2) Yasal Dayanak, 3) Risk Değerlendirmesi Özeti, 4) Kişisel Koruyucu Donanım, 5) Eğitim ve Bilinçlendirme, 6) Sağlık Gözetimi, 7) Acil Durum Prosedürleri, 8) Denetim ve İzleme, 9) Sorumluluklar`;
-      userPrompt = `Firma: ${firmaAdi}
+Plan MUTLAKA şu 12 bölümü içermeli, her biri detaylı olsun:
+
+1. GENEL ESASLAR VE AMAÇ
+- Planın amacı, kapsamı, yasal dayanakları (6331 sayılı Kanun, ilgili yönetmelikler)
+- Tanımlar (İSG, risk değerlendirmesi, destek elemanı, koordinatör vb.)
+- Planın güncelleme ve revizyon esasları
+
+2. SAĞLIK VE GÜVENLİK ORGANİZASYONU
+- İşveren yükümlülükleri
+- İSG Kurulu yapısı ve görevleri
+- İş güvenliği uzmanı, işyeri hekimi, koordinatör görev tanımları
+- Çalışan temsilcisi hakları
+
+3. RİSK ANALİZİ VE DEĞERLENDİRME
+- Risk değerlendirme yöntemi ve periyodu
+- Tehlike sınıfına göre önlemler
+- Sektöre özgü riskler ve kontrol tedbirleri
+
+4. EĞİTİM VE ÇALIŞANLARIN BİLGİLENDİRİLMESİ
+- İşe giriş eğitimi zorunluluğu
+- Periyodik eğitim planı (yılda 12 saat)
+- Eğitim konuları (genel, sağlık, teknik, diğer)
+- Eğitim kayıtları ve sertifikasyon
+
+5. SAĞLIK GÖZETİMİ VE İLKYARDIM
+- İşe giriş sağlık raporu zorunluluğu
+- Periyodik sağlık kontrolleri
+- İlkyardım ekibi ve malzemeleri (her 10 çalışana 1 ilkyardımcı)
+- Acil sağlık prosedürleri
+
+6. ACİL DURUMLAR VE EYLEM PLANLARI
+- Yangın acil durum eylem planı
+- İş kazası acil durum prosedürü
+- Deprem, sızıntı, sel acil durum planları
+- Tahliye prosedürleri ve toplanma noktaları
+- Acil durum tatbikatları (yılda en az 1)
+
+7. KİŞİSEL KORUYUCU DONANIM (KKD)
+- KKD seçim kriterleri ve standartları (EN normları)
+- Baret, eldiven, iş ayakkabısı, emniyet kemeri, gözlük, maske standartları
+- KKD zimmet ve takip sistemi
+- KKD kullanım eğitimi
+
+8. SAĞLIK VE GÜVENLİK İŞARETLERİ
+- Yasaklayıcı, uyarı, emredici işaretler
+- Acil çıkış ve ilkyardım işaretleri
+- Yangınla mücadele işaretleri
+- İşaret yerleştirme kuralları
+
+9. İŞ KAZASI VE RAMAK KALA YÖNETİMİ
+- İş kazası bildirimi prosedürü (SGK'ya 3 iş günü)
+- Kaza inceleme ve kök neden analizi
+- Ramak kala raporlama sistemi
+- İstatistik takibi
+
+10. ÖDÜL VE CEZA UYGULAMALARI
+- İSG kurallarına uyumsuzluk yaptırımları
+- Ayın İSG Elemanı seçimi
+- Teşvik ve ödül sistemi
+
+11. İZLEME, ÖLÇME VE DENETİM PLANI
+- Periyodik kontrol gerektiren ekipmanlar
+- Teknik ölçümler (gürültü, toz, aydınlatma, topraklama)
+- Sağlık gözetimi takvimi (akciğer grafisi, SFT, odyometre)
+- İSG Kurulu toplantı takvimi (aylık)
+
+12. ZİYARETÇİLER VE ALT İŞVERENLER
+- Ziyaretçi güvenlik talimatları
+- Alt işveren koordinasyonu
+- Taşeron çalışan eğitimi
+- İletişim ve raporlama`;
+
+      userPrompt = `Firma / İşyeri Adı: ${firmaAdi}
+Proje Adı: ${projeAdi || "Belirtilmemiş"}
+Proje Adresi: ${projeAdresi || "Belirtilmemiş"}
+İşveren / Proje Sorumlusu: ${isverenAdi || "Belirtilmemiş"}
+İş Güvenliği Uzmanı: ${isgUzmani || "Belirtilmemiş"}
+İşyeri Hekimi: ${isyeriHekimi || "Belirtilmemiş"}
+Sağlık ve Güvenlik Koordinatörü: ${koordinator || "Belirtilmemiş"}
 Sektör: ${sektor}
 Tehlike Sınıfı: ${riskSeviyesi || "Tehlikeli"}
 Çalışan Sayısı: ${calisanSayisi || "Belirtilmemiş"}
 Ek Notlar: ${prompt || "Yok"}
 
-Bu firmaya özel, sektöre ve tehlike sınıfına uygun Sağlık ve Güvenlik Planı hazırla.`;
+Bu firmaya özel, sektöre ve tehlike sınıfına uygun, 12 bölümlü kapsamlı Sağlık ve Güvenlik Planı hazırla. Her bölümde en az 6 detaylı madde olsun. Maddeler somut, uygulanabilir ve yasal mevzuata uygun olsun.`;
     }
 
     // ── KOORDİNATÖR ATAMASI ──
@@ -308,7 +438,7 @@ Bu verilere göre İSG yöneticisine kısa ve net bir analiz sun.`;
           { role: "user", content: userPrompt },
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 6000,
         response_format: { type: "json_object" },
       }),
     });

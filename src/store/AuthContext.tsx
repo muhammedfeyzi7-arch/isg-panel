@@ -44,8 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       errMsg.includes('revoked');
     
     if (isRefreshTokenError) {
-      // Login sayfasındayken hiçbir şey yapma — login kendi hatasını yönetir
+      // Login veya super-admin sayfasındayken hiçbir şey yapma
       if (window.location.pathname === '/login') return;
+      if (window.location.pathname.startsWith('/super-admin')) return;
       clearAuthStorage();
       try {
         await supabase.auth.signOut({ scope: 'local' });

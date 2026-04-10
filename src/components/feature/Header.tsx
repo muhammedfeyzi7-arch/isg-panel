@@ -201,29 +201,32 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const dropdownBorder = isDark ? 'var(--border-main)'   : 'rgba(15,23,42,0.09)';
   const dropdownItemHover = isDark ? 'var(--bg-hover)'   : 'rgba(15,23,42,0.038)';
 
-  const displayBildirimler = bildirimler.slice(0, 10);
+  // Sadece okunmamışları göster, okunmuşlar gizli
+  const displayBildirimler = bildirimler.filter(b => !b.okundu).slice(0, 20);
 
   // Bildirime tıklayınca ilgili modüle git
   const handleBildirimClick = (b: typeof bildirimler[0]) => {
     bildirimOku(b.id);
     setNotifOpen(false);
     const targetModule = b.module || 'dashboard';
-    setActiveModule(targetModule);
-    // recordId varsa ilgili modülün açması için sinyal gönder
-    if (b.recordId) {
-      try {
-        localStorage.setItem('isg_open_record', JSON.stringify({
-          module: targetModule,
-          recordId: b.recordId,
-          tip: b.tip,
-          ts: Date.now(),
-        }));
-        // Custom event ile aynı anda açık olan sayfayı tetikle
-        window.dispatchEvent(new CustomEvent('isg_open_record', {
-          detail: { module: targetModule, recordId: b.recordId, tip: b.tip },
-        }));
-      } catch { /* ignore */ }
-    }
+    // Kısa gecikme — önce dropdown kapanır, sonra navigasyon çalışır
+    setTimeout(() => {
+      setActiveModule(targetModule);
+      // recordId varsa ilgili modülün açması için sinyal gönder
+      if (b.recordId) {
+        try {
+          localStorage.setItem('isg_open_record', JSON.stringify({
+            module: targetModule,
+            recordId: b.recordId,
+            tip: b.tip,
+            ts: Date.now(),
+          }));
+          window.dispatchEvent(new CustomEvent('isg_open_record', {
+            detail: { module: targetModule, recordId: b.recordId, tip: b.tip },
+          }));
+        } catch { /* ignore */ }
+      }
+    }, 50);
   };
 
   const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string; badge: string; badgeBg: string }> = {
@@ -617,17 +620,17 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
               {displayBildirimler.length > 0 && (
                 <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: `1px solid ${dropdownBorder}` }}>
                   <p className="text-[10.5px]" style={{ color: '#475569' }}>
-                    {bildirimler.length > 10 ? `${bildirimler.length - 10} daha var` : `${bildirimler.length} toplam uyarı`}
+                    {okunmamisBildirimSayisi} okunmamış uyarı
                   </p>
                   <button
-                    onClick={() => { setActiveModule('dashboard'); setNotifOpen(false); }}
+                    onClick={tumunuOku}
                     className="text-[11.5px] font-semibold cursor-pointer transition-all flex items-center gap-1.5"
                     style={{ color: '#60A5FA' }}
                     onMouseEnter={e => { e.currentTarget.style.color = '#93C5FD'; }}
                     onMouseLeave={e => { e.currentTarget.style.color = '#60A5FA'; }}
                   >
-                    Panele Git
-                    <i className="ri-arrow-right-line text-[11px]" />
+                    Tümünü okundu işaretle
+                    <i className="ri-check-double-line text-[11px]" />
                   </button>
                 </div>
               )}

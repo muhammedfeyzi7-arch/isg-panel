@@ -65,8 +65,11 @@ export default function SuperAdminLoginPage() {
       sessionStorage.setItem('sa_access_token', data.session.access_token);
       sessionStorage.setItem('sa_user_id', data.user.id);
 
-      // Supabase'in kendi localStorage session'ını temizle (normal kullanıcıyla karışmasın)
-      await supabase.auth.signOut({ scope: 'local' });
+      // signOut yerine localStorage'daki Supabase tokenlarını manuel temizle
+      // signOut kullanmak SIGNED_OUT eventi fırlatır ve AuthContext akışını bozabilir
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-')) localStorage.removeItem(key);
+      });
 
       navigate('/super-admin', { replace: true });
     } catch {

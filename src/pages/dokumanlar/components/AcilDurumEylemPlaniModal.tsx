@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import InlineEdit from './InlineEdit';
 import { exportToPDF } from '../utils/pdfExport';
@@ -75,8 +76,8 @@ export default function AcilDurumEylemPlaniModal({ onClose }: Props) {
     setSections(prev => prev.map((s, i) => i === si ? { ...s, icerik: s.icerik.filter((_, j) => j !== ii) } : s));
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
       <div className="w-full rounded-2xl flex flex-col overflow-hidden"
         style={{ maxWidth: step === 'result' ? '780px' : '560px', maxHeight: '90vh', background: 'var(--bg-card)', border: '1px solid var(--border-main)' }}>
 
@@ -224,6 +225,7 @@ export default function AcilDurumEylemPlaniModal({ onClose }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

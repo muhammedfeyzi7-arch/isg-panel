@@ -351,7 +351,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const in60 = new Date(today.getTime() + 60 * 86400000);
+    const in30 = new Date(today.getTime() + 30 * 86400000);
     const result: Bildirim[] = [];
 
     // Tarih string'ini güvenli şekilde parse et — geçersizse null döner
@@ -415,7 +415,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!d) return;
       const kalanGun = getDaysRemaining(e.gecerlilikTarihi)!;
 
-      if (d >= today && d <= in60) {
+      if (d >= today && d <= in30) {
         result.push({
           id: `evrak_surecek_${e.id}`,
           tip: 'evrak_surecek',
