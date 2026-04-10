@@ -85,12 +85,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Uygulama açılınca süresi dolan org'ları otomatik pasife al (günde 1 kez)
     triggerAutoExpire();
 
-    supabase.auth.getSession().then(({ data: { session: s }, error }) => {
+    supabase.auth.getSession().then(async ({ data: { session: s }, error }) => {
       if (error) {
         handleAuthError(error);
-      } else {
-        setSession(s);
+        setLoading(false);
+        return;
       }
+
+      if (s?.user) {
+        // Sayfa yenilenince de org kontrolü yap
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_super_admin')
+          .eq('user_id', s.user.id)
+          .maybeSingle();
+
+        if (!profile?.is_super_admin) {
+          const { data: membership } = await supabase
+            .from('user_organizations')
+            .select('organization_id, is_active')
+            .eq('user_id', s.user.id)
+            .maybeSingle();
+
+          if (!membership || !membership.is_active) {
+            await supabase.auth.signOut({ scope: 'local' });
+            clearAuthStorage();
+            setSession(null);
+            setLoading(false);
+            return;
+          }
+
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('is_active, subscription_end')
+            .eq('id', membership.organization_id)
+            .maybeSingle();
+
+          if (!org || !org.is_active) {
+            await supabase.auth.signOut({ scope: 'local' });
+            clearAuthStorage();
+            setSession(null);
+            setLoading(false);
+            return;
+          }
+
+          if (org.subscription_end) {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const endStr = String(org.subscription_end).substring(0, 10);
+            if (endStr < todayStr) {
+              await supabase.auth.signOut({ scope: 'local' });
+              clearAuthStorage();
+              setSession(null);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      }
+
+      setSession(s);
       setLoading(false);
     }).catch((err) => {
       handleAuthError(err);
@@ -116,6 +170,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!membership || !membership.is_active) {
             await supabase.auth.signOut({ scope: 'local' });
             clearAuthStorage();
+            setSession(null);
+            setLoading(false);
             return;
           }
 
@@ -128,6 +184,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!org || !org.is_active) {
             await supabase.auth.signOut({ scope: 'local' });
             clearAuthStorage();
+            setSession(null);
+            setLoading(false);
             return;
           }
 
@@ -138,6 +196,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (endStr < todayStr) {
               await supabase.auth.signOut({ scope: 'local' });
               clearAuthStorage();
+              setSession(null);
+              setLoading(false);
               return;
             }
           }

@@ -172,8 +172,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return () => clearInterval(interval);
   }, [session, loading, checkOrgStatus, logout]);
 
-  if (loading || status === 'checking') return null;
+  if (loading) return null;
   if (!session) return <Navigate to="/login" replace />;
+  if (status === 'checking') return null;
   if (status === 'expired') return <Navigate to="/subscription-expired" replace />;
   if (status === 'inactive') return <Navigate to="/subscription-expired" replace />;
 
