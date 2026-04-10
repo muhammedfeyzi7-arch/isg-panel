@@ -124,7 +124,7 @@
 html, body, #root {
   height: 100%;
   background-color: var(--bg-app);
-  transition: background-color 0.3s ease;
+  /* Tema geçişi anlık - transition kaldırıldı */
 }
 
 body {

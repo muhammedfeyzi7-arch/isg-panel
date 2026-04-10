@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/store/AuthContext';
 import { supabase } from '@/lib/supabase';
+
 import SupportModal from '@/components/feature/SupportModal';
 
 type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'ayarlar';
@@ -44,7 +45,23 @@ export default function OsgbHeader({
 
   const hour = new Date().getHours();
   const greeting = hour >= 6 && hour < 12 ? 'Günaydın' : hour >= 12 && hour < 17 ? 'İyi Günler' : 'İyi Akşamlar';
-  const firstName = user?.email?.split('@')[0] ?? 'Admin';
+
+  // user_metadata.full_name varsa onu kullan, yoksa email prefix
+  const [displayName, setDisplayName] = useState<string>(
+    user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'Admin'
+  );
+  const firstName = displayName;
+
+  // Supabase auth değişikliklerini dinle (Ayarlar'da isim güncellenince)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const name = session.user.user_metadata?.full_name ?? session.user.email?.split('@')[0] ?? 'Admin';
+        setDisplayName(name);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // ── Notifications ──
   const [supportNotifs, setSupportNotifs] = useState<SupportNotification[]>([]);

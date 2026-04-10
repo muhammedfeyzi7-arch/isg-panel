@@ -55,12 +55,6 @@ export default function OsgbSidebar({
   const { logout, user } = useAuth();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setIsMounted(true), 60);
-    return () => clearTimeout(t);
-  }, []);
 
   const handleNav = (tab: Tab) => {
     setActiveTab(tab);
@@ -77,12 +71,11 @@ export default function OsgbSidebar({
           'fixed left-0 top-0 h-screen flex flex-col z-[42]',
           collapsed ? 'w-[64px]' : 'w-[220px]',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-          isMounted ? 'opacity-100' : 'opacity-0',
         ].join(' ')}
         style={{
           background: 'var(--bg-sidebar)',
           borderRight: '1px solid var(--border-subtle)',
-          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, background 0.3s ease',
+          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1), background 0s, border-color 0s',
           boxShadow: '2px 0 16px rgba(0,0,0,0.08)',
         }}
       >

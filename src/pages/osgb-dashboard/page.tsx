@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../store/AuthContext';
 import { useApp } from '../../store/AppContext';
@@ -11,7 +11,6 @@ import OsgbSidebar from './components/OsgbSidebar';
 import OsgbHeader from './components/OsgbHeader';
 import OsgbSettings from './components/OsgbSettings';
 import ZiyaretlerTab from './components/ZiyaretlerTab';
-import OsgbQuickActions from './components/OsgbQuickActions';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -57,9 +56,11 @@ export default function OsgbDashboardPage() {
     try { return (localStorage.getItem('isg_theme') as 'dark' | 'light') ?? 'dark'; } catch { return 'dark'; }
   });
 
-  // ── Tema: document class + localStorage sync ──
+  // ── Tema toggle — anlık geçiş ──
   useEffect(() => {
     const root = document.documentElement;
+    // Tema geçişini anlık yap (0ms), sadece içerik transition'ları kalsın
+    root.style.setProperty('--theme-transition', '0s');
     if (osgbTheme === 'light') {
       root.classList.add('light-mode');
     } else {
@@ -67,6 +68,7 @@ export default function OsgbDashboardPage() {
     }
     try { localStorage.setItem('isg_theme', osgbTheme); } catch { /* ignore */ }
   }, [osgbTheme]);
+
   const [searchFirma, setSearchFirma] = useState('');
   const [searchUzman, setSearchUzman] = useState('');
 
@@ -91,7 +93,6 @@ export default function OsgbDashboardPage() {
 
   // Firma Ekle Modal
   const [showFirmaModal, setShowFirmaModal] = useState(false);
-  const [firmaAd, setFirmaAd] = useState('');
   const [firmaLoading, setFirmaLoading] = useState(false);
   const [firmaError, setFirmaError] = useState<string | null>(null);
 
@@ -131,7 +132,7 @@ export default function OsgbDashboardPage() {
           const [
             { count: personelCount },
             { count: uygunsuzlukCount },
-            { count: kapatılanCount },
+            { count: kapatilanCount },
             { count: tutanakCount },
             { count: egitimCount },
           ] = await Promise.all([
@@ -163,7 +164,7 @@ export default function OsgbDashboardPage() {
             personelSayisi: personelCount ?? 0,
             uzmanAd: atananUzman?.display_name ?? null,
             uygunsuzluk: uygunsuzlukCount ?? 0,
-            kapatilan: kapatılanCount ?? 0,
+            kapatilan: kapatilanCount ?? 0,
             tutanakSayisi: tutanakCount ?? 0,
             egitimSayisi: egitimCount ?? 0,
           });
@@ -205,8 +206,16 @@ export default function OsgbDashboardPage() {
   }, [fetchData]);
 
   // ── Firma Ekle ──
+  const [firmaForm, setFirmaForm] = useState({
+    ad: '', yetkili: '', telefon: '', eposta: '', sgkSicil: '', adres: '',
+    tehlikeSinifi: 'Tehlikeli', durum: 'Aktif',
+    sozlesmeBas: '', sozlesmeBit: '', notlar: '', logoFile: null as File | null,
+  });
+  const [firmaFormTab, setFirmaFormTab] = useState<0 | 1 | 2>(0);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   const handleFirmaEkle = async () => {
-    if (!firmaAd.trim()) { setFirmaError('Firma adı zorunludur.'); return; }
+    if (!firmaForm.ad.trim()) { setFirmaError('Firma adı zorunludur.'); return; }
     if (!org?.id) return;
     setFirmaLoading(true);
     setFirmaError(null);
@@ -216,7 +225,7 @@ export default function OsgbDashboardPage() {
       const { data: newFirma, error } = await supabase
         .from('organizations')
         .insert({
-          name: firmaAd.trim(),
+          name: firmaForm.ad.trim(),
           invite_code: inviteCode,
           created_by: user?.id,
           org_type: 'firma',
@@ -230,15 +239,15 @@ export default function OsgbDashboardPage() {
         return;
       }
 
-      // app_data oluştur
       await supabase.from('app_data').upsert(
         { organization_id: newFirma.id, data: {}, updated_at: new Date().toISOString() },
         { onConflict: 'organization_id' }
       );
 
-      addToast(`${firmaAd.trim()} başarıyla eklendi!`, 'success');
+      addToast(`${firmaForm.ad.trim()} başarıyla eklendi!`, 'success');
       setShowFirmaModal(false);
-      setFirmaAd('');
+      setFirmaForm({ ad: '', yetkili: '', telefon: '', eposta: '', sgkSicil: '', adres: '', tehlikeSinifi: 'Tehlikeli', durum: 'Aktif', sozlesmeBas: '', sozlesmeBit: '', notlar: '', logoFile: null });
+      setFirmaFormTab(0);
       await fetchData();
     } catch (err) {
       setFirmaError(String(err));
@@ -399,7 +408,7 @@ export default function OsgbDashboardPage() {
         collapsed={sidebarCollapsed}
         orgName={org?.name ?? 'OSGB'}
         onMobileMenuToggle={() => setMobileOpen(v => !v)}
-        onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); setFirmaAd(''); }}
+        onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); }}
         onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' }); }}
         theme={osgbTheme}
         onToggleTheme={() => setOsgbTheme(t => t === 'dark' ? 'light' : 'dark')}
@@ -442,14 +451,6 @@ export default function OsgbDashboardPage() {
                     ))}
                   </div>
 
-                  {/* Hızlı İşlemler Modülü */}
-                  <OsgbQuickActions
-                    onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); setFirmaAd(''); }}
-                    onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' }); }}
-                    onZiyaretGit={() => setActiveTab('ziyaretler')}
-                    onRaporGit={() => setActiveTab('raporlar')}
-                  />
-
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Firmalar özet */}
                     <div className="rounded-2xl p-5" style={cardStyle}>
@@ -470,7 +471,7 @@ export default function OsgbDashboardPage() {
                             <i className="ri-building-2-line text-xl" style={{ color: '#10B981' }} />
                           </div>
                           <p className="text-xs" style={{ color: textMuted }}>Henüz firma eklenmedi</p>
-                          <button onClick={() => setShowFirmaModal(true)}
+                          <button onClick={() => { setShowFirmaModal(true); setFirmaError(null); }}
                             className="whitespace-nowrap flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
                             style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                             <i className="ri-add-line" />Firma Ekle
@@ -602,7 +603,7 @@ export default function OsgbDashboardPage() {
                         placeholder="Firma ara..." className="text-sm pl-9 pr-4 py-2.5 rounded-xl w-full outline-none"
                         style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: 'var(--text-primary)' }} />
                     </div>
-                    <button onClick={() => { setShowFirmaModal(true); setFirmaError(null); setFirmaAd(''); }}
+                    <button onClick={() => { setShowFirmaModal(true); setFirmaError(null); }}
                       className="whitespace-nowrap ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
                       style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                       <i className="ri-add-line" />Firma Ekle
@@ -1002,180 +1003,361 @@ export default function OsgbDashboardPage() {
         </div>
       </main>
 
-      {/* ── FİRMA EKLE MODAL ── */}
+      {/* ── FİRMA EKLE MODAL — Premium 3 Bölüm ── */}
       {showFirmaModal && createPortal(
         <div className="fixed inset-0 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(16px)', zIndex: 99999 }}
-          onClick={e => { if (e.target === e.currentTarget) setShowFirmaModal(false); }}>
-          <div className="w-full max-w-md rounded-2xl p-6 space-y-5 animate-modal-in"
-            style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)' }}>
-            <div className="flex items-center justify-between">
+          onClick={e => { if (e.target === e.currentTarget) { setShowFirmaModal(false); setFirmaFormTab(0); } }}>
+          <div className="w-full max-w-2xl rounded-2xl animate-modal-in overflow-hidden flex flex-col"
+            style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)', maxHeight: '90vh' }}>
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--border-subtle)' }}>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 flex items-center justify-center rounded-xl"
                   style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
                   <i className="ri-building-2-line text-base" style={{ color: '#10B981' }} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Müşteri Firma Ekle</h3>
-                  <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>OSGB'nize bağlı yeni firma</p>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Müşteri Firma Ekle</h3>
+                  <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>OSGB&apos;nize bağlı yeni müşteri firma</p>
                 </div>
               </div>
-              <button onClick={() => setShowFirmaModal(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}>
-                <i className="ri-close-line" />
+              <button onClick={() => { setShowFirmaModal(false); setFirmaFormTab(0); }}
+                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = firmaForm.logoFile ? 'rgba(16,185,129,0.35)' : 'var(--border-subtle)';
+                  (e.currentTarget as HTMLElement).style.background = firmaForm.logoFile ? 'rgba(16,185,129,0.06)' : 'var(--bg-item)';
+                }}>
+                <i className="ri-close-line text-sm" />
               </button>
             </div>
 
-            <div>
-              <label style={labelStyle}>Firma Adı *</label>
-              <input value={firmaAd}
-                onChange={e => { setFirmaAd(e.target.value); setFirmaError(null); }}
-                placeholder="Örn: ABC Tekstil A.Ş."
-                style={inputStyle}
-                onKeyDown={e => { if (e.key === 'Enter') handleFirmaEkle(); }}
-              />
+            {/* Section Tabs */}
+            <div className="flex gap-1 px-6 pt-4 flex-shrink-0">
+              {[
+                { idx: 0, icon: 'ri-id-card-line', label: 'Kimlik & İletişim' },
+                { idx: 1, icon: 'ri-file-list-3-line', label: 'Sözleşme & Durum' },
+                { idx: 2, icon: 'ri-image-line', label: 'Logo & Notlar' },
+              ].map(tab => (
+                <button
+                  key={tab.idx}
+                  onClick={() => setFirmaFormTab(tab.idx as 0 | 1 | 2)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                  style={{
+                    background: firmaFormTab === tab.idx ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
+                    border: firmaFormTab === tab.idx ? '1px solid rgba(16,185,129,0.25)' : '1px solid var(--border-subtle)',
+                    color: firmaFormTab === tab.idx ? '#10B981' : 'var(--text-muted)',
+                  }}>
+                  <i className={`${tab.icon} text-xs`} />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.idx + 1}</span>
+                </button>
+              ))}
             </div>
 
-            <div className="flex items-start gap-2 p-3 rounded-xl"
-              style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
-              <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
-              <p className="text-xs leading-relaxed" style={{ color: '#64748b' }}>
-                Firma eklendikten sonra, firmaya ait kullanıcılar bu firmanın davet kodu ile sisteme katılabilir veya siz gezici uzman atayabilirsiniz.
-              </p>
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto flex-1 px-6 py-5">
+
+              {/* Tab 0: Kimlik & İletişim */}
+              {firmaFormTab === 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                      <i className="ri-id-card-line text-xs" style={{ color: '#10B981' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Firma kimlik ve iletişim bilgileri</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Temel bilgileri eksiksiz doldurunuz</p>
+                    </div>
+                  </div>
+
+                  {/* Firma Adı — tam genişlik */}
+                  <div>
+                    <label style={labelStyle}>Firma Adı <span style={{ color: '#EF4444' }}>*</span></label>
+                    <input
+                      value={firmaForm.ad}
+                      onChange={e => { setFirmaForm(p => ({ ...p, ad: e.target.value })); setFirmaError(null); }}
+                      placeholder="Firma adı giriniz"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label style={labelStyle}>Yetkili Kişi</label>
+                      <input
+                        value={firmaForm.yetkili}
+                        onChange={e => setFirmaForm(p => ({ ...p, yetkili: e.target.value }))}
+                        placeholder="Yetkili kişi adı"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Telefon</label>
+                      <input
+                        value={firmaForm.telefon}
+                        onChange={e => setFirmaForm(p => ({ ...p, telefon: e.target.value }))}
+                        placeholder="0212 000 00 00"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>E-posta</label>
+                      <input
+                        type="email"
+                        value={firmaForm.eposta}
+                        onChange={e => setFirmaForm(p => ({ ...p, eposta: e.target.value }))}
+                        placeholder="info@firma.com"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>SGK Sicil No</label>
+                      <input
+                        value={firmaForm.sgkSicil}
+                        onChange={e => setFirmaForm(p => ({ ...p, sgkSicil: e.target.value }))}
+                        placeholder="SGK sicil numarası"
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Adres</label>
+                    <textarea
+                      value={firmaForm.adres}
+                      onChange={e => setFirmaForm(p => ({ ...p, adres: e.target.value }))}
+                      placeholder="Firma adresi"
+                      rows={3}
+                      style={{ ...inputStyle, resize: 'none', height: 'auto' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 1: Sözleşme & Durum */}
+              {firmaFormTab === 1 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(245,158,11,0.1)' }}>
+                      <i className="ri-file-list-3-line text-xs" style={{ color: '#F59E0B' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Sözleşme & Durum</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Tehlike sınıfı, durum ve sözleşme tarihleri</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label style={labelStyle}>Tehlike Sınıfı</label>
+                      <div className="flex gap-2">
+                        {['Az Tehlikeli', 'Tehlikeli', 'Çok Tehlikeli'].map(opt => (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setFirmaForm(p => ({ ...p, tehlikeSinifi: opt }))}
+                            className="flex-1 py-2 px-1 rounded-xl text-[10.5px] font-semibold cursor-pointer transition-all whitespace-nowrap"
+                            style={{
+                              background: firmaForm.tehlikeSinifi === opt
+                                ? opt === 'Çok Tehlikeli' ? 'rgba(239,68,68,0.12)' : opt === 'Tehlikeli' ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)'
+                                : 'var(--bg-item)',
+                              border: firmaForm.tehlikeSinifi === opt
+                                ? opt === 'Çok Tehlikeli' ? '1.5px solid rgba(239,68,68,0.35)' : opt === 'Tehlikeli' ? '1.5px solid rgba(245,158,11,0.35)' : '1.5px solid rgba(16,185,129,0.35)'
+                                : '1.5px solid var(--border-subtle)',
+                              color: firmaForm.tehlikeSinifi === opt
+                                ? opt === 'Çok Tehlikeli' ? '#EF4444' : opt === 'Tehlikeli' ? '#F59E0B' : '#10B981'
+                                : 'var(--text-muted)',
+                            }}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Firma Durumu</label>
+                      <div className="flex gap-2">
+                        {['Aktif', 'Pasif'].map(opt => (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setFirmaForm(p => ({ ...p, durum: opt }))}
+                            className="flex-1 py-2 px-3 rounded-xl text-[11px] font-semibold cursor-pointer transition-all"
+                            style={{
+                              background: firmaForm.durum === opt ? (opt === 'Aktif' ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.12)') : 'var(--bg-item)',
+                              border: firmaForm.durum === opt ? (opt === 'Aktif' ? '1.5px solid rgba(16,185,129,0.35)' : '1.5px solid rgba(100,116,139,0.35)') : '1.5px solid var(--border-subtle)',
+                              color: firmaForm.durum === opt ? (opt === 'Aktif' ? '#10B981' : '#64748B') : 'var(--text-muted)',
+                            }}>
+                            {opt === 'Aktif' ? '● Aktif' : '○ Pasif'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label style={labelStyle}>Sözleşme Başlangıcı</label>
+                      <input
+                        type="date"
+                        value={firmaForm.sozlesmeBas}
+                        onChange={e => setFirmaForm(p => ({ ...p, sozlesmeBas: e.target.value }))}
+                        style={{ ...inputStyle, colorScheme: isDark ? 'dark' : 'light' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Sözleşme Bitişi</label>
+                      <input
+                        type="date"
+                        value={firmaForm.sozlesmeBit}
+                        onChange={e => setFirmaForm(p => ({ ...p, sozlesmeBit: e.target.value }))}
+                        style={{ ...inputStyle, colorScheme: isDark ? 'dark' : 'light' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sözleşme durum özeti */}
+                  {firmaForm.sozlesmeBas && firmaForm.sozlesmeBit && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl"
+                      style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                      <i className="ri-calendar-check-line text-sm flex-shrink-0" style={{ color: '#10B981' }} />
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        <span style={{ color: '#10B981', fontWeight: 600 }}>
+                          {new Date(firmaForm.sozlesmeBas).toLocaleDateString('tr-TR')}
+                        </span>
+                        <span style={{ color: 'var(--text-faint)' }}> — </span>
+                        <span style={{ color: '#10B981', fontWeight: 600 }}>
+                          {new Date(firmaForm.sozlesmeBit).toLocaleDateString('tr-TR')}
+                        </span>
+                        <span style={{ color: 'var(--text-muted)' }}> tarihler arası sözleşme</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 2: Logo & Notlar */}
+              {firmaFormTab === 2 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(139,92,246,0.1)' }}>
+                      <i className="ri-image-line text-xs" style={{ color: '#8B5CF6' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Logo & Notlar</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Firma logosu ve ek açıklamalar</p>
+                    </div>
+                  </div>
+
+                  {/* Logo yükleme */}
+                  <div>
+                    <label style={labelStyle}>Firma Logosu <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>(PNG / JPG)</span></label>
+                    <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/jpg" className="hidden"
+                      onChange={e => { const f = e.target.files?.[0] ?? null; setFirmaForm(p => ({ ...p, logoFile: f })); }} />
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      className="w-full flex flex-col items-center justify-center gap-3 py-8 rounded-2xl cursor-pointer transition-all"
+                      style={{
+                        background: firmaForm.logoFile ? 'rgba(16,185,129,0.06)' : 'var(--bg-item)',
+                        border: `2px dashed ${firmaForm.logoFile ? 'rgba(16,185,129,0.35)' : 'var(--border-subtle)'}`,
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.4)'; (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.04)'; }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.borderColor = firmaForm.logoFile ? 'rgba(16,185,129,0.35)' : 'var(--border-subtle)';
+                        (e.currentTarget as HTMLElement).style.background = firmaForm.logoFile ? 'rgba(16,185,129,0.06)' : 'var(--bg-item)';
+                      }}>
+                      {firmaForm.logoFile ? (
+                        <>
+                          <div className="w-12 h-12 flex items-center justify-center rounded-2xl" style={{ background: 'rgba(16,185,129,0.12)' }}>
+                            <i className="ri-image-line text-xl" style={{ color: '#10B981' }} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs font-semibold" style={{ color: '#10B981' }}>{firmaForm.logoFile.name}</p>
+                            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                              {(firmaForm.logoFile.size / 1024).toFixed(1)} KB · Değiştirmek için tıklayın
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 flex items-center justify-center rounded-2xl" style={{ background: 'var(--bg-hover)' }}>
+                            <i className="ri-upload-cloud-2-line text-2xl" style={{ color: 'var(--text-faint)' }} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Logo yüklemek için tıklayın</p>
+                            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>PNG veya JPG, max 2MB</p>
+                          </div>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Notlar</label>
+                    <textarea
+                      value={firmaForm.notlar}
+                      onChange={e => setFirmaForm(p => ({ ...p, notlar: e.target.value }))}
+                      placeholder="Firma hakkında ek notlar, özel koşullar..."
+                      rows={5}
+                      maxLength={500}
+                      style={{ ...inputStyle, resize: 'none', height: 'auto' }}
+                    />
+                    <p className="text-[10px] mt-1 text-right" style={{ color: 'var(--text-faint)' }}>
+                      {firmaForm.notlar.length}/500
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Error */}
             {firmaError && (
-              <div className="flex items-start gap-2 p-3 rounded-xl"
+              <div className="mx-6 mb-3 flex items-start gap-2 p-3 rounded-xl flex-shrink-0"
                 style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
                 <i className="ri-error-warning-line text-sm flex-shrink-0" style={{ color: '#ef4444' }} />
                 <p className="text-xs" style={{ color: '#dc2626' }}>{firmaError}</p>
               </div>
             )}
 
-            <div className="flex gap-3">
-              <button onClick={() => setShowFirmaModal(false)}
-                className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
-                style={{ background: 'rgba(15,23,42,0.05)', border: '1px solid rgba(15,23,42,0.1)', color: '#64748b' }}>
-                İptal
-              </button>
-              <button onClick={handleFirmaEkle} disabled={firmaLoading}
-                className="flex-1 whitespace-nowrap flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: firmaLoading ? 0.7 : 1 }}>
-                {firmaLoading ? <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</> : <><i className="ri-add-line" />Firma Ekle</>}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* ── FİRMA DETAY MODAL ── */}
-      {secilenFirma && org?.id && (
-        <FirmaDetayModal
-          firmaId={secilenFirma.id}
-          firmaAdi={secilenFirma.name}
-          orgId={org.id}
-          uzmanlar={uzmanlar}
-          onClose={() => setSecilenFirma(null)}
-          onRefresh={fetchData}
-          addToast={addToast}
-        />
-      )}
-
-      {/* ── UZMAN DETAY MODAL ── */}
-      {secilenUzman && org?.id && (
-        <UzmanDetayModal
-          uzman={secilenUzman}
-          orgId={org.id}
-          altFirmalar={altFirmalar}
-          onClose={() => setSecilenUzman(null)}
-          onRefresh={fetchData}
-          addToast={addToast}
-        />
-      )}
-
-      {/* ── UZMAN EKLE MODAL ── */}
-      {showUzmanModal && createPortal(
-        <div className="fixed inset-0 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(16px)', zIndex: 99999 }}
-          onClick={e => { if (e.target === e.currentTarget) setShowUzmanModal(false); }}>
-          <div className="w-full max-w-md rounded-2xl p-6 space-y-4 animate-modal-in"
-            style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)' }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 flex items-center justify-center rounded-xl"
-                  style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                  <i className="ri-user-star-line text-base" style={{ color: '#8B5CF6' }} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold" style={{ color: '#0f172a' }}>Gezici Uzman Ekle</h3>
-                  <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>OSGB'nize bağlı yeni uzman</p>
-                </div>
-              </div>
-              <button onClick={() => setShowUzmanModal(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}>
-                <i className="ri-close-line" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label style={labelStyle}>Ad Soyad *</label>
-                <input value={uzmanForm.ad} onChange={e => { setUzmanForm(p => ({ ...p, ad: e.target.value })); setUzmanError(null); }}
-                  placeholder="Mehmet Yılmaz" style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>E-posta *</label>
-                <input type="email" value={uzmanForm.email} onChange={e => { setUzmanForm(p => ({ ...p, email: e.target.value })); setUzmanError(null); }}
-                  placeholder="uzman@osgb.com" style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Geçici Şifre *</label>
-                <div className="relative">
-                  <input type={showUzmanPw ? 'text' : 'password'} value={uzmanForm.password}
-                    onChange={e => { setUzmanForm(p => ({ ...p, password: e.target.value })); setUzmanError(null); }}
-                    placeholder="En az 8 karakter" style={{ ...inputStyle, paddingRight: '40px' }} />
-                  <button type="button" onClick={() => setShowUzmanPw(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center cursor-pointer"
-                    style={{ color: '#64748b' }}>
-                    <i className={`${showUzmanPw ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+              style={{ borderTop: '1px solid var(--border-subtle)' }}>
+              {/* Tab nav */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFirmaFormTab(t => Math.max(0, t - 1) as 0 | 1 | 2)}
+                  disabled={firmaFormTab === 0}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', opacity: firmaFormTab === 0 ? 0.4 : 1 }}>
+                  <i className="ri-arrow-left-line" /> Geri
+                </button>
+                {firmaFormTab < 2 && (
+                  <button
+                    onClick={() => setFirmaFormTab(t => Math.min(2, t + 1) as 0 | 1 | 2)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                    style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}>
+                    İleri <i className="ri-arrow-right-line" />
                   </button>
-                </div>
-                <p className="text-[10px] mt-1" style={{ color: '#94a3b8' }}>Uzman ilk girişinde şifresini değiştirmeye zorlanacak.</p>
+                )}
               </div>
-              <div>
-                <label style={labelStyle}>Atanacak Firma (isteğe bağlı)</label>
-                <select value={uzmanForm.atananFirmaId} onChange={e => setUzmanForm(p => ({ ...p, atananFirmaId: e.target.value }))}
-                  style={{ ...inputStyle, cursor: 'pointer' }}>
-                  <option value="">— Şimdilik atama yapma —</option>
-                  {altFirmalar.map(f => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
-            {uzmanError && (
-              <div className="flex items-start gap-2 p-3 rounded-xl"
-                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                <i className="ri-error-warning-line text-sm flex-shrink-0" style={{ color: '#ef4444' }} />
-                <p className="text-xs" style={{ color: '#dc2626' }}>{uzmanError}</p>
+              <div className="flex gap-2">
+                <button onClick={() => { setShowFirmaModal(false); setFirmaFormTab(0); }}
+                  className="whitespace-nowrap px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer"
+                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                  İptal
+                </button>
+                <button onClick={handleFirmaEkle} disabled={firmaLoading || !firmaForm.ad.trim()}
+                  className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: (firmaLoading || !firmaForm.ad.trim()) ? 0.7 : 1 }}>
+                  {firmaLoading ? <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</> : <><i className="ri-add-line" />Firma Ekle</>}
+                </button>
               </div>
-            )}
-
-            <div className="flex gap-3">
-              <button onClick={() => setShowUzmanModal(false)}
-                className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
-                style={{ background: 'rgba(15,23,42,0.05)', border: '1px solid rgba(15,23,42,0.1)', color: '#64748b' }}>
-                İptal
-              </button>
-              <button onClick={handleUzmanEkle} disabled={uzmanLoading}
-                className="flex-1 whitespace-nowrap flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: uzmanLoading ? 0.7 : 1 }}>
-                {uzmanLoading ? <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</> : <><i className="ri-user-add-line" />Uzman Ekle</>}
-              </button>
             </div>
           </div>
         </div>,
