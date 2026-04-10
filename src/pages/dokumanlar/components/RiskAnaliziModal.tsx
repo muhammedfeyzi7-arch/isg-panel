@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import { exportToPDF } from '../utils/pdfExport';
+import { exportRiskToExcel } from '../utils/excelExport';
 
 interface RiskRow {
   no: number;
@@ -148,6 +149,7 @@ export default function RiskAnaliziModal({ onClose }: Props) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [excelLoading, setExcelLoading] = useState(false);
   const [rows, setRows] = useState<RiskRow[]>([]);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'form' | 'result'>('form');
@@ -243,6 +245,20 @@ export default function RiskAnaliziModal({ onClose }: Props) {
         `Risk-Analizi-${firmaBilgileri.firmaAdi || firmaAdi || sektor}`,
       );
     } finally { setPdfLoading(false); }
+  };
+
+  const handleExcel = () => {
+    setExcelLoading(true);
+    try {
+      exportRiskToExcel(
+        rows,
+        firmaBilgileri,
+        sektor,
+        `Risk-Analizi-${firmaBilgileri.firmaAdi || firmaAdi || sektor}`,
+      );
+    } finally {
+      setExcelLoading(false);
+    }
   };
 
   const riskSummary = rows.reduce((acc, r) => { acc[r.riskTanimi1] = (acc[r.riskTanimi1] || 0) + 1; return acc; }, {} as Record<string, number>);
@@ -591,6 +607,10 @@ export default function RiskAnaliziModal({ onClose }: Props) {
               </button>
               <div className="flex items-center gap-2">
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{sektor} — {rows.length} risk</span>
+                <button onClick={handleExcel} disabled={excelLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
+                  style={{ background: excelLoading ? 'rgba(22,163,74,0.4)' : '#16A34A', color: '#fff', opacity: excelLoading ? 0.7 : 1 }}>
+                  {excelLoading ? <><i className="ri-loader-4-line animate-spin" /> Hazırlanıyor...</> : <><i className="ri-file-excel-2-line" /> Excel İndir</>}
+                </button>
                 <button onClick={handlePDF} disabled={pdfLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
                   style={{ background: pdfLoading ? 'rgba(2,132,199,0.4)' : '#0284C7', color: '#fff', opacity: pdfLoading ? 0.7 : 1 }}>
                   {pdfLoading ? <><i className="ri-loader-4-line animate-spin" /> Hazırlanıyor...</> : <><i className="ri-file-pdf-line" /> PDF İndir</>}
