@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '@/store/AuthContext';
+import SupportModal from '@/components/feature/SupportModal';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'raporlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'raporlar' | 'ayarlar';
 
 interface OsgbSidebarProps {
   activeTab: Tab;
@@ -14,6 +15,8 @@ interface OsgbSidebarProps {
   setCollapsed: (v: boolean) => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  firmaCount?: number;
+  uzmanCount?: number;
 }
 
 const navGroups = [
@@ -34,15 +37,18 @@ const navGroups = [
     label: 'SİSTEM',
     items: [
       { id: 'raporlar' as Tab, label: 'Raporlar', icon: 'ri-bar-chart-2-line' },
+      { id: 'ayarlar' as Tab, label: 'Ayarlar', icon: 'ri-settings-4-line' },
     ],
   },
 ];
 
 export default function OsgbSidebar({
   activeTab, setActiveTab, orgName, collapsed, setCollapsed, mobileOpen = false, onMobileClose,
+  firmaCount = 0, uzmanCount = 0,
 }: OsgbSidebarProps) {
   const { logout, user } = useAuth();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const sidebarBg = 'var(--bg-sidebar, #0f172a)';
   const borderRight = '1px solid var(--border-subtle, rgba(255,255,255,0.07))';
@@ -55,6 +61,7 @@ export default function OsgbSidebar({
   };
 
   return (
+    <>
     <aside
       className={`
         fixed left-0 top-0 h-screen flex flex-col z-[42]
@@ -202,6 +209,53 @@ export default function OsgbSidebar({
         ))}
       </nav>
 
+      {/* ── Mini Stats ── */}
+      {!collapsed && (
+        <div className="px-2 pb-1.5">
+          <div
+            className="rounded-lg p-2.5 flex gap-0"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            {[
+              { value: firmaCount, label: 'Firma', color: '#34D399' },
+              { value: uzmanCount, label: 'Uzman', color: '#6EE7B7' },
+            ].map((stat, i) => (
+              <div key={stat.label} className="flex-1 flex items-center">
+                {i > 0 && (
+                  <div className="w-px self-stretch mx-1.5" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                )}
+                <div className="flex-1 text-center">
+                  <p className="text-[12px] font-bold leading-none" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="text-[8.5px] font-semibold mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>{stat.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Destek Butonu ── */}
+      <div className="px-2 pb-1.5">
+        <button
+          onClick={() => setSupportOpen(true)}
+          title={collapsed ? 'Destek / Sorun Bildir' : ''}
+          className={`w-full flex items-center cursor-pointer rounded-lg transition-all duration-150 ${collapsed ? 'justify-center p-1.5' : 'gap-2 px-2.5 py-1.5'}`}
+          style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.18)' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.13)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.32)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.07)'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.18)'; }}
+        >
+          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+            <i className="ri-customer-service-2-line text-xs" style={{ color: '#10B981' }} />
+          </div>
+          {!collapsed && (
+            <>
+              <span className="text-[11px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>Destek</span>
+              <i className="ri-arrow-right-s-line text-xs" style={{ color: 'rgba(16,185,129,0.5)' }} />
+            </>
+          )}
+        </button>
+      </div>
+
       {/* ── Profile + Logout ── */}
       <div
         className={`mx-2 mb-2.5 rounded-lg flex items-center gap-2 ${collapsed ? 'justify-center p-1.5' : 'px-2.5 py-2'}`}
@@ -241,5 +295,8 @@ export default function OsgbSidebar({
         )}
       </div>
     </aside>
+
+    <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+    </>
   );
 }

@@ -9,6 +9,7 @@ import FirmaDetayModal from './components/FirmaDetayModal';
 import UzmanDetayModal from './components/UzmanDetayModal';
 import OsgbSidebar from './components/OsgbSidebar';
 import OsgbHeader from './components/OsgbHeader';
+import OsgbSettings from './components/OsgbSettings';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -31,7 +32,7 @@ interface Uzman {
   active_firm_name: string | null;
 }
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'raporlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'raporlar' | 'ayarlar';
 
 interface FirmaDetay {
   id: string;
@@ -50,6 +51,7 @@ export default function OsgbDashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [osgbTheme, setOsgbTheme] = useState<'dark' | 'light'>('dark');
   const [searchFirma, setSearchFirma] = useState('');
   const [searchUzman, setSearchUzman] = useState('');
 
@@ -371,6 +373,8 @@ export default function OsgbDashboardPage() {
         setCollapsed={setSidebarCollapsed}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        firmaCount={altFirmalar.length}
+        uzmanCount={uzmanlar.length}
       />
 
       <OsgbHeader
@@ -380,6 +384,8 @@ export default function OsgbDashboardPage() {
         onMobileMenuToggle={() => setMobileOpen(v => !v)}
         onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); setFirmaAd(''); }}
         onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' }); }}
+        theme={osgbTheme}
+        onToggleTheme={() => setOsgbTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
 
       <main
@@ -721,6 +727,16 @@ export default function OsgbDashboardPage() {
                   )}
                 </div>
               )}
+              {/* ── AYARLAR TAB ── */}
+              {activeTab === 'ayarlar' && org?.id && (
+                <OsgbSettings
+                  orgId={org.id}
+                  orgName={org.name ?? 'OSGB'}
+                  firmaCount={altFirmalar.length}
+                  uzmanCount={uzmanlar.length}
+                />
+              )}
+
               {/* ── RAPORLAR TAB ── */}
               {activeTab === 'raporlar' && (
                 <div className="space-y-5">
