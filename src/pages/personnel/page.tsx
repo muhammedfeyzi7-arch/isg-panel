@@ -96,7 +96,8 @@ interface ImportResult {
 
 export default function PersonellerPage() {
   const { personeller, firmalar, addPersonel, updatePersonel, deletePersonel, addToast, quickCreate, setQuickCreate, getPersonelFoto, setPersonelFoto, refreshData, dataLoading, pageLoading, partialLoading } = useApp();
-  const { canCreate, canEdit, canDelete, isReadOnly, canViewSensitiveData } = usePermissions();
+  const { canCreate, canEdit, canDelete, isReadOnly, canViewSensitiveData, isGeziciUzman } = usePermissions();
+  const { org } = useApp();
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -544,7 +545,13 @@ export default function PersonellerPage() {
 
   const getFirmaAd = (id: string) => firmalar.find(f => f.id === id)?.ad || '—';
 
-  const openAdd = () => { setForm({ ...emptyPersonel }); setEditingId(null); setFormOpen(true); setQuickCreate(null); };
+  const openAdd = () => {
+    const defaultFirmaId = '';
+    setForm({ ...emptyPersonel, firmaId: defaultFirmaId });
+    setEditingId(null);
+    setFormOpen(true);
+    setQuickCreate(null);
+  };
   const openEdit = (p: Personel) => { setForm({ ...p }); setEditingId(p.id); setPendingFotoFile(null); setFormOpen(true); };
 
   const handleSave = async () => {

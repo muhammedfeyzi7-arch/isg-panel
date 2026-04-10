@@ -98,7 +98,7 @@ export default function OsgbDashboardPage() {
 
   // Uzman Ekle Modal
   const [showUzmanModal, setShowUzmanModal] = useState(false);
-  const [uzmanForm, setUzmanForm] = useState({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaId: '' });
+  const [uzmanForm, setUzmanForm] = useState({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaIds: [] as string[] });
   const [uzmanFormTab, setUzmanFormTab] = useState<0 | 1 | 2>(0);
   const [uzmanLoading, setUzmanLoading] = useState(false);
   const [uzmanError, setUzmanError] = useState<string | null>(null);
@@ -283,7 +283,8 @@ export default function OsgbDashboardPage() {
           display_name: fullName,
           role: 'member',
           osgb_role: 'gezici_uzman',
-          active_firm_id: uzmanForm.atananFirmaId || null,
+          active_firm_id: uzmanForm.atananFirmaIds[0] || null,
+          active_firm_ids: uzmanForm.atananFirmaIds.length > 0 ? uzmanForm.atananFirmaIds : null,
         }),
       });
       const json = await res.json();
@@ -408,7 +409,7 @@ export default function OsgbDashboardPage() {
         orgName={org?.name ?? 'OSGB'}
         onMobileMenuToggle={() => setMobileOpen(v => !v)}
         onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); }}
-        onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaId: '' }); }}
+        onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaIds: [] }); }}
         theme={osgbTheme}
         onToggleTheme={() => setOsgbTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
@@ -699,7 +700,7 @@ export default function OsgbDashboardPage() {
                         placeholder="Uzman ara..." className="text-sm pl-9 pr-4 py-2.5 rounded-xl w-full outline-none"
                         style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: 'var(--text-primary)' }} />
                     </div>
-                    <button onClick={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaId: '' }); }}
+                    <button onClick={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaIds: [] }); }}
                       className="whitespace-nowrap ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
                       style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                       <i className="ri-user-add-line" />Uzman Ekle
@@ -1243,44 +1244,62 @@ export default function OsgbDashboardPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <label style={labelStyle}>Atanacak Firma</label>
-                    <select value={uzmanForm.atananFirmaId} onChange={e => setUzmanForm(p => ({ ...p, atananFirmaId: e.target.value }))}
-                      className="cursor-pointer outline-none" style={inputStyle}>
-                      <option value="">— Şimdi Atama —</option>
-                      {altFirmalar.map(f => (
-                        <option key={f.id} value={f.id}>{f.name}{f.uzmanAd ? ` (${f.uzmanAd} atanmış)` : ''}</option>
-                      ))}
-                    </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>
+                      Atanacak Firma(lar)
+                      <span className="ml-1.5 font-normal" style={{ color: 'var(--text-faint)' }}>
+                        ({uzmanForm.atananFirmaIds.length} seçili)
+                      </span>
+                    </label>
+                    {uzmanForm.atananFirmaIds.length > 0 && (
+                      <button onClick={() => setUzmanForm(p => ({ ...p, atananFirmaIds: [] }))}
+                        className="text-[10px] cursor-pointer" style={{ color: '#EF4444' }}>
+                        Tümünü kaldır
+                      </button>
+                    )}
                   </div>
 
-                  {/* Firma kartları */}
-                  {altFirmalar.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                      {altFirmalar.map(f => (
-                        <button key={f.id} type="button"
-                          onClick={() => setUzmanForm(p => ({ ...p, atananFirmaId: p.atananFirmaId === f.id ? '' : f.id }))}
-                          className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all text-left"
-                          style={{
-                            background: uzmanForm.atananFirmaId === f.id ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
-                            border: uzmanForm.atananFirmaId === f.id ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid var(--border-subtle)',
-                          }}>
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ background: uzmanForm.atananFirmaId === f.id ? 'rgba(16,185,129,0.15)' : 'var(--bg-hover)' }}>
-                            <i className="ri-building-2-line text-xs" style={{ color: uzmanForm.atananFirmaId === f.id ? '#10B981' : 'var(--text-muted)' }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate" style={{ color: uzmanForm.atananFirmaId === f.id ? '#10B981' : 'var(--text-primary)' }}>{f.name}</p>
-                            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                              {f.uzmanAd ? `${f.uzmanAd} atanmış` : `${f.personelSayisi} personel`}
-                            </p>
-                          </div>
-                          {uzmanForm.atananFirmaId === f.id && (
-                            <i className="ri-check-line text-sm flex-shrink-0" style={{ color: '#10B981' }} />
-                          )}
-                        </button>
-                      ))}
+                  {/* Firma kartları — çoklu seçim */}
+                  {altFirmalar.length > 0 ? (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {altFirmalar.map(f => {
+                        const secili = uzmanForm.atananFirmaIds.includes(f.id);
+                        const birincil = uzmanForm.atananFirmaIds[0] === f.id;
+                        return (
+                          <button key={f.id} type="button"
+                            onClick={() => setUzmanForm(p => ({
+                              ...p,
+                              atananFirmaIds: p.atananFirmaIds.includes(f.id)
+                                ? p.atananFirmaIds.filter(id => id !== f.id)
+                                : [...p.atananFirmaIds, f.id],
+                            }))}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all text-left"
+                            style={{
+                              background: secili ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
+                              border: secili ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid var(--border-subtle)',
+                            }}>
+                            <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                              style={secili
+                                ? { background: 'linear-gradient(135deg,#10B981,#059669)' }
+                                : { background: 'var(--bg-input)', border: '1.5px solid var(--border-main)' }}>
+                              {secili && <i className="ri-check-line text-white text-[10px]" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold truncate" style={{ color: secili ? '#10B981' : 'var(--text-primary)' }}>{f.name}</p>
+                              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                {f.uzmanAd ? `${f.uzmanAd} atanmış` : `${f.personelSayisi} personel`}
+                              </p>
+                            </div>
+                            {birincil && secili && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                                style={{ background: 'rgba(16,185,129,0.15)', color: '#059669' }}>Birincil</span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
+                  ) : (
+                    <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>Henüz firma eklenmedi.</p>
                   )}
 
                   {altFirmalar.length === 0 && (

@@ -158,7 +158,7 @@ export default function EvraklarPage() {
   const getPersonelAd = (id?: string) => id ? (personeller.find(p => p.id === id)?.adSoyad || '—') : 'Firma Evrakı';
 
   const openAdd = () => {
-    const defaultFirmaId = isGeziciUzman && org?.id ? org.id : '';
+    const defaultFirmaId = '';
     setForm({ ...emptyEvrak, firmaId: defaultFirmaId });
     setEditingId(null);
     setPendingFile(null);
@@ -495,17 +495,13 @@ export default function EvraklarPage() {
             <select
               value={f('firmaId')}
               onChange={e => set('firmaId', e.target.value)}
-              disabled={isGeziciUzman}
+              disabled={false}
               className="input-premium cursor-pointer disabled:opacity-70"
             >
               <option value="">Firma Seçin...</option>
               {firmaListesiEvrak.map(fi => <option key={fi.id} value={fi.id}>{fi.ad}</option>)}
             </select>
-            {isGeziciUzman && (
-              <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: '#64748B' }}>
-                <i className="ri-lock-line" /> Atanan firma otomatik seçildi
-              </p>
-            )}
+
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: '#64748B' }}>Personel (Opsiyonel)</label>

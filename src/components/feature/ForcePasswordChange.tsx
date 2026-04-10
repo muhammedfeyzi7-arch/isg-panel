@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../store/AuthContext';
 import { useApp } from '../../store/AppContext';
 import { logActivity } from '../../utils/activityLog';
+import { supabase } from '../../lib/supabase';
 
 function getPasswordStrength(pwd: string): { score: number; label: string; color: string } {
   if (!pwd) return { score: 0, label: '', color: '' };
@@ -20,7 +21,7 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
 
 export default function ForcePasswordChange() {
   const { updatePassword, logout, user } = useAuth();
-  const { clearMustChangePassword, theme, org } = useApp();
+  const { clearMustChangePassword, refetchOrg, theme, org } = useApp();
   const isDark = theme === 'dark';
 
   const [newPassword, setNewPassword] = useState('');
@@ -70,10 +71,11 @@ export default function ForcePasswordChange() {
         description: 'İlk giriş zorunlu şifre değişikliği tamamlandı.',
       });
     }
+    // Edge function üzerinden DB'yi güncelle (service role ile RLS'yi bypass eder)
     await clearMustChangePassword();
     setLoading(false);
-    // Kısa bir bekleme sonrası sayfayı yenile — edge function cache'ini bypass et
-    setTimeout(() => window.location.reload(), 400);
+    // State'i tazele — reload gerekmeden ekran kapanır
+    await refetchOrg();
   };
 
   const inputStyle: React.CSSProperties = {

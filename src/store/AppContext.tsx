@@ -6,7 +6,8 @@ import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
 import { useOrganization } from '../hooks/useOrganization';
 import { logActivity } from '../utils/activityLog';
-import type { Toast } from '../types';
+import { supabase } from '../lib/supabase';
+import type { Toast, Firma } from '../types';
 
 export interface Bildirim {
   id: string;
@@ -33,6 +34,8 @@ export interface OrgInfo {
   email?: string;
   orgType: 'firma' | 'osgb';
   osgbRole?: 'osgb_admin' | 'gezici_uzman' | null;
+  /** Gezici uzman için atanmış tüm firma ID'leri */
+  activeFirmIds?: string[];
 }
 
 interface AppContextType extends StoreType {
@@ -190,6 +193,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     orgLoading,
     onRemoteChangeCb,
   );
+
+  // Gezici uzman için atanmış tüm firmaları Supabase'den çekip firmalar listesine inject et
+  const [geziciFirmalar, setGeziciFirmalar] = useState<Firma[]>([]);
+  useEffect(() => {
+    if (org?.osgbRole !== 'gezici_uzman') {
+      setGeziciFirmalar([]);
+      return;
+    }
+    // activeFirmIds varsa hepsini çek, yoksa org.id (ilk/tek firma) kullan
+    const firmIds = org.activeFirmIds && org.activeFirmIds.length > 0
+      ? org.activeFirmIds
+      : org.id ? [org.id] : [];
+
+    if (firmIds.length === 0) {
+      setGeziciFirmalar([]);
+      return;
+    }
+
+    supabase
+      .from('organizations')
+      .select('id, name')
+      .in('id', firmIds)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setGeziciFirmalar(
+            data.map(d => ({
+              id: d.id,
+              ad: d.name,
+              yetkiliKisi: '',
+              telefon: '',
+              email: '',
+              adres: '',
+              sektor: '',
+              notlar: '',
+              silinmis: false,
+            } as Firma))
+          );
+        }
+      });
+  }, [org?.osgbRole, org?.id, org?.activeFirmIds]);
 
   const fetchTable = useCallback(async (table: string) => {
     const orgId = org?.id;
@@ -433,9 +476,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await clearMustChangePw();
   }, [clearMustChangePw]);
 
+  // Gezici uzman için firmalar listesini atanmış tüm firmalarla doldur
+  const mergedFirmalar = useMemo<Firma[]>(() => {
+    if (org?.osgbRole !== 'gezici_uzman') return store.firmalar;
+    if (geziciFirmalar.length === 0) return store.firmalar;
+    // store.firmalar'da olmayanları başa ekle
+    const mevcutIds = new Set(store.firmalar.map(f => f.id));
+    const yeniFirmalar = geziciFirmalar.filter(f => !mevcutIds.has(f.id));
+    return [...yeniFirmalar, ...store.firmalar];
+  }, [org?.osgbRole, geziciFirmalar, store.firmalar]);
+
   return (
     <AppContext.Provider value={{
       ...store,
+      firmalar: mergedFirmalar,
       toasts, addToast, removeToast,
       activeModule, setActiveModule,
       sidebarCollapsed, setSidebarCollapsed,

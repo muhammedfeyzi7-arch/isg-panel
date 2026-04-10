@@ -53,10 +53,11 @@ export function usePermissions(): Permissions {
     return true;
   };
 
+  // Gezici uzman → firmalar sekmesi hariç normal firma kullanıcısı gibi tam yetkili
   return {
-    canCreate: (isAdmin || isMember || isFirmaUser) && !isGeziciUzman,
-    canEdit:   (isAdmin || isMember || isFirmaUser) && !isGeziciUzman,
-    canDelete: (isAdmin || isMember) && !isGeziciUzman,
+    canCreate: isAdmin || isMember || isFirmaUser || isGeziciUzman,
+    canEdit:   isAdmin || isMember || isFirmaUser || isGeziciUzman,
+    canDelete: isAdmin || isMember || isGeziciUzman,
     isReadOnly: isDenetci,
     isDenetci,
     isGeziciUzman,

@@ -14,6 +14,8 @@ export interface OrgInfo {
   email?: string;
   orgType: 'firma' | 'osgb';
   osgbRole?: 'osgb_admin' | 'gezici_uzman' | null;
+  /** Gezici uzman için atanmış tüm firma ID'leri */
+  activeFirmIds?: string[];
 }
 
 // ... existing code ...
@@ -176,29 +178,40 @@ export function useOrganization(user: User | null) {
         const rawOrg = data.organizations;
         const o = (Array.isArray(rawOrg) ? rawOrg[0] : rawOrg) as { id: string; name: string; invite_code: string; org_type?: string };
 
-        if (data.osgb_role === 'gezici_uzman' && data.active_firm_id) {
-          const { data: firmaOrg } = await supabase
-            .from('organizations')
-            .select('id, name, invite_code, org_type')
-            .eq('id', data.active_firm_id)
-            .maybeSingle();
+        if (data.osgb_role === 'gezici_uzman') {
+          // active_firm_ids (çoklu) veya active_firm_id (tekli legacy) destekle
+          const firmIds: string[] = (data as Record<string, unknown>).active_firm_ids as string[] | undefined
+            ? ((data as Record<string, unknown>).active_firm_ids as string[]).filter(Boolean)
+            : data.active_firm_id ? [data.active_firm_id] : [];
 
-          if (firmaOrg) {
-            setOrg({
-              id: firmaOrg.id,
-              name: firmaOrg.name,
-              invite_code: firmaOrg.invite_code,
-              role: 'member',
-              isActive: data.is_active !== false,
-              mustChangePassword: data.must_change_password === true,
-              displayName: data.display_name ?? undefined,
-              email: data.email ?? undefined,
-              orgType: 'firma',
-              osgbRole: 'gezici_uzman',
-            });
-            setLoading(false);
-            return;
+          // İlk firmayı "aktif" org olarak kullan (store'un organizasyon bazlı veri çekmesi için)
+          if (firmIds.length > 0) {
+            const { data: firmaOrg } = await supabase
+              .from('organizations')
+              .select('id, name, invite_code, org_type')
+              .eq('id', firmIds[0])
+              .maybeSingle();
+
+            if (firmaOrg) {
+              setOrg({
+                id: firmaOrg.id,
+                name: firmaOrg.name,
+                invite_code: firmaOrg.invite_code,
+                role: 'member',
+                isActive: data.is_active !== false,
+                mustChangePassword: data.must_change_password === true,
+                displayName: data.display_name ?? undefined,
+                email: data.email ?? undefined,
+                orgType: 'firma',
+                osgbRole: 'gezici_uzman',
+                // Tüm atanmış firma ID'lerini tut
+                activeFirmIds: firmIds,
+              });
+              setLoading(false);
+              return;
+            }
           }
+          // Hiç firma atanmamış
           setOrg({
             id: o.id,
             name: o.name,
@@ -210,23 +223,7 @@ export function useOrganization(user: User | null) {
             email: data.email ?? undefined,
             orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
             osgbRole: 'gezici_uzman',
-          });
-          setLoading(false);
-          return;
-        }
-
-        if (data.osgb_role === 'gezici_uzman' && !data.active_firm_id) {
-          setOrg({
-            id: o.id,
-            name: o.name,
-            invite_code: o.invite_code,
-            role: data.role ?? 'member',
-            isActive: data.is_active !== false,
-            mustChangePassword: data.must_change_password === true,
-            displayName: data.display_name ?? undefined,
-            email: data.email ?? undefined,
-            orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
-            osgbRole: 'gezici_uzman',
+            activeFirmIds: [],
           });
           setLoading(false);
           return;
@@ -390,21 +387,28 @@ export function useOrganization(user: User | null) {
   const clearMustChangePassword = async (): Promise<void> => {
     if (!user) return;
     try {
-      // user_id ile tüm aktif kayıtları güncelle —
-      // gezici uzman için org.id atanan firma ID'si olabilir,
-      // user_organizations.organization_id ise OSGB org ID'si olduğundan
-      // organization_id filtresi kullanmıyoruz.
-      const { error } = await supabase
-        .from('user_organizations')
-        .update({ must_change_password: false })
-        .eq('user_id', user.id)
-        .eq('is_active', true);
+      // RLS gezici uzman için client-side update'i engelleyebileceğinden
+      // service role kullanan edge function üzerinden güncelliyoruz.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) return;
 
-      if (error) {
-        console.error('[clearMustChangePassword] DB update failed:', error.message);
+      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+      const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'clear_must_change_password' }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.error('[clearMustChangePassword] Edge function failed:', res.status, errText);
         return;
       }
-      // Local state'i güncelle — sayfa yenilemede tekrar çıkmasın
+
+      // Local state'i hemen güncelle — sayfa yenilemede tekrar çıkmasın
       setOrg(prev => prev ? { ...prev, mustChangePassword: false } : null);
     } catch (e) {
       console.error('[clearMustChangePassword] exception:', e);

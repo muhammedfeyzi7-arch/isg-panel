@@ -45,7 +45,11 @@ export default function UzmanDetayModal({
 }: UzmanDetayModalProps) {
   const [activeTab, setActiveTab] = useState<'ozet' | 'uygunsuzluk' | 'ayarlar'>('ozet');
   const [isActive, setIsActive] = useState(uzman.is_active);
-  const [secilenFirmaId, setSecilenFirmaId] = useState(uzman.active_firm_id ?? '');
+  const [secilenFirmaIds, setSecilenFirmaIds] = useState<string[]>(
+    (uzman as typeof uzman & { active_firm_ids?: string[] }).active_firm_ids?.length
+      ? (uzman as typeof uzman & { active_firm_ids?: string[] }).active_firm_ids!
+      : uzman.active_firm_id ? [uzman.active_firm_id] : []
+  );
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<UzmanStats | null>(null);
   const [uygunsuzluklar, setUygunsuzluklar] = useState<UygunsuzlukRow[]>([]);
@@ -93,12 +97,22 @@ export default function UzmanDetayModal({
     setDataLoading(false);
   };
 
+  const toggleFirma = (firmaId: string) => {
+    setSecilenFirmaIds(prev =>
+      prev.includes(firmaId) ? prev.filter(id => id !== firmaId) : [...prev, firmaId]
+    );
+  };
+
   const handleKaydet = async () => {
     setLoading(true);
     try {
       const { error } = await supabase
         .from('user_organizations')
-        .update({ is_active: isActive, active_firm_id: secilenFirmaId || null })
+        .update({
+          is_active: isActive,
+          active_firm_id: secilenFirmaIds[0] ?? null,
+          active_firm_ids: secilenFirmaIds.length > 0 ? secilenFirmaIds : null,
+        })
         .eq('user_id', uzman.user_id)
         .eq('organization_id', orgId);
 
@@ -268,13 +282,24 @@ export default function UzmanDetayModal({
                         </div>
                         <span className="text-xs" style={{ color: '#64748b' }}>{uzman.email}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 flex items-center justify-center">
+                      <div className="flex items-start gap-2">
+                        <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <i className="ri-building-2-line text-xs" style={{ color: '#94a3b8' }} />
                         </div>
-                        <span className="text-xs" style={{ color: '#64748b' }}>
-                          {uzman.active_firm_name ?? 'Firma atanmadı'}
-                        </span>
+                        <div>
+                          {secilenFirmaIds.length > 0
+                            ? secilenFirmaIds.map((id, idx) => {
+                                const f = altFirmalar.find(af => af.id === id);
+                                return f ? (
+                                  <span key={id} className="text-xs block" style={{ color: '#64748b' }}>
+                                    {idx === 0 ? <strong>{f.name}</strong> : f.name}
+                                    {idx === 0 && secilenFirmaIds.length > 1 && <span style={{ color: '#94a3b8' }}> (birincil)</span>}
+                                  </span>
+                                ) : null;
+                              })
+                            : <span className="text-xs" style={{ color: '#94a3b8' }}>Firma atanmadı</span>
+                          }
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 flex items-center justify-center">
@@ -361,20 +386,56 @@ export default function UzmanDetayModal({
                     </button>
                   </div>
 
-                  {/* Firma Atama */}
+                  {/* Firma Atama — Çoklu Seçim */}
                   <div>
-                    <label className="block text-xs font-semibold mb-2" style={{ color: '#475569' }}>Atanacak Firma</label>
-                    <select
-                      value={secilenFirmaId}
-                      onChange={e => setSecilenFirmaId(e.target.value)}
-                      className="text-xs px-3 py-2.5 rounded-xl cursor-pointer w-full"
-                      style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#1e293b', outline: 'none' }}
-                    >
-                      <option value="">— Firma Atanmadı —</option>
-                      {altFirmalar.map(f => (
-                        <option key={f.id} value={f.id}>{f.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-semibold" style={{ color: '#475569' }}>
+                        Atanacak Firma(lar)
+                        <span className="ml-1.5 text-[10px] font-normal" style={{ color: '#94a3b8' }}>
+                          ({secilenFirmaIds.length} seçili)
+                        </span>
+                      </label>
+                      {secilenFirmaIds.length > 0 && (
+                        <button onClick={() => setSecilenFirmaIds([])} className="text-[10px] cursor-pointer" style={{ color: '#EF4444' }}>
+                          Tümünü kaldır
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                      {altFirmalar.map(f => {
+                        const secili = secilenFirmaIds.includes(f.id);
+                        return (
+                          <button key={f.id} type="button" onClick={() => toggleFirma(f.id)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all text-left"
+                            style={{
+                              background: secili ? 'rgba(139,92,246,0.08)' : '#f8fafc',
+                              border: secili ? '1.5px solid rgba(139,92,246,0.3)' : '1.5px solid #e2e8f0',
+                            }}>
+                            <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                              style={secili
+                                ? { background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)' }
+                                : { background: '#fff', border: '1.5px solid #cbd5e1' }}>
+                              {secili && <i className="ri-check-line text-white text-[10px]" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold truncate" style={{ color: secili ? '#6D28D9' : '#1e293b' }}>{f.name}</p>
+                            </div>
+                            {secili && secilenFirmaIds[0] === f.id && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                                style={{ background: 'rgba(139,92,246,0.12)', color: '#7C3AED' }}>Birincil</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                      {altFirmalar.length === 0 && (
+                        <p className="text-xs text-center py-4" style={{ color: '#94a3b8' }}>Henüz firma eklenmedi</p>
+                      )}
+                    </div>
+                    {secilenFirmaIds.length > 1 && (
+                      <p className="text-[10px] mt-1.5" style={{ color: '#94a3b8' }}>
+                        İlk seçilen firma birincil olarak atanır ve uzmanın varsayılan organizasyonunu belirler.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex gap-3 pt-2">

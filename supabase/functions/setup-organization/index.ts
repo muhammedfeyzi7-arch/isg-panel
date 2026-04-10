@@ -78,11 +78,38 @@ Deno.serve(async (req) => {
 
   const userId = authUser.id;
 
+  // ── Handle clear_must_change_password action ──
+  let requestBody: Record<string, unknown> = {};
+  try {
+    const text = await req.text();
+    if (text) requestBody = JSON.parse(text) as Record<string, unknown>;
+  } catch { /* ignore */ }
+
+  if (requestBody.action === 'clear_must_change_password') {
+    const { error: updateError } = await supabase
+      .from('user_organizations')
+      .update({ must_change_password: false })
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    if (updateError) {
+      console.error('[setup-org] clear_must_change_password failed:', updateError.message);
+      return new Response(JSON.stringify({ error: updateError.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   let resolvedEmail = authUser.email ?? '';
   let resolvedDisplayName = '';
   let metaOrgId = '';
   let metaRole = '';
   let metaOsgbRole = '';
+  let metaActiveFirmIds: string[] = [];
 
   try {
     const { data: adminUserData } = await supabase.auth.admin.getUserById(userId);
@@ -93,6 +120,11 @@ Deno.serve(async (req) => {
       metaOrgId = (meta.organization_id as string) || '';
       metaRole = (meta.role as string) || '';
       metaOsgbRole = (meta.osgb_role as string) || '';
+      // active_firm_ids: array of UUIDs assigned to gezici uzman
+      const rawFirmIds = meta.active_firm_ids;
+      if (Array.isArray(rawFirmIds)) {
+        metaActiveFirmIds = rawFirmIds.filter((id): id is string => typeof id === 'string' && id.length > 0);
+      }
     }
   } catch (e) {
     console.warn('[setup-org] Could not fetch full auth user:', e);
@@ -101,6 +133,10 @@ Deno.serve(async (req) => {
     metaOrgId = (meta.organization_id as string) || '';
     metaRole = (meta.role as string) || '';
     metaOsgbRole = (meta.osgb_role as string) || '';
+    const rawFirmIds = meta.active_firm_ids;
+    if (Array.isArray(rawFirmIds)) {
+      metaActiveFirmIds = rawFirmIds.filter((id): id is string => typeof id === 'string' && id.length > 0);
+    }
   }
 
   if (!resolvedDisplayName && resolvedEmail) {
@@ -118,7 +154,7 @@ Deno.serve(async (req) => {
     // ── Check for existing active membership ──
     const { data: existingMembership } = await supabase
       .from('user_organizations')
-      .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, organizations(id, name, invite_code, org_type)')
+      .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_ids, organizations(id, name, invite_code, org_type)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('joined_at', { ascending: true })
@@ -154,6 +190,7 @@ Deno.serve(async (req) => {
         display_name: existingMembership.display_name || user.display_name,
         email: existingMembership.email || user.email,
         osgb_role: existingMembership.osgb_role ?? null,
+        active_firm_ids: existingMembership.active_firm_ids ?? [],
         created: false,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -169,6 +206,7 @@ Deno.serve(async (req) => {
       if (targetOrg) {
         const assignedRole = normalizeRole(metaRole || 'member');
         const assignedOsgbRole = metaOsgbRole || null;
+        const assignedFirmIds = metaActiveFirmIds.length > 0 ? metaActiveFirmIds : null;
 
         const { data: inactiveMembership } = await supabase
           .from('user_organizations')
@@ -178,6 +216,7 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         const osgbPayload = assignedOsgbRole ? { osgb_role: assignedOsgbRole } : {};
+        const firmIdsPayload = assignedFirmIds ? { active_firm_ids: assignedFirmIds } : {};
 
         if (inactiveMembership) {
           await supabase
@@ -188,6 +227,7 @@ Deno.serve(async (req) => {
               display_name: user.display_name,
               email: user.email,
               ...osgbPayload,
+              ...firmIdsPayload,
             })
             .eq('user_id', user.id)
             .eq('organization_id', metaOrgId);
@@ -204,6 +244,7 @@ Deno.serve(async (req) => {
               must_change_password: true,
               kvkk_accepted: false,
               ...osgbPayload,
+              ...firmIdsPayload,
             });
 
           if (memberError && memberError.code !== '23505') {
@@ -222,6 +263,7 @@ Deno.serve(async (req) => {
               organization_id: null,
               role: null,
               osgb_role: null,
+              active_firm_ids: null,
             },
           });
         } catch (e) {
@@ -237,6 +279,7 @@ Deno.serve(async (req) => {
           display_name: user.display_name,
           email: user.email,
           osgb_role: assignedOsgbRole,
+          active_firm_ids: assignedFirmIds ?? [],
           created: false,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -284,7 +327,7 @@ Deno.serve(async (req) => {
       if (memberError.code === '23505') {
         const { data: retryMembership } = await supabase
           .from('user_organizations')
-          .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, organizations(id, name, invite_code, org_type)')
+          .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_ids, organizations(id, name, invite_code, org_type)')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .order('joined_at', { ascending: true })
@@ -303,6 +346,7 @@ Deno.serve(async (req) => {
             display_name: retryMembership.display_name || user.display_name,
             email: retryMembership.email || user.email,
             osgb_role: retryMembership.osgb_role ?? null,
+            active_firm_ids: retryMembership.active_firm_ids ?? [],
             created: false,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -344,6 +388,7 @@ Deno.serve(async (req) => {
       display_name: user.display_name,
       email: user.email,
       osgb_role: null,
+      active_firm_ids: [],
       created: true,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
