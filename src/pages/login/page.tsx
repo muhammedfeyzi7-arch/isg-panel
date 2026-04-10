@@ -19,6 +19,13 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Login sayfasına gelince eski/bozuk token'ları temizle
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-')) localStorage.removeItem(key);
+    });
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith('sb-')) sessionStorage.removeItem(key);
+    });
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
@@ -369,36 +376,13 @@ export default function LoginPage() {
             {error && (
               <div
                 className="flex items-start gap-3 rounded-xl p-4"
-                style={
-                  error.includes('ABONELİĞİNİZ SONLANMIŞTIR')
-                    ? {
-                        background: 'rgba(234,88,12,0.07)',
-                        border: '1.5px solid rgba(234,88,12,0.35)',
-                      }
-                    : {
-                        background: 'rgba(239,68,68,0.06)',
-                        border: '1px solid rgba(239,68,68,0.2)',
-                      }
-                }
+                style={{
+                  background: 'rgba(239,68,68,0.06)',
+                  border: '1px solid rgba(239,68,68,0.2)',
+                }}
               >
-                <i
-                  className={`${error.includes('ABONELİĞİNİZ SONLANMIŞTIR') ? 'ri-alarm-warning-fill' : 'ri-error-warning-line'} text-base flex-shrink-0 mt-0.5`}
-                  style={{ color: error.includes('ABONELİĞİNİZ SONLANMIŞTIR') ? '#ea580c' : '#ef4444' }}
-                />
-                <div>
-                  {error.includes('ABONELİĞİNİZ SONLANMIŞTIR') ? (
-                    <>
-                      <p className="text-sm font-bold leading-snug mb-1" style={{ color: '#c2410c' }}>
-                        ABONELİĞİNİZ SONLANMIŞTIR
-                      </p>
-                      <p className="text-xs leading-relaxed" style={{ color: '#9a3412' }}>
-                        Lütfen hizmet sağlayıcınızla iletişime geçin.
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm leading-relaxed" style={{ color: '#dc2626' }}>{error}</p>
-                  )}
-                </div>
+                <i className="ri-error-warning-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+                <p className="text-sm leading-relaxed" style={{ color: '#dc2626' }}>{error}</p>
               </div>
             )}
 

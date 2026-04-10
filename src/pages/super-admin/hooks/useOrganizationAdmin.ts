@@ -6,10 +6,6 @@ import { useState, useCallback } from 'react';
 const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
 
-// Base URL: https://xxx.supabase.co (rest/v1 olmadan)
-const SUPABASE_BASE_URL = SUPABASE_URL.replace(/\/rest\/v1\/?$/, '');
-const SUPABASE_FUNCTIONS_URL = `${SUPABASE_BASE_URL}/functions/v1`;
-
 function saHeaders() {
   const token = sessionStorage.getItem('sa_access_token') ?? '';
   return {
@@ -21,7 +17,7 @@ function saHeaders() {
 }
 
 async function saFetch(path: string, options?: Parameters<typeof fetch>[1]) {
-  const res = await fetch(`${SUPABASE_BASE_URL}/rest/v1/${path}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
     headers: { ...saHeaders(), ...(options?.headers ?? {}) },
   });
@@ -31,24 +27,6 @@ async function saFetch(path: string, options?: Parameters<typeof fetch>[1]) {
   }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
-}
-
-async function saFetchFunction(slug: string, body: unknown) {
-  const token = sessionStorage.getItem('sa_access_token') ?? '';
-  const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/${slug}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'apikey': SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
-  }
-  return res.json();
 }
 
 export interface OrgAdmin {
@@ -107,16 +85,13 @@ export function useOrganizationAdmin() {
     orgId: string,
     fields: { subscription_end?: string; is_active?: boolean }
   ) => {
-    await saFetchFunction('super-admin-update-org', { org_id: orgId, fields });
-    await fetchOrgs();
-  }, [fetchOrgs]);
-
-  const forceSignOutOrg = useCallback(async (orgId: string) => {
-    // O org'daki tüm kullanıcıları zorla çıkart
-    await saFetchFunction('super-admin-update-org', {
-      org_id: orgId,
-      fields: { is_active: false },
-    });
+    await saFetch(
+      `organizations?id=eq.${orgId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ ...fields, updated_at: new Date().toISOString() }),
+      }
+    );
     await fetchOrgs();
   }, [fetchOrgs]);
 
@@ -128,5 +103,5 @@ export function useOrganizationAdmin() {
     await fetchOrgs();
   }, [fetchOrgs]);
 
-  return { orgs, loading, error, fetchOrgs, updateSubscription, forceSignOutOrg, deleteOrg };
+  return { orgs, loading, error, fetchOrgs, updateSubscription, deleteOrg };
 }
