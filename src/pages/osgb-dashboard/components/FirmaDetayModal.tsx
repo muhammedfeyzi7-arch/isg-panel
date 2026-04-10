@@ -246,27 +246,37 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
                 </button>
               </div>
               {uzmanlar.length === 0 ? (
-                <p className="text-xs" style={{ color: textFaint }}>Henüz uzman eklenmedi.</p>
+                <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <i className="ri-information-line text-sm flex-shrink-0" style={{ color: '#F59E0B' }} />
+                  <p className="text-xs" style={{ color: textMuted }}>Henüz gezici uzman eklenmedi. Önce uzman ekleyin.</p>
+                </div>
               ) : (
-                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
                   {uzmanlar.map(u => {
                     const secili = atananUzmanIds.includes(u.user_id);
+                    // Başka firmada ama bu firmada değil → sarı badge
                     const baskaBirFirmada = !secili &&
                       ((u.active_firm_ids && u.active_firm_ids.length > 0) || u.active_firm_id) &&
-                      u.active_firm_id !== firmaId &&
-                      !(u.active_firm_ids ?? []).includes(firmaId);
+                      !(u.active_firm_ids ?? []).includes(firmaId) &&
+                      u.active_firm_id !== firmaId;
                     return (
                       <button key={u.user_id} type="button" onClick={() => toggleUzman(u.user_id)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all text-left"
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all text-left"
                         style={{
                           background: secili ? 'rgba(16,185,129,0.08)' : inputBg,
                           border: secili ? `1.5px solid rgba(16,185,129,0.3)` : `1.5px solid ${inputBorder}`,
                         }}>
+                        {/* Checkbox */}
                         <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                           style={secili
                             ? { background: 'linear-gradient(135deg, #10B981, #059669)' }
                             : { background: isDark ? 'rgba(255,255,255,0.08)' : '#fff', border: `1.5px solid ${inputBorder}` }}>
                           {secili && <i className="ri-check-line text-white text-[10px]" />}
+                        </div>
+                        {/* Avatar */}
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                          style={{ background: secili ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                          {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold truncate" style={{ color: secili ? '#059669' : textPrimary }}>
@@ -274,22 +284,31 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
                           </p>
                           <p className="text-[10px] truncate" style={{ color: textFaint }}>{u.email}</p>
                         </div>
-                        {baskaBirFirmada && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
-                            style={{ background: 'rgba(245,158,11,0.1)', color: '#D97706' }}>
-                            Başka firmada
-                          </span>
-                        )}
-                        {secili && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                            style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>
-                            ✓ Atandı
-                          </span>
-                        )}
+                        {/* Badge'ler */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {baskaBirFirmada && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                              style={{ background: 'rgba(245,158,11,0.12)', color: '#D97706', border: '1px solid rgba(245,158,11,0.25)' }}>
+                              Başka firmada
+                            </span>
+                          )}
+                          {secili && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                              style={{ background: 'rgba(16,185,129,0.12)', color: '#059669', border: '1px solid rgba(16,185,129,0.25)' }}>
+                              ✓ Atandı
+                            </span>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
                 </div>
+              )}
+              {uzmanlar.length > 0 && (
+                <p className="text-[10px] mt-2" style={{ color: textFaint }}>
+                  <i className="ri-information-line mr-1" />
+                  Başka firmada olan uzmanlar da seçilebilir — her iki firmaya erişimi olur.
+                </p>
               )}
             </div>
 

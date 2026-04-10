@@ -197,7 +197,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Gezici uzman için atanmış tüm firmaları Supabase'den çekip firmalar listesine inject et
   const [geziciFirmalar, setGeziciFirmalar] = useState<Firma[]>([]);
   // Gezici uzman için ek firma ID'lerinin verilerini (primary firma dışındaki) store verisine merge et
-  const [extraFirmaVeriler, setExtraFirmaVeriler] = useState<{
+  // firmaId → tablo → kayıtlar şeklinde normalize yapı — realtime patch için
+  type ExtraFirmaVeriMap = Record<string, {
     personeller: import('../types').Personel[];
     evraklar: import('../types').Evrak[];
     egitimler: import('../types').Egitim[];
@@ -206,15 +207,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ekipmanlar: import('../types').Ekipman[];
     tutanaklar: import('../types').Tutanak[];
     isIzinleri: import('../types').IsIzni[];
-  }>({
-    personeller: [], evraklar: [], egitimler: [], muayeneler: [],
-    uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [],
-  });
+  }>;
+  const [extraFirmaVeriMap, setExtraFirmaVeriMap] = useState<ExtraFirmaVeriMap>({});
+
+  // Flatten helper — tüm ek firmaların verilerini birleştir
+  const flattenExtraVeriler = useCallback((map: ExtraFirmaVeriMap) => {
+    const result = {
+      personeller: [] as import('../types').Personel[],
+      evraklar: [] as import('../types').Evrak[],
+      egitimler: [] as import('../types').Egitim[],
+      muayeneler: [] as import('../types').Muayene[],
+      uygunsuzluklar: [] as import('../types').Uygunsuzluk[],
+      ekipmanlar: [] as import('../types').Ekipman[],
+      tutanaklar: [] as import('../types').Tutanak[],
+      isIzinleri: [] as import('../types').IsIzni[],
+    };
+    Object.values(map).forEach(v => {
+      result.personeller.push(...v.personeller);
+      result.evraklar.push(...v.evraklar);
+      result.egitimler.push(...v.egitimler);
+      result.muayeneler.push(...v.muayeneler);
+      result.uygunsuzluklar.push(...v.uygunsuzluklar);
+      result.ekipmanlar.push(...v.ekipmanlar);
+      result.tutanaklar.push(...v.tutanaklar);
+      result.isIzinleri.push(...v.isIzinleri);
+    });
+    return result;
+  }, []);
+
+  const [extraFirmaVeriler, setExtraFirmaVeriler] = useState(() => flattenExtraVeriler({}));
 
   useEffect(() => {
     if (org?.osgbRole !== 'gezici_uzman') {
       setGeziciFirmalar([]);
-      setExtraFirmaVeriler({ personeller: [], evraklar: [], egitimler: [], muayeneler: [], uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [] });
+      setExtraFirmaVeriMap({});
+      setExtraFirmaVeriler(flattenExtraVeriler({}));
       return;
     }
 
@@ -276,25 +303,114 @@ export function AppProvider({ children }: { children: ReactNode }) {
           fetchTableForOrg('tutanaklar', firmId),
           fetchTableForOrg('is_izinleri', firmId),
         ]);
-        return { personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri };
+        return { firmId, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri };
       })
     ).then(results => {
-      const merged = results.reduce(
-        (acc, r) => ({
-          personeller: [...acc.personeller, ...(r.personeller as import('../types').Personel[])],
-          evraklar: [...acc.evraklar, ...(r.evraklar as import('../types').Evrak[])],
-          egitimler: [...acc.egitimler, ...(r.egitimler as import('../types').Egitim[])],
-          muayeneler: [...acc.muayeneler, ...(r.muayeneler as import('../types').Muayene[])],
-          uygunsuzluklar: [...acc.uygunsuzluklar, ...(r.uygunsuzluklar as import('../types').Uygunsuzluk[])],
-          ekipmanlar: [...acc.ekipmanlar, ...(r.ekipmanlar as import('../types').Ekipman[])],
-          tutanaklar: [...acc.tutanaklar, ...(r.tutanaklar as import('../types').Tutanak[])],
-          isIzinleri: [...acc.isIzinleri, ...(r.isIzinleri as import('../types').IsIzni[])],
-        }),
-        { personeller: [], evraklar: [], egitimler: [], muayeneler: [], uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [] } as typeof extraFirmaVeriler
-      );
-      setExtraFirmaVeriler(merged);
+      const newMap: ExtraFirmaVeriMap = {};
+      results.forEach(r => {
+        newMap[r.firmId] = {
+          personeller: r.personeller as import('../types').Personel[],
+          evraklar: r.evraklar as import('../types').Evrak[],
+          egitimler: r.egitimler as import('../types').Egitim[],
+          muayeneler: r.muayeneler as import('../types').Muayene[],
+          uygunsuzluklar: r.uygunsuzluklar as import('../types').Uygunsuzluk[],
+          ekipmanlar: r.ekipmanlar as import('../types').Ekipman[],
+          tutanaklar: r.tutanaklar as import('../types').Tutanak[],
+          isIzinleri: r.isIzinleri as import('../types').IsIzni[],
+        };
+      });
+      setExtraFirmaVeriMap(newMap);
+      setExtraFirmaVeriler(flattenExtraVeriler(newMap));
     });
-  }, [org?.osgbRole, org?.id, org?.activeFirmIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [org?.osgbRole, org?.id, org?.activeFirmIds, flattenExtraVeriler]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Gezici uzman: ek firmalar için realtime subscription ──
+  useEffect(() => {
+    if (org?.osgbRole !== 'gezici_uzman') return;
+    const extraIds = (org.activeFirmIds ?? []).filter(id => id !== org.id);
+    if (extraIds.length === 0) return;
+
+    const TABLES = [
+      'personeller', 'evraklar', 'egitimler', 'muayeneler',
+      'uygunsuzluklar', 'ekipmanlar', 'tutanaklar', 'is_izinleri',
+    ];
+
+    type TableKey = 'personeller' | 'evraklar' | 'egitimler' | 'muayeneler' | 'uygunsuzluklar' | 'ekipmanlar' | 'tutanaklar' | 'isIzinleri';
+    const TABLE_KEY_MAP: Record<string, TableKey> = {
+      personeller: 'personeller',
+      evraklar: 'evraklar',
+      egitimler: 'egitimler',
+      muayeneler: 'muayeneler',
+      uygunsuzluklar: 'uygunsuzluklar',
+      ekipmanlar: 'ekipmanlar',
+      tutanaklar: 'tutanaklar',
+      is_izinleri: 'isIzinleri',
+    };
+
+    const channels = extraIds.map(firmId => {
+      const channelName = `gezici_extra_${firmId}_${Date.now()}`;
+      let ch = supabase.channel(channelName);
+
+      TABLES.forEach(table => {
+        ch = ch.on(
+          'postgres_changes' as Parameters<typeof ch.on>[0],
+          { event: '*', schema: 'public', table, filter: `organization_id=eq.${firmId}` } as Parameters<typeof ch.on>[1],
+          (payload: { eventType: string; new: Record<string, unknown>; old?: Record<string, unknown> }) => {
+            const recordId = (payload.new?.id ?? payload.old?.id) as string | undefined;
+            if (!recordId) return;
+
+            const tableKey = TABLE_KEY_MAP[table];
+            if (!tableKey) return;
+
+            const newData = payload.new?.data as Record<string, unknown> | undefined;
+            const deletedAt = payload.new?.deleted_at;
+            const isDeletion = payload.eventType === 'DELETE' || !!deletedAt;
+
+            setExtraFirmaVeriMap(prev => {
+              const firmData = prev[firmId] ?? {
+                personeller: [], evraklar: [], egitimler: [], muayeneler: [],
+                uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [],
+              };
+
+              type AnyRecord = { id: string };
+              const currentList = (firmData[tableKey] as AnyRecord[]);
+
+              let updatedList: AnyRecord[];
+              if (isDeletion) {
+                updatedList = currentList.filter(r => r.id !== recordId);
+              } else if (newData) {
+                const record = { ...newData, id: recordId } as AnyRecord;
+                const idx = currentList.findIndex(r => r.id === recordId);
+                if (idx === -1) {
+                  updatedList = [record, ...currentList];
+                } else {
+                  updatedList = [...currentList];
+                  updatedList[idx] = record;
+                }
+              } else {
+                return prev; // No change
+              }
+
+              const updatedFirmData = { ...firmData, [tableKey]: updatedList };
+              const newMap = { ...prev, [firmId]: updatedFirmData };
+              // Flatten'ı side effect olarak çalıştır
+              setTimeout(() => {
+                setExtraFirmaVeriler(flattenExtraVeriler(newMap));
+              }, 0);
+              return newMap;
+            });
+          }
+        ) as typeof ch;
+      });
+
+      ch.subscribe();
+      return ch;
+    });
+
+    return () => {
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [org?.osgbRole, org?.id, org?.activeFirmIds, flattenExtraVeriler]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTable = useCallback(async (table: string) => {
     const orgId = org?.id;
