@@ -35,28 +35,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleAuthError = useCallback(async (error: Error | unknown) => {
     const errMsg = (error instanceof Error ? error.message : String(error)).toLowerCase();
-    // Sadece gerçek oturum/token yenileme hatalarında çalış — yanlış şifre hatalarında ÇALIŞMA
     const isRefreshTokenError =
       errMsg.includes('refresh token not found') ||
       errMsg.includes('invalid refresh token') ||
       errMsg.includes('token has expired') ||
       errMsg.includes('token is expired') ||
       errMsg.includes('revoked');
-    
+
     if (isRefreshTokenError) {
-      // Login veya super-admin sayfasındayken hiçbir şey yapma
       if (window.location.pathname === '/login') return;
       if (window.location.pathname.startsWith('/super-admin')) return;
       clearAuthStorage();
       try {
         await supabase.auth.signOut({ scope: 'local' });
       } catch {
-        // Ignore signOut errors
+        // ignore
       }
       setSession(null);
       window.location.replace('/login');
     }
   }, [clearAuthStorage]);
+
+  // Süresi dolan organizasyonları otomatik pasife al — günde 1 kez
+  // useEffect'ten ÖNCE tanımlanmalı!
+  const triggerAutoExpire = useCallback(async () => {
+    const LAST_RUN_KEY = 'isg_auto_expire_last_run';
+    const lastRun = localStorage.getItem(LAST_RUN_KEY);
+    const today = new Date().toISOString().substring(0, 10);
+    if (lastRun === today) return;
+
+    try {
+      const supabaseBase = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string).replace(/\/rest\/v1\/?$/, '');
+      await fetch(`${supabaseBase}/functions/v1/auto-expire-organizations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      localStorage.setItem(LAST_RUN_KEY, today);
+    } catch {
+      // Sessizce devam et
+    }
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -67,7 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Uygulama açılınca süresi dolan org'ları otomatik pasife al (günde 1 kez)
     triggerAutoExpire();
 
-    // Load existing session on mount
     supabase.auth.getSession().then(({ data: { session: s }, error }) => {
       if (error) {
         handleAuthError(error);
@@ -76,12 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     }).catch((err) => {
-      // Network or token error — clear stale tokens and show login
       handleAuthError(err);
       setLoading(false);
     });
 
-    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
       if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
         setSession(s);
@@ -98,26 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [clearAuthStorage, handleAuthError, triggerAutoExpire]);
 
-  // Süresi dolan organizasyonları otomatik pasife al + kullanıcıları kick et
-  // Günde bir kez çalışır (localStorage'da son çalışma zamanı tutulur)
-  const triggerAutoExpire = useCallback(async () => {
-    const LAST_RUN_KEY = 'isg_auto_expire_last_run';
-    const lastRun = localStorage.getItem(LAST_RUN_KEY);
-    const today = new Date().toISOString().substring(0, 10); // YYYY-MM-DD
-    if (lastRun === today) return; // Bugün zaten çalıştı
-
-    try {
-      const supabaseBase = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string).replace(/\/rest\/v1\/?$/, '');
-      await fetch(`${supabaseBase}/functions/v1/auto-expire-organizations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      localStorage.setItem(LAST_RUN_KEY, today);
-    } catch {
-      // Sessizce devam et — kritik değil
-    }
-  }, []);
-
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
     if (!isSupabaseConfigured) {
       return { error: 'Supabase bağlantısı yapılandırılmamış. Lütfen Supabase\'i bağlayın.' };
@@ -131,14 +126,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
 
-      // Giriş başarısız — her türlü hata "yanlış şifre/mail" olarak göster
       if (signInError) {
         return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
       }
 
-      // Giriş başarılı — kullanıcının aktif org üyeliği ve organizasyon durumu kontrol et
       if (signInData?.user) {
-        // Super admin kontrolü — super admin her zaman girebilir
         const { data: profile } = await supabase
           .from('profiles')
           .select('is_super_admin')
@@ -146,7 +138,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
 
         if (!profile?.is_super_admin) {
-          // 1. user_organizations kaydı aktif mi?
           const { data: membership } = await supabase
             .from('user_organizations')
             .select('organization_id, is_active')
@@ -159,7 +150,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { error: 'Hesabınız devre dışı bırakılmış veya organizasyondan çıkarılmış. Lütfen yöneticinizle iletişime geçin.' };
           }
 
-          // 2. Organizasyonun kendisi aktif mi?
           const { data: org } = await supabase
             .from('organizations')
             .select('is_active, subscription_end')
@@ -172,10 +162,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { error: 'ABONELİĞİNİZ SONLANMIŞTIR. Lütfen hizmet sağlayıcınızla iletişime geçin.' };
           }
 
-          // 3. Abonelik süresi dolmuş mu? (string karşılaştırma — UTC sorunu yok)
+          // String karşılaştırma — UTC/timezone sorunu yok
           if (org.subscription_end) {
-            const today = new Date();
-            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const endStr = String(org.subscription_end).substring(0, 10);
             if (endStr < todayStr) {
               await supabase.auth.signOut({ scope: 'local' });
@@ -197,9 +187,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await supabase.auth.signOut({ scope: 'global' });
     } catch {
-      // Ignore signOut errors
+      // ignore
     }
-    // Force full page reload to completely reset all in-memory state
     window.location.replace('/login');
   }, [clearAuthStorage]);
 
