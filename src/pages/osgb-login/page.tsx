@@ -38,12 +38,15 @@ export default function OsgbLoginPage() {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (!currentUser) { setError('Kullanıcı bulunamadı.'); setLoading(false); return; }
 
-        const { data: uo } = await supabase
+        // Tüm aktif kayıtları çek, osgb_role olanı önceliklendir
+        const { data: uoList } = await supabase
           .from('user_organizations')
           .select('osgb_role, organization_id')
           .eq('user_id', currentUser.id)
-          .eq('is_active', true)
-          .maybeSingle();
+          .eq('is_active', true);
+
+        const uo = (uoList ?? []).find(r => r.osgb_role === 'osgb_admin' || r.osgb_role === 'gezici_uzman')
+          ?? (uoList ?? [])[0];
 
         const role = uo?.osgb_role;
 
