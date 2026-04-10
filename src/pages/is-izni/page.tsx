@@ -1153,14 +1153,6 @@ export default function IsIzniPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          <button
-            onClick={async () => { setRefreshing(true); await refreshData(); setRefreshing(false); }}
-            disabled={refreshing}
-            className="btn-secondary whitespace-nowrap"
-          >
-            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Yenileniyor...' : 'Yenile'}
-          </button>
           {canCreate && (
             <button onClick={openAdd} className="btn-primary whitespace-nowrap">
               <i className="ri-add-line" /> Yeni İş İzni

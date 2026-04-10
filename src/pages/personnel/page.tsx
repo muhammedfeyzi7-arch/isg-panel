@@ -627,9 +627,6 @@ export default function PersonellerPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px' }}>
-            <i className={`ri-refresh-line text-xs ${refreshing ? 'animate-spin' : ''}`} /><span className="hidden sm:inline ml-1">{refreshing ? 'Yenileniyor...' : 'Yenile'}</span>
-          </button>
           <button onClick={handleDownloadTemplate} className="btn-secondary whitespace-nowrap hidden sm:flex" style={{ fontSize: '12px', padding: '6px 12px' }}>
             <i className="ri-download-2-line text-xs" />Şablon İndir
           </button>

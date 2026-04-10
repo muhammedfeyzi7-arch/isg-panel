@@ -885,9 +885,6 @@ export default function TutanaklarPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap">
-            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />{refreshing ? 'Yenileniyor...' : 'Yenile'}
-          </button>
           {canCreate && (
             <button onClick={openAdd} className="btn-primary whitespace-nowrap">
               <i className="ri-add-line" /> Yeni Tutanak

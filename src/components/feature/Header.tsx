@@ -257,18 +257,18 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           borderBottom: `1px solid ${headerBorder}`,
           boxShadow: isDark ? '0 1px 8px rgba(0,0,0,0.25)' : '0 1px 6px rgba(15,23,42,0.06)',
           transition: 'left 0.26s cubic-bezier(0.4,0,0.2,1), background 0.3s ease',
-          paddingLeft: '12px',
-          paddingRight: '12px',
-          gap: '8px',
+          paddingLeft: '10px',
+          paddingRight: '10px',
+          gap: '6px',
         }}
       >
         {/* ── MOBİL: Hamburger ── */}
         <button
           onClick={onMobileMenuToggle}
-          className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all duration-200 lg:hidden flex-shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 lg:hidden flex-shrink-0"
           style={{ color: textMuted, background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
         >
-          <i className="ri-menu-line text-base" />
+          <i className="ri-menu-line text-sm" />
         </button>
 
         {/* ── DESKTOP: Sidebar collapse toggle ── */}
@@ -283,12 +283,12 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         </button>
 
         {/* ── Sayfa Başlığı (Mobil: orta, Desktop: sol) ── */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0 min-w-0">
           <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
             style={{ background: `${isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.1)'}` }}>
             <i className={`${currentModule?.icon || 'ri-home-line'} text-[11px]`} style={{ color: '#818CF8' }} />
           </div>
-          <span className="text-[13px] font-bold truncate" style={{ color: nameColor, maxWidth: '160px' }}>
+          <span className="text-[12px] sm:text-[13px] font-bold truncate" style={{ color: nameColor, maxWidth: '120px' }}>
             {currentModule?.label || activeModule}
           </span>
         </div>
@@ -381,30 +381,30 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
 
         {/* ── Tema Toggle ── */}
         <button onClick={toggleTheme} title={isDark ? 'Açık Tema' : 'Koyu Tema'}
-          className="w-9 h-9 lg:w-8 lg:h-8 flex items-center justify-center rounded-xl lg:rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0"
           style={{ background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
           onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = iconBtnBg; }}>
-          <i className={`${isDark ? 'ri-sun-line' : 'ri-moon-line'} text-base lg:text-sm`} style={{ color: isDark ? '#F59E0B' : '#475569' }} />
+          <i className={`${isDark ? 'ri-sun-line' : 'ri-moon-line'} text-sm`} style={{ color: isDark ? '#F59E0B' : '#475569' }} />
         </button>
 
-        {/* ── Hızlı Ekle (Desktop) ── */}
+        {/* ── Hızlı Ekle ── */}
         <button onClick={() => { setQuickOpen(true); setNotifOpen(false); setProfileOpen(false); }}
-          className="btn-primary flex-shrink-0 hidden sm:flex"
-          style={{ padding: '6px 12px', fontSize: '11.5px', borderRadius: '8px' }}>
+          className="btn-primary flex-shrink-0 flex"
+          style={{ padding: '5px 10px', fontSize: '11px', borderRadius: '8px' }}>
           <i className="ri-add-line text-sm" />
-          <span className="hidden lg:inline">Hızlı Ekle</span>
+          <span className="hidden lg:inline ml-1">Hızlı Ekle</span>
         </button>
 
         {/* ── Support Notifications (Supabase) ── */}
-        <div className="relative flex-shrink-0" ref={supportNotifRef}>
+        <div className="relative flex-shrink-0 hidden sm:block" ref={supportNotifRef}>
           <button
             onClick={() => { setSupportNotifOpen(v => !v); setNotifOpen(false); setProfileOpen(false); setQuickOpen(false); fetchSupportNotifs(); }}
-            className="w-9 h-9 lg:w-8 lg:h-8 flex items-center justify-center rounded-xl lg:rounded-lg cursor-pointer transition-all duration-200 relative"
+            className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 relative"
             style={{ background: supportNotifOpen ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)') : iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
             title="Destek Bildirimleri"
           >
-            <i className="ri-message-3-line text-base lg:text-sm" style={{ color: supportNotifOpen ? (isDark ? '#E2E8F0' : '#0F172A') : textMuted }} />
+            <i className="ri-message-3-line text-sm" style={{ color: supportNotifOpen ? (isDark ? '#E2E8F0' : '#0F172A') : textMuted }} />
             {unreadSupportCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full px-1"
                 style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 0 6px rgba(16,185,129,0.5)' }}>
@@ -414,7 +414,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           </button>
 
           {supportNotifOpen && (
-            <div className="absolute right-0 top-11 z-50 w-[320px] animate-slide-up overflow-hidden"
+            <div className="absolute right-0 top-11 z-50 w-[290px] sm:w-[320px] animate-slide-up overflow-hidden"
               style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '16px', boxShadow: isDark ? '0 25px 60px rgba(0,0,0,0.6)' : '0 20px 50px rgba(15,23,42,0.15)', backdropFilter: 'blur(20px)' }}>
               <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
                 <div className="flex items-center gap-2.5">
@@ -489,7 +489,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         <div className="relative flex-shrink-0" ref={notifRef}>
           <button
             onClick={() => { setNotifOpen(v => !v); setQuickOpen(false); setProfileOpen(false); }}
-            className="w-9 h-9 lg:w-8 lg:h-8 flex items-center justify-center rounded-xl lg:rounded-lg cursor-pointer transition-all duration-200 relative"
+            className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 relative"
             style={{
               background: notifOpen ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)') : iconBtnBg,
               border: `1px solid ${notifOpen ? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.14)') : iconBtnBorder}`,
@@ -497,7 +497,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             onMouseEnter={e => { if (!notifOpen) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)'; }}
             onMouseLeave={e => { if (!notifOpen) e.currentTarget.style.background = iconBtnBg; }}
           >
-            <i className="ri-notification-3-line text-base lg:text-sm" style={{ color: notifOpen ? (isDark ? '#E2E8F0' : '#0F172A') : textMuted }} />
+            <i className="ri-notification-3-line text-sm" style={{ color: notifOpen ? (isDark ? '#E2E8F0' : '#0F172A') : textMuted }} />
             {okunmamisBildirimSayisi > 0 && (
               <span
                 className="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full px-1 notif-badge-enter"
@@ -510,7 +510,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
 
           {notifOpen && (
             <div
-              className="absolute right-0 top-11 z-50 w-[340px] animate-slide-up overflow-hidden"
+              className="absolute right-0 top-11 z-50 w-[300px] sm:w-[340px] animate-slide-up overflow-hidden"
               style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '16px', boxShadow: isDark ? '0 25px 60px rgba(0,0,0,0.6)' : '0 20px 50px rgba(15,23,42,0.15)', backdropFilter: 'blur(20px)' }}
             >
               {/* Header */}
@@ -642,7 +642,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         <div className="relative flex-shrink-0" ref={profileRef}>
           <button
             onClick={() => { setProfileOpen(v => !v); setNotifOpen(false); setQuickOpen(false); }}
-            className="flex items-center gap-1.5 cursor-pointer transition-all duration-200 rounded-xl lg:rounded-lg py-1 px-1.5"
+            className="flex items-center gap-1.5 cursor-pointer transition-all duration-200 rounded-lg py-1 px-1.5"
             style={{
               background: profileOpen ? (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.06)') : 'transparent',
               border: `1px solid ${profileOpen ? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)') : 'transparent'}`,
@@ -652,7 +652,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           >
             {/* Avatar */}
             <div
-              className="w-8 h-8 lg:w-7 lg:h-7 rounded-xl lg:rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 2px 8px rgba(99,102,241,0.3)' }}
             >
               {(currentUser.ad || 'U').charAt(0).toUpperCase()}
@@ -668,7 +668,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
 
           {profileOpen && (
             <div
-              className="absolute right-0 top-12 z-50 w-56 animate-slide-up overflow-hidden"
+              className="absolute right-0 top-12 z-50 w-52 sm:w-56 animate-slide-up overflow-hidden"
               style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '16px', boxShadow: isDark ? '0 25px 60px rgba(0,0,0,0.55)' : '0 20px 50px rgba(15,23,42,0.15)', backdropFilter: 'blur(20px)' }}
             >
               {/* Profile header */}

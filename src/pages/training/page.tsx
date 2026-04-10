@@ -530,10 +530,6 @@ export default function EgitimlerPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Eğitim kayıtları ve katılım takibi</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap">
-            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Yenileniyor...' : 'Yenile'}
-          </button>
           <button onClick={() => exportEgitimlerToExcel(egitimler, firmalar, personeller)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-excel-2-line mr-1" />Excel Raporu
           </button>

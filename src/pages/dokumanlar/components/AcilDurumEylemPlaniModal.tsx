@@ -714,7 +714,7 @@ export default function AcilDurumEylemPlaniModal({ onClose }: Props) {
                   <input
                     value={form.santiyeAdi}
                     onChange={e => set('santiyeAdi', e.target.value)}
-                    placeholder="Örn: THY 3. Etap"
+                    placeholder="Örn: Proje Adı"
                     className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
                     style={{ background: 'var(--bg-app)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
                   />
@@ -737,7 +737,7 @@ export default function AcilDurumEylemPlaniModal({ onClose }: Props) {
                 <input
                   value={form.santiyeAdresi}
                   onChange={e => set('santiyeAdresi', e.target.value)}
-                  placeholder="Örn: İstanbul Havalimanı, Arnavutköy / İstanbul"
+                  placeholder="Örn: Mahalle, İlçe / İl"
                   className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
                   style={{ background: 'var(--bg-app)', border: '1px solid var(--border-main)', color: 'var(--text-primary)' }}
                 />

@@ -169,15 +169,6 @@ export default function UygunsuzluklarPage() {
               <i className="ri-search-eye-line" /> Denetçi — Saha Modu
             </span>
           )}
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing || dataLoading}
-            className="btn-secondary whitespace-nowrap"
-            title="Başka cihazdan eklenen verileri görmek için yenile"
-          >
-            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Yenileniyor...' : 'Yenile'}
-          </button>
           <button onClick={() => setShowReport(true)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-chart-line mr-1" />DÖF Raporu
           </button>

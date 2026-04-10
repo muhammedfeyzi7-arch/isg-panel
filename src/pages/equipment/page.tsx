@@ -898,9 +898,6 @@ export default function EkipmanlarPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Ekipman kayıtlarını ve kontrol durumlarını yönetin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap">
-            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />{refreshing ? 'Yenileniyor...' : 'Yenile'}
-          </button>
           <button onClick={() => exportEkipmanToExcel(ekipmanlar, firmalar)} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
           </button>

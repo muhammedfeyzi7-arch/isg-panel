@@ -510,14 +510,6 @@ export default function MuayenelerPage() {
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Personel periyodik muayene tarihlerini takip edin</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <button
-            onClick={async () => { setRefreshing(true); await refreshData(); setRefreshing(false); }}
-            disabled={refreshing}
-            className="btn-secondary whitespace-nowrap"
-          >
-            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Yenileniyor...' : 'Yenile'}
-          </button>
           <button onClick={downloadTemplate} className="btn-secondary whitespace-nowrap">
             <i className="ri-file-download-line mr-1" />Şablon İndir
           </button>

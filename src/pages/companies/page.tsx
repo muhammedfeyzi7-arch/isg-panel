@@ -287,10 +287,6 @@ export default function FirmalarPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleRefresh} disabled={refreshing || dataLoading} className="btn-secondary whitespace-nowrap">
-            <i className={`ri-refresh-line mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Yenileniyor...' : 'Yenile'}
-          </button>
           {canCreate && (
             <button onClick={openAdd} className="btn-primary" style={{ fontSize: '12.5px', padding: '7px 14px' }}>
               <i className="ri-add-line text-sm" />
