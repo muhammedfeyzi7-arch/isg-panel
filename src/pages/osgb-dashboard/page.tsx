@@ -98,10 +98,12 @@ export default function OsgbDashboardPage() {
 
   // Uzman Ekle Modal
   const [showUzmanModal, setShowUzmanModal] = useState(false);
-  const [uzmanForm, setUzmanForm] = useState({ ad: '', email: '', password: '', atananFirmaId: '' });
+  const [uzmanForm, setUzmanForm] = useState({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaId: '' });
+  const [uzmanFormTab, setUzmanFormTab] = useState<0 | 1 | 2>(0);
   const [uzmanLoading, setUzmanLoading] = useState(false);
   const [uzmanError, setUzmanError] = useState<string | null>(null);
   const [showUzmanPw, setShowUzmanPw] = useState(false);
+  const [showUzmanPwConfirm, setShowUzmanPwConfirm] = useState(false);
 
   // ── Veri çek ──
   const fetchData = useCallback(async () => {
@@ -258,9 +260,11 @@ export default function OsgbDashboardPage() {
 
   // ── Uzman Ekle ──
   const handleUzmanEkle = async () => {
-    if (!uzmanForm.ad.trim()) { setUzmanError('Ad Soyad zorunludur.'); return; }
+    const fullName = `${uzmanForm.ad.trim()} ${uzmanForm.soyad.trim()}`.trim();
+    if (!fullName) { setUzmanError('Ad ve soyad zorunludur.'); return; }
     if (!uzmanForm.email.trim()) { setUzmanError('E-posta zorunludur.'); return; }
     if (uzmanForm.password.length < 8) { setUzmanError('Şifre en az 8 karakter olmalıdır.'); return; }
+    if (uzmanForm.password !== uzmanForm.passwordConfirm) { setUzmanError('Şifreler eşleşmiyor.'); return; }
     if (!org?.id) return;
     setUzmanLoading(true);
     setUzmanError(null);
@@ -268,7 +272,6 @@ export default function OsgbDashboardPage() {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (!token) { setUzmanError('Oturum bulunamadı.'); return; }
-
       const res = await fetch(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -277,22 +280,18 @@ export default function OsgbDashboardPage() {
           organization_id: org.id,
           email: uzmanForm.email.trim().toLowerCase(),
           password: uzmanForm.password,
-          display_name: uzmanForm.ad.trim(),
+          display_name: fullName,
           role: 'member',
           osgb_role: 'gezici_uzman',
           active_firm_id: uzmanForm.atananFirmaId || null,
         }),
       });
-
       const json = await res.json();
-      if (json.error) {
-        setUzmanError(json.error);
-        return;
-      }
-
-      addToast(`${uzmanForm.ad.trim()} gezici uzman olarak eklendi!`, 'success');
+      if (json.error) { setUzmanError(json.error); return; }
+      addToast(`${fullName} gezici uzman olarak eklendi!`, 'success');
       setShowUzmanModal(false);
-      setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' });
+      setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaId: '' });
+      setUzmanFormTab(0);
       await fetchData();
     } catch (err) {
       setUzmanError(String(err));
@@ -409,7 +408,7 @@ export default function OsgbDashboardPage() {
         orgName={org?.name ?? 'OSGB'}
         onMobileMenuToggle={() => setMobileOpen(v => !v)}
         onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); }}
-        onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' }); }}
+        onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaId: '' }); }}
         theme={osgbTheme}
         onToggleTheme={() => setOsgbTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
@@ -700,7 +699,7 @@ export default function OsgbDashboardPage() {
                         placeholder="Uzman ara..." className="text-sm pl-9 pr-4 py-2.5 rounded-xl w-full outline-none"
                         style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: 'var(--text-primary)' }} />
                     </div>
-                    <button onClick={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanForm({ ad: '', email: '', password: '', atananFirmaId: '' }); }}
+                    <button onClick={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaId: '' }); }}
                       className="whitespace-nowrap ml-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
                       style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                       <i className="ri-user-add-line" />Uzman Ekle
@@ -716,7 +715,7 @@ export default function OsgbDashboardPage() {
                         <p className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>Henüz gezici uzman eklenmedi</p>
                         <p className="text-xs" style={{ color: textMuted }}>Gezici uzmanlarınızı ekleyip firmalara atayın.</p>
                       </div>
-                      <button onClick={() => setShowUzmanModal(true)}
+                      <button onClick={() => { setShowUzmanModal(true); setUzmanFormTab(0); }}
                         className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
                         style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                         <i className="ri-user-add-line" />İlk Uzmanı Ekle
@@ -1002,6 +1001,343 @@ export default function OsgbDashboardPage() {
           )}
         </div>
       </main>
+
+      {/* ── FİRMA DETAY MODAL ── */}
+      {secilenFirma && (
+        <FirmaDetayModal
+          firmaId={secilenFirma.id}
+          firmaAdi={secilenFirma.name}
+          orgId={org?.id ?? ''}
+          uzmanlar={uzmanlar}
+          onClose={() => setSecilenFirma(null)}
+          onRefresh={fetchData}
+          addToast={addToast}
+          isDark={isDark}
+        />
+      )}
+
+      {/* ── UZMAN DETAY MODAL ── */}
+      {secilenUzman && (
+        <UzmanDetayModal
+          uzman={secilenUzman}
+          orgId={org?.id ?? ''}
+          altFirmalar={altFirmalar}
+          onClose={() => setSecilenUzman(null)}
+          onRefresh={fetchData}
+          addToast={addToast}
+        />
+      )}
+
+      {/* ── UZMAN EKLE MODAL — Premium 3 Bölüm ── */}
+      {showUzmanModal && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(16px)', zIndex: 99999 }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowUzmanModal(false); setUzmanFormTab(0); } }}>
+          <div className="w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col"
+            style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)', maxHeight: '90vh' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl"
+                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  <i className="ri-user-add-line text-base" style={{ color: '#10B981' }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Gezici Uzman Ekle</h3>
+                  <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>OSGB ekibinize yeni gezici uzman</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowUzmanModal(false); setUzmanFormTab(0); }}
+                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}>
+                <i className="ri-close-line text-sm" />
+              </button>
+            </div>
+
+            {/* Section Tabs */}
+            <div className="flex gap-1 px-6 pt-4 flex-shrink-0">
+              {[
+                { idx: 0, icon: 'ri-user-line', label: 'Kişisel Bilgiler' },
+                { idx: 1, icon: 'ri-lock-password-line', label: 'Giriş Bilgileri' },
+                { idx: 2, icon: 'ri-building-2-line', label: 'Firma Atama' },
+              ].map(tab => (
+                <button key={tab.idx}
+                  onClick={() => setUzmanFormTab(tab.idx as 0 | 1 | 2)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                  style={{
+                    background: uzmanFormTab === tab.idx ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
+                    border: uzmanFormTab === tab.idx ? '1px solid rgba(16,185,129,0.25)' : '1px solid var(--border-subtle)',
+                    color: uzmanFormTab === tab.idx ? '#10B981' : 'var(--text-muted)',
+                  }}>
+                  <i className={`${tab.icon} text-xs`} />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.idx + 1}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="overflow-y-auto flex-1 px-6 py-5">
+              {/* Tab 0: Kişisel Bilgiler */}
+              {uzmanFormTab === 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                      <i className="ri-user-line text-xs" style={{ color: '#10B981' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Kişisel Bilgiler</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Uzmanın kimlik ve iletişim bilgileri</p>
+                    </div>
+                  </div>
+
+                  {/* Avatar önizleme */}
+                  <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-extrabold text-white flex-shrink-0"
+                      style={{ background: uzmanForm.ad ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                      {uzmanForm.ad ? uzmanForm.ad.charAt(0).toUpperCase() : <i className="ri-user-line text-xl" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {uzmanForm.ad || uzmanForm.soyad ? `${uzmanForm.ad} ${uzmanForm.soyad}`.trim() : 'Uzman Adı'}
+                      </p>
+                      <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{uzmanForm.uzmanlik || 'Uzmanlık Alanı'}</p>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full inline-block mt-1"
+                        style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        Gezici Uzman
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label style={labelStyle}>Ad <span style={{ color: '#EF4444' }}>*</span></label>
+                      <input value={uzmanForm.ad} onChange={e => { setUzmanForm(p => ({ ...p, ad: e.target.value })); setUzmanError(null); }}
+                        placeholder="Ad" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Soyad <span style={{ color: '#EF4444' }}>*</span></label>
+                      <input value={uzmanForm.soyad} onChange={e => setUzmanForm(p => ({ ...p, soyad: e.target.value }))}
+                        placeholder="Soyad" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Telefon</label>
+                      <input value={uzmanForm.telefon} onChange={e => setUzmanForm(p => ({ ...p, telefon: e.target.value }))}
+                        placeholder="0555 000 00 00" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Uzmanlık Alanı</label>
+                      <select value={uzmanForm.uzmanlik} onChange={e => setUzmanForm(p => ({ ...p, uzmanlik: e.target.value }))}
+                        className="cursor-pointer outline-none" style={inputStyle}>
+                        <option value="">Seçiniz</option>
+                        <option value="İş Güvenliği Uzmanı (A)">İş Güvenliği Uzmanı (A)</option>
+                        <option value="İş Güvenliği Uzmanı (B)">İş Güvenliği Uzmanı (B)</option>
+                        <option value="İş Güvenliği Uzmanı (C)">İş Güvenliği Uzmanı (C)</option>
+                        <option value="İşyeri Hekimi">İşyeri Hekimi</option>
+                        <option value="Diğer SGK Uzmanı">Diğer SGK Uzmanı</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 1: Giriş Bilgileri */}
+              {uzmanFormTab === 1 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(245,158,11,0.1)' }}>
+                      <i className="ri-lock-password-line text-xs" style={{ color: '#F59E0B' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Giriş Bilgileri</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Uzmanın sisteme giriş için e-posta ve şifresi</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>E-posta <span style={{ color: '#EF4444' }}>*</span></label>
+                    <div className="relative">
+                      <i className="ri-mail-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
+                      <input type="email" value={uzmanForm.email}
+                        onChange={e => { setUzmanForm(p => ({ ...p, email: e.target.value })); setUzmanError(null); }}
+                        placeholder="uzman@ornek.com"
+                        style={{ ...inputStyle, paddingLeft: '36px' }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Şifre <span style={{ color: '#EF4444' }}>*</span></label>
+                    <div className="relative">
+                      <i className="ri-lock-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
+                      <input type={showUzmanPw ? 'text' : 'password'} value={uzmanForm.password}
+                        onChange={e => setUzmanForm(p => ({ ...p, password: e.target.value }))}
+                        placeholder="En az 8 karakter"
+                        style={{ ...inputStyle, paddingLeft: '36px', paddingRight: '44px' }} />
+                      <button type="button" onClick={() => setShowUzmanPw(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                        style={{ color: 'var(--text-muted)' }}>
+                        <i className={`${showUzmanPw ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
+                      </button>
+                    </div>
+                    {/* Şifre gücü */}
+                    {uzmanForm.password.length > 0 && (
+                      <div className="flex gap-1 mt-2">
+                        {[...Array(4)].map((_, i) => {
+                          const len = uzmanForm.password.length;
+                          const active = (i === 0 && len >= 1) || (i === 1 && len >= 6) || (i === 2 && len >= 8) || (i === 3 && len >= 12);
+                          const color = len < 6 ? '#EF4444' : len < 8 ? '#F59E0B' : len < 12 ? '#10B981' : '#22C55E';
+                          return <div key={i} className="flex-1 h-1 rounded-full" style={{ background: active ? color : 'var(--border-subtle)' }} />;
+                        })}
+                        <span className="text-[10px] ml-1" style={{ color: uzmanForm.password.length < 6 ? '#EF4444' : uzmanForm.password.length < 8 ? '#F59E0B' : '#10B981' }}>
+                          {uzmanForm.password.length < 6 ? 'Zayıf' : uzmanForm.password.length < 8 ? 'Orta' : uzmanForm.password.length < 12 ? 'İyi' : 'Güçlü'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Şifre Tekrar <span style={{ color: '#EF4444' }}>*</span></label>
+                    <div className="relative">
+                      <i className="ri-lock-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
+                      <input type={showUzmanPwConfirm ? 'text' : 'password'} value={uzmanForm.passwordConfirm}
+                        onChange={e => setUzmanForm(p => ({ ...p, passwordConfirm: e.target.value }))}
+                        placeholder="Şifreyi tekrar girin"
+                        style={{
+                          ...inputStyle, paddingLeft: '36px', paddingRight: '44px',
+                          borderColor: uzmanForm.passwordConfirm && uzmanForm.password !== uzmanForm.passwordConfirm ? '#EF4444' : undefined,
+                        }} />
+                      <button type="button" onClick={() => setShowUzmanPwConfirm(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                        style={{ color: 'var(--text-muted)' }}>
+                        <i className={`${showUzmanPwConfirm ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
+                      </button>
+                    </div>
+                    {uzmanForm.passwordConfirm && uzmanForm.password !== uzmanForm.passwordConfirm && (
+                      <p className="text-[10px] mt-1" style={{ color: '#EF4444' }}>Şifreler eşleşmiyor</p>
+                    )}
+                  </div>
+
+                  <div className="p-3 rounded-xl flex items-start gap-2.5" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                    <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
+                    <p className="text-[10.5px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      Uzman bu e-posta ve şifre ile sisteme giriş yapabilecek. Şifreyi güvenli bir şekilde iletin.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Firma Atama */}
+              {uzmanFormTab === 2 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(139,92,246,0.1)' }}>
+                      <i className="ri-building-2-line text-xs" style={{ color: '#8B5CF6' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Firma Atama</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Uzmanı bir müşteri firmaya atayın (isteğe bağlı)</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Atanacak Firma</label>
+                    <select value={uzmanForm.atananFirmaId} onChange={e => setUzmanForm(p => ({ ...p, atananFirmaId: e.target.value }))}
+                      className="cursor-pointer outline-none" style={inputStyle}>
+                      <option value="">— Şimdi Atama —</option>
+                      {altFirmalar.map(f => (
+                        <option key={f.id} value={f.id}>{f.name}{f.uzmanAd ? ` (${f.uzmanAd} atanmış)` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Firma kartları */}
+                  {altFirmalar.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                      {altFirmalar.map(f => (
+                        <button key={f.id} type="button"
+                          onClick={() => setUzmanForm(p => ({ ...p, atananFirmaId: p.atananFirmaId === f.id ? '' : f.id }))}
+                          className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all text-left"
+                          style={{
+                            background: uzmanForm.atananFirmaId === f.id ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
+                            border: uzmanForm.atananFirmaId === f.id ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid var(--border-subtle)',
+                          }}>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{ background: uzmanForm.atananFirmaId === f.id ? 'rgba(16,185,129,0.15)' : 'var(--bg-hover)' }}>
+                            <i className="ri-building-2-line text-xs" style={{ color: uzmanForm.atananFirmaId === f.id ? '#10B981' : 'var(--text-muted)' }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate" style={{ color: uzmanForm.atananFirmaId === f.id ? '#10B981' : 'var(--text-primary)' }}>{f.name}</p>
+                            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                              {f.uzmanAd ? `${f.uzmanAd} atanmış` : `${f.personelSayisi} personel`}
+                            </p>
+                          </div>
+                          {uzmanForm.atananFirmaId === f.id && (
+                            <i className="ri-check-line text-sm flex-shrink-0" style={{ color: '#10B981' }} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {altFirmalar.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 gap-2">
+                      <i className="ri-building-2-line text-2xl" style={{ color: 'var(--text-faint)' }} />
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Henüz firma eklenmedi. Uzmanı önce ekleyip sonra atama yapabilirsiniz.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Error */}
+            {uzmanError && (
+              <div className="mx-6 mb-3 flex items-start gap-2 p-3 rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <i className="ri-error-warning-line text-sm flex-shrink-0" style={{ color: '#ef4444' }} />
+                <p className="text-xs" style={{ color: '#dc2626' }}>{uzmanError}</p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+              style={{ borderTop: '1px solid var(--border-subtle)' }}>
+              <div className="flex gap-2">
+                <button onClick={() => setUzmanFormTab(t => Math.max(0, t - 1) as 0 | 1 | 2)}
+                  disabled={uzmanFormTab === 0}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', opacity: uzmanFormTab === 0 ? 0.4 : 1 }}>
+                  <i className="ri-arrow-left-line" /> Geri
+                </button>
+                {uzmanFormTab < 2 && (
+                  <button onClick={() => setUzmanFormTab(t => Math.min(2, t + 1) as 0 | 1 | 2)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                    style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}>
+                    İleri <i className="ri-arrow-right-line" />
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { setShowUzmanModal(false); setUzmanFormTab(0); }}
+                  className="whitespace-nowrap px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer"
+                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                  İptal
+                </button>
+                <button onClick={handleUzmanEkle}
+                  disabled={uzmanLoading || !uzmanForm.ad.trim() || !uzmanForm.email.trim() || uzmanForm.password.length < 8}
+                  className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: (uzmanLoading || !uzmanForm.ad.trim() || !uzmanForm.email.trim() || uzmanForm.password.length < 8) ? 0.6 : 1 }}>
+                  {uzmanLoading ? <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</> : <><i className="ri-user-add-line" />Uzman Ekle</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── FİRMA EKLE MODAL — Premium 3 Bölüm ── */}
       {showFirmaModal && createPortal(

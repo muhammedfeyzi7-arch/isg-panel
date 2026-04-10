@@ -1,7 +1,6 @@
 import {
   createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode,
 } from 'react';
-import { isKvkkAcceptedLocally } from '../components/feature/KvkkPopup';
 import type { User } from '@supabase/supabase-js';
 import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
@@ -30,21 +29,16 @@ export interface OrgInfo {
   role: string;
   isActive: boolean;
   mustChangePassword: boolean;
-  kvkkAccepted: boolean;
   displayName?: string;
   email?: string;
   orgType: 'firma' | 'osgb';
   osgbRole?: 'osgb_admin' | 'gezici_uzman' | null;
 }
 
-// StoreType zaten restoreEgitim, permanentDeleteEgitim, restoreMuayene, permanentDeleteMuayene içeriyor
 interface AppContextType extends StoreType {
   fetchTable: (table: string) => Promise<void>;
-  /** İlk açılış — henüz hiç veri yok, tüm sayfa skeleton göster */
   pageLoading: boolean;
-  /** Arka planda yenileniyor — veri var ama güncelleniyor (spinner/subtle) */
   partialLoading: boolean;
-  /** Supabase realtime channel bağlantı durumu */
   realtimeStatus: 'connected' | 'connecting' | 'disconnected';
   toasts: Toast[];
   addToast: (message: string, type?: Toast['type']) => void;
@@ -68,8 +62,6 @@ interface AppContextType extends StoreType {
   orgError: string | null;
   mustChangePassword: boolean;
   clearMustChangePassword: () => Promise<void>;
-  kvkkAccepted: boolean;
-  setKvkkAccepted: () => void;
   createOrg: (name: string, userId: string) => Promise<{ error: string | null }>;
   joinOrg: (code: string) => Promise<{ error: string | null }>;
   regenerateInviteCode: () => Promise<{ error: string | null; newCode?: string }>;
@@ -109,31 +101,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     refetch: refetchOrg,
     clearMustChangePassword: clearMustChangePw,
   } = useOrganization(user);
-  // Auto-create org is now handled inside useOrganization.loadOrg() via the edge function.
-  // No separate autoCreateOrg effect needed here.
-
-  // localStorage'da zaten kabul ettiyse true ile başlat
-  const [kvkkAcceptedLocal, setKvkkAcceptedLocal] = useState(() => {
-    try { return user ? isKvkkAcceptedLocally(user.id) : false; } catch { return false; }
-  });
 
   const org = useMemo<OrgInfo | null>(() => {
     if (!rawOrg) return null;
     return {
       ...rawOrg,
-      kvkkAccepted: rawOrg.kvkkAccepted || kvkkAcceptedLocal,
       displayName: rawOrg.displayName || getUserDisplayName(user),
       email: rawOrg.email || user?.email,
     };
-  }, [rawOrg, user, kvkkAcceptedLocal]);
-
-  const setKvkkAccepted = useCallback(() => {
-    setKvkkAcceptedLocal(true);
-    // user değiştiğinde de güncelle
-    if (user) {
-      try { localStorage.setItem(`kvkk_accepted_${user.id}`, '1'); } catch { /* ignore */ }
-    }
-  }, [user]);
+  }, [rawOrg, user]);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -148,7 +124,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // ── Activity logging — writes to Supabase activity_logs table ──
   const orgRef = useRef(org);
   const userRef = useRef(user);
   useEffect(() => { orgRef.current = org; }, [org]);
@@ -175,7 +150,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // ── Log user_login once per session ──
   const loginLoggedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!user || !org) return;
@@ -197,18 +171,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addToastRef = useRef(addToast);
   useEffect(() => { addToastRef.current = addToast; }, [addToast]);
 
-  // onSaveError ve onRemoteChange callback'leri — ref pattern ile stale closure önlenir
-  // ve useStore'un realtime useEffect'i gereksiz yere yeniden bağlanmaz
   const onSaveErrorCb = useCallback((msg: string) => {
     addToastRef.current(msg, 'error');
-  }, []); // deps yok — addToastRef her zaman güncel
+  }, []);
 
   const onRemoteChangeCb = useCallback((module: string) => {
     addToastRef.current(
       `${module} modülünde başka bir kullanıcı değişiklik yaptı — veriler güncellendi.`,
       'info',
     );
-  }, []); // deps yok — addToastRef her zaman güncel
+  }, []);
 
   const store = useStore(
     org?.id ?? null,
@@ -219,7 +191,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     onRemoteChangeCb,
   );
 
-  // ── fetchTable — sayfa bazlı lazy load için ──
   const fetchTable = useCallback(async (table: string) => {
     const orgId = org?.id;
     if (!orgId) return;
@@ -240,21 +211,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else console.warn(`[ISG] fetchTable: unknown table "${table}"`);
   }, [org?.id, store.fetchFirmalar, store.fetchPersoneller, store.fetchEvraklar, store.fetchEgitimler, store.fetchMuayeneler, store.fetchUygunsuzluklar, store.fetchEkipmanlar, store.fetchGorevler, store.fetchTutanaklar, store.fetchIsIzinleri]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist active module across page refreshes
   const [activeModule, setActiveModuleState] = useState<string>(() => {
     try { return localStorage.getItem('isg_active_module') || 'dashboard'; } catch { return 'dashboard'; }
   });
   const setActiveModule = useCallback((m: string) => {
     setActiveModuleState(m);
     try { localStorage.setItem('isg_active_module', m); } catch { /* ignore */ }
-    // Modül değişince sayfayı en üste kaydır
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [quickCreate, setQuickCreate] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
-  // Kontrol yapıldı bildirimleri — geçici, sadece session'da tutulur
   const [kontrolBildirimleri, setKontrolBildirimleri] = useState<Bildirim[]>([]);
 
   const isIzniBildirimi = useCallback((
@@ -265,12 +233,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const yeniBildirim: Bildirim = {
       id,
       tip: tip === 'onaylandi' ? 'is_izni_onaylandi' : 'is_izni_reddedildi',
-      mesaj: tip === 'onaylandi'
-        ? `İş izni onaylandı — ${izinNo}`
-        : `İş izni reddedildi — ${izinNo}`,
-      detay: sahaNotu
-        ? `Saha notu: ${sahaNotu}`
-        : tip === 'onaylandi' ? 'Sahada uygundur' : 'Uygun değil',
+      mesaj: tip === 'onaylandi' ? `İş izni onaylandı — ${izinNo}` : `İş izni reddedildi — ${izinNo}`,
+      detay: sahaNotu ? `Saha notu: ${sahaNotu}` : tip === 'onaylandi' ? 'Sahada uygundur' : 'Uygun değil',
       tarih: now,
       okundu: false,
       kalanGun: 0,
@@ -291,9 +255,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const yeniBildirim: Bildirim = {
       id,
       tip: 'ekipman_kontrol_yapildi',
-      mesaj: gecikmisDi
-        ? `${ekipmanAd} — Gecikmiş kontrol tamamlandı`
-        : `${ekipmanAd} — Kontrol tamamlandı`,
+      mesaj: gecikmisDi ? `${ekipmanAd} — Gecikmiş kontrol tamamlandı` : `${ekipmanAd} — Kontrol tamamlandı`,
       detay: `Durum: ${durum} · ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`,
       tarih: now,
       okundu: false,
@@ -302,7 +264,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recordId: ekipmanId,
     };
     setKontrolBildirimleri(prev => [yeniBildirim, ...prev].slice(0, 20));
-    // 30 saniye sonra otomatik okundu işaretle
     setTimeout(() => {
       setKontrolBildirimleri(prev => prev.map(b => b.id === id ? { ...b, okundu: true } : b));
     }, 30000);
@@ -317,8 +278,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   });
 
-
-  // Sync user info into store's currentUser (including full_name from user_metadata)
   useEffect(() => {
     if (!user) return;
     const metaName = user.user_metadata?.full_name as string | undefined;
@@ -338,7 +297,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.email, user?.user_metadata?.full_name, user?.user_metadata?.role]);
 
-  // Theme sync
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'light') {
@@ -354,7 +312,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const bildirimler = useMemo<Bildirim[]>(() => {
-    // kontrolBildirimleri önce gelsin (en güncel)
     const kontrolMerged = kontrolBildirimleri.map(b => ({
       ...b,
       okundu: b.okundu || okunanlar.has(b.id),
@@ -364,7 +321,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const in30 = new Date(today.getTime() + 30 * 86400000);
     const result: Bildirim[] = [];
 
-    // Tarih string'ini güvenli şekilde parse et — geçersizse null döner
     const parseDate = (dateStr: string | null | undefined): Date | null => {
       if (!dateStr || !dateStr.trim()) return null;
       const d = new Date(dateStr);
@@ -373,182 +329,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return d;
     };
 
-    // Sadece geçerli tarih için gün hesapla — geçersizse null döner
     const getDaysRemaining = (dateStr: string | null | undefined): number | null => {
       const d = parseDate(dateStr);
       if (!d) return null;
       return Math.ceil((d.getTime() - today.getTime()) / 86400000);
     };
 
-    // ── Evraklar ──
     store.evraklar.forEach(e => {
       if (e.silinmis) return;
       const personel = e.personelId ? store.personeller.find(p => p.id === e.personelId) : null;
       const firma = store.firmalar.find(f => f.id === e.firmaId);
       const detayBase = `${personel ? personel.adSoyad + ' — ' : ''}${firma?.ad || ''}`;
 
-      // Durum bazlı kontrol — tarih olmasa bile durum "Süre Dolmuş" veya "Eksik" ise bildirim üret
       if (e.durum === 'Süre Dolmuş') {
         const d = parseDate(e.gecerlilikTarihi);
         const tarihBilgi = d ? `${d.toLocaleDateString('tr-TR')} tarihinde doldu` : 'Süresi dolmuş';
-        result.push({
-          id: `evrak_dolmus_${e.id}`,
-          tip: 'evrak_dolmus',
-          mesaj: `${e.ad} evrakının süresi dolmuş`,
-          detay: `${detayBase}${detayBase ? ' — ' : ''}${tarihBilgi}`,
-          tarih: e.gecerlilikTarihi || new Date().toISOString().split('T')[0],
-          okundu: okunanlar.has(`evrak_dolmus_${e.id}`),
-          kalanGun: -1,
-          module: 'evraklar',
-          recordId: e.id,
-        });
+        result.push({ id: `evrak_dolmus_${e.id}`, tip: 'evrak_dolmus', mesaj: `${e.ad} evrakının süresi dolmuş`, detay: `${detayBase}${detayBase ? ' — ' : ''}${tarihBilgi}`, tarih: e.gecerlilikTarihi || new Date().toISOString().split('T')[0], okundu: okunanlar.has(`evrak_dolmus_${e.id}`), kalanGun: -1, module: 'evraklar', recordId: e.id });
         return;
       }
-
       if (e.durum === 'Eksik') {
-        result.push({
-          id: `evrak_eksik_${e.id}`,
-          tip: 'evrak_dolmus',
-          mesaj: `${e.ad} evrakı eksik`,
-          detay: `${detayBase}${detayBase ? ' — ' : ''}Evrak henüz yüklenmemiş`,
-          tarih: new Date().toISOString().split('T')[0],
-          okundu: okunanlar.has(`evrak_eksik_${e.id}`),
-          kalanGun: -1,
-          module: 'evraklar',
-          recordId: e.id,
-        });
+        result.push({ id: `evrak_eksik_${e.id}`, tip: 'evrak_dolmus', mesaj: `${e.ad} evrakı eksik`, detay: `${detayBase}${detayBase ? ' — ' : ''}Evrak henüz yüklenmemiş`, tarih: new Date().toISOString().split('T')[0], okundu: okunanlar.has(`evrak_eksik_${e.id}`), kalanGun: -1, module: 'evraklar', recordId: e.id });
         return;
       }
-
-      // Tarih bazlı kontrol — geçerlilik tarihi varsa
       const d = parseDate(e.gecerlilikTarihi);
       if (!d) return;
       const kalanGun = getDaysRemaining(e.gecerlilikTarihi)!;
-
       if (d >= today && d <= in30) {
-        result.push({
-          id: `evrak_surecek_${e.id}`,
-          tip: 'evrak_surecek',
-          mesaj: `${e.ad} evrakının süresi yaklaşıyor`,
-          detay: `${detayBase}${detayBase ? ' — ' : ''}${kalanGun === 0 ? 'Bugün dolacak!' : `${kalanGun} gün kaldı`}`,
-          tarih: e.gecerlilikTarihi!,
-          okundu: okunanlar.has(`evrak_surecek_${e.id}`),
-          kalanGun,
-          module: 'evraklar',
-          recordId: e.id,
-        });
+        result.push({ id: `evrak_surecek_${e.id}`, tip: 'evrak_surecek', mesaj: `${e.ad} evrakının süresi yaklaşıyor`, detay: `${detayBase}${detayBase ? ' — ' : ''}${kalanGun === 0 ? 'Bugün dolacak!' : `${kalanGun} gün kaldı`}`, tarih: e.gecerlilikTarihi!, okundu: okunanlar.has(`evrak_surecek_${e.id}`), kalanGun, module: 'evraklar', recordId: e.id });
       } else if (d < today) {
-        result.push({
-          id: `evrak_dolmus_${e.id}`,
-          tip: 'evrak_dolmus',
-          mesaj: `${e.ad} evrakının süresi dolmuş`,
-          detay: `${detayBase}${detayBase ? ' — ' : ''}${d.toLocaleDateString('tr-TR')} tarihinde doldu`,
-          tarih: e.gecerlilikTarihi!,
-          okundu: okunanlar.has(`evrak_dolmus_${e.id}`),
-          kalanGun,
-          module: 'evraklar',
-          recordId: e.id,
-        });
+        result.push({ id: `evrak_dolmus_${e.id}`, tip: 'evrak_dolmus', mesaj: `${e.ad} evrakının süresi dolmuş`, detay: `${detayBase}${detayBase ? ' — ' : ''}${d.toLocaleDateString('tr-TR')} tarihinde doldu`, tarih: e.gecerlilikTarihi!, okundu: okunanlar.has(`evrak_dolmus_${e.id}`), kalanGun, module: 'evraklar', recordId: e.id });
       }
     });
 
-    // ── Ekipman kontrolleri ──
     store.ekipmanlar.forEach(ek => {
       if (ek.silinmis) return;
       const firma = store.firmalar.find(f => f.id === ek.firmaId);
-
-      // ⚠️ UYGUN DEĞİL: anında kritik bildirim
       if (ek.durum === 'Uygun Değil') {
-        result.push({
-          id: `ekipman_uygunsuz_${ek.id}`,
-          tip: 'ekipman_kontrol',
-          mesaj: `${ek.ad} — KRİTİK: Uygun Değil`,
-          detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman uygunsuz olarak işaretlendi`,
-          tarih: new Date().toISOString().split('T')[0],
-          okundu: okunanlar.has(`ekipman_uygunsuz_${ek.id}`),
-          kalanGun: -999,
-          module: 'ekipmanlar',
-          recordId: ek.id,
-        });
+        result.push({ id: `ekipman_uygunsuz_${ek.id}`, tip: 'ekipman_kontrol', mesaj: `${ek.ad} — KRİTİK: Uygun Değil`, detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman uygunsuz olarak işaretlendi`, tarih: new Date().toISOString().split('T')[0], okundu: okunanlar.has(`ekipman_uygunsuz_${ek.id}`), kalanGun: -999, module: 'ekipmanlar', recordId: ek.id });
         return;
       }
-
-      // ⚠️ BAKIMDA: bildirim üret
       if (ek.durum === 'Bakımda') {
-        result.push({
-          id: `ekipman_bakimda_${ek.id}`,
-          tip: 'ekipman_kontrol',
-          mesaj: `${ek.ad} bakımda`,
-          detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman bakım sürecinde`,
-          tarih: new Date().toISOString().split('T')[0],
-          okundu: okunanlar.has(`ekipman_bakimda_${ek.id}`),
-          kalanGun: -1,
-          module: 'ekipmanlar',
-          recordId: ek.id,
-        });
+        result.push({ id: `ekipman_bakimda_${ek.id}`, tip: 'ekipman_kontrol', mesaj: `${ek.ad} bakımda`, detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman bakım sürecinde`, tarih: new Date().toISOString().split('T')[0], okundu: okunanlar.has(`ekipman_bakimda_${ek.id}`), kalanGun: -1, module: 'ekipmanlar', recordId: ek.id });
         return;
       }
-
-      // Tarih bazlı kontrol — sonraki kontrol tarihi varsa
       const d = parseDate(ek.sonrakiKontrolTarihi);
       if (!d) return;
       const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi)!;
-
-      // Tarihi geçmiş ekipman — bildirim üret
       if (kalanGun < 0) {
-        result.push({
-          id: `ekipman_gecikti_${ek.id}`,
-          tip: 'ekipman_kontrol',
-          mesaj: `${ek.ad} kontrolü gecikti`,
-          detay: `${firma?.ad ? firma.ad + ' — ' : ''}${Math.abs(kalanGun)} gün gecikti`,
-          tarih: ek.sonrakiKontrolTarihi,
-          okundu: okunanlar.has(`ekipman_gecikti_${ek.id}`),
-          kalanGun,
-          module: 'ekipmanlar',
-          recordId: ek.id,
-        });
+        result.push({ id: `ekipman_gecikti_${ek.id}`, tip: 'ekipman_kontrol', mesaj: `${ek.ad} kontrolü gecikti`, detay: `${firma?.ad ? firma.ad + ' — ' : ''}${Math.abs(kalanGun)} gün gecikti`, tarih: ek.sonrakiKontrolTarihi, okundu: okunanlar.has(`ekipman_gecikti_${ek.id}`), kalanGun, module: 'ekipmanlar', recordId: ek.id });
         return;
       }
-
       if (kalanGun > 60) return;
-      result.push({
-        id: `ekipman_${ek.id}`,
-        tip: 'ekipman_kontrol',
-        mesaj: `${ek.ad} kontrolü yaklaşıyor`,
-        detay: `${firma?.ad ? firma.ad + ' — ' : ''}${kalanGun === 0 ? 'Bugün kontrol edilmeli!' : `${kalanGun} gün kaldı`}`,
-        tarih: ek.sonrakiKontrolTarihi,
-        okundu: okunanlar.has(`ekipman_${ek.id}`),
-        kalanGun,
-        module: 'ekipmanlar',
-        recordId: ek.id,
-      });
+      result.push({ id: `ekipman_${ek.id}`, tip: 'ekipman_kontrol', mesaj: `${ek.ad} kontrolü yaklaşıyor`, detay: `${firma?.ad ? firma.ad + ' — ' : ''}${kalanGun === 0 ? 'Bugün kontrol edilmeli!' : `${kalanGun} gün kaldı`}`, tarih: ek.sonrakiKontrolTarihi, okundu: okunanlar.has(`ekipman_${ek.id}`), kalanGun, module: 'ekipmanlar', recordId: ek.id });
     });
 
-    // ── Eğitimler ──
-    // Yeni modelde geçerlilik süresi yok — bildirim üretilmez.
-    // (Eğitim modülü artık sadece katılım takibi yapıyor)
-
-    // ── Sağlık muayeneleri ──
     store.muayeneler.forEach(m => {
       if (m.silinmis) return;
-      // sonrakiTarih öncelikli; yoksa muayeneTarihi kullan
       const tarihStr = m.sonrakiTarih || m.muayeneTarihi;
       const d = parseDate(tarihStr);
-      if (!d) return; // Geçerli tarih yoksa → uyarı üretme
+      if (!d) return;
       const kalanGun = getDaysRemaining(tarihStr)!;
       if (kalanGun < 0 || kalanGun > 60) return;
       const personel = store.personeller.find(p => p.id === m.personelId);
-      result.push({
-        id: `saglik_${m.id}`,
-        tip: 'saglik_surecek',
-        mesaj: `${personel?.adSoyad || 'Personel'} muayene tarihi yaklaşıyor`,
-        detay: `Periyodik Muayene — ${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`,
-        tarih: tarihStr!,
-        okundu: okunanlar.has(`saglik_${m.id}`),
-        kalanGun,
-        module: 'muayeneler',
-        recordId: m.id,
-      });
+      result.push({ id: `saglik_${m.id}`, tip: 'saglik_surecek', mesaj: `${personel?.adSoyad || 'Personel'} muayene tarihi yaklaşıyor`, detay: `Periyodik Muayene — ${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`, tarih: tarihStr!, okundu: okunanlar.has(`saglik_${m.id}`), kalanGun, module: 'muayeneler', recordId: m.id });
     });
 
     const sorted = result.sort((a, b) => a.kalanGun - b.kalanGun);
@@ -561,15 +404,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [bildirimler],
   );
 
-  // FIX: Cap localStorage bildirim IDs at 500 to prevent QuotaExceededError
-  // After 1 year of use, unlimited IDs would hit the 5MB localStorage limit
   const MAX_OKUNAN_IDS = 500;
   const persistOkunanlar = useCallback((ids: Set<string>) => {
     try {
-      // Keep only the most recent MAX_OKUNAN_IDS entries
       const arr = [...ids].slice(-MAX_OKUNAN_IDS);
       localStorage.setItem('isg_okunan_bildirimler', JSON.stringify(arr));
-    } catch { /* ignore QuotaExceededError */ }
+    } catch { /* ignore */ }
   }, []);
 
   const bildirimOku = useCallback((id: string) => {
@@ -605,14 +445,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       org, orgLoading, orgError: loadError,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,
-      // KVKK sadece firma admin'ine gösterilir
-      // OSGB org, osgb_role olan herkes veya admin olmayan rol → KVKK atla
-      kvkkAccepted: (
-        org?.orgType === 'osgb' ||
-        org?.osgbRole != null ||
-        (org?.role != null && org.role !== 'admin')
-      ) ? true : (org?.kvkkAccepted ?? false) || kvkkAcceptedLocal,
-      setKvkkAccepted,
       createOrg,
       joinOrg,
       regenerateInviteCode,

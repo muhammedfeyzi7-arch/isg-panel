@@ -5,9 +5,8 @@ import { useApp } from '../../store/AppContext';
 import Layout from '../../components/feature/Layout';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import OnboardingTour from '../../components/feature/OnboardingTour';
-import KvkkPopup from '../../components/feature/KvkkPopup';
 import ToastContainer from '../../components/base/ToastContainer';
-import GeziciUzmanBanner from '../../components/feature/GeziciUzmanBanner';
+
 import DashboardPage from '../dashboard/page';
 import FirmalarPage from '../companies/page';
 import PersonellerPage from '../personnel/page';
@@ -46,7 +45,7 @@ const PATH_TO_MODULE: Record<string, string> = {
 };
 
 function AppContent() {
-  const { activeModule, orgError, org, orgLoading, mustChangePassword, setActiveModule, kvkkAccepted, setKvkkAccepted, pageLoading } = useApp();
+  const { activeModule, orgError, org, mustChangePassword, setActiveModule, pageLoading } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   const [loadingDone, setLoadingDone] = useState(false);
@@ -54,7 +53,6 @@ function AppContent() {
   // pageLoading bitince loading screen'i kapat
   useEffect(() => {
     if (!pageLoading) {
-      // Kısa bir gecikme — animasyon tamamlansın
       const t = setTimeout(() => setLoadingDone(true), 300);
       return () => clearTimeout(t);
     }
@@ -76,19 +74,12 @@ function AppContent() {
     }
   }, [activeModule]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // İlk yükleme — loading screen göster (cache varsa çok kısa sürer)
   if (!loadingDone) {
     return <AppLoadingScreen onDone={() => setLoadingDone(true)} />;
   }
 
   if (mustChangePassword) {
     return <ForcePasswordChange />;
-  }
-
-  // KVKK: org yüklendi, admin rolü, ve kvkk_accepted=false ise göster
-  // orgLoading bitene kadar bekliyoruz — yükleme sırasında false gelebilir
-  if (org && !orgLoading && !kvkkAccepted) {
-    return <KvkkPopup onAccepted={setKvkkAccepted} organizationId={org.id} />;
   }
 
   if (orgError && !org) {
@@ -109,14 +100,9 @@ function AppContent() {
   }
 
   const isFirmaUser = org?.role === 'firma_user';
-
-  // firma_user yasak modüllere erişmeye çalışırsa dashboard'a yönlendir
   const FIRMA_USER_ALLOWED = new Set(['dashboard', 'personeller', 'evraklar', 'egitimler', 'uygunsuzluklar']);
 
-  const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
-
   const renderPage = () => {
-    // firma_user için modul kısıtlaması
     if (isFirmaUser && !FIRMA_USER_ALLOWED.has(activeModule)) {
       return <DashboardPage />;
     }
@@ -142,8 +128,7 @@ function AppContent() {
   };
 
   return (
-    <div style={isGeziciUzman ? { paddingTop: '36px' } : undefined}>
-      {isGeziciUzman && <GeziciUzmanBanner />}
+    <div>
       <Layout>
         <ToastContainer />
         <OnboardingTour />

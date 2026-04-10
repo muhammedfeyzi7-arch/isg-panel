@@ -58,7 +58,6 @@ export default function OsgbOnboardingPage() {
           email: user.email ?? '',
           is_active: true,
           must_change_password: false,
-          kvkk_accepted: true,
           osgb_role: 'osgb_admin',
         });
 

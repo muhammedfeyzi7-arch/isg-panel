@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/store/AuthContext';
 import { supabase } from '@/lib/supabase';
 
@@ -110,6 +111,8 @@ export default function OsgbHeader({
   // ── Quick Add dropdown ──
   const [quickOpen, setQuickOpen] = useState(false);
   const quickRef = useRef<HTMLDivElement>(null);
+  const quickBtnRef = useRef<HTMLButtonElement>(null);
+  const [quickRect, setQuickRect] = useState<DOMRect | null>(null);
 
   // ── Refresh ──
   const [refreshing, setRefreshing] = useState(false);
@@ -125,13 +128,29 @@ export default function OsgbHeader({
     setTimeout(() => setRefreshDone(false), 2000);
   };
 
+  // ── ESC tuşu ile quick modal kapat ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setQuickOpen(false);
+    };
+    if (quickOpen) document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [quickOpen]);
+
   // ── Click outside ──
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchFocus(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
       if (supportNotifRef.current && !supportNotifRef.current.contains(e.target as Node)) setSupportNotifOpen(false);
-      if (quickRef.current && !quickRef.current.contains(e.target as Node)) setQuickOpen(false);
+      // Quick dropdown is rendered via portal — close if click is outside the button
+      if (quickRef.current && !quickRef.current.contains(e.target as Node)) {
+        // Check if click is inside the portal dropdown (data-quick-dropdown attr)
+        const target = e.target as HTMLElement;
+        if (!target.closest('[data-quick-dropdown]')) {
+          setQuickOpen(false);
+        }
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -285,46 +304,150 @@ export default function OsgbHeader({
         {/* Hızlı Ekle */}
         <div className="relative flex-shrink-0" ref={quickRef}>
           <button
-            onClick={() => { setQuickOpen(v => !v); setProfileOpen(false); setSupportNotifOpen(false); }}
+            ref={quickBtnRef}
+            onClick={() => {
+              const rect = quickBtnRef.current?.getBoundingClientRect() ?? null;
+              setQuickRect(rect);
+              setQuickOpen(v => !v);
+              setProfileOpen(false);
+              setSupportNotifOpen(false);
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white cursor-pointer whitespace-nowrap flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontSize: '11px', borderRadius: '8px' }}
           >
             <i className="ri-add-line text-sm" />
             <span className="hidden sm:inline">Hızlı Ekle</span>
           </button>
+        </div>
 
-          {quickOpen && (
+        {/* Hızlı Ekle — Tam Ekran Modal (Portal) */}
+        {quickOpen && createPortal(
+          <div
+            data-quick-dropdown="true"
+            className="fixed inset-0 flex items-center justify-center p-4"
+            style={{ zIndex: 999999, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)' }}
+            onMouseDown={e => { if (e.target === e.currentTarget) setQuickOpen(false); }}
+          >
+            {/* ESC tuşu ile kapat */}
             <div
-              className="absolute right-0 top-11 z-50 w-44 overflow-hidden"
-              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '14px', boxShadow: isDark ? '0 20px 50px rgba(0,0,0,0.5)' : '0 16px 40px rgba(15,23,42,0.15)' }}
+              className="relative w-full max-w-lg rounded-2xl overflow-hidden"
+              style={{
+                background: isDark ? '#1e293b' : '#ffffff',
+                border: `1px solid ${dropdownBorder}`,
+                boxShadow: isDark ? '0 40px 100px rgba(0,0,0,0.7)' : '0 30px 80px rgba(15,23,42,0.18)',
+              }}
             >
-              <div className="py-1.5">
-                <button
-                  onClick={() => { onFirmaEkle?.(); setQuickOpen(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
-                  onMouseEnter={e => { e.currentTarget.style.background = dropdownHover; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                    <i className="ri-building-2-line text-xs" style={{ color: '#10B981' }} />
+              {/* Renkli üst bant */}
+              <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #10B981, #059669, #8B5CF6, #06B6D4, #F59E0B)' }} />
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <i className="ri-add-circle-line text-lg" style={{ color: '#10B981' }} />
                   </div>
-                  <span className="text-[12.5px] font-medium" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>Firma Ekle</span>
-                </button>
-                <button
-                  onClick={() => { onUzmanEkle?.(); setQuickOpen(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
-                  onMouseEnter={e => { e.currentTarget.style.background = dropdownHover; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(139,92,246,0.1)' }}>
-                    <i className="ri-user-add-line text-xs" style={{ color: '#8B5CF6' }} />
+                  <div>
+                    <h3 className="text-sm font-bold" style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}>Hızlı Ekle</h3>
+                    <p className="text-[11px] mt-0.5" style={{ color: '#64748B' }}>Hangi kaydı oluşturmak istiyorsunuz?</p>
                   </div>
-                  <span className="text-[12.5px] font-medium" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>Uzman Ekle</span>
+                </div>
+                <button
+                  onClick={() => setQuickOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                  style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)', color: '#64748B', border: `1px solid ${dropdownBorder}` }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)'; (e.currentTarget as HTMLElement).style.color = '#64748B'; }}
+                >
+                  <i className="ri-close-line text-sm" />
                 </button>
               </div>
+
+              <div className="px-6 py-5 space-y-5">
+                {/* Temel İşlemler */}
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#94A3B8' }}>— Temel İşlemler</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Firma Ekle */}
+                    <button
+                      onClick={() => { onFirmaEkle?.(); setQuickOpen(false); }}
+                      className="flex flex-col items-start gap-3 p-4 rounded-xl cursor-pointer transition-all text-left group"
+                      style={{ background: isDark ? 'rgba(16,185,129,0.06)' : '#f0fdf4', border: `1.5px solid rgba(16,185,129,0.2)` }}
+                      onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(16,185,129,0.12)' : '#dcfce7'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(16,185,129,0.06)' : '#f0fdf4'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.2)'; }}
+                    >
+                      <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        <i className="ri-building-2-line text-lg" style={{ color: '#10B981' }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>Firma Ekle</p>
+                        <p className="text-[10.5px] mt-0.5" style={{ color: '#64748B' }}>Yeni firma kaydı oluştur</p>
+                        <p className="text-[10px] font-semibold mt-2" style={{ color: '#10B981' }}>Modüle git →</p>
+                      </div>
+                    </button>
+
+                    {/* Uzman Ekle */}
+                    <button
+                      onClick={() => { onUzmanEkle?.(); setQuickOpen(false); }}
+                      className="flex flex-col items-start gap-3 p-4 rounded-xl cursor-pointer transition-all text-left group"
+                      style={{ background: isDark ? 'rgba(16,185,129,0.06)' : '#f0fdf4', border: `1.5px solid rgba(16,185,129,0.2)` }}
+                      onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(16,185,129,0.12)' : '#dcfce7'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(16,185,129,0.06)' : '#f0fdf4'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.2)'; }}
+                    >
+                      <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        <i className="ri-user-add-line text-lg" style={{ color: '#10B981' }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>Uzman Ekle</p>
+                        <p className="text-[10.5px] mt-0.5" style={{ color: '#64748B' }}>Çalışan kaydı ekle</p>
+                        <p className="text-[10px] font-semibold mt-2" style={{ color: '#10B981' }}>Modüle git →</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Diğer İşlemler */}
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#94A3B8' }}>— Diğer İşlemler</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { icon: 'ri-file-list-3-line', label: 'Ziyaret Ekle', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', tab: 'ziyaretler' as Tab },
+                      { icon: 'ri-bar-chart-grouped-line', label: 'Raporlar', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', tab: 'raporlar' as Tab },
+                      { icon: 'ri-map-pin-2-line', label: 'Ziyaretler', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', tab: 'ziyaretler' as Tab },
+                      { icon: 'ri-settings-3-line', label: 'Ayarlar', color: '#64748B', bg: 'rgba(100,116,139,0.1)', tab: 'ayarlar' as Tab },
+                    ].map(item => (
+                      <button
+                        key={item.label}
+                        onClick={() => { navToTab(item.tab); setQuickOpen(false); }}
+                        className="flex flex-col items-center justify-center gap-2 py-3 px-2 rounded-xl cursor-pointer transition-all"
+                        style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)', border: `1px solid ${dropdownBorder}` }}
+                        onMouseEnter={e => { e.currentTarget.style.background = item.bg; e.currentTarget.style.borderColor = item.color + '44'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)'; e.currentTarget.style.borderColor = dropdownBorder; }}
+                      >
+                        <div className="w-8 h-8 flex items-center justify-center rounded-lg" style={{ background: item.bg }}>
+                          <i className={`${item.icon} text-sm`} style={{ color: item.color }} />
+                        </div>
+                        <span className="text-[10px] font-semibold text-center leading-tight" style={{ color: isDark ? '#94A3B8' : '#475569' }}>{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-3 flex items-center justify-between" style={{ borderTop: `1px solid ${dropdownBorder}` }}>
+                <div className="flex items-center gap-2">
+                  <kbd className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)', color: '#64748B', border: `1px solid ${dropdownBorder}` }}>ESC</kbd>
+                  <span className="text-[10px]" style={{ color: '#64748B' }}>ile kapat</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <i className="ri-flashlight-line text-xs" style={{ color: '#10B981' }} />
+                  <span className="text-[10px] font-semibold" style={{ color: '#64748B' }}>6 modül mevcut</span>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+          </div>,
+          document.body
+        )}
 
         {/* Bildirimler */}
         <div className="relative flex-shrink-0 hidden sm:block" ref={supportNotifRef}>

@@ -10,22 +10,19 @@ export interface OrgInfo {
   role: string;
   isActive: boolean;
   mustChangePassword: boolean;
-  kvkkAccepted: boolean;
   displayName?: string;
   email?: string;
   orgType: 'firma' | 'osgb';
   osgbRole?: 'osgb_admin' | 'gezici_uzman' | null;
 }
 
-function getLegacyStorageKey(userId: string): string {
-  return `isg_data_${userId}`;
-}
+// ... existing code ...
 
 export function useOrganization(user: User | null) {
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const autoCreateDoneRef = useRef<string | null>(null); // used for deduplication
+  const autoCreateDoneRef = useRef<string | null>(null);
 
   const loadOrg = useCallback(async () => {
     if (!user) {
@@ -43,7 +40,6 @@ export function useOrganization(user: User | null) {
       setLoading(false);
     }, 15000);
 
-    // Helper: create org directly via Supabase client (fallback when edge function fails)
     const createOrgDirectly = async (): Promise<boolean> => {
       try {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -91,7 +87,6 @@ export function useOrganization(user: User | null) {
           role: 'admin',
           isActive: true,
           mustChangePassword: false,
-          kvkkAccepted: true,
           displayName: emailPrefix,
           email: user.email ?? undefined,
           orgType: 'firma',
@@ -104,7 +99,6 @@ export function useOrganization(user: User | null) {
       }
     };
 
-    // Helper: load/create via edge function (uses service role key — bypasses RLS, auto-creates org if needed)
     const loadViaEdgeFunction = async (): Promise<boolean> => {
       try {
         clearTimeout(timeoutId);
@@ -128,15 +122,12 @@ export function useOrganization(user: User | null) {
           role?: string;
           is_active?: boolean;
           must_change_password?: boolean;
-          kvkk_accepted?: boolean;
           display_name?: string;
           email?: string;
           created?: boolean;
           osgb_role?: string | null;
         };
         if (resData?.organization) {
-          const isOsgbUser = resData.osgb_role != null || resData.organization.org_type === 'osgb';
-          const isNonAdminRole = (resData.role ?? 'admin') !== 'admin';
           setOrg({
             id: resData.organization.id,
             name: resData.organization.name,
@@ -144,8 +135,6 @@ export function useOrganization(user: User | null) {
             role: resData.role ?? 'admin',
             isActive: resData.is_active !== false,
             mustChangePassword: resData.must_change_password === true,
-            // OSGB kullanıcıları ve admin olmayan roller KVKK'yı atlasın
-            kvkkAccepted: (isNonAdminRole || isOsgbUser) ? true : (resData.kvkk_accepted === true),
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
             orgType: (resData.organization.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
@@ -161,10 +150,9 @@ export function useOrganization(user: User | null) {
     };
 
     try {
-      // PRIMARY: Try direct Supabase query first (fast path)
       const { data, error } = await supabase
         .from('user_organizations')
-        .select('role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_id, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
+        .select('role, is_active, must_change_password, display_name, email, osgb_role, active_firm_id, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -174,7 +162,6 @@ export function useOrganization(user: User | null) {
       clearTimeout(timeoutId);
 
       if (error) {
-        // RLS error — fallback to edge function
         console.warn('[ISG] loadOrg RLS error, falling back to edge function:', error.message);
         const ok = await loadViaEdgeFunction();
         if (!ok) {
@@ -189,7 +176,6 @@ export function useOrganization(user: User | null) {
         const rawOrg = data.organizations;
         const o = (Array.isArray(rawOrg) ? rawOrg[0] : rawOrg) as { id: string; name: string; invite_code: string; org_type?: string };
 
-        // Gezici uzman için: active_firm_id varsa, o firmanın bilgilerini çek ve org.id olarak kullan
         if (data.osgb_role === 'gezici_uzman' && data.active_firm_id) {
           const { data: firmaOrg } = await supabase
             .from('organizations')
@@ -205,7 +191,6 @@ export function useOrganization(user: User | null) {
               role: 'member',
               isActive: data.is_active !== false,
               mustChangePassword: data.must_change_password === true,
-              kvkkAccepted: true,
               displayName: data.display_name ?? undefined,
               email: data.email ?? undefined,
               orgType: 'firma',
@@ -214,8 +199,6 @@ export function useOrganization(user: User | null) {
             setLoading(false);
             return;
           }
-          // active_firm_id var ama firma bulunamadı — uzman henüz firma atanmamış
-          // OSGB org ID'siyle devam et, gezici uzman sayfasına yönlendirilecek
           setOrg({
             id: o.id,
             name: o.name,
@@ -223,7 +206,6 @@ export function useOrganization(user: User | null) {
             role: data.role ?? 'member',
             isActive: data.is_active !== false,
             mustChangePassword: data.must_change_password === true,
-            kvkkAccepted: true,
             displayName: data.display_name ?? undefined,
             email: data.email ?? undefined,
             orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
@@ -233,7 +215,6 @@ export function useOrganization(user: User | null) {
           return;
         }
 
-        // Gezici uzman ama henüz firma atanmamış (active_firm_id yok)
         if (data.osgb_role === 'gezici_uzman' && !data.active_firm_id) {
           setOrg({
             id: o.id,
@@ -242,7 +223,6 @@ export function useOrganization(user: User | null) {
             role: data.role ?? 'member',
             isActive: data.is_active !== false,
             mustChangePassword: data.must_change_password === true,
-            kvkkAccepted: true,
             displayName: data.display_name ?? undefined,
             email: data.email ?? undefined,
             orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
@@ -252,13 +232,6 @@ export function useOrganization(user: User | null) {
           return;
         }
 
-        // KVKK: sadece firma admin'ine göster.
-        // OSGB org ise, osgb_role varsa, ya da role admin değilse → KVKK atla
-        const isOsgbOrg = o.org_type === 'osgb';
-        const hasOsgbRole = !!data.osgb_role;
-        const isNonAdmin = (data.role ?? 'admin') !== 'admin';
-        const shouldSkipKvkk = isOsgbOrg || hasOsgbRole || isNonAdmin;
-
         setOrg({
           id: o.id,
           name: o.name,
@@ -266,17 +239,14 @@ export function useOrganization(user: User | null) {
           role: data.role ?? 'admin',
           isActive: data.is_active !== false,
           mustChangePassword: data.must_change_password === true,
-          kvkkAccepted: shouldSkipKvkk ? true : data.kvkk_accepted === true,
           displayName: data.display_name ?? undefined,
           email: data.email ?? undefined,
           orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
           osgbRole: (data.osgb_role as 'osgb_admin' | 'gezici_uzman' | null) ?? null,
         });
       } else {
-        // No org found — try edge function first (auto-creates org + admin membership)
         const ok = await loadViaEdgeFunction();
         if (!ok) {
-          // Edge function failed — fallback: create org directly via Supabase client
           const fallbackOk = await createOrgDirectly();
           if (!fallbackOk) {
             setOrg(null);
@@ -309,7 +279,7 @@ export function useOrganization(user: User | null) {
 
   const migrateLegacyData = async (userId: string, organizationId: string) => {
     try {
-      const raw = localStorage.getItem(getLegacyStorageKey(userId));
+      const raw = localStorage.getItem(`isg_data_${userId}`);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<AppData>;
       if (!parsed || typeof parsed !== 'object') return;
@@ -320,15 +290,13 @@ export function useOrganization(user: User | null) {
         ekipmanlar: (parsed.ekipmanlar ?? []).map((e: Record<string, unknown>) => { const { dosyaVeri: _d, ...r } = e; return r; }),
         tutanaklar: (parsed.tutanaklar ?? []).map((t: Record<string, unknown>) => { const { dosyaVeri: _d, ...r } = t; return r; }),
       };
-      await supabase
-        .from('app_data')
-        .upsert({
-          organization_id: organizationId,
-          data: slim as object,
-          updated_at: new Date().toISOString(),
-        });
+      await supabase.from('app_data').upsert({
+        organization_id: organizationId,
+        data: slim as object,
+        updated_at: new Date().toISOString(),
+      });
     } catch {
-      // Migration failed silently
+      // silent
     }
   };
 
@@ -420,13 +388,17 @@ export function useOrganization(user: User | null) {
   };
 
   const clearMustChangePassword = async (): Promise<void> => {
-    if (!user || !org) return;
+    if (!user) return;
     try {
+      // user_id ile tüm aktif kayıtları güncelle —
+      // gezici uzman için org.id atanan firma ID'si olabilir, 
+      // user_organizations.organization_id ise OSGB org ID'si olduğundan
+      // organization_id filtresi kullanmıyoruz.
       await supabase
         .from('user_organizations')
         .update({ must_change_password: false })
         .eq('user_id', user.id)
-        .eq('organization_id', org.id);
+        .eq('is_active', true);
       setOrg(prev => prev ? { ...prev, mustChangePassword: false } : null);
     } catch {
       // silent

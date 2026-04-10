@@ -114,7 +114,7 @@ export default function FirmalarPage() {
     addFirma, updateFirma, deleteFirma, addToast, quickCreate, setQuickCreate,
     setFirmaLogo, org,
   } = useApp();
-  const { canCreate, canEdit, canDelete, isReadOnly } = usePermissions();
+  const { canCreate, canEdit, canDelete, isReadOnly, isGeziciUzman } = usePermissions();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [tehlikeFilter, setTehlikeFilter] = useState('');
@@ -280,6 +280,144 @@ export default function FirmalarPage() {
 
 
   if (pageLoading) return <FirmaListSkeleton rows={6} />;
+
+  // Gezici uzman: sadece atanan firmayı göster, ekleme/silme yok
+  if (isGeziciUzman) {
+    // firmalar listesi OSGB'nin app_data'sından geliyor, gezici uzman için boş olabilir
+    // Bu durumda org nesnesindeki bilgileri kullan (name, id)
+    const atananFirmaFromList = firmalar.find(f => !f.silinmis && f.id === org?.id);
+    // Org'dan gelen bilgilerle minimal firma objesi oluştur (liste boşsa fallback)
+    const atananFirma = atananFirmaFromList ?? (org?.id ? {
+      id: org.id,
+      ad: org.name,
+      durum: 'Aktif' as const,
+      tehlikeSinifi: '—' as never,
+      yetkiliKisi: '',
+      telefon: '',
+      email: '',
+      adres: '',
+      sozlesmeBas: '',
+      sozlesmeBit: '',
+      notlar: '',
+    } : null);
+    const firmaPersonelSayisi = personeller.filter(p => !p.silinmis && p.firmaId === org?.id).length;
+    const firmaEvrakSayisi = evraklar.filter(e => !e.silinmis && e.firmaId === org?.id).length;
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Firma Bilgilerim</h1>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Admin tarafından atanan firma bilgileri</p>
+        </div>
+
+        {/* Atanan firma bilgi kartı */}
+        {atananFirma ? (
+          <div className="rounded-2xl overflow-hidden isg-card">
+            <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10B981, #059669)' }} />
+            <div className="p-5">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="w-14 h-14 flex items-center justify-center rounded-2xl flex-shrink-0 text-lg font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                  {atananFirma.ad.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-extrabold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{atananFirma.ad}</h2>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+                      style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}>
+                      {atananFirma.durum ?? 'Aktif'}
+                    </span>
+                    {atananFirmaFromList?.tehlikeSinifi && (
+                      <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+                        {atananFirmaFromList.tehlikeSinifi}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full"
+                      style={{ background: 'rgba(100,116,139,0.1)', border: '1px solid rgba(100,116,139,0.2)' }}>
+                      <i className="ri-lock-line text-[9px]" style={{ color: '#64748B' }} />
+                      <span className="text-[11px] font-medium" style={{ color: '#64748B' }}>Admin tarafından atandı</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* İstatistik kartları */}
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="rounded-xl p-3.5" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                  <p className="text-2xl font-extrabold" style={{ color: '#10B981' }}>{firmaPersonelSayisi}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Toplam Personel</p>
+                </div>
+                <div className="rounded-xl p-3.5" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                  <p className="text-2xl font-extrabold" style={{ color: '#818CF8' }}>{firmaEvrakSayisi}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Toplam Evrak</p>
+                </div>
+              </div>
+
+              {/* Detay bilgiler */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {atananFirma.yetkiliKisi && (
+                  <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Yetkili Kişi</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{atananFirma.yetkiliKisi}</p>
+                  </div>
+                )}
+                {atananFirma.telefon && (
+                  <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Telefon</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{atananFirma.telefon}</p>
+                  </div>
+                )}
+                {atananFirma.email && (
+                  <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>E-posta</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{atananFirma.email}</p>
+                  </div>
+                )}
+                {atananFirma.adres && (
+                  <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Adres</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{atananFirma.adres}</p>
+                  </div>
+                )}
+                {atananFirma.sozlesmeBas && (
+                  <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Sözleşme Başlangıcı</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{new Date(atananFirma.sozlesmeBas).toLocaleDateString('tr-TR')}</p>
+                  </div>
+                )}
+                {atananFirma.sozlesmeBit && (
+                  <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Sözleşme Bitişi</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{new Date(atananFirma.sozlesmeBit).toLocaleDateString('tr-TR')}</p>
+                  </div>
+                )}
+              </div>
+
+              {atananFirma.notlar && (
+                <div className="mt-3 rounded-xl p-3.5" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: '#818CF8' }}>Notlar</p>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{atananFirma.notlar}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl p-12 flex flex-col items-center gap-4 isg-card">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+              <i className="ri-time-line text-2xl" style={{ color: '#F59E0B' }} />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Firma Ataması Bekleniyor</p>
+              <p className="text-xs mt-1.5 max-w-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                OSGB admininiz henüz size bir firma ataması yapmadı. Atama yapıldığında burada otomatik görünecek.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

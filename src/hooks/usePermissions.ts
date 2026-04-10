@@ -6,6 +6,7 @@ export interface Permissions {
   canDelete: boolean;
   isReadOnly: boolean;
   isDenetci: boolean;
+  isGeziciUzman: boolean;
   role: string;
   canAccessSettings: boolean;
   canAccessModule: (moduleId: string) => boolean;
@@ -37,6 +38,7 @@ const FIRMA_USER_ALLOWED_MODULES = new Set([
 export function usePermissions(): Permissions {
   const { org } = useApp();
   const role = (org?.role ?? 'member').toLowerCase();
+  const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
 
   const isAdmin     = role === 'admin';
   const isMember    = role === 'member';
@@ -52,11 +54,12 @@ export function usePermissions(): Permissions {
   };
 
   return {
-    canCreate: isAdmin || isMember || isFirmaUser,
-    canEdit:   isAdmin || isMember || isFirmaUser,
-    canDelete: isAdmin || isMember,
+    canCreate: (isAdmin || isMember || isFirmaUser) && !isGeziciUzman,
+    canEdit:   (isAdmin || isMember || isFirmaUser) && !isGeziciUzman,
+    canDelete: (isAdmin || isMember) && !isGeziciUzman,
     isReadOnly: isDenetci,
     isDenetci,
+    isGeziciUzman,
     role: org?.role ?? 'member',
     canAccessSettings: isAdmin,
     canAccessModule,
