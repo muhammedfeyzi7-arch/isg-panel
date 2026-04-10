@@ -7,6 +7,19 @@ interface KvkkPopupProps {
   organizationId?: string;
 }
 
+// KVKK'yı localStorage'da da saklayalım — her yenilemede gösterme
+function markKvkkAcceptedLocally(userId: string) {
+  try {
+    const key = `kvkk_accepted_${userId}`;
+    localStorage.setItem(key, '1');
+  } catch { /* ignore */ }
+}
+export function isKvkkAcceptedLocally(userId: string): boolean {
+  try {
+    return localStorage.getItem(`kvkk_accepted_${userId}`) === '1';
+  } catch { return false; }
+}
+
 export default function KvkkPopup({ onAccepted, organizationId }: KvkkPopupProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -51,20 +64,16 @@ export default function KvkkPopup({ onAccepted, organizationId }: KvkkPopupProps
 
       if (updateError) {
         console.error('[KVKK] DB update error:', updateError);
-        // RLS hatası olsa bile onAccepted'ı çağır — UI akışını bloke etme
-        // Arka planda tekrar dene
         if (organizationId) {
           await supabase.rpc('accept_kvkk', { p_user_id: user.id, p_org_id: organizationId }).catch(() => null);
         }
-        // Local'de kabul edilmiş say, tekrar sormayalım
-        onAccepted();
-        return;
       }
-      // Başarılı — local state'i güncelle
+      // Her durumda localStorage'a kaydet — sayfa yenilemede tekrar sorma
+      markKvkkAcceptedLocally(user.id);
       onAccepted();
     } catch (err) {
       console.error('[KVKK] Unexpected error:', err);
-      // Hata olsa bile bloke etme, kullanıma devam ettir
+      if (user) markKvkkAcceptedLocally(user.id);
       onAccepted();
     } finally {
       setLoading(false);

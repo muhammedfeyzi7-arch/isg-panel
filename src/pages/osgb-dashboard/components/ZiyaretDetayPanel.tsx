@@ -1,311 +1,281 @@
-import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MockZiyaret } from '@/mocks/ziyaretler';
+import { useState } from 'react';
 
-interface ZiyaretDetayPanelProps {
-  ziyaret: MockZiyaret;
-  isDark: boolean;
-  onClose: () => void;
-  onBitir: (id: string) => void;
+interface Ziyaret {
+  id: string;
+  uzman_ad: string | null;
+  uzman_email: string | null;
+  firma_ad: string | null;
+  giris_saati: string;
+  cikis_saati: string | null;
+  durum: 'aktif' | 'tamamlandi';
+  konum_lat: number | null;
+  konum_lng: number | null;
+  konum_adres: string | null;
+  qr_ile_giris: boolean;
+  notlar: string | null;
+  sure_dakika: number | null;
 }
 
-function calcDuration(giris: string, cikis: string | null): string {
-  const end = cikis ? new Date(cikis) : new Date();
-  const diff = Math.max(0, end.getTime() - new Date(giris).getTime());
-  const h = Math.floor(diff / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  if (h === 0) return `${m} dk`;
-  if (m === 0) return `${h} sa`;
-  return `${h} sa ${m} dk`;
+interface ZiyaretDetayPanelProps {
+  ziyaret: Ziyaret;
+  isDark: boolean;
+  onClose: () => void;
+  onBitir: (id: string) => Promise<void>;
+}
+
+function formatSure(dakika: number | null): string {
+  if (!dakika || dakika < 0) return '—';
+  const h = Math.floor(dakika / 60);
+  const m = dakika % 60;
+  if (h > 0) return `${h} saat ${m} dakika`;
+  return `${m} dakika`;
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('tr-TR', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function calcElapsed(giris: string): string {
+  const diff = Math.floor((Date.now() - new Date(giris).getTime()) / 60000);
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  if (h > 0) return `${h}s ${m}d`;
+  return `${m} dakika`;
 }
 
 export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir }: ZiyaretDetayPanelProps) {
-  const [bitirOnay, setBitirOnay] = useState(false);
-  const [bitirLoading, setBitirLoading] = useState(false);
+  const [confirmBitir, setConfirmBitir] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const isAktif = ziyaret.durum === 'aktif';
-  const duration = calcDuration(ziyaret.giris_saati, ziyaret.cikis_saati);
 
-  const fmtTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-  const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-
-  const handleBitir = async () => {
-    setBitirLoading(true);
-    await new Promise(r => setTimeout(r, 700));
-    onBitir(ziyaret.id);
-    setBitirLoading(false);
-    setBitirOnay(false);
+  const cardStyle: React.CSSProperties = {
+    background: 'var(--bg-item)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: '14px',
   };
 
-  const mapSrc = ziyaret.konum_lat && ziyaret.konum_lng
-    ? `https://www.google.com/maps/embed/v1/place?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&q=${ziyaret.konum_lat},${ziyaret.konum_lng}&zoom=15`
-    : null;
+  const handleBitir = async () => {
+    setLoading(true);
+    await onBitir(ziyaret.id);
+    setLoading(false);
+    setConfirmBitir(false);
+  };
 
-  const panelBg = isDark ? '#1a2335' : '#ffffff';
-  const borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.1)';
-  const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
-  const textMuted = isDark ? '#64748b' : '#64748b';
-  const textSecondary = isDark ? '#94a3b8' : '#475569';
-  const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)';
-  const rowBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)';
-  const overlayBg = isDark ? 'rgba(0,0,0,0.7)' : 'rgba(15,23,42,0.4)';
+  const mapUrl = ziyaret.konum_lat && ziyaret.konum_lng
+    ? `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU3qiE&q=${ziyaret.konum_lat},${ziyaret.konum_lng}&zoom=15`
+    : null;
 
   return createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center p-4 z-[9999]"
-      style={{ background: overlayBg, backdropFilter: 'blur(12px)' }}
+      className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)', zIndex: 99999 }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-lg rounded-2xl overflow-hidden animate-modal-in"
-        style={{ background: panelBg, border: `1px solid ${borderColor}`, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+        className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col"
+        style={{
+          background: 'var(--modal-bg)',
+          border: '1px solid var(--modal-border)',
+          maxHeight: '90vh',
+        }}
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-5 py-4 flex-shrink-0"
-          style={{ borderBottom: `1px solid ${dividerColor}` }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 flex items-center justify-center rounded-xl"
-              style={{
-                background: isAktif ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)',
-                border: `1px solid ${isAktif ? 'rgba(16,185,129,0.25)' : 'rgba(100,116,139,0.2)'}`,
-              }}
-            >
-              <i className="ri-map-pin-2-line text-sm" style={{ color: isAktif ? '#10B981' : '#64748b' }} />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold" style={{ color: textPrimary }}>Ziyaret Detayı</h2>
-              <p className="text-[10px] font-medium mt-0.5" style={{ color: textMuted }}>
-                {fmtDate(ziyaret.giris_saati)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Durum badge */}
-            <span
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold"
-              style={{
-                background: isAktif ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)',
-                border: `1px solid ${isAktif ? 'rgba(16,185,129,0.28)' : 'rgba(100,116,139,0.2)'}`,
-                color: isAktif ? '#10B981' : '#64748b',
-              }}
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{
-                  background: isAktif ? '#10B981' : '#64748b',
-                  animation: isAktif ? 'status-pulse 2s ease-in-out infinite' : 'none',
-                }}
-              />
-              {isAktif ? 'Aktif' : 'Tamamlandı'}
-            </span>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150"
-              style={{ color: textMuted, background: rowBg }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBg; }}
-            >
-              <i className="ri-close-line text-sm" />
-            </button>
-          </div>
+        {/* Handle bar (mobil) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
         </div>
 
-        {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-          {/* Uzman + Firma */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl p-3" style={{ background: rowBg, border: `1px solid ${dividerColor}` }}>
-              <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] mb-2" style={{ color: textMuted }}>Uzman</p>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl"
+              style={{ background: isAktif ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.12)' }}>
+              <i className={`ri-map-pin-2-line text-base`} style={{ color: isAktif ? '#22C55E' : '#94A3B8' }} />
+            </div>
+            <div>
               <div className="flex items-center gap-2">
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
-                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
-                >
-                  {ziyaret.uzman_ad.charAt(0)}
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Ziyaret Detayı</h3>
+                {isAktif ? (
+                  <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
+                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                    AKTİF
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(148,163,184,0.12)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.2)' }}>
+                    TAMAMLANDI
+                  </span>
+                )}
+              </div>
+              {ziyaret.qr_ile_giris && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md mt-1 inline-block"
+                  style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}>
+                  QR ile giriş
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
+            style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}>
+            <i className="ri-close-line text-sm" />
+          </button>
+        </div>
+
+        {/* İçerik */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+          {/* Uzman + Firma kartları */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-2xl" style={cardStyle}>
+              <p className="text-[9.5px] font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>Uzman</p>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                  style={{ background: isAktif ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                  {(ziyaret.uzman_ad ?? '?').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{ziyaret.uzman_ad}</p>
-                  <p className="text-[9px] truncate" style={{ color: textMuted }}>{ziyaret.uzman_email}</p>
+                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ziyaret.uzman_ad ?? '—'}</p>
+                  <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{ziyaret.uzman_email ?? ''}</p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl p-3" style={{ background: rowBg, border: `1px solid ${dividerColor}` }}>
-              <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] mb-2" style={{ color: textMuted }}>Firma</p>
+            <div className="p-3 rounded-2xl" style={cardStyle}>
+              <p className="text-[9.5px] font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>Firma</p>
               <div className="flex items-center gap-2">
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(16,185,129,0.1)' }}
-                >
-                  <i className="ri-building-3-line text-xs" style={{ color: '#059669' }} />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(16,185,129,0.1)' }}>
+                  <i className="ri-building-2-line text-sm" style={{ color: '#059669' }} />
                 </div>
-                <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{ziyaret.firma_ad}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ziyaret.firma_ad ?? '—'}</p>
               </div>
             </div>
           </div>
 
-          {/* Süre + Saat bilgileri */}
-          <div className="rounded-xl p-4" style={{ background: rowBg, border: `1px solid ${dividerColor}` }}>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em] mb-1.5" style={{ color: textMuted }}>Giriş</p>
-                <p className="text-[15px] font-extrabold" style={{ color: '#10B981' }}>{fmtTime(ziyaret.giris_saati)}</p>
-                <p className="text-[9px] mt-0.5" style={{ color: textMuted }}>
-                  {new Date(ziyaret.giris_saati).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+          {/* Zaman çizelgesi */}
+          <div className="p-4 rounded-2xl" style={cardStyle}>
+            <p className="text-[9.5px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--text-faint)' }}>Zaman</p>
+            <div className="flex items-center gap-3">
+              {/* Giriş */}
+              <div className="flex-1 text-center">
+                <div className="w-8 h-8 flex items-center justify-center rounded-full mx-auto mb-1.5"
+                  style={{ background: 'rgba(16,185,129,0.12)', border: '1.5px solid rgba(16,185,129,0.3)' }}>
+                  <i className="ri-login-circle-line text-xs" style={{ color: '#10B981' }} />
+                </div>
+                <p className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>Giriş</p>
+                <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {new Date(ziyaret.giris_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+                <p className="text-[9px]" style={{ color: 'var(--text-faint)' }}>
+                  {new Date(ziyaret.giris_saati).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
                 </p>
               </div>
-              <div className="flex flex-col items-center justify-center">
-                <div className="flex items-center gap-1 w-full">
-                  <div className="flex-1 h-px" style={{ background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.12)' }} />
-                  <div
-                    className="flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold"
-                    style={{ background: isAktif ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)', color: isAktif ? '#10B981' : '#64748b' }}
-                  >
-                    {duration}
+              {/* Süre ortası */}
+              <div className="flex-1 text-center">
+                <div className="flex items-center gap-1">
+                  <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
+                  <div className="px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0"
+                    style={{ background: isAktif ? 'rgba(34,197,94,0.1)' : 'rgba(6,182,212,0.1)', color: isAktif ? '#22C55E' : '#06B6D4' }}>
+                    {isAktif ? calcElapsed(ziyaret.giris_saati) : formatSure(ziyaret.sure_dakika)}
                   </div>
-                  <div className="flex-1 h-px" style={{ background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.12)' }} />
+                  <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
                 </div>
-                <p className="text-[9px] mt-1.5 font-medium" style={{ color: textMuted }}>toplam süre</p>
               </div>
-              <div className="text-center">
-                <p className="text-[9px] font-bold uppercase tracking-[0.1em] mb-1.5" style={{ color: textMuted }}>Çıkış</p>
+              {/* Çıkış */}
+              <div className="flex-1 text-center">
+                <div className="w-8 h-8 flex items-center justify-center rounded-full mx-auto mb-1.5"
+                  style={{
+                    background: ziyaret.cikis_saati ? 'rgba(148,163,184,0.12)' : 'rgba(245,158,11,0.08)',
+                    border: `1.5px solid ${ziyaret.cikis_saati ? 'rgba(148,163,184,0.3)' : 'rgba(245,158,11,0.2)'}`,
+                  }}>
+                  <i className={`ri-logout-circle-line text-xs`}
+                    style={{ color: ziyaret.cikis_saati ? '#94A3B8' : '#F59E0B' }} />
+                </div>
+                <p className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>Çıkış</p>
                 {ziyaret.cikis_saati ? (
                   <>
-                    <p className="text-[15px] font-extrabold" style={{ color: textPrimary }}>{fmtTime(ziyaret.cikis_saati)}</p>
-                    <p className="text-[9px] mt-0.5" style={{ color: textMuted }}>
-                      {new Date(ziyaret.cikis_saati).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                    <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                      {new Date(ziyaret.cikis_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    <p className="text-[9px]" style={{ color: 'var(--text-faint)' }}>
+                      {new Date(ziyaret.cikis_saati).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
                     </p>
                   </>
                 ) : (
-                  <>
-                    <p className="text-[13px] font-bold" style={{ color: '#64748b' }}>—</p>
-                    <p className="text-[9px] mt-0.5" style={{ color: '#10B981' }}>Devam ediyor</p>
-                  </>
+                  <p className="text-xs font-bold" style={{ color: '#F59E0B' }}>Devam ediyor</p>
                 )}
               </div>
             </div>
           </div>
 
-          {/* QR Badge */}
-          {ziyaret.qr_ile_giris && (
-            <div
-              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl"
-              style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}
-            >
-              <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)' }}>
-                <i className="ri-qr-code-line text-xs" style={{ color: '#10B981' }} />
-              </div>
-              <div>
-                <p className="text-xs font-semibold" style={{ color: '#10B981' }}>QR Kod ile Giriş</p>
-                <p className="text-[10px]" style={{ color: textMuted }}>Giriş QR tarama ile doğrulandı</p>
-              </div>
-              <i className="ri-check-double-line ml-auto text-sm" style={{ color: '#10B981' }} />
-            </div>
-          )}
-
           {/* Notlar */}
           {ziyaret.notlar && (
-            <div>
-              <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] mb-2" style={{ color: textMuted }}>Ziyaret Notları</p>
-              <div
-                className="rounded-xl px-4 py-3"
-                style={{ background: rowBg, border: `1px solid ${dividerColor}` }}
-              >
-                <p className="text-[12.5px] leading-relaxed" style={{ color: textSecondary }}>{ziyaret.notlar}</p>
+            <div className="p-4 rounded-2xl" style={cardStyle}>
+              <div className="flex items-center gap-2 mb-2">
+                <i className="ri-file-text-line text-xs" style={{ color: '#10B981' }} />
+                <p className="text-[9.5px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-faint)' }}>Notlar</p>
               </div>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{ziyaret.notlar}</p>
             </div>
           )}
 
           {/* Harita */}
-          {ziyaret.konum_lat && ziyaret.konum_lng ? (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-[9.5px] font-bold uppercase tracking-[0.1em]" style={{ color: textMuted }}>Konum</p>
-                <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.08)', color: '#10B981' }}>
-                  GPS Doğrulandı
-                </span>
+          {mapUrl && (
+            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+              <div className="flex items-center gap-2 p-3" style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-item)' }}>
+                <i className="ri-map-2-line text-xs" style={{ color: '#10B981' }} />
+                <p className="text-[9.5px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-faint)' }}>Konum</p>
+                {ziyaret.konum_adres && (
+                  <span className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>{ziyaret.konum_adres}</span>
+                )}
               </div>
-              <div className="rounded-xl overflow-hidden" style={{ height: '160px', border: `1px solid ${borderColor}` }}>
-                <iframe
-                  src={`https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d1000!2d${ziyaret.konum_lng}!3d${ziyaret.konum_lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1str!2str!4v1`}
-                  width="100%"
-                  height="160"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title="Konum Haritası"
-                />
-              </div>
-              <p className="text-[9px] mt-1.5" style={{ color: textMuted }}>
-                {ziyaret.konum_lat.toFixed(4)}, {ziyaret.konum_lng.toFixed(4)}
-              </p>
-            </div>
-          ) : (
-            <div
-              className="rounded-xl px-4 py-3 flex items-center gap-2.5"
-              style={{ background: rowBg, border: `1px solid ${dividerColor}` }}
-            >
-              <i className="ri-map-pin-line text-sm flex-shrink-0" style={{ color: textMuted }} />
-              <p className="text-xs" style={{ color: textMuted }}>Konum bilgisi mevcut değil</p>
+              <iframe
+                src={mapUrl}
+                width="100%"
+                height="220"
+                style={{ border: 0, display: 'block' }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Ziyaret Konumu"
+              />
             </div>
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — Bitir butonu */}
         {isAktif && (
-          <div
-            className="flex-shrink-0 px-5 py-4"
-            style={{ borderTop: `1px solid ${dividerColor}` }}
-          >
-            {!bitirOnay ? (
+          <div className="px-5 py-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+            {!confirmBitir ? (
               <button
-                onClick={() => setBitirOnay(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-all duration-150"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.06))',
-                  border: '1.5px solid rgba(239,68,68,0.3)',
-                  color: '#ef4444',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.18)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.06))'; }}
-              >
-                <i className="ri-stop-circle-line text-base" />
+                onClick={() => setConfirmBitir(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold cursor-pointer transition-all whitespace-nowrap"
+                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, #059669, #047857)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, #10B981, #059669)'; }}>
+                <i className="ri-checkbox-circle-line" />
                 Ziyareti Bitir
               </button>
             ) : (
-              <div className="space-y-3">
-                <div
-                  className="flex items-start gap-3 p-3 rounded-xl"
-                  style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}
-                >
-                  <i className="ri-alert-line text-base flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
-                  <p className="text-xs leading-relaxed" style={{ color: isDark ? '#fca5a5' : '#dc2626' }}>
-                    Ziyaret sonlandırılacak. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?
-                  </p>
-                </div>
+              <div className="space-y-2">
+                <p className="text-center text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  Ziyareti bitirmek istediğinize emin misiniz?
+                </p>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setBitirOnay(false)}
+                  <button onClick={() => setConfirmBitir(false)}
                     className="flex-1 py-2.5 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
-                    style={{ background: rowBg, border: `1px solid ${borderColor}`, color: textMuted }}
-                  >
-                    Vazgeç
+                    style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                    İptal
                   </button>
-                  <button
-                    onClick={handleBitir}
-                    disabled={bitirLoading}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer whitespace-nowrap"
-                    style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', opacity: bitirLoading ? 0.7 : 1 }}
-                  >
-                    {bitirLoading ? (
-                      <><i className="ri-loader-4-line animate-spin" />Sonlandırılıyor...</>
-                    ) : (
-                      <><i className="ri-stop-circle-line" />Evet, Bitir</>
-                    )}
+                  <button onClick={handleBitir} disabled={loading}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap text-white"
+                    style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: loading ? 0.7 : 1 }}>
+                    {loading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-check-line" />Evet, Bitir</>}
                   </button>
                 </div>
               </div>

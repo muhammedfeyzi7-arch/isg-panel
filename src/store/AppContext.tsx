@@ -1,6 +1,7 @@
 import {
   createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode,
 } from 'react';
+import { isKvkkAcceptedLocally } from '../components/feature/KvkkPopup';
 import type { User } from '@supabase/supabase-js';
 import { useStore, type StoreType } from './useStore';
 import { useAuth } from './AuthContext';
@@ -111,7 +112,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Auto-create org is now handled inside useOrganization.loadOrg() via the edge function.
   // No separate autoCreateOrg effect needed here.
 
-  const [kvkkAcceptedLocal, setKvkkAcceptedLocal] = useState(false);
+  // localStorage'da zaten kabul ettiyse true ile başlat
+  const [kvkkAcceptedLocal, setKvkkAcceptedLocal] = useState(() => {
+    try { return user ? isKvkkAcceptedLocally(user.id) : false; } catch { return false; }
+  });
 
   const org = useMemo<OrgInfo | null>(() => {
     if (!rawOrg) return null;
@@ -125,7 +129,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setKvkkAccepted = useCallback(() => {
     setKvkkAcceptedLocal(true);
-  }, []);
+    // user değiştiğinde de güncelle
+    if (user) {
+      try { localStorage.setItem(`kvkk_accepted_${user.id}`, '1'); } catch { /* ignore */ }
+    }
+  }, [user]);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -603,7 +611,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         org?.orgType === 'osgb' ||
         org?.osgbRole != null ||
         (org?.role != null && org.role !== 'admin')
-      ) ? true : (org?.kvkkAccepted ?? false),
+      ) ? true : (org?.kvkkAccepted ?? false) || kvkkAcceptedLocal,
       setKvkkAccepted,
       createOrg,
       joinOrg,

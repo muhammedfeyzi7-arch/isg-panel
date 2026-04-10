@@ -1,493 +1,449 @@
-import { useState, useMemo } from 'react';
-import { mockZiyaretler, mockUzmanlar, mockFirmalar, MockZiyaret } from '@/mocks/ziyaretler';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useApp } from '@/store/AppContext';
 import ZiyaretDetayPanel from './ZiyaretDetayPanel';
+
+interface Ziyaret {
+  id: string;
+  osgb_org_id: string;
+  firma_org_id: string;
+  firma_ad: string | null;
+  uzman_user_id: string;
+  uzman_ad: string | null;
+  uzman_email: string | null;
+  giris_saati: string;
+  cikis_saati: string | null;
+  durum: 'aktif' | 'tamamlandi';
+  konum_lat: number | null;
+  konum_lng: number | null;
+  konum_adres: string | null;
+  qr_ile_giris: boolean;
+  notlar: string | null;
+  sure_dakika: number | null;
+}
 
 interface ZiyaretlerTabProps {
   isDark: boolean;
 }
 
-type DateFilter = 'bugun' | 'bu_hafta' | 'ozel';
-
-function calcDuration(giris: string, cikis: string | null): string {
-  const end = cikis ? new Date(cikis) : new Date();
-  const diff = Math.max(0, end.getTime() - new Date(giris).getTime());
-  const h = Math.floor(diff / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  if (h === 0) return `${m} dk`;
-  if (m === 0) return `${h} sa`;
-  return `${h} sa ${m} dk`;
+function formatSure(dakika: number | null): string {
+  if (!dakika || dakika < 0) return '—';
+  const h = Math.floor(dakika / 60);
+  const m = dakika % 60;
+  if (h > 0) return `${h}s ${m}d`;
+  return `${m}d`;
 }
 
-function fmtTime(iso: string): string {
+function formatSaat(iso: string): string {
   return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
-
-function isToday(iso: string): boolean {
-  const d = new Date(iso);
-  const t = new Date();
-  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+function formatTarih(iso: string): string {
+  return new Date(iso).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function isThisWeek(iso: string): boolean {
-  const d = new Date(iso);
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay() + 1);
-  startOfWeek.setHours(0, 0, 0, 0);
-  return d >= startOfWeek;
-}
+type FilterTarih = 'bugun' | 'bu_hafta' | 'ozel';
 
 export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
-  const [dateFilter, setDateFilter] = useState<DateFilter>('bugun');
-  const [ozelDate, setOzelDate] = useState('');
-  const [uzmanFilter, setUzmanFilter] = useState('');
-  const [firmaFilter, setFirmaFilter] = useState('');
-  const [secilenZiyaret, setSecilenZiyaret] = useState<MockZiyaret | null>(null);
-  const [ziyaretler, setZiyaretler] = useState<MockZiyaret[]>(mockZiyaretler);
+  const { org, addToast } = useApp();
+  const [ziyaretler, setZiyaretler] = useState<Ziyaret[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [secilenZiyaret, setSecilenZiyaret] = useState<Ziyaret | null>(null);
 
-  const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
-  const textMuted = isDark ? '#64748b' : '#64748b';
-  const textSecondary = isDark ? '#94a3b8' : '#475569';
-  const cardBg = isDark ? '#1e2a3a' : '#ffffff';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
-  const rowBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)';
-  const rowHover = isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)';
-  const rowActive = isDark ? 'rgba(16,185,129,0.09)' : 'rgba(16,185,129,0.06)';
-  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)';
-  const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)';
-  const headBg = isDark ? 'rgba(0,0,0,0.2)' : 'rgba(15,23,42,0.04)';
-  const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)';
+  // Filtreler
+  const [filterTarih, setFilterTarih] = useState<FilterTarih>('bugun');
+  const [filterOzelBaslangic, setFilterOzelBaslangic] = useState('');
+  const [filterOzelBitis, setFilterOzelBitis] = useState('');
+  const [filterUzman, setFilterUzman] = useState('');
+  const [filterFirma, setFilterFirma] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  const filtered = useMemo(() => {
-    return ziyaretler.filter(z => {
-      if (dateFilter === 'bugun' && !isToday(z.giris_saati)) return false;
-      if (dateFilter === 'bu_hafta' && !isThisWeek(z.giris_saati)) return false;
-      if (dateFilter === 'ozel' && ozelDate) {
-        const d = new Date(z.giris_saati).toISOString().split('T')[0];
-        if (d !== ozelDate) return false;
+  // CSS vars
+  const cardStyle: React.CSSProperties = {
+    background: 'var(--bg-card-solid)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: '16px',
+  };
+  const textPrimary = 'var(--text-primary)';
+  const textMuted = 'var(--text-muted)';
+
+  const fetchZiyaretler = useCallback(async () => {
+    if (!org?.id) return;
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('osgb_ziyaretler')
+        .select('*')
+        .eq('osgb_org_id', org.id)
+        .order('giris_saati', { ascending: false });
+
+      // Tarih filtresi
+      const now = new Date();
+      if (filterTarih === 'bugun') {
+        const start = new Date(now); start.setHours(0, 0, 0, 0);
+        const end = new Date(now); end.setHours(23, 59, 59, 999);
+        query = query.gte('giris_saati', start.toISOString()).lte('giris_saati', end.toISOString());
+      } else if (filterTarih === 'bu_hafta') {
+        const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
+        const start = new Date(now); start.setDate(now.getDate() - dayOfWeek); start.setHours(0, 0, 0, 0);
+        const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23, 59, 59, 999);
+        query = query.gte('giris_saati', start.toISOString()).lte('giris_saati', end.toISOString());
+      } else if (filterTarih === 'ozel' && filterOzelBaslangic) {
+        const start = new Date(filterOzelBaslangic); start.setHours(0, 0, 0, 0);
+        query = query.gte('giris_saati', start.toISOString());
+        if (filterOzelBitis) {
+          const end = new Date(filterOzelBitis); end.setHours(23, 59, 59, 999);
+          query = query.lte('giris_saati', end.toISOString());
+        }
       }
-      if (uzmanFilter && z.uzman_id !== uzmanFilter) return false;
-      if (firmaFilter && z.firma_id !== firmaFilter) return false;
-      return true;
-    });
-  }, [ziyaretler, dateFilter, ozelDate, uzmanFilter, firmaFilter]);
 
-  const aktifler = filtered.filter(z => z.durum === 'aktif');
-  const tamamlananlar = filtered.filter(z => z.durum === 'tamamlandi');
-  const sorted = [...aktifler, ...tamamlananlar];
+      if (filterUzman) query = query.ilike('uzman_ad', `%${filterUzman}%`);
+      if (filterFirma) query = query.ilike('firma_ad', `%${filterFirma}%`);
 
-  // Stats
-  const bugunToplam = ziyaretler.filter(z => isToday(z.giris_saati)).length;
-  const aktifSahadaki = ziyaretler.filter(z => z.durum === 'aktif').length;
-  const toplamTum = ziyaretler.length;
-  const tamamlananSureleri = ziyaretler
-    .filter(z => z.durum === 'tamamlandi' && z.cikis_saati)
-    .map(z => new Date(z.cikis_saati!).getTime() - new Date(z.giris_saati).getTime());
-  const ortSure = tamamlananSureleri.length > 0
-    ? Math.round(tamamlananSureleri.reduce((a, b) => a + b, 0) / tamamlananSureleri.length / 60000)
-    : 0;
+      const { data, error } = await query.limit(200);
+      if (error) throw error;
 
-  const handleBitir = (id: string) => {
-    setZiyaretler(prev => prev.map(z =>
-      z.id === id ? { ...z, durum: 'tamamlandi' as const, cikis_saati: new Date().toISOString() } : z
-    ));
-    if (secilenZiyaret?.id === id) setSecilenZiyaret(null);
+      // Aktifler önce, sonra tarih sırası
+      const sorted = (data ?? []).sort((a, b) => {
+        if (a.durum === 'aktif' && b.durum !== 'aktif') return -1;
+        if (a.durum !== 'aktif' && b.durum === 'aktif') return 1;
+        return new Date(b.giris_saati).getTime() - new Date(a.giris_saati).getTime();
+      });
+      setZiyaretler(sorted as Ziyaret[]);
+    } catch (err) {
+      console.error('[Ziyaretler] fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [org?.id, filterTarih, filterOzelBaslangic, filterOzelBitis, filterUzman, filterFirma]);
+
+  useEffect(() => { fetchZiyaretler(); }, [fetchZiyaretler]);
+
+  const handleBitir = async (ziyaretId: string) => {
+    try {
+      const cikis = new Date().toISOString();
+      const { error } = await supabase
+        .from('osgb_ziyaretler')
+        .update({ durum: 'tamamlandi', cikis_saati: cikis, updated_at: cikis })
+        .eq('id', ziyaretId);
+      if (error) throw error;
+      addToast('Ziyaret tamamlandı!', 'success');
+      setSecilenZiyaret(null);
+      await fetchZiyaretler();
+    } catch (err) {
+      addToast(`Hata: ${String(err)}`, 'error');
+    }
   };
 
-  const dateFilterBtns: { id: DateFilter; label: string }[] = [
-    { id: 'bugun', label: 'Bugün' },
-    { id: 'bu_hafta', label: 'Bu Hafta' },
-    { id: 'ozel', label: 'Özel Tarih' },
-  ];
+  // KPI hesapları
+  const bugunZiyaret = ziyaretler.filter(z => {
+    const d = new Date(z.giris_saati);
+    const today = new Date();
+    return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+  }).length;
+  const aktifSahaUzman = [...new Set(ziyaretler.filter(z => z.durum === 'aktif').map(z => z.uzman_user_id))].length;
+  const toplamZiyaret = ziyaretler.length;
+  const tamamlananlar = ziyaretler.filter(z => z.sure_dakika && z.sure_dakika > 0);
+  const ortalamaSure = tamamlananlar.length > 0
+    ? Math.round(tamamlananlar.reduce((s, z) => s + (z.sure_dakika ?? 0), 0) / tamamlananlar.length)
+    : 0;
+
+  // Benzersiz uzman ve firma listesi (filtre dropdown için)
+  const uzmanListesi = [...new Set(ziyaretler.map(z => z.uzman_ad).filter(Boolean))];
+  const firmaListesi = [...new Set(ziyaretler.map(z => z.firma_ad).filter(Boolean))];
+
+  const aktifFilterSayisi = [filterUzman, filterFirma].filter(Boolean).length;
 
   return (
     <div className="space-y-4 page-enter">
+      {/* ── HEADER + FİLTRELER ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div>
+          <h2 className="text-base font-bold" style={{ color: textPrimary }}>Ziyaretler</h2>
+          <p className="text-xs mt-0.5" style={{ color: textMuted }}>Saha ziyaret takibi ve yönetimi</p>
+        </div>
 
-      {/* ── KPI Cards ── */}
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
+          {/* Tarih filtresi tab */}
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+            {([
+              { id: 'bugun', label: 'Bugün' },
+              { id: 'bu_hafta', label: 'Bu Hafta' },
+              { id: 'ozel', label: 'Özel' },
+            ] as { id: FilterTarih; label: string }[]).map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => setFilterTarih(opt.id)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                style={{
+                  background: filterTarih === opt.id ? 'rgba(16,185,129,0.12)' : 'transparent',
+                  color: filterTarih === opt.id ? '#10B981' : textMuted,
+                  border: filterTarih === opt.id ? '1px solid rgba(16,185,129,0.25)' : '1px solid transparent',
+                }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Özel tarih alanları */}
+          {filterTarih === 'ozel' && (
+            <div className="flex items-center gap-2">
+              <input type="date" value={filterOzelBaslangic} onChange={e => setFilterOzelBaslangic(e.target.value)}
+                className="text-xs px-3 py-2 rounded-xl outline-none"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary, colorScheme: isDark ? 'dark' : 'light' }} />
+              <span className="text-xs" style={{ color: textMuted }}>—</span>
+              <input type="date" value={filterOzelBitis} onChange={e => setFilterOzelBitis(e.target.value)}
+                className="text-xs px-3 py-2 rounded-xl outline-none"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary, colorScheme: isDark ? 'dark' : 'light' }} />
+            </div>
+          )}
+
+          {/* Filtre toggle */}
+          <div className="relative">
+            <button
+              onClick={() => setFilterOpen(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+              style={{
+                background: aktifFilterSayisi > 0 ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
+                border: `1px solid ${aktifFilterSayisi > 0 ? 'rgba(16,185,129,0.25)' : 'var(--border-subtle)'}`,
+                color: aktifFilterSayisi > 0 ? '#10B981' : textMuted,
+              }}>
+              <i className="ri-filter-3-line text-xs" />
+              Filtrele
+              {aktifFilterSayisi > 0 && (
+                <span className="w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold text-white"
+                  style={{ background: '#10B981' }}>
+                  {aktifFilterSayisi}
+                </span>
+              )}
+            </button>
+
+            {filterOpen && (
+              <div className="absolute right-0 top-10 z-50 w-64 p-4 rounded-2xl"
+                style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)', boxShadow: isDark ? '0 20px 50px rgba(0,0,0,0.5)' : '0 16px 40px rgba(15,23,42,0.12)' }}>
+                <p className="text-xs font-bold mb-3" style={{ color: textPrimary }}>Filtreler</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-1.5" style={{ color: textMuted }}>Uzman</label>
+                    <select value={filterUzman} onChange={e => setFilterUzman(e.target.value)}
+                      className="w-full text-xs px-3 py-2 rounded-xl cursor-pointer outline-none"
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary }}>
+                      <option value="">Tüm Uzmanlar</option>
+                      {uzmanListesi.map(u => <option key={u} value={u ?? ''}>{u}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold mb-1.5" style={{ color: textMuted }}>Firma</label>
+                    <select value={filterFirma} onChange={e => setFilterFirma(e.target.value)}
+                      className="w-full text-xs px-3 py-2 rounded-xl cursor-pointer outline-none"
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary }}>
+                      <option value="">Tüm Firmalar</option>
+                      {firmaListesi.map(f => <option key={f} value={f ?? ''}>{f}</option>)}
+                    </select>
+                  </div>
+                  {aktifFilterSayisi > 0 && (
+                    <button onClick={() => { setFilterUzman(''); setFilterFirma(''); setFilterOpen(false); }}
+                      className="w-full py-2 rounded-xl text-xs font-semibold cursor-pointer"
+                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}>
+                      <i className="ri-close-line mr-1" />Filtreleri Temizle
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Yenile */}
+          <button onClick={fetchZiyaretler}
+            className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all"
+            style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; (e.currentTarget as HTMLElement).style.color = '#10B981'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; }}>
+            <i className="ri-refresh-line text-sm" />
+          </button>
+        </div>
+      </div>
+
+      {/* ── KPI KARTLAR ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {
-            label: 'Bugünkü Ziyaret',
-            value: bugunToplam,
-            icon: 'ri-calendar-check-line',
-            color: '#10B981',
-            bg: 'rgba(16,185,129,0.1)',
-            border: 'rgba(16,185,129,0.18)',
-            trend: '+2 dün',
-          },
-          {
-            label: 'Aktif Sahadaki',
-            value: aktifSahadaki,
-            icon: 'ri-map-pin-user-line',
-            color: '#F59E0B',
-            bg: 'rgba(245,158,11,0.1)',
-            border: 'rgba(245,158,11,0.18)',
-            trend: 'Sahada',
-          },
-          {
-            label: 'Toplam Ziyaret',
-            value: toplamTum,
-            icon: 'ri-route-line',
-            color: '#06B6D4',
-            bg: 'rgba(6,182,212,0.1)',
-            border: 'rgba(6,182,212,0.18)',
-            trend: 'Tüm zamanlar',
-          },
-          {
-            label: 'Ort. Ziyaret Süresi',
-            value: `${ortSure} dk`,
-            icon: 'ri-time-line',
-            color: '#8B5CF6',
-            bg: 'rgba(139,92,246,0.1)',
-            border: 'rgba(139,92,246,0.18)',
-            trend: 'Tamamlanan',
-          },
-        ].map((s, i) => (
-          <div
-            key={s.label}
-            className="rounded-2xl p-4 stat-card stagger-item"
-            style={{
-              background: cardBg,
-              border: `1px solid ${cardBorder}`,
-              animationDelay: `${i * 0.06}s`,
-            }}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: s.bg, border: `1px solid ${s.border}` }}
-              >
-                <i className={`${s.icon} text-base`} style={{ color: s.color }} />
+          { label: 'Bugünkü Ziyaret', value: bugunZiyaret, icon: 'ri-calendar-check-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.15)', pulse: false },
+          { label: 'Aktif Sahadaki Uzman', value: aktifSahaUzman, icon: 'ri-map-pin-user-line', color: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.15)', pulse: aktifSahaUzman > 0 },
+          { label: 'Toplam Ziyaret', value: toplamZiyaret, icon: 'ri-bar-chart-2-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.15)', pulse: false },
+          { label: 'Ortalama Süre', value: formatSure(ortalamaSure), icon: 'ri-time-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.15)', pulse: false },
+        ].map((kpi, i) => (
+          <div key={kpi.label} className="rounded-2xl p-4" style={cardStyle}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: kpi.bg, border: `1px solid ${kpi.border}` }}>
+                <i className={`${kpi.icon} text-base`} style={{ color: kpi.color }} />
               </div>
-              {aktifSahadaki > 0 && s.label === 'Aktif Sahadaki' && (
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: '#10B981', boxShadow: '0 0 6px rgba(16,185,129,0.6)', animation: 'status-pulse 2s ease-in-out infinite' }}
-                />
+              {kpi.pulse && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                  <span className="text-[9px] font-bold" style={{ color: '#22C55E' }}>CANLI</span>
+                </div>
               )}
             </div>
-            <p
-              className="text-2xl font-extrabold mb-0.5"
-              style={{ color: textPrimary, letterSpacing: '-0.03em' }}
-            >
-              {s.value}
-            </p>
-            <p className="text-[11px] font-medium" style={{ color: textMuted }}>{s.label}</p>
-            <p className="text-[9.5px] font-semibold mt-1" style={{ color: s.color }}>{s.trend}</p>
+            <p className="text-2xl font-extrabold leading-none" style={{ color: textPrimary }}>{kpi.value}</p>
+            <p className="text-[11px] font-medium mt-1.5" style={{ color: textMuted }}>{kpi.label}</p>
           </div>
         ))}
       </div>
 
-      {/* ── Filtreler ── */}
-      <div
-        className="rounded-2xl px-4 py-3 flex flex-wrap items-center gap-3"
-        style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
-      >
-        {/* Date filter tabs */}
-        <div
-          className="flex items-center gap-0.5 p-1 rounded-xl"
-          style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${dividerColor}` }}
-        >
-          {dateFilterBtns.map(btn => (
-            <button
-              key={btn.id}
-              onClick={() => setDateFilter(btn.id)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap transition-all duration-150"
-              style={{
-                background: dateFilter === btn.id
-                  ? isDark ? '#1e3a2e' : '#ffffff'
-                  : 'transparent',
-                color: dateFilter === btn.id ? '#10B981' : textMuted,
-                border: dateFilter === btn.id ? '1px solid rgba(16,185,129,0.3)' : '1px solid transparent',
-              }}
-            >
-              {btn.label}
-            </button>
-          ))}
+      {/* ── ANA LİSTE ── */}
+      {loading ? (
+        <div className="rounded-2xl p-12 flex flex-col items-center gap-3" style={cardStyle}>
+          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#10B981' }} />
+          <p className="text-sm" style={{ color: textMuted }}>Ziyaretler yükleniyor...</p>
         </div>
-
-        {/* Özel tarih input */}
-        {dateFilter === 'ozel' && (
-          <input
-            type="date"
-            value={ozelDate}
-            onChange={e => setOzelDate(e.target.value)}
-            className="text-xs px-3 py-2 rounded-xl outline-none cursor-pointer"
-            style={{
-              background: inputBg,
-              border: `1px solid ${inputBorder}`,
-              color: textPrimary,
-            }}
-          />
-        )}
-
-        {/* Uzman filtre */}
-        <select
-          value={uzmanFilter}
-          onChange={e => setUzmanFilter(e.target.value)}
-          className="text-xs px-3 py-2 rounded-xl outline-none cursor-pointer"
-          style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: textPrimary }}
-        >
-          <option value="">Tüm Uzmanlar</option>
-          {mockUzmanlar.map(u => (
-            <option key={u.id} value={u.id}>{u.ad}</option>
-          ))}
-        </select>
-
-        {/* Firma filtre */}
-        <select
-          value={firmaFilter}
-          onChange={e => setFirmaFilter(e.target.value)}
-          className="text-xs px-3 py-2 rounded-xl outline-none cursor-pointer"
-          style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: textPrimary }}
-        >
-          <option value="">Tüm Firmalar</option>
-          {mockFirmalar.map(f => (
-            <option key={f.id} value={f.id}>{f.ad}</option>
-          ))}
-        </select>
-
-        {/* Reset */}
-        {(uzmanFilter || firmaFilter) && (
-          <button
-            onClick={() => { setUzmanFilter(''); setFirmaFilter(''); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all duration-150"
-            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}
-          >
-            <i className="ri-close-line text-xs" />
-            Temizle
-          </button>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs font-semibold" style={{ color: textMuted }}>
-            {sorted.length} ziyaret
-          </span>
-          {aktifler.length > 0 && (
-            <span
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
-              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981' }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981', animation: 'status-pulse 2s ease-in-out infinite' }} />
-              {aktifler.length} Aktif
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Tablo ── */}
-      {sorted.length === 0 ? (
-        <div
-          className="rounded-2xl flex flex-col items-center justify-center py-16 gap-4"
-          style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
-        >
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}
-          >
+      ) : ziyaretler.length === 0 ? (
+        <div className="rounded-2xl p-12 flex flex-col items-center gap-4" style={cardStyle}>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
             <i className="ri-map-pin-2-line text-2xl" style={{ color: '#10B981' }} />
           </div>
           <div className="text-center">
-            <p className="text-sm font-bold mb-1" style={{ color: textPrimary }}>Bu dönemde ziyaret bulunamadı</p>
-            <p className="text-xs" style={{ color: textMuted }}>Farklı bir tarih filtresi veya uzman/firma seçin</p>
+            <p className="text-sm font-semibold" style={{ color: textPrimary }}>
+              {filterTarih === 'bugun' ? 'Bugün henüz ziyaret yok' : 'Ziyaret bulunamadı'}
+            </p>
+            <p className="text-xs mt-1" style={{ color: textMuted }}>
+              {filterTarih === 'bugun'
+                ? 'Uzmanlar QR kod veya manuel giriş ile ziyaret başlatabilir.'
+                : 'Seçili dönemde veya filtre koşullarında ziyaret kaydı yok.'}
+            </p>
           </div>
+          {aktifFilterSayisi > 0 && (
+            <button onClick={() => { setFilterUzman(''); setFilterFirma(''); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer"
+              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}>
+              <i className="ri-close-line" />Filtreleri Temizle
+            </button>
+          )}
         </div>
       ) : (
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
-        >
-          {/* Table header */}
-          <div
-            className="overflow-x-auto"
-          >
-            <table className="w-full min-w-[720px]">
+        <div className="rounded-2xl overflow-hidden" style={cardStyle}>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px]">
               <thead>
-                <tr style={{ background: headBg, borderBottom: `1px solid ${dividerColor}` }}>
+                <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--table-head-bg)' }}>
                   {['Uzman', 'Firma', 'Giriş', 'Çıkış', 'Süre', 'Durum', 'Konum', ''].map(h => (
-                    <th
-                      key={h}
-                      className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
-                      style={{ color: textMuted }}
-                    >
-                      {h}
-                    </th>
+                    <th key={h} className="text-left px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: textMuted }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((z, i) => {
+                {ziyaretler.map((z, i) => {
                   const isAktif = z.durum === 'aktif';
-                  const duration = calcDuration(z.giris_saati, z.cikis_saati);
-
                   return (
                     <tr
                       key={z.id}
-                      className="cursor-pointer transition-all duration-150"
-                      style={{
-                        borderBottom: i < sorted.length - 1 ? `1px solid ${dividerColor}` : 'none',
-                        background: isAktif ? rowActive : rowBg,
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowHover; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isAktif ? rowActive : rowBg; }}
                       onClick={() => setSecilenZiyaret(z)}
+                      className="cursor-pointer transition-all"
+                      style={{
+                        borderBottom: i < ziyaretler.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                        background: isAktif ? (isDark ? 'rgba(16,185,129,0.04)' : 'rgba(16,185,129,0.025)') : 'transparent',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isAktif ? (isDark ? 'rgba(16,185,129,0.09)' : 'rgba(16,185,129,0.06)') : 'var(--bg-row-hover)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isAktif ? (isDark ? 'rgba(16,185,129,0.04)' : 'rgba(16,185,129,0.025)') : 'transparent'; }}
                     >
                       {/* Uzman */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
-                            style={{
-                              background: isAktif
-                                ? 'linear-gradient(135deg, #10B981, #059669)'
-                                : isDark ? 'linear-gradient(135deg, #334155, #475569)' : 'linear-gradient(135deg, #64748b, #475569)',
-                            }}
-                          >
-                            {z.uzman_ad.charAt(0)}
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+                            style={{ background: isAktif ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                            {(z.uzman_ad ?? z.uzman_email ?? '?').charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[12px] font-semibold truncate" style={{ color: textPrimary }}>{z.uzman_ad}</p>
-                            <p className="text-[9.5px] truncate" style={{ color: textMuted }}>{z.uzman_email}</p>
+                            <p className="text-xs font-semibold truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>{z.uzman_ad ?? '—'}</p>
+                            <p className="text-[10px] truncate max-w-[120px]" style={{ color: textMuted }}>{z.uzman_email ?? ''}</p>
                           </div>
                         </div>
                       </td>
-
                       {/* Firma */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div
-                            className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
-                            style={{ background: 'rgba(16,185,129,0.1)' }}
-                          >
-                            <i className="ri-building-3-line text-[10px]" style={{ color: '#059669' }} />
+                          <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.08)' }}>
+                            <i className="ri-building-2-line text-[10px]" style={{ color: '#059669' }} />
                           </div>
-                          <span className="text-[12px] font-medium whitespace-nowrap" style={{ color: textSecondary }}>{z.firma_ad}</span>
+                          <span className="text-xs font-medium truncate max-w-[110px]" style={{ color: 'var(--text-secondary)' }}>{z.firma_ad ?? '—'}</span>
                         </div>
                       </td>
-
                       {/* Giriş */}
                       <td className="px-4 py-3">
-                        <div>
-                          <p className="text-[12px] font-semibold tabular-nums" style={{ color: '#10B981' }}>{fmtTime(z.giris_saati)}</p>
-                          <p className="text-[9.5px]" style={{ color: textMuted }}>
-                            {new Date(z.giris_saati).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                          </p>
-                        </div>
+                        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{formatSaat(z.giris_saati)}</p>
+                        <p className="text-[10px]" style={{ color: textMuted }}>{formatTarih(z.giris_saati)}</p>
                       </td>
-
                       {/* Çıkış */}
                       <td className="px-4 py-3">
                         {z.cikis_saati ? (
-                          <div>
-                            <p className="text-[12px] font-semibold tabular-nums" style={{ color: textPrimary }}>{fmtTime(z.cikis_saati)}</p>
-                            <p className="text-[9.5px]" style={{ color: textMuted }}>
-                              {new Date(z.cikis_saati).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                            </p>
-                          </div>
+                          <>
+                            <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{formatSaat(z.cikis_saati)}</p>
+                            <p className="text-[10px]" style={{ color: textMuted }}>{formatTarih(z.cikis_saati)}</p>
+                          </>
                         ) : (
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                              style={{ background: '#10B981', animation: 'status-pulse 2s ease-in-out infinite' }}
-                            />
-                            <span className="text-[11px] font-semibold" style={{ color: '#10B981' }}>Devam</span>
-                          </div>
+                          <span className="text-xs" style={{ color: textMuted }}>—</span>
                         )}
                       </td>
-
                       {/* Süre */}
                       <td className="px-4 py-3">
-                        <span
-                          className="text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full"
                           style={{
-                            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)',
-                            color: isAktif ? '#10B981' : textSecondary,
-                            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'}`,
-                          }}
-                        >
-                          {duration}
+                            background: z.sure_dakika ? 'rgba(6,182,212,0.1)' : 'var(--bg-item)',
+                            color: z.sure_dakika ? '#06B6D4' : textMuted,
+                          }}>
+                          {z.sure_dakika ? formatSure(z.sure_dakika) : isAktif ? '...' : '—'}
                         </span>
                       </td>
-
                       {/* Durum */}
                       <td className="px-4 py-3">
-                        <span
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap w-fit"
-                          style={{
-                            background: isAktif ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
-                            border: `1px solid ${isAktif ? 'rgba(16,185,129,0.25)' : 'rgba(100,116,139,0.2)'}`,
-                            color: isAktif ? '#10B981' : '#64748b',
-                          }}
-                        >
-                          <span
-                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                            style={{
-                              background: isAktif ? '#10B981' : '#64748b',
-                              animation: isAktif ? 'status-pulse 2s ease-in-out infinite' : 'none',
-                            }}
-                          />
-                          {isAktif ? 'Aktif' : 'Tamamlandı'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {isAktif ? (
+                            <>
+                              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
+                                Aktif
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="w-2 h-2 rounded-full" style={{ background: '#94A3B8' }} />
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                style={{ background: 'rgba(148,163,184,0.1)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.2)' }}>
+                                Tamamlandı
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </td>
-
                       {/* Konum */}
                       <td className="px-4 py-3">
-                        {z.konum_lat ? (
-                          <div className="flex items-center gap-1.5">
-                            <div
-                              className="w-6 h-6 flex items-center justify-center rounded-lg"
-                              style={{ background: 'rgba(16,185,129,0.1)' }}
-                            >
-                              <i className="ri-map-pin-2-fill text-[10px]" style={{ color: '#10B981' }} />
-                            </div>
-                            <span className="text-[10px] font-medium" style={{ color: '#10B981' }}>GPS</span>
+                        {z.konum_lat && z.konum_lng ? (
+                          <div className="w-7 h-7 flex items-center justify-center rounded-lg"
+                            style={{ background: 'rgba(16,185,129,0.1)' }}
+                            title={z.konum_adres ?? 'Konum mevcut'}>
+                            <i className="ri-map-pin-2-line text-xs" style={{ color: '#10B981' }} />
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5">
-                            <div
-                              className="w-6 h-6 flex items-center justify-center rounded-lg"
-                              style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)' }}
-                            >
-                              <i className="ri-map-pin-line text-[10px]" style={{ color: textMuted }} />
-                            </div>
-                            <span className="text-[10px] font-medium" style={{ color: textMuted }}>—</span>
+                          <div className="w-7 h-7 flex items-center justify-center rounded-lg"
+                            style={{ background: 'var(--bg-item)' }}>
+                            <i className="ri-map-pin-line text-xs" style={{ color: textMuted }} />
                           </div>
                         )}
                       </td>
-
                       {/* Detay */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {z.qr_ile_giris && (
-                            <div
-                              title="QR ile Giriş"
-                              className="w-6 h-6 flex items-center justify-center rounded-lg"
-                              style={{ background: 'rgba(16,185,129,0.1)' }}
-                            >
-                              <i className="ri-qr-code-line text-[10px]" style={{ color: '#10B981' }} />
-                            </div>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                              style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
+                              QR
+                            </span>
                           )}
                           <button
-                            onClick={e => { e.stopPropagation(); setSecilenZiyaret(z); }}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10.5px] font-semibold cursor-pointer whitespace-nowrap transition-all duration-150"
-                            style={{
-                              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
-                              border: `1px solid ${dividerColor}`,
-                              color: textSecondary,
-                            }}
-                            onMouseEnter={e => {
-                              (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)';
-                              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.25)';
-                              (e.currentTarget as HTMLElement).style.color = '#10B981';
-                            }}
-                            onMouseLeave={e => {
-                              (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)';
-                              (e.currentTarget as HTMLElement).style.borderColor = dividerColor;
-                              (e.currentTarget as HTMLElement).style.color = textSecondary;
-                            }}
-                          >
-                            <i className="ri-eye-line text-[10px]" />
-                            Detay
+                            className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
+                            title="Detay">
+                            <i className="ri-arrow-right-s-line text-sm" style={{ color: '#059669' }} />
                           </button>
                         </div>
                       </td>
@@ -497,36 +453,10 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               </tbody>
             </table>
           </div>
-
-          {/* Footer summary */}
-          {sorted.length > 0 && (
-            <div
-              className="flex items-center justify-between px-4 py-3"
-              style={{ borderTop: `1px solid ${dividerColor}` }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full" style={{ background: '#10B981' }} />
-                  <span className="text-[10.5px] font-semibold" style={{ color: textMuted }}>
-                    {aktifler.length} aktif
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full" style={{ background: '#64748b' }} />
-                  <span className="text-[10.5px] font-semibold" style={{ color: textMuted }}>
-                    {tamamlananlar.length} tamamlandı
-                  </span>
-                </div>
-              </div>
-              <span className="text-[10.5px] font-semibold" style={{ color: textMuted }}>
-                Toplam {sorted.length} kayıt
-              </span>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Detay paneli */}
+      {/* Detay Panel */}
       {secilenZiyaret && (
         <ZiyaretDetayPanel
           ziyaret={secilenZiyaret}
