@@ -300,22 +300,44 @@ export async function downloadFromUrl(url: string, fileName: string): Promise<bo
 
 /**
  * URL'den base64'e çevir (Excel/Word embed için)
- * filePath ise önce signed URL üretir, sonra fetch eder
+ * filePath ise Supabase Storage download API kullanır (CORS sorunu olmaz)
+ * HTTP URL ise fetch ile çeker
  */
 export async function urlToBase64(urlOrPath: string): Promise<string | null> {
   if (!urlOrPath) return null;
   try {
-    // filePath ise signed URL üret
-    let fetchUrl = urlOrPath;
-    if (!urlOrPath.startsWith('data:') && !urlOrPath.startsWith('http://') && !urlOrPath.startsWith('https://')) {
-      const signed = await getSignedUrlFromPath(urlOrPath);
-      if (!signed) return null;
-      fetchUrl = signed;
-    }
     // base64 ise direkt döndür
-    if (fetchUrl.startsWith('data:')) return fetchUrl;
+    if (urlOrPath.startsWith('data:')) return urlOrPath;
 
-    const res = await fetch(fetchUrl, {
+    // filePath ise (http/https/data ile başlamıyorsa) → Supabase download API kullan
+    if (
+      !urlOrPath.startsWith('http://') &&
+      !urlOrPath.startsWith('https://') &&
+      !urlOrPath.startsWith('blob:')
+    ) {
+      // Supabase storage URL'inden path çıkar
+      const pathMatch = urlOrPath.match(/\/storage\/v1\/object\/(?:public|sign)\/[^/]+\/(.+?)(?:\?|$)/);
+      const cleanPath = pathMatch ? pathMatch[1] : urlOrPath;
+
+      const { data, error } = await supabase.storage
+        .from('uploads')
+        .download(cleanPath);
+
+      if (error || !data) {
+        console.error('[urlToBase64] Supabase download error:', error);
+        return null;
+      }
+
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(data);
+      });
+    }
+
+    // HTTP URL ise fetch ile çek
+    const res = await fetch(urlOrPath, {
       mode: 'cors',
       credentials: 'omit',
       cache: 'no-store',
@@ -328,7 +350,8 @@ export async function urlToBase64(urlOrPath: string): Promise<string | null> {
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
-  } catch {
+  } catch (err) {
+    console.error('[urlToBase64] error:', err);
     return null;
   }
 }

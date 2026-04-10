@@ -3,6 +3,10 @@ import { Navigate } from "react-router-dom";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import LoginPage from "../pages/login/page";
+import OsgbLoginPage from "../pages/osgb-login/page";
+import OsgbDashboardPage from "../pages/osgb-dashboard/page";
+import OsgbOnboardingPage from "../pages/osgb-onboarding/page";
+import OsgbUzmanPage from "../pages/osgb-uzman/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
@@ -36,6 +40,34 @@ const routes: RouteObject[] = [
   {
     path: "/login",
     element: <LoginPage />,
+  },
+  {
+    path: "/osgb-login",
+    element: <OsgbLoginPage />,
+  },
+  {
+    path: "/osgb-dashboard",
+    element: (
+      <ProtectedRoute>
+        <OsgbDashboardPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/osgb-onboarding",
+    element: (
+      <ProtectedRoute>
+        <OsgbOnboardingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/osgb-uzman",
+    element: (
+      <ProtectedRoute>
+        <OsgbUzmanPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/forgot-password",

@@ -13,6 +13,8 @@ export interface OrgInfo {
   kvkkAccepted: boolean;
   displayName?: string;
   email?: string;
+  orgType: 'firma' | 'osgb';
+  osgbRole?: 'osgb_admin' | 'gezici_uzman' | null;
 }
 
 function getLegacyStorageKey(userId: string): string {
@@ -92,6 +94,8 @@ export function useOrganization(user: User | null) {
           kvkkAccepted: true,
           displayName: emailPrefix,
           email: user.email ?? undefined,
+          orgType: 'firma',
+          osgbRole: null,
         });
         return true;
       } catch (e) {
@@ -120,7 +124,7 @@ export function useOrganization(user: User | null) {
           return false;
         }
         const resData = await res.json() as {
-          organization?: { id: string; name: string; invite_code: string };
+          organization?: { id: string; name: string; invite_code: string; org_type?: string };
           role?: string;
           is_active?: boolean;
           must_change_password?: boolean;
@@ -128,6 +132,7 @@ export function useOrganization(user: User | null) {
           display_name?: string;
           email?: string;
           created?: boolean;
+          osgb_role?: string | null;
         };
         if (resData?.organization) {
           setOrg({
@@ -137,10 +142,11 @@ export function useOrganization(user: User | null) {
             role: resData.role ?? 'admin',
             isActive: resData.is_active !== false,
             mustChangePassword: resData.must_change_password === true,
-            // KVKK sadece admin rolündeki kullanıcıya gösterilir
             kvkkAccepted: (resData.role ?? 'admin') !== 'admin' ? true : resData.kvkk_accepted !== false,
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
+            orgType: (resData.organization.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
+            osgbRole: (resData.osgb_role as 'osgb_admin' | 'gezici_uzman' | null) ?? null,
           });
           return true;
         }
@@ -155,7 +161,7 @@ export function useOrganization(user: User | null) {
       // PRIMARY: Try direct Supabase query first (fast path)
       const { data, error } = await supabase
         .from('user_organizations')
-        .select('role, is_active, must_change_password, display_name, email, kvkk_accepted, organizations(id, name, invite_code)')
+        .select('role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('joined_at', { ascending: true })
@@ -177,7 +183,8 @@ export function useOrganization(user: User | null) {
       }
 
       if (data && data.organizations) {
-        const o = data.organizations as { id: string; name: string; invite_code: string };
+        const rawOrg = data.organizations;
+        const o = (Array.isArray(rawOrg) ? rawOrg[0] : rawOrg) as { id: string; name: string; invite_code: string; org_type?: string };
         setOrg({
           id: o.id,
           name: o.name,
@@ -185,10 +192,11 @@ export function useOrganization(user: User | null) {
           role: data.role ?? 'admin',
           isActive: data.is_active !== false,
           mustChangePassword: data.must_change_password === true,
-          // KVKK sadece admin rolündeki kullanıcıya gösterilir — diğer roller için her zaman kabul edilmiş say
           kvkkAccepted: (data.role ?? 'admin') !== 'admin' ? true : data.kvkk_accepted === true,
           displayName: data.display_name ?? undefined,
           email: data.email ?? undefined,
+          orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
+          osgbRole: (data.osgb_role as 'osgb_admin' | 'gezici_uzman' | null) ?? null,
         });
       } else {
         // No org found — try edge function first (auto-creates org + admin membership)

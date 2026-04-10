@@ -10,7 +10,7 @@ import Modal from '../../components/base/Modal';
 import { generateTutanakNo } from '../../store/useStore';
 import TutanakDetailModal from './components/TutanakDetailModal';
 import { usePermissions } from '../../hooks/usePermissions';
-import { getSignedUrlFromPath } from '@/utils/fileUpload';
+import { getSignedUrlFromPath, urlToBase64 } from '@/utils/fileUpload';
 
 /* ── Durum renk konfig ──────────────────────────────────────── */
 const STS_CONFIG: Record<TutanakStatus, { color: string; bg: string; icon: string }> = {
@@ -836,20 +836,13 @@ export default function TutanaklarPage() {
     try {
       const firma = firmalar.find(f => f.id === t.firmaId);
       const fileVeri = await resolveFileVeri(t);
-      // Firma logosu artık firma.logoUrl'den gelir (Storage URL)
-      const firmaLogoUrl = firma?.logoUrl;
+      // Firma logosu — logoUrl filePath veya URL olabilir, urlToBase64 ikisini de handle eder
+      const firmaLogoRaw = firma?.logoUrl;
       let firmaLogoVeri: string | undefined;
-      if (firmaLogoUrl) {
+      if (firmaLogoRaw) {
         try {
-          const res = await fetch(firmaLogoUrl);
-          if (res.ok) {
-            const blob = await res.blob();
-            firmaLogoVeri = await new Promise<string>(resolve => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-          }
+          const base64 = await urlToBase64(firmaLogoRaw);
+          if (base64) firmaLogoVeri = base64;
         } catch { /* logo yüklenemedi */ }
       }
       await generateWordDoc(t, firma?.ad || '—', fileVeri, firmaLogoVeri);

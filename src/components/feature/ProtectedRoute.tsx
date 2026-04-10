@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/AuthContext';
 import { supabase } from '../../lib/supabase';
 
@@ -7,9 +7,15 @@ interface ProtectedRouteProps {
   children: ReactNode;
 }
 
+type OrgType = 'firma' | 'osgb';
+type OsgbRole = 'osgb_admin' | 'gezici_uzman' | null;
+
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { session, loading } = useAuth();
+  const location = useLocation();
   const [subStatus, setSubStatus] = useState<'checking' | 'ok' | 'expired'>('checking');
+  const [orgType, setOrgType] = useState<OrgType>('firma');
+  const [osgbRole, setOsgbRole] = useState<OsgbRole>(null);
 
   useEffect(() => {
     if (loading || !session) {
@@ -17,10 +23,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       return;
     }
     (async () => {
-      // Kullanıcının organizasyonunu bul
       const { data: uo } = await supabase
         .from('user_organizations')
-        .select('organization_id')
+        .select('organization_id, osgb_role')
         .eq('user_id', session.user.id)
         .eq('is_active', true)
         .limit(1)
@@ -30,13 +35,13 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
       const { data: org } = await supabase
         .from('organizations')
-        .select('is_active, subscription_end')
+        .select('is_active, subscription_end, org_type')
         .eq('id', uo.organization_id)
         .maybeSingle();
 
       if (!org) { setSubStatus('ok'); return; }
 
-      // Super admin kontrolü — super admin asla bloklanmaz
+      // Super admin kontrolü
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_super_admin')
@@ -49,6 +54,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         ? new Date(org.subscription_end) < new Date()
         : false;
 
+      setOrgType((org.org_type === 'osgb' ? 'osgb' : 'firma') as OrgType);
+      setOsgbRole((uo.osgb_role as OsgbRole) ?? null);
+
       if (!org.is_active || isExpired) {
         setSubStatus('expired');
       } else {
@@ -60,6 +68,23 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (loading || subStatus === 'checking') return null;
   if (!session) return <Navigate to="/login" replace />;
   if (subStatus === 'expired') return <Navigate to="/subscription-expired" replace />;
+
+  // OSGB kullanıcısı firma paneline girmeye çalışıyorsa → OSGB paneline yönlendir
+  const isOsgbPath = location.pathname.startsWith('/osgb');
+  if (orgType === 'osgb' && !isOsgbPath) {
+    if (osgbRole === 'gezici_uzman') {
+      return <Navigate to="/osgb-uzman" replace />;
+    }
+    return <Navigate to="/osgb-dashboard" replace />;
+  }
+
+  // OSGB onboarding: OSGB login'den gelip henüz org'u olmayan kullanıcı
+  // (org_type firma ama /osgb-dashboard'a gitmeye çalışıyor = yeni OSGB kullanıcısı)
+  const isOsgbDashboard = location.pathname === '/osgb-dashboard';
+  const isOsgbOnboarding = location.pathname === '/osgb-onboarding';
+  if (isOsgbDashboard && orgType === 'firma' && !isOsgbOnboarding) {
+    return <Navigate to="/osgb-onboarding" replace />;
+  }
 
   return <>{children}</>;
 }

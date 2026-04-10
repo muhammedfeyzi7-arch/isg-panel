@@ -32,6 +32,8 @@ export interface OrgInfo {
   kvkkAccepted: boolean;
   displayName?: string;
   email?: string;
+  orgType: 'firma' | 'osgb';
+  osgbRole?: 'osgb_admin' | 'gezici_uzman' | null;
 }
 
 // StoreType zaten restoreEgitim, permanentDeleteEgitim, restoreMuayene, permanentDeleteMuayene içeriyor

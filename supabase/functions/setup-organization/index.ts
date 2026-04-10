@@ -1,6 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// CORS — tüm origin'lere izin ver (preview URL'leri için)
 function getCorsHeaders(origin: string | null): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': origin ?? '*',
@@ -10,7 +9,6 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-// Kullanıcı için profiles kaydı oluştur (yoksa) — tour_completed: false ile
 async function ensureProfileRecord(
   supabase: ReturnType<typeof createClient>,
   userId: string,
@@ -65,10 +63,7 @@ Deno.serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-  // Service role client (bypasses RLS)
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  // Verify user token using Supabase auth (no JWT secret needed)
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
@@ -76,7 +71,6 @@ Deno.serve(async (req) => {
   const { data: { user: authUser }, error: authError } = await userClient.auth.getUser();
 
   if (authError || !authUser) {
-    console.error('[setup-org] Auth verification failed:', authError?.message);
     return new Response(JSON.stringify({ error: 'Invalid token', details: authError?.message }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -84,11 +78,11 @@ Deno.serve(async (req) => {
 
   const userId = authUser.id;
 
-  // Get full user info from admin API (latest metadata)
   let resolvedEmail = authUser.email ?? '';
   let resolvedDisplayName = '';
   let metaOrgId = '';
   let metaRole = '';
+  let metaOsgbRole = '';
 
   try {
     const { data: adminUserData } = await supabase.auth.admin.getUserById(userId);
@@ -98,17 +92,17 @@ Deno.serve(async (req) => {
       resolvedDisplayName = (meta.full_name as string) || (meta.name as string) || '';
       metaOrgId = (meta.organization_id as string) || '';
       metaRole = (meta.role as string) || '';
+      metaOsgbRole = (meta.osgb_role as string) || '';
     }
   } catch (e) {
     console.warn('[setup-org] Could not fetch full auth user:', e);
-    // Use data from token
     const meta = authUser.user_metadata ?? {};
     resolvedDisplayName = (meta.full_name as string) || (meta.name as string) || '';
     metaOrgId = (meta.organization_id as string) || '';
     metaRole = (meta.role as string) || '';
+    metaOsgbRole = (meta.osgb_role as string) || '';
   }
 
-  // Derive display name from email if still empty
   if (!resolvedDisplayName && resolvedEmail) {
     resolvedDisplayName = resolvedEmail
       .split('@')[0]
@@ -124,7 +118,7 @@ Deno.serve(async (req) => {
     // ── Check for existing active membership ──
     const { data: existingMembership } = await supabase
       .from('user_organizations')
-      .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, organizations(id, name, invite_code)')
+      .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, organizations(id, name, invite_code, org_type)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('joined_at', { ascending: true })
@@ -132,9 +126,8 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existingMembership?.organizations) {
-      const org = existingMembership.organizations as { id: string; name: string; invite_code: string };
+      const org = existingMembership.organizations as { id: string; name: string; invite_code: string; org_type?: string };
 
-      // Back-fill display_name / email if they were empty
       const needsUpdate =
         (!existingMembership.display_name && user.display_name) ||
         (!existingMembership.email && user.email);
@@ -160,22 +153,22 @@ Deno.serve(async (req) => {
         kvkk_accepted: existingMembership.kvkk_accepted === true,
         display_name: existingMembership.display_name || user.display_name,
         email: existingMembership.email || user.email,
+        osgb_role: existingMembership.osgb_role ?? null,
         created: false,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // ── No active org found — check metadata for pre-assigned org ──
     if (metaOrgId) {
-      console.log(`[setup-org] User ${userId} has metadata org_id=${metaOrgId}, role=${metaRole}`);
-
       const { data: targetOrg } = await supabase
         .from('organizations')
-        .select('id, name, invite_code')
+        .select('id, name, invite_code, org_type')
         .eq('id', metaOrgId)
         .maybeSingle();
 
       if (targetOrg) {
         const assignedRole = normalizeRole(metaRole || 'member');
+        const assignedOsgbRole = metaOsgbRole || null;
 
         const { data: inactiveMembership } = await supabase
           .from('user_organizations')
@@ -183,6 +176,8 @@ Deno.serve(async (req) => {
           .eq('user_id', user.id)
           .eq('organization_id', metaOrgId)
           .maybeSingle();
+
+        const osgbPayload = assignedOsgbRole ? { osgb_role: assignedOsgbRole } : {};
 
         if (inactiveMembership) {
           await supabase
@@ -192,6 +187,7 @@ Deno.serve(async (req) => {
               role: assignedRole,
               display_name: user.display_name,
               email: user.email,
+              ...osgbPayload,
             })
             .eq('user_id', user.id)
             .eq('organization_id', metaOrgId);
@@ -207,6 +203,7 @@ Deno.serve(async (req) => {
               is_active: true,
               must_change_password: true,
               kvkk_accepted: false,
+              ...osgbPayload,
             });
 
           if (memberError && memberError.code !== '23505') {
@@ -216,7 +213,6 @@ Deno.serve(async (req) => {
 
         await ensureProfileRecord(supabase, user.id, assignedRole);
 
-        // Clear metadata for security
         try {
           const { data: currentUser } = await supabase.auth.admin.getUserById(user.id);
           const currentMeta = currentUser?.user?.user_metadata ?? {};
@@ -225,6 +221,7 @@ Deno.serve(async (req) => {
               ...currentMeta,
               organization_id: null,
               role: null,
+              osgb_role: null,
             },
           });
         } catch (e) {
@@ -239,14 +236,13 @@ Deno.serve(async (req) => {
           kvkk_accepted: false,
           display_name: user.display_name,
           email: user.email,
+          osgb_role: assignedOsgbRole,
           created: false,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
     // ── No org found — create one automatically ──
-    console.log(`[setup-org] No org found for user ${userId} — creating new org automatically`);
-
     const orgName = user.display_name !== 'Kullanıcı'
       ? user.display_name
       : user.email
@@ -261,12 +257,11 @@ Deno.serve(async (req) => {
 
     const { data: newOrg, error: orgError } = await supabase
       .from('organizations')
-      .insert({ name: orgName, invite_code: inviteCode, created_by: user.id })
+      .insert({ name: orgName, invite_code: inviteCode, created_by: user.id, org_type: 'firma' })
       .select()
       .maybeSingle();
 
     if (orgError || !newOrg) {
-      console.error('[setup-org] Org creation failed:', orgError?.message);
       return new Response(JSON.stringify({ error: orgError?.message || 'Org creation failed' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -289,7 +284,7 @@ Deno.serve(async (req) => {
       if (memberError.code === '23505') {
         const { data: retryMembership } = await supabase
           .from('user_organizations')
-          .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, organizations(id, name, invite_code)')
+          .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, organizations(id, name, invite_code, org_type)')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .order('joined_at', { ascending: true })
@@ -297,7 +292,7 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (retryMembership?.organizations) {
-          const org = retryMembership.organizations as { id: string; name: string; invite_code: string };
+          const org = retryMembership.organizations as { id: string; name: string; invite_code: string; org_type?: string };
           await ensureProfileRecord(supabase, user.id);
           return new Response(JSON.stringify({
             organization: org,
@@ -307,12 +302,12 @@ Deno.serve(async (req) => {
             kvkk_accepted: retryMembership.kvkk_accepted === true,
             display_name: retryMembership.display_name || user.display_name,
             email: retryMembership.email || user.email,
+            osgb_role: retryMembership.osgb_role ?? null,
             created: false,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
 
-      console.error('[setup-org] Member insert failed:', memberError.message);
       return new Response(JSON.stringify({ error: memberError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -341,13 +336,14 @@ Deno.serve(async (req) => {
     }).catch(() => { /* silent */ });
 
     return new Response(JSON.stringify({
-      organization: newOrg,
+      organization: { ...newOrg, org_type: 'firma' },
       role: 'admin',
       is_active: true,
       must_change_password: false,
       kvkk_accepted: true,
       display_name: user.display_name,
       email: user.email,
+      osgb_role: null,
       created: true,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
