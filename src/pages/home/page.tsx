@@ -87,7 +87,7 @@ function AppContent() {
   // KVKK: org yüklendi, admin rolü, ve kvkk_accepted=false ise göster
   // orgLoading bitene kadar bekliyoruz — yükleme sırasında false gelebilir
   if (org && !orgLoading && !kvkkAccepted) {
-    return <KvkkPopup onAccepted={setKvkkAccepted} />;
+    return <KvkkPopup onAccepted={setKvkkAccepted} organizationId={org.id} />;
   }
 
   if (orgError && !org) {
