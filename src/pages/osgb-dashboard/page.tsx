@@ -720,50 +720,71 @@ export default function OsgbDashboardPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredUzmanlar.map(u => (
-                        <div key={u.user_id} className="rounded-2xl p-5 isg-card-hover" style={cardStyle}>
-                          <div className="flex items-start gap-3 mb-4">
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
-                              style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)', boxShadow: u.is_active ? '0 4px 12px rgba(16,185,129,0.35)' : 'none' }}>
-                              {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold truncate" style={{ color: textPrimary }}>{u.display_name}</p>
-                              <p className="text-xs truncate" style={{ color: textMuted }}>{u.email}</p>
-                            </div>
-                            <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1 animate-pulse"
-                              style={{ background: u.is_active ? '#10B981' : '#64748b' }} />
-                          </div>
-                          <div className="space-y-2 mb-4">
-                            <div className="flex items-center gap-2 text-xs rounded-lg px-3 py-2" style={{ background: rowBgBase }}>
-                              <i className="ri-building-2-line text-xs" style={{ color: '#059669' }} />
-                              <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{u.active_firm_name ?? 'Firma atanmadı'}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs rounded-lg px-3 py-2" style={{ background: rowBgBase }}>
-                              <i className="ri-user-star-line text-xs" style={{ color: '#8B5CF6' }} />
-                              <span style={{ color: 'var(--text-secondary)' }}>Gezici Uzman</span>
-                            </div>
-                          </div>
-                          <div className="pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                              style={{
-                                background: u.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
-                                color: u.is_active ? '#10B981' : '#64748b',
-                                border: `1px solid ${u.is_active ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)'}`,
-                              }}>
-                              {u.is_active ? '● Aktif' : '○ Pasif'}
-                            </span>
-                            <button
-                              onClick={() => setSecilenUzman(u)}
-                              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
-                              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669' }}
+                    <div className="rounded-2xl overflow-hidden" style={cardStyle}>
+                      <table className="w-full">
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--table-head-bg)' }}>
+                            {['Uzman', 'E-posta', 'Atanmış Firma', 'Durum', ''].map(h => (
+                              <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: textMuted }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredUzmanlar.map((u, i) => (
+                            <tr key={u.user_id}
+                              style={{ borderBottom: i < filteredUzmanlar.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-row-hover)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                             >
-                              <i className="ri-settings-3-line text-xs" />Düzenle
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                    style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                                    {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="text-xs font-semibold" style={{ color: textPrimary }}>{u.display_name ?? u.email}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{u.email}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  {u.active_firm_name ? (
+                                    <>
+                                      <div className="w-5 h-5 flex items-center justify-center rounded flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                                        <i className="ri-building-2-line text-[10px]" style={{ color: '#059669' }} />
+                                      </div>
+                                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{u.active_firm_name}</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs" style={{ color: textMuted }}>—</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
+                                  style={{
+                                    background: u.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
+                                    color: u.is_active ? '#10B981' : '#64748b',
+                                    border: `1px solid ${u.is_active ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)'}`,
+                                  }}>
+                                  {u.is_active ? '● Aktif' : '○ Pasif'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => setSecilenUzman(u)}
+                                  className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                                  style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#7C3AED' }}
+                                >
+                                  <i className="ri-eye-line text-xs" />Detay
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>
