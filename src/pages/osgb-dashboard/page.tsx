@@ -11,6 +11,7 @@ import OsgbSidebar from './components/OsgbSidebar';
 import OsgbHeader from './components/OsgbHeader';
 import OsgbSettings from './components/OsgbSettings';
 import ZiyaretlerTab from './components/ZiyaretlerTab';
+import OsgbLoadingScreen from './components/OsgbLoadingScreen';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -78,6 +79,7 @@ export default function OsgbDashboardPage() {
   const [uzmanlar, setUzmanlar] = useState<Uzman[]>([]);
   const [firmaDetaylar, setFirmaDetaylar] = useState<FirmaDetay[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [showIntro, setShowIntro] = useState(true);
 
   // Detay modalları
   const [secilenFirma, setSecilenFirma] = useState<{ id: string; name: string } | null>(null);
@@ -385,6 +387,10 @@ export default function OsgbDashboardPage() {
   const textPrimary = 'var(--text-primary)';
   const textMuted = 'var(--text-muted)';
 
+  if (showIntro) {
+    return <OsgbLoadingScreen onDone={() => setShowIntro(false)} />;
+  }
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-app)' }}>
 
@@ -430,12 +436,7 @@ export default function OsgbDashboardPage() {
         className={`transition-all duration-300 pt-[46px] min-h-screen ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
       >
         <div className="px-2 sm:px-3 md:px-5 py-3 max-w-[1680px]">
-          {dataLoading ? (
-            <div className="flex items-center justify-center py-20 gap-3" style={{ color: '#94a3b8' }}>
-              <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#10B981' }} />
-              <span className="text-sm">Veriler yükleniyor...</span>
-            </div>
-          ) : (
+          {!dataLoading && (
             <>
               {/* ── DASHBOARD ── */}
               {activeTab === 'dashboard' && (
