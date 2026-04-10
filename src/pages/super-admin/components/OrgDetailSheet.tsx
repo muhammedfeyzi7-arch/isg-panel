@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { OrgAdmin } from '../hooks/useOrganizationAdmin';
 import OrgMembersTab from './OrgMembersTab';
+
+const SUPABASE_BASE_URL = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string).replace(/\/rest\/v1\/?$/, '');
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
 
 interface Props {
   org: OrgAdmin | null;
@@ -28,6 +31,7 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
   const [tab, setTab] = useState<'info' | 'members'>('info');
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
+  const [kicking, setKicking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
@@ -39,6 +43,29 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); }
   }, [toast]);
+
+  const handleForceKick = useCallback(async () => {
+    if (!org) return;
+    setKicking(true);
+    try {
+      const token = sessionStorage.getItem('sa_access_token') ?? '';
+      const res = await fetch(`${SUPABASE_BASE_URL}/functions/v1/super-admin-force-signout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ org_id: org.id }),
+      });
+      if (!res.ok) throw new Error('Kick başarısız');
+      setToast({ msg: 'Tüm kullanıcılar sistemden çıkarıldı.', type: 'ok' });
+    } catch {
+      setToast({ msg: 'Kullanıcıları çıkarma başarısız.', type: 'err' });
+    } finally {
+      setKicking(false);
+    }
+  }, [org]);
 
   const handleToggleActive = async () => {
     if (!org) return;
@@ -173,8 +200,8 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
               </div>
 
               {/* Aktif/Pasif */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <p className="text-slate-600 text-xs font-medium mb-3">Organizasyon Durumu</p>
+              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
+                <p className="text-slate-600 text-xs font-medium mb-1">Organizasyon Durumu</p>
                 <button
                   onClick={handleToggleActive}
                   disabled={saving}
@@ -186,7 +213,18 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
                 >
                   {saving
                     ? <><i className="ri-loader-4-line animate-spin text-sm"></i> İşleniyor...</>
-                    : org.is_active ? 'Pasife Al' : 'Aktif Et'
+                    : org.is_active ? <><i className="ri-forbid-line text-sm"></i> Pasife Al</> : <><i className="ri-check-line text-sm"></i> Aktif Et</>
+                  }
+                </button>
+                {/* Zorla Çıkart — mevcut session'ları anında öldür */}
+                <button
+                  onClick={handleForceKick}
+                  disabled={kicking}
+                  className="w-full py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 border bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100"
+                >
+                  {kicking
+                    ? <><i className="ri-loader-4-line animate-spin text-sm"></i> Çıkarılıyor...</>
+                    : <><i className="ri-logout-box-r-line text-sm"></i> Tüm Kullanıcıları Zorla Çıkart</>
                   }
                 </button>
               </div>

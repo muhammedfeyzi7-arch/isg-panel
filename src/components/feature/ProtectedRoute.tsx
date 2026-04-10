@@ -49,9 +49,18 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       if (!org) return 'inactive';
       if (!org.is_active) return 'inactive';
 
-      const isExpired = org.subscription_end
-        ? new Date(org.subscription_end) < new Date()
-        : false;
+      // Tarih karşılaştırması: subscription_end "YYYY-MM-DD" formatında geliyor
+      // Türkiye saatiyle bugünün tarihini al ve karşılaştır
+      let isExpired = false;
+      if (org.subscription_end) {
+        const today = new Date();
+        // Bugünün tarihini YYYY-MM-DD formatında al (local time)
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        // subscription_end'i de YYYY-MM-DD olarak al (ilk 10 karakter)
+        const endStr = org.subscription_end.substring(0, 10);
+        // Bitiş tarihi bugünden önce ise expired
+        isExpired = endStr < todayStr;
+      }
 
       if (isExpired) return 'expired';
 
@@ -133,7 +142,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     };
   }, [session, loading, checkOrgStatus, setupRealtimeListener]);
 
-  // Her route değişiminde de kontrol et (arka planda, kullanıcıyı bloklamadan)
+  // Her route değişiminde de kontrol et
   useEffect(() => {
     if (!session || loading || status === 'checking') return;
 
@@ -147,6 +156,21 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+  // Her 20 saniyede bir arka planda kontrol et — realtime çalışmasa bile yakalar
+  useEffect(() => {
+    if (!session || loading) return;
+
+    const interval = setInterval(async () => {
+      const result = await checkOrgStatus(session.user.id);
+      if (result === 'inactive' || result === 'expired') {
+        setStatus(result);
+        logout();
+      }
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [session, loading, checkOrgStatus, logout]);
 
   if (loading || status === 'checking') return null;
   if (!session) return <Navigate to="/login" replace />;

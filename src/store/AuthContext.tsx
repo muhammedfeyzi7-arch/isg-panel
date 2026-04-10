@@ -64,6 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Uygulama açılınca süresi dolan org'ları otomatik pasife al (günde 1 kez)
+    triggerAutoExpire();
+
     // Load existing session on mount
     supabase.auth.getSession().then(({ data: { session: s }, error }) => {
       if (error) {
@@ -93,7 +96,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [clearAuthStorage, handleAuthError]);
+  }, [clearAuthStorage, handleAuthError, triggerAutoExpire]);
+
+  // Süresi dolan organizasyonları otomatik pasife al + kullanıcıları kick et
+  // Günde bir kez çalışır (localStorage'da son çalışma zamanı tutulur)
+  const triggerAutoExpire = useCallback(async () => {
+    const LAST_RUN_KEY = 'isg_auto_expire_last_run';
+    const lastRun = localStorage.getItem(LAST_RUN_KEY);
+    const today = new Date().toISOString().substring(0, 10); // YYYY-MM-DD
+    if (lastRun === today) return; // Bugün zaten çalıştı
+
+    try {
+      const supabaseBase = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string).replace(/\/rest\/v1\/?$/, '');
+      await fetch(`${supabaseBase}/functions/v1/auto-expire-organizations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      localStorage.setItem(LAST_RUN_KEY, today);
+    } catch {
+      // Sessizce devam et — kritik değil
+    }
+  }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
     if (!isSupabaseConfigured) {
@@ -149,11 +172,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { error: 'ABONELİĞİNİZ SONLANMIŞTIR. Lütfen hizmet sağlayıcınızla iletişime geçin.' };
           }
 
-          // 3. Abonelik süresi dolmuş mu?
-          if (org.subscription_end && new Date(org.subscription_end) < new Date()) {
-            await supabase.auth.signOut({ scope: 'local' });
-            clearAuthStorage();
-            return { error: 'ABONELİĞİNİZ SONLANMIŞTIR. Lütfen hizmet sağlayıcınızla iletişime geçin.' };
+          // 3. Abonelik süresi dolmuş mu? (string karşılaştırma — UTC sorunu yok)
+          if (org.subscription_end) {
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const endStr = String(org.subscription_end).substring(0, 10);
+            if (endStr < todayStr) {
+              await supabase.auth.signOut({ scope: 'local' });
+              clearAuthStorage();
+              return { error: 'ABONELİĞİNİZ SONLANMIŞTIR. Lütfen hizmet sağlayıcınızla iletişime geçin.' };
+            }
           }
         }
       }
