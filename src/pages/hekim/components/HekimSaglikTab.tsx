@@ -131,7 +131,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
             { label: 'Kısıtlı', value: kisitli, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', icon: 'ri-alert-line' },
             { label: 'Yaklaşan (30g)', value: yaklasiyor, color: '#EF4444', bg: 'rgba(239,68,68,0.08)', icon: 'ri-calendar-event-line' },
           ].map(kpi => (
-            <div key={kpi.label} className="rounded-xl px-4 py-3 flex items-center gap-3"
+            <div key={kpi.label} className="stat-card-interactive rounded-xl px-4 py-3 flex items-center gap-3"
               style={{ background: kpi.bg, border: `1px solid ${kpi.color}22` }}>
               <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${kpi.color}18` }}>
                 <i className={`${kpi.icon} text-sm`} style={{ color: kpi.color }} />
@@ -210,9 +210,9 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
             ))}
           </div>
 
-          {/* Satırlar */}
-          <div>
-            {filtered.map((m, idx) => {
+          {/* Satırlar — premium kart */}
+          <div className="space-y-1.5 p-2 min-w-[700px]">
+            {filtered.map((m) => {
               const sonucStyle = getSonucStyle(m.sonuc);
               const daysUntil = getDaysUntil(m.sonrakiTarih);
               const isYaklasiyor = daysUntil !== null && daysUntil >= 0 && daysUntil <= 30;
@@ -220,12 +220,30 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
               const isExpanded = expandedId === m.id;
 
               return (
-                <div key={m.id} style={{ borderBottom: idx < filtered.length - 1 ? `1px solid ${borderColor}` : 'none' }}>
+                <div key={m.id} className="rounded-xl overflow-hidden transition-all duration-200"
+                  style={{
+                    border: isExpanded ? 'rgba(16,185,129,0.3) 1px solid' : `1px solid ${borderColor}`,
+                    background: isExpanded
+                      ? (isDark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.04)')
+                      : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)'),
+                  }}>
                   <div
-                    className="grid grid-cols-[2fr_1.2fr_1.2fr_1.2fr_1fr_80px] items-center cursor-pointer transition-all"
-                    style={{ background: isExpanded ? (isDark ? 'rgba(16,185,129,0.05)' : 'rgba(16,185,129,0.03)') : 'transparent' }}
-                    onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = rowHoverBg; }}
-                    onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    className="grid grid-cols-[2fr_1.2fr_1.2fr_1.2fr_1fr_80px] items-center cursor-pointer transition-all duration-200"
+                    style={{ background: 'transparent' }}
+                    onMouseEnter={e => {
+                      if (!isExpanded) {
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.background = isDark ? 'rgba(16,185,129,0.05)' : 'rgba(16,185,129,0.04)';
+                        (el.closest('.rounded-xl') as HTMLElement | null)?.style.setProperty('border-color', 'rgba(16,185,129,0.25)');
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!isExpanded) {
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.background = 'transparent';
+                        (el.closest('.rounded-xl') as HTMLElement | null)?.style.setProperty('border-color', borderColor);
+                      }
+                    }}
                     onClick={() => setExpandedId(isExpanded ? null : m.id)}
                   >
                     {/* Personel */}
@@ -316,6 +334,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
           </div>
         </div>
       )}
+
     </div>
   );
 }

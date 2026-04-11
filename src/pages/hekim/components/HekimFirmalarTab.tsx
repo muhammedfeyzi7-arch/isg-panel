@@ -193,11 +193,12 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
       {!loading && filtered.length > 0 && (
         <div className="rounded-2xl overflow-hidden" style={card}>
           <div className="overflow-x-auto">
-            <div className="space-y-1 min-w-[700px]">
+            <div className="min-w-[700px]">
               {/* Sütun başlıkları */}
-              <div className="grid px-4 py-2"
+              <div className="grid px-4 py-2.5"
                 style={{
                   gridTemplateColumns: '2fr 1fr 1.5fr 1fr',
+                  background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)',
                   borderBottom: '1px solid var(--border-subtle)',
                 }}>
                 <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>FİRMA</span>
@@ -206,28 +207,35 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
                 <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>DURUM</span>
               </div>
 
-              {/* Satırlar — her biri ayrı kart */}
-              <div className="space-y-1.5 pt-1">
+              {/* Satırlar — premium kart stili */}
+              <div className="space-y-1.5 p-2">
                 {filtered.map((firma) => {
                   const days = getDaysDiff(firma.sonMuayene);
                   return (
                     <div
                       key={firma.id}
-                      className="grid px-4 py-3 transition-all cursor-default"
+                      className="grid px-4 py-3 rounded-xl cursor-default transition-all duration-200"
                       style={{
                         gridTemplateColumns: '2fr 1fr 1.5fr 1fr',
-                        background: 'transparent',
+                        background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)',
+                        border: '1px solid var(--border-subtle)',
                       }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)';
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.background = isDark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.05)';
+                        el.style.borderColor = 'rgba(16,185,129,0.3)';
+                        el.style.transform = 'translateX(2px)';
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                        const el = e.currentTarget as HTMLElement;
+                        el.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)';
+                        el.style.borderColor = 'var(--border-subtle)';
+                        el.style.transform = 'translateX(0)';
                       }}
                     >
                       {/* Firma adı */}
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-extrabold text-white"
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-extrabold text-white"
                           style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                           {firma.name.charAt(0).toUpperCase()}
                         </div>

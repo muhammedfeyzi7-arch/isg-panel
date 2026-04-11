@@ -906,11 +906,11 @@ export default function EkipmanlarPage() {
     <div className="space-y-5">
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #FB923C, #F59E0B, #FBBF24)' }} />
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399, #059669)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #FB923C, #EA580C)' }}>
+              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
               <i className="ri-tools-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -920,7 +920,7 @@ export default function EkipmanlarPage() {
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{aktifEkipmanlar.length} ekipman kayıtlı</span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.18)', color: '#FB923C' }}>
+                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.18)', color: '#10B981' }}>
                   {stats.uygun} uygun
                 </span>
                 {stats.uygunDegil > 0 && (
@@ -942,7 +942,7 @@ export default function EkipmanlarPage() {
               </button>
             )}
             {canCreate && (
-              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #FB923C, #EA580C)', border: '1px solid rgba(251,146,60,0.4)' }}>
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.4)' }}>
                 <i className="ri-add-line" />
                 Ekipman Ekle
               </button>
@@ -959,7 +959,7 @@ export default function EkipmanlarPage() {
           { label: 'Uygun Değil', value: stats.uygunDegil, icon: 'ri-close-circle-line', color: '#F87171', bg: 'rgba(248,113,113,0.1)' },
           { label: 'Yaklaşan Kontrol', value: stats.yaklasan, icon: 'ri-time-line', color: '#FBBF24', bg: 'rgba(251,191,36,0.1)' },
         ].map(s => (
-          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4">
+          <div key={s.label} className="isg-card stat-card-interactive rounded-xl p-4 flex items-center gap-4">
             <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
               <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
             </div>
@@ -1083,120 +1083,132 @@ export default function EkipmanlarPage() {
             })}
           </div>
 
-          {/* Masaüstü tablo görünümü */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="table-premium w-full">
+          {/* Masaüstü premium kart liste */}
+          <div className="hidden md:block">
+            {/* Sütun başlıkları */}
+            <div className="grid items-center px-4 py-2"
+              style={{
+                gridTemplateColumns: canDelete ? '32px 2fr 1.2fr 1.5fr 1fr 1fr 1fr 1.2fr 120px' : '2fr 1.2fr 1.5fr 1fr 1fr 1fr 1.2fr 120px',
+                borderBottom: '1px solid var(--border-subtle)',
+              }}>
+              {canDelete && (
+                <div className="flex items-center justify-center">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                </div>
+              )}
+              {['EKİPMAN', 'TÜR', 'FİRMA', 'ALAN', 'SERİ NO', 'SON KONTROL', 'SONRAKİ KONTROL', 'DURUM', 'İŞLEMLER'].map(h => (
+                <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
+              ))}
+            </div>
 
-              <thead>
-                <tr>
-                  {canDelete && (
-                    <th className="w-10 text-center">
-                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                    </th>
-                  )}
-                  <th>Ekipman Adı</th>
-                  <th>Tür</th>
-                  <th>Firma</th>
-                  <th>Bulunduğu Alan</th>
-                  <th>Seri No</th>
-                  <th>Son Kontrol</th>
-                  <th>Sonraki Kontrol</th>
-                  <th>Durum</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(ekipman => {
-                  const firma = firmalar.find(f => f.id === ekipman.firmaId);
-                  const effectiveDurum = getEffectiveDurum(ekipman);
-                  const sc = STATUS_CONFIG[effectiveDurum] ?? { label: effectiveDurum, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
-                  const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
-                  const isUrgent = days >= 0 && days <= 30;
-                  const isOverdue = days < 0;
-                  // Dosya durumu: dosyaAdi var ama dosyaUrl yoksa "yüklenemedi"
-                  const hasFileError = ekipman.dosyaAdi && !ekipman.dosyaUrl;
-                  return (
-                    <tr key={ekipman.id} style={{ background: selected.has(ekipman.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
-                      {canDelete && (
-                        <td className="text-center">
-                          <input type="checkbox" checked={selected.has(ekipman.id)} onChange={() => toggleOne(ekipman.id)} className="cursor-pointer" />
-                        </td>
+            {/* Premium kart satırlar */}
+            <div className="space-y-1.5 pt-1">
+              {filtered.map(ekipman => {
+                const firma = firmalar.find(f => f.id === ekipman.firmaId);
+                const effectiveDurum = getEffectiveDurum(ekipman);
+                const sc = STATUS_CONFIG[effectiveDurum] ?? { label: effectiveDurum, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
+                const days = getDaysUntil(ekipman.sonrakiKontrolTarihi);
+                const isUrgent = days >= 0 && days <= 30;
+                const isOverdue = days < 0;
+                const hasFileError = ekipman.dosyaAdi && !ekipman.dosyaUrl;
+                const isSelected = selected.has(ekipman.id);
+                return (
+                  <div
+                    key={ekipman.id}
+                    className="grid items-center px-4 py-3 rounded-xl transition-all"
+                    style={{
+                      gridTemplateColumns: canDelete ? '32px 2fr 1.2fr 1.5fr 1fr 1fr 1fr 1.2fr 120px' : '2fr 1.2fr 1.5fr 1fr 1fr 1fr 1.2fr 120px',
+                      background: isSelected ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)',
+                      border: isSelected ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = isSelected ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)';
+                      (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)';
+                      (e.currentTarget as HTMLElement).style.borderColor = isSelected ? 'rgba(239,68,68,0.2)' : 'var(--border-subtle)';
+                      (e.currentTarget as HTMLElement).style.transform = 'none';
+                    }}
+                  >
+                    {canDelete && (
+                      <div className="flex items-center justify-center">
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleOne(ekipman.id)} className="cursor-pointer" />
+                      </div>
+                    )}
+                    {/* Ekipman adı */}
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: sc.bg, border: `1px solid ${sc.color}30` }}>
+                        <i className="ri-tools-line text-xs" style={{ color: sc.color }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ekipman.ad}</p>
+                        {ekipman.marka && <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{ekipman.marka} {ekipman.model}</p>}
+                      </div>
+                    </div>
+                    {/* Tür */}
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs truncate block" style={{ color: 'var(--text-muted)' }}>{ekipman.tur || '—'}</span>
+                    </div>
+                    {/* Firma */}
+                    <div className="min-w-0 pr-2">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <i className="ri-building-2-line text-[9px]" />
+                        <span className="truncate max-w-[80px]">{firma?.ad || '—'}</span>
+                      </span>
+                    </div>
+                    {/* Alan */}
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs truncate block" style={{ color: 'var(--text-muted)' }}>{ekipman.bulunduguAlan || '—'}</span>
+                    </div>
+                    {/* Seri No */}
+                    <div className="min-w-0 pr-2">
+                      <span className="text-[10px] font-mono" style={{ color: 'var(--text-faint)' }}>{ekipman.seriNo || '—'}</span>
+                    </div>
+                    {/* Son Kontrol */}
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{fmtLocalDate(ekipman.sonKontrolTarihi)}</span>
+                    </div>
+                    {/* Sonraki Kontrol */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs font-medium" style={{ color: isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : 'var(--text-muted)' }}>
+                        {fmtLocalDate(ekipman.sonrakiKontrolTarihi)}
+                      </p>
+                      {isOverdue && <p className="text-[9px] font-bold mt-0.5" style={{ color: '#EF4444' }}>{Math.abs(days)}g gecikmiş</p>}
+                      {isUrgent && !isOverdue && <p className="text-[9px] font-bold mt-0.5" style={{ color: '#F59E0B' }}>{days}g kaldı</p>}
+                    </div>
+                    {/* Durum */}
+                    <div>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold whitespace-nowrap"
+                        style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.color}30` }}>
+                        <i className={`${sc.icon} text-[9px]`} />{sc.label}
+                      </span>
+                    </div>
+                    {/* İşlemler */}
+                    <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
+                      {hasFileError && <EkipmanBtn icon="ri-upload-2-line" onClick={() => openEdit(ekipman)} title="Belge Ekle" />}
+                      {ekipman.dosyaUrl && (
+                        <EkipmanBtn icon="ri-eye-line" onClick={async () => {
+                          const win = window.open('', '_blank');
+                          if (win) win.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="font-size:16px">Belge yükleniyor...</p></body></html>');
+                          const url = await getSignedUrlFromPath(ekipman.dosyaUrl!);
+                          if (url) { if (win && !win.closed) win.location.href = url; else window.open(url, '_blank'); }
+                          else { if (win && !win.closed) win.close(); addToast('Belge erişim linki alınamadı.', 'error'); }
+                        }} title="Belgeyi Görüntüle" />
                       )}
-                      <td>
-                        <div>
-                          <p className="font-semibold text-slate-200 text-sm">{ekipman.ad}</p>
-                          {ekipman.marka && <p className="text-xs mt-0.5" style={{ color: '#475569' }}>{ekipman.marka} {ekipman.model}</p>}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="text-sm text-slate-400">{ekipman.tur || '—'}</span>
-                      </td>
-                      <td>
-                        <span className="text-sm text-slate-300">{firma?.ad || '—'}</span>
-                      </td>
-                      <td>
-                        <span className="text-sm text-slate-400">{ekipman.bulunduguAlan || '—'}</span>
-                      </td>
-                      <td>
-                        <span className="text-xs font-mono text-slate-500">{ekipman.seriNo || '—'}</span>
-                      </td>
-                      <td>
-                        <span className="text-sm text-slate-400">
-                          {fmtLocalDate(ekipman.sonKontrolTarihi)}
-                        </span>
-                      </td>
-                      <td>
-                        <div>
-                          <span className={`text-sm ${isOverdue ? 'text-red-400' : isUrgent ? 'text-yellow-400' : 'text-slate-400'}`}>
-                            {fmtLocalDate(ekipman.sonrakiKontrolTarihi)}
-                          </span>
-                          {isOverdue && <p className="text-[10px] text-red-500 mt-0.5">{Math.abs(days)} gün gecikmiş</p>}
-                          {isUrgent && !isOverdue && <p className="text-[10px] text-yellow-500 mt-0.5">{days} gün kaldı</p>}
-                        </div>
-                      </td>
-                      <td>
-                        <span
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap"
-                          style={{ background: sc.bg, color: sc.color }}
-                        >
-                          <i className={sc.icon} />
-                          {sc.label}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1.5">
-                          {hasFileError && (
-                            <EkipmanBtn icon="ri-upload-2-line" onClick={() => openEdit(ekipman)} title="Belge Ekle" />
-                          )}
-                          {ekipman.dosyaUrl && (
-                            <EkipmanBtn icon="ri-eye-line" onClick={async () => {
-                              const win = window.open('', '_blank');
-                              if (win) win.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="font-size:16px">Belge yükleniyor...</p></body></html>');
-                              const url = await getSignedUrlFromPath(ekipman.dosyaUrl!);
-                              if (url) { if (win && !win.closed) win.location.href = url; else window.open(url, '_blank'); }
-                              else { if (win && !win.closed) win.close(); addToast('Belge erişim linki alınamadı.', 'error'); }
-                            }} title="Belgeyi Görüntüle" />
-                          )}
-                          {ekipman.dosyaUrl && (
-                            <EkipmanBtn icon="ri-download-2-line" onClick={() => handleFileDownload(ekipman)} title="Belgeyi İndir" />
-                          )}
-                          {canEdit && (
-                            <EkipmanBtn icon="ri-checkbox-circle-line" onClick={() => openKontrolModal(ekipman)} title="Kontrol Kaydı Ekle" />
-                          )}
-                          <EkipmanBtn icon="ri-qr-code-line" onClick={() => setQrEkipman(ekipman)} title="QR Kod" />
-                          {canEdit && (
-                            <EkipmanBtn icon="ri-edit-line" onClick={() => openEdit(ekipman)} title="Düzenle" />
-                          )}
-                          {canDelete && (
-                            <EkipmanBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(ekipman.id)} title="Sil" />
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      {ekipman.dosyaUrl && <EkipmanBtn icon="ri-download-2-line" onClick={() => handleFileDownload(ekipman)} title="Belgeyi İndir" />}
+                      {canEdit && <EkipmanBtn icon="ri-checkbox-circle-line" onClick={() => openKontrolModal(ekipman)} title="Kontrol Kaydı Ekle" />}
+                      <EkipmanBtn icon="ri-qr-code-line" onClick={() => setQrEkipman(ekipman)} title="QR Kod" />
+                      {canEdit && <EkipmanBtn icon="ri-edit-line" onClick={() => openEdit(ekipman)} title="Düzenle" />}
+                      {canDelete && <EkipmanBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(ekipman.id)} title="Sil" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
           </>
         )}

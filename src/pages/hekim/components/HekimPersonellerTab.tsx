@@ -238,9 +238,10 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
           <div className="overflow-x-auto">
             <div className="min-w-[700px]">
               {/* Sütun başlıkları */}
-              <div className="grid px-4 py-2"
+              <div className="grid px-4 py-2.5"
                 style={{
                   gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr',
+                  background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)',
                   borderBottom: '1px solid var(--border-subtle)',
                 }}>
                 <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>PERSONEL</span>
@@ -250,21 +251,28 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
                 <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>SONUÇ</span>
               </div>
 
-              {/* Satırlar — her biri ayrı kart */}
-              <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {/* Satırlar — premium kart stili */}
+              <div className="space-y-1.5 p-2">
                 {filtered.map((p) => (
                   <div
                     key={p.id}
-                    className="grid px-4 py-3 transition-all cursor-default"
+                    className="grid px-4 py-3 rounded-xl cursor-default transition-all duration-200"
                     style={{
                       gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr',
-                      background: 'transparent',
+                      background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)',
+                      border: '1px solid var(--border-subtle)',
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)';
+                      const el = e.currentTarget as HTMLElement;
+                      el.style.background = isDark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.05)';
+                      el.style.borderColor = 'rgba(16,185,129,0.3)';
+                      el.style.transform = 'translateX(2px)';
                     }}
                     onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background = 'transparent';
+                      const el = e.currentTarget as HTMLElement;
+                      el.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)';
+                      el.style.borderColor = 'var(--border-subtle)';
+                      el.style.transform = 'translateX(0)';
                     }}
                   >
                     {/* Personel */}
@@ -327,3 +335,4 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
     </div>
   );
 }
+

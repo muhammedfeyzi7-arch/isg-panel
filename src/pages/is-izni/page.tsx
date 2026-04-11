@@ -238,7 +238,7 @@ function IsIzniEvraklari({ izinId, orgId, firmaId, izinTuru, onRefresh }: {
               onClick={() => void handleAc(dosya)}
               disabled={isLoading}
               className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
-              style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }}
+              style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
               title="Dosyayı Aç"
             >
               {isLoading
@@ -292,7 +292,7 @@ function ViewDetayModal({ record, firmalar, personeller, orgId, evrakRefresh, ca
         <button
           onClick={() => setTab('detay')}
           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
-          style={{ background: tab === 'detay' ? 'rgba(96,165,250,0.18)' : 'transparent', color: tab === 'detay' ? '#60A5FA' : 'var(--text-muted)' }}
+          style={{ background: tab === 'detay' ? 'rgba(16,185,129,0.18)' : 'transparent', color: tab === 'detay' ? '#10B981' : 'var(--text-muted)' }}
         >
           <i className="ri-information-line" />Detay
         </button>
@@ -311,12 +311,12 @@ function ViewDetayModal({ record, firmalar, personeller, orgId, evrakRefresh, ca
       {tab === 'gecmis' ? (
         <div className="space-y-2">
           {/* Oluşturulma */}
-          <div className="flex items-start gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
-            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(96,165,250,0.15)' }}>
-              <i className="ri-add-circle-line text-sm" style={{ color: '#60A5FA' }} />
+          <div className="flex items-start gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.15)' }}>
+              <i className="ri-add-circle-line text-sm" style={{ color: '#10B981' }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold" style={{ color: '#60A5FA' }}>İzin Oluşturuldu</p>
+              <p className="text-xs font-bold" style={{ color: '#10B981' }}>İzin Oluşturuldu</p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{record.olusturanKisi || '—'}</p>
               {record.olusturmaTarihi && (
                 <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
@@ -497,9 +497,9 @@ function ViewDetayModal({ record, firmalar, personeller, orgId, evrakRefresh, ca
 
           {/* Evraklar */}
           <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(96,165,250,0.2)' }}>
-            <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: 'rgba(96,165,250,0.07)', borderBottom: '1px solid rgba(96,165,250,0.15)' }}>
-              <i className="ri-attachment-2 text-sm" style={{ color: '#60A5FA' }} />
-              <p className="text-xs font-bold" style={{ color: '#60A5FA' }}>Yüklü Evraklar</p>
+            <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: 'rgba(16,185,129,0.07)', borderBottom: '1px solid rgba(16,185,129,0.15)' }}>
+              <i className="ri-attachment-2 text-sm" style={{ color: '#10B981' }} />
+              <p className="text-xs font-bold" style={{ color: '#10B981' }}>Yüklü Evraklar</p>
             </div>
             <div className="p-3">
               <IsIzniEvraklari
@@ -692,10 +692,10 @@ function DenetciDegerlendirmeModal({ izin, firma, orgId, onClose, onUygun, onUyg
           )}
 
           {/* Evraklar */}
-          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(96,165,250,0.2)' }}>
-            <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: 'rgba(96,165,250,0.07)', borderBottom: '1px solid rgba(96,165,250,0.15)' }}>
-              <i className="ri-attachment-2 text-sm" style={{ color: '#60A5FA' }} />
-              <p className="text-xs font-bold" style={{ color: '#60A5FA' }}>Evraklar</p>
+          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(16,185,129,0.2)' }}>
+            <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: 'rgba(16,185,129,0.07)', borderBottom: '1px solid rgba(16,185,129,0.15)' }}>
+              <i className="ri-attachment-2 text-sm" style={{ color: '#10B981' }} />
+              <p className="text-xs font-bold" style={{ color: '#10B981' }}>Evraklar</p>
             </div>
             <div className="p-3">
               <IsIzniEvraklari
@@ -818,7 +818,7 @@ function sanitizeFileName(name: string): string {
 
 // ─── Aksiyon butonu ────────────────────────────────────────────────────────
 function IsIzniBtn({ icon, onClick, title }: { icon: string; onClick: () => void; title: string }) {
-  const accent = '#60A5FA';
+  const accent = '#10B981';
   return (
     <button onClick={onClick} title={title}
       className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
@@ -1159,11 +1159,11 @@ export default function IsIzniPage() {
       )}
 
       {/* Header */}
-      <div className="rounded-2xl px-5 py-4" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderTop: '2px solid #60A5FA' }}>
+      <div className="rounded-2xl px-5 py-4" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderTop: '2px solid #10B981' }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)' }}>
-              <i className="ri-shield-keyhole-line text-lg" style={{ color: '#60A5FA' }} />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <i className="ri-shield-keyhole-line text-lg" style={{ color: '#10B981' }} />
             </div>
             <div>
               <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)' }}>İş İzinleri</h1>
@@ -1174,7 +1174,7 @@ export default function IsIzniPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {canCreate && (
-              <button onClick={openAdd} className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer" style={{ background: 'linear-gradient(135deg, #60A5FA, #3B82F6)' }}>
+              <button onClick={openAdd} className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                 <i className="ri-add-line" /> Yeni İş İzni
               </button>
             )}
@@ -1185,13 +1185,13 @@ export default function IsIzniPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Toplam',        value: stats.total,        icon: 'ri-shield-keyhole-line',  color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
+          { label: 'Toplam',        value: stats.total,        icon: 'ri-shield-keyhole-line',  color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
           { label: 'Onay Bekliyor', value: stats.onayBekliyor, icon: 'ri-time-line',            color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
           { label: 'Onaylandı',     value: stats.onaylandi,    icon: 'ri-checkbox-circle-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)' },
           { label: 'Reddedildi',    value: stats.reddedildi,   icon: 'ri-close-circle-line',    color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
           { label: 'Süresi Dolan',  value: stats.suresiDolan,  icon: 'ri-alarm-warning-line',   color: '#F87171', bg: 'rgba(248,113,113,0.1)' },
         ].map(s => (
-          <div key={s.label} className="isg-card rounded-xl p-3 flex items-center gap-3">
+          <div key={s.label} className="isg-card stat-card-interactive rounded-xl p-3 flex items-center gap-3">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
               <i className={`${s.icon} text-base`} style={{ color: s.color }} />
             </div>
@@ -1230,140 +1230,153 @@ export default function IsIzniPage() {
       {/* Liste */}
       {filtered.length === 0 ? (
         <div className="isg-card rounded-xl py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
-            <i className="ri-shield-keyhole-line text-3xl" style={{ color: '#60A5FA' }} />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+            <i className="ri-shield-keyhole-line text-3xl" style={{ color: '#10B981' }} />
           </div>
           <p className="font-semibold" style={{ color: 'var(--text-muted)' }}>İş izni kaydı bulunamadı</p>
           {canCreate && <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Yeni İş İzni</button>}
         </div>
       ) : (
-        <div className="isg-card rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="table-premium w-full">
-              <thead>
-                <tr>
-                  <th className="text-left">İzin No</th>
-                  <th className="text-left">Tip</th>
-                  <th className="text-left">Firma</th>
-                  <th className="text-left">Tarih Aralığı</th>
-                  <th className="text-left">Durum</th>
-                  <th className="text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(iz => {
-                  const firma = firmalar.find(f => f.id === iz.firmaId);
-                  const tip = TIP_CONFIG[iz.tip] || { color: '#64748B', bg: 'rgba(100,116,139,0.12)', icon: 'ri-question-line' };
-                  const dur = DURUM_CONFIG[iz.durum] || DURUM_CONFIG['Onay Bekliyor'];
-                  const expired = isExpired(iz.bitisTarihi);
-                  const daysLeft = getDaysLeft(iz.bitisTarihi);
-                  const expiringSoon = !expired && daysLeft !== null && daysLeft >= 0 && daysLeft <= 2;
+        <div className="space-y-1.5">
+          {/* Sütun başlıkları */}
+          <div className="grid items-center px-4 py-2"
+            style={{
+              gridTemplateColumns: '1.4fr 1.1fr 1.3fr 1.4fr 1.5fr 120px',
+              borderBottom: '1px solid var(--border-subtle)',
+            }}>
+            {['İZİN NO', 'TİP', 'FİRMA', 'TARİH ARALIĞI', 'DURUM', 'İŞLEMLER'].map(h => (
+              <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
+            ))}
+          </div>
 
-                  return (
-                    <tr key={iz.id}>
-                      <td>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-mono font-semibold" style={{ color: '#60A5FA' }}>{iz.izinNo}</span>
-                          {expired && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                              Süresi Geçmiş
-                            </span>
-                          )}
-                          {expiringSoon && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
-                              {daysLeft === 0 ? 'Bugün' : `${daysLeft}g`}
-                            </span>
-                          )}
-                        </div>
-                        {iz.aciklama && (
-                          <p className="text-[11px] mt-0.5 truncate max-w-[200px]" style={{ color: 'var(--text-muted)' }}>{iz.aciklama}</p>
-                        )}
-                      </td>
-                      <td>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap" style={{ background: tip.bg, color: tip.color }}>
-                          <i className={tip.icon} />{iz.tip}
+          {/* Kart satırlar */}
+          <div className="space-y-1.5 pt-1">
+            {filtered.map(iz => {
+              const firma = firmalar.find(f => f.id === iz.firmaId);
+              const tip = TIP_CONFIG[iz.tip] || { color: '#64748B', bg: 'rgba(100,116,139,0.12)', icon: 'ri-question-line' };
+              const dur = DURUM_CONFIG[iz.durum] || DURUM_CONFIG['Onay Bekliyor'];
+              const expired = isExpired(iz.bitisTarihi);
+              const daysLeft = getDaysLeft(iz.bitisTarihi);
+              const expiringSoon = !expired && daysLeft !== null && daysLeft >= 0 && daysLeft <= 2;
+
+              return (
+                <div
+                  key={iz.id}
+                  className="grid items-center px-4 py-3 rounded-xl transition-all duration-150"
+                  style={{
+                    gridTemplateColumns: '1.4fr 1.1fr 1.3fr 1.4fr 1.5fr 120px',
+                    background: 'var(--bg-card-solid)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.03)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.18)';
+                    (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-solid)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
+                    (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
+                  }}
+                >
+                  {/* İzin No */}
+                  <div className="flex flex-col gap-0.5 pr-2 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)' }}>
+                        <i className="ri-shield-keyhole-line text-[10px]" style={{ color: '#10B981' }} />
+                      </div>
+                      <span className="text-xs font-mono font-bold" style={{ color: '#10B981' }}>{iz.izinNo}</span>
+                      {expired && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>Geçmiş</span>
+                      )}
+                      {expiringSoon && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
+                          {daysLeft === 0 ? 'Bugün' : `${daysLeft}g`}
                         </span>
-                      </td>
-                      <td>
-                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{firma?.ad || '—'}</p>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1.5">
-                          <i className="ri-calendar-line text-xs" style={{ color: 'var(--text-muted)' }} />
-                          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                            {iz.baslamaTarihi ? new Date(iz.baslamaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
-                            {iz.bitisTarihi && (
-                              <span style={{ color: 'var(--text-muted)' }}>
-                                {' → '}
-                                {new Date(iz.bitisTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                              </span>
-                            )}
+                      )}
+                    </div>
+                    {iz.aciklama && (
+                      <p className="text-[10px] truncate pl-8" style={{ color: 'var(--text-muted)' }}>{iz.aciklama}</p>
+                    )}
+                  </div>
+
+                  {/* Tip */}
+                  <div className="pr-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold whitespace-nowrap" style={{ background: tip.bg, color: tip.color }}>
+                      <i className={`${tip.icon} text-[9px]`} />{iz.tip}
+                    </span>
+                  </div>
+
+                  {/* Firma */}
+                  <div className="min-w-0 pr-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap max-w-full truncate"
+                      style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
+                      <i className="ri-building-2-line text-[9px] flex-shrink-0" />
+                      <span className="truncate">{firma?.ad || '—'}</span>
+                    </span>
+                  </div>
+
+                  {/* Tarih aralığı */}
+                  <div className="pr-2">
+                    <div className="flex items-center gap-1">
+                      <i className="ri-calendar-line text-[10px] flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                        {iz.baslamaTarihi ? new Date(iz.baslamaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
+                        {iz.bitisTarihi && (
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            {' → '}{new Date(iz.bitisTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                           </span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}` }}>
-                          <i className={`${dur.icon} text-xs`} />{dur.label}
-                        </span>
-                        {iz.durum === 'Reddedildi' && (
-                          <div className="mt-1 space-y-0.5">
-                            {iz.reddedenKisi && (
-                              <p className="text-[10px] truncate max-w-[180px]" style={{ color: '#EF4444' }}>
-                                <i className="ri-user-line mr-0.5" />{iz.reddedenKisi}
-                                {iz.reddetmeTarihi && <span style={{ color: '#64748B' }}> · {new Date(iz.reddetmeTarihi).toLocaleDateString('tr-TR')}</span>}
-                              </p>
-                            )}
-                            {iz.sahaNotu && (
-                              <p className="text-[10px] truncate max-w-[180px]" style={{ color: '#94A3B8' }}>
-                                <i className="ri-chat-1-line mr-0.5" />{iz.sahaNotu}
-                              </p>
-                            )}
-                          </div>
                         )}
-                        {iz.durum === 'Onaylandı' && (
-                          <div className="mt-1 space-y-0.5">
-                            {iz.onaylayanKisi && (
-                              <p className="text-[10px] truncate max-w-[180px]" style={{ color: '#34D399' }}>
-                                <i className="ri-user-line mr-0.5" />{iz.onaylayanKisi}
-                                {iz.onayTarihi && <span style={{ color: '#64748B' }}> · {new Date(iz.onayTarihi).toLocaleDateString('tr-TR')}</span>}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1 justify-end">
-                          {/* Denetçi: değerlendirme butonu */}
-                          {isDenetci && iz.durum === 'Onay Bekliyor' && (
-                            <button
-                              onClick={() => setDenetciRecordId(iz.id)}
-                              title="Değerlendir"
-                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg cursor-pointer text-xs font-semibold whitespace-nowrap"
-                              style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.25)' }}
-                            >
-                              <i className="ri-shield-check-line text-xs" />Değerlendir
-                            </button>
-                          )}
-                          {/* Denetçi: detay görüntüle */}
-                          {isDenetci && iz.durum !== 'Onay Bekliyor' && (
-                            <IsIzniBtn icon="ri-eye-line" onClick={() => setDenetciRecordId(iz.id)} title="Detay" />
-                          )}
-                          {/* Admin/Member işlemleri */}
-                          {!isDenetci && (
-                            <>
-                              <IsIzniBtn icon="ri-eye-line" onClick={() => setViewRecordId(iz.id)} title="Detay" />
-                              <IsIzniBtn icon="ri-file-pdf-line" onClick={() => { const f = firmalar.find(x => x.id === iz.firmaId); generateIsIzniPdf(iz, f, personeller.filter(p => iz.calisanlar?.includes(p.adSoyad))); }} title="PDF" />
-                              {canEdit && <IsIzniBtn icon="ri-edit-line" onClick={() => openEdit(iz)} title="Düzenle" />}
-                              {canDelete && <IsIzniBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(iz.id)} title="Sil" />}
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Durum */}
+                  <div className="pr-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap" style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}` }}>
+                      <i className={`${dur.icon} text-[9px]`} />{dur.label}
+                    </span>
+                    {iz.durum === 'Reddedildi' && iz.reddedenKisi && (
+                      <p className="text-[9px] mt-0.5 truncate max-w-[160px]" style={{ color: '#EF4444' }}>
+                        <i className="ri-user-line mr-0.5" />{iz.reddedenKisi}
+                        {iz.reddetmeTarihi && <span style={{ color: '#64748B' }}> · {new Date(iz.reddetmeTarihi).toLocaleDateString('tr-TR')}</span>}
+                      </p>
+                    )}
+                    {iz.durum === 'Onaylandı' && iz.onaylayanKisi && (
+                      <p className="text-[9px] mt-0.5 truncate max-w-[160px]" style={{ color: '#34D399' }}>
+                        <i className="ri-user-line mr-0.5" />{iz.onaylayanKisi}
+                        {iz.onayTarihi && <span style={{ color: '#64748B' }}> · {new Date(iz.onayTarihi).toLocaleDateString('tr-TR')}</span>}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* İşlemler */}
+                  <div className="flex items-center gap-1 justify-end">
+                    {isDenetci && iz.durum === 'Onay Bekliyor' && (
+                      <button
+                        onClick={() => setDenetciRecordId(iz.id)}
+                        title="Değerlendir"
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer text-[10px] font-semibold whitespace-nowrap"
+                        style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.25)' }}
+                      >
+                        <i className="ri-shield-check-line text-xs" />Değerlendir
+                      </button>
+                    )}
+                    {isDenetci && iz.durum !== 'Onay Bekliyor' && (
+                      <IsIzniBtn icon="ri-eye-line" onClick={() => setDenetciRecordId(iz.id)} title="Detay" />
+                    )}
+                    {!isDenetci && (
+                      <>
+                        <IsIzniBtn icon="ri-eye-line" onClick={() => setViewRecordId(iz.id)} title="Detay" />
+                        <IsIzniBtn icon="ri-file-pdf-line" onClick={() => { const f = firmalar.find(x => x.id === iz.firmaId); generateIsIzniPdf(iz, f, personeller.filter(p => iz.calisanlar?.includes(p.adSoyad))); }} title="PDF" />
+                        {canEdit && <IsIzniBtn icon="ri-edit-line" onClick={() => openEdit(iz)} title="Düzenle" />}
+                        {canDelete && <IsIzniBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(iz.id)} title="Sil" />}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1390,11 +1403,11 @@ export default function IsIzniPage() {
         <div className="space-y-4">
           {/* İzin no önizleme */}
           {!editId && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
-              <i className="ri-barcode-line flex-shrink-0" style={{ color: '#60A5FA' }} />
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+              <i className="ri-barcode-line flex-shrink-0" style={{ color: '#10B981' }} />
               <div>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>İzin numarası otomatik üretilir</p>
-                <p className="text-sm font-mono font-semibold" style={{ color: '#60A5FA' }}>{generateIsIzniNo(isIzinleri)}</p>
+                <p className="text-sm font-mono font-semibold" style={{ color: '#10B981' }}>{generateIsIzniNo(isIzinleri)}</p>
               </div>
             </div>
           )}
@@ -1458,7 +1471,7 @@ export default function IsIzniPage() {
                 {editId && <span className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>(opsiyonel)</span>}
               </label>
               {formEvraklar.length > 0 && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(96,165,250,0.12)', color: '#60A5FA' }}>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981' }}>
                   {formEvraklar.length} dosya seçildi
                 </span>
               )}

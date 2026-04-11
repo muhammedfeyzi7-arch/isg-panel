@@ -870,11 +870,11 @@ export default function TutanaklarPage() {
       )}
 
       {/* Header */}
-      <div className="rounded-2xl px-5 py-4" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderTop: '2px solid #14B8A6' }}>
+      <div className="rounded-2xl px-5 py-4" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderTop: '2px solid #10B981' }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(20,184,166,0.12)', border: '1px solid rgba(20,184,166,0.2)' }}>
-              <i className="ri-article-line text-lg" style={{ color: '#14B8A6' }} />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <i className="ri-article-line text-lg" style={{ color: '#10B981' }} />
             </div>
             <div>
               <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)' }}>Tutanak Yönetimi</h1>
@@ -883,7 +883,7 @@ export default function TutanaklarPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {canCreate && (
-              <button onClick={openAdd} className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer" style={{ background: 'linear-gradient(135deg, #14B8A6, #0D9488)' }}>
+              <button onClick={openAdd} className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                 <i className="ri-add-line" /> Yeni Tutanak
               </button>
             )}
@@ -894,12 +894,12 @@ export default function TutanaklarPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Toplam Tutanak', value: stats.total,      icon: 'ri-article-line',         color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
+          { label: 'Toplam Tutanak', value: stats.total,      icon: 'ri-article-line',         color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
           { label: 'Taslak',         value: stats.taslak,     icon: 'ri-draft-line',            color: '#94A3B8', bg: 'rgba(148,163,184,0.1)' },
           { label: 'Tamamlandı',     value: stats.tamamlandi, icon: 'ri-checkbox-circle-line',  color: '#34D399', bg: 'rgba(52,211,153,0.1)' },
-          { label: 'Onaylandı',      value: stats.onaylandi,  icon: 'ri-shield-check-line',     color: '#60A5FA', bg: 'rgba(96,165,250,0.1)' },
+          { label: 'Onaylandı',      value: stats.onaylandi,  icon: 'ri-shield-check-line',     color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
         ].map(s => (
-          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4">
+          <div key={s.label} className="isg-card stat-card-interactive rounded-xl p-4 flex items-center gap-4">
             <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
               <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
             </div>
@@ -995,7 +995,7 @@ export default function TutanaklarPage() {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="font-mono text-xs font-bold" style={{ color: '#60A5FA' }}>{t.tutanakNo}</span>
+                        <span className="font-mono text-xs font-bold" style={{ color: '#10B981' }}>{t.tutanakNo}</span>
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap" style={{ background: stc.bg, color: stc.color }}>
                           <i className={stc.icon} />{t.durum}
                         </span>
@@ -1022,105 +1022,121 @@ export default function TutanaklarPage() {
             })}
           </div>
 
-          {/* Masaüstü tablo görünümü */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="table-premium w-full">
-              <thead>
-                <tr>
-                  {canDelete && (
-                    <th className="w-10 text-center">
-                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                    </th>
-                  )}
-                  <th className="text-left">Tutanak No</th>
-                  <th className="text-left">Başlık</th>
-                  <th className="text-left hidden md:table-cell">Firma</th>
-                  <th className="text-left hidden lg:table-cell">Tarih</th>
-                  <th className="text-left">Durum</th>
-                  <th className="text-left hidden lg:table-cell">Oluşturan</th>
-                  <th className="text-left hidden md:table-cell">Ek Dosya</th>
-                  <th className="text-right w-36">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(t => {
-                  const firma = firmalar.find(f => f.id === t.firmaId);
-                  const stc = STS_CONFIG[t.durum] ?? { color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
-                  return (
-                    <tr key={t.id} style={{ background: selected.has(t.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
-                      {canDelete && (
-                        <td className="text-center">
-                          <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleOne(t.id)} className="cursor-pointer" />
-                        </td>
+          {/* Masaüstü premium kart liste */}
+          <div className="hidden md:block">
+            {/* Sütun başlıkları */}
+            <div className="grid items-center px-4 py-2"
+              style={{
+                gridTemplateColumns: canDelete ? '32px 1fr 2fr 1.5fr 1fr 1.2fr 1fr 1fr 120px' : '1fr 2fr 1.5fr 1fr 1.2fr 1fr 1fr 120px',
+                borderBottom: '1px solid var(--border-subtle)',
+              }}>
+              {canDelete && (
+                <div className="flex items-center justify-center">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                </div>
+              )}
+              {['TUTANAK NO', 'BAŞLIK', 'FİRMA', 'TARİH', 'DURUM', 'OLUŞTURAN', 'EK DOSYA', 'İŞLEMLER'].map(h => (
+                <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
+              ))}
+            </div>
+
+            <div className="space-y-1.5 pt-1">
+              {filtered.map(t => {
+                const firma = firmalar.find(f => f.id === t.firmaId);
+                const stc = STS_CONFIG[t.durum] ?? { color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-question-line' };
+                const isSelected = selected.has(t.id);
+                return (
+                  <div
+                    key={t.id}
+                    className="grid items-center px-4 py-3 rounded-xl transition-all cursor-pointer"
+                    style={{
+                      gridTemplateColumns: canDelete ? '32px 1fr 2fr 1.5fr 1fr 1.2fr 1fr 1fr 120px' : '1fr 2fr 1.5fr 1fr 1.2fr 1fr 1fr 120px',
+                      background: isSelected ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)',
+                      border: isSelected ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = isSelected ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)';
+                      (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)';
+                      (e.currentTarget as HTMLElement).style.borderColor = isSelected ? 'rgba(239,68,68,0.2)' : 'var(--border-subtle)';
+                      (e.currentTarget as HTMLElement).style.transform = 'none';
+                    }}
+                    onClick={() => setViewId(t.id)}
+                  >
+                    {canDelete && (
+                      <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleOne(t.id)} className="cursor-pointer" />
+                      </div>
+                    )}
+                    {/* Tutanak no */}
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs font-mono font-bold" style={{ color: '#10B981' }}>{t.tutanakNo}</span>
+                    </div>
+                    {/* Başlık */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{t.baslik}</p>
+                      {t.aciklama && (
+                        <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{t.aciklama}</p>
                       )}
-                      <td>
-                        <span className="text-sm font-mono font-semibold" style={{ color: '#60A5FA' }}>
-                          {t.tutanakNo}
-                        </span>
-                      </td>
-                      <td>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t.baslik}</p>
-                        {t.aciklama && (
-                          <p className="text-xs mt-0.5 truncate max-w-[160px]" style={{ color: 'var(--text-muted)' }}>
-                            {t.aciklama}
-                          </p>
-                        )}
-                      </td>
-                      <td className="hidden md:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{firma?.ad || '—'}</span>
-                      </td>
-                      <td className="hidden lg:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                          {t.tarih ? new Date(t.tarih).toLocaleDateString('tr-TR') : '—'}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap"
-                          style={{ background: stc.bg, color: stc.color }}
-                        >
-                          <i className={stc.icon} />{t.durum}
-                        </span>
-                      </td>
-                      <td className="hidden lg:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t.olusturanKisi || '—'}</span>
-                      </td>
-                      <td className="hidden md:table-cell">
-                        {t.dosyaAdi ? (
-                          <button
-                            onClick={() => handleFileDownload(t)}
-                            className="flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-all hover:gap-2 whitespace-nowrap"
-                            style={{ color: '#34D399' }}
-                          >
-                            <i className="ri-attachment-2 text-sm" />
-                            <span className="max-w-[70px] truncate">{t.dosyaAdi}</span>
-                          </button>
-                        ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>—</span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1 justify-end flex-wrap">
-                          <button
-                            onClick={() => setViewId(t.id)}
-                            title="Tutanağı Görüntüle / İndir"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
-                            style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.2)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; }}
-                          >
-                            <i className="ri-eye-line" />
-                            <span className="hidden lg:inline">Görüntüle</span>
-                          </button>
-                          {canEdit && <TableBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(t)} title="Düzenle" />}
-                          {canDelete && <TableBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteId(t.id)} title="Sil" />}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    </div>
+                    {/* Firma */}
+                    <div className="min-w-0 pr-2">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <i className="ri-building-2-line text-[9px]" />
+                        <span className="truncate max-w-[80px]">{firma?.ad || '—'}</span>
+                      </span>
+                    </div>
+                    {/* Tarih */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {t.tarih ? new Date(t.tarih).toLocaleDateString('tr-TR') : '—'}
+                      </p>
+                    </div>
+                    {/* Durum */}
+                    <div>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold whitespace-nowrap"
+                        style={{ background: stc.bg, color: stc.color, border: `1px solid ${stc.color}30` }}>
+                        <i className={`${stc.icon} text-[9px]`} />{t.durum}
+                      </span>
+                    </div>
+                    {/* Oluşturan */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{t.olusturanKisi || '—'}</p>
+                    </div>
+                    {/* Ek dosya */}
+                    <div onClick={e => e.stopPropagation()}>
+                      {t.dosyaAdi ? (
+                        <button onClick={() => handleFileDownload(t)}
+                          className="flex items-center gap-1 text-[10px] font-semibold cursor-pointer whitespace-nowrap"
+                          style={{ color: '#34D399' }}>
+                          <i className="ri-attachment-2 text-xs" />
+                          <span className="max-w-[60px] truncate">{t.dosyaAdi}</span>
+                        </button>
+                      ) : (
+                        <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>—</span>
+                      )}
+                    </div>
+                    {/* İşlemler */}
+                    <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => setViewId(t.id)}
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-all whitespace-nowrap"
+                        style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.2)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; }}>
+                        <i className="ri-eye-line text-xs" />
+                      </button>
+                      {canEdit && <TableBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(t)} title="Düzenle" />}
+                      {canDelete && <TableBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteId(t.id)} title="Sil" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -1155,11 +1171,11 @@ export default function TutanaklarPage() {
           {/* Otomatik tutanak no bilgisi */}
           {!editId && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-              style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
-              <i className="ri-barcode-line flex-shrink-0" style={{ color: '#60A5FA' }} />
+              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+              <i className="ri-barcode-line flex-shrink-0" style={{ color: '#10B981' }} />
               <div>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Tutanak numarası otomatik üretilir</p>
-                <p className="text-sm font-mono font-semibold" style={{ color: '#60A5FA' }}>
+                <p className="text-sm font-mono font-semibold" style={{ color: '#10B981' }}>
                   {generateTutanakNo(tutanaklar)}
                 </p>
               </div>
@@ -1259,8 +1275,8 @@ export default function TutanaklarPage() {
                 style={{ border: '2px dashed var(--border-subtle)', background: 'var(--bg-item)' }}
                 onClick={() => fileRef.current?.click()}
                 onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)';
-                  e.currentTarget.style.background = 'rgba(59,130,246,0.04)';
+                  e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)';
+                  e.currentTarget.style.background = 'rgba(16,185,129,0.04)';
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.borderColor = 'var(--border-subtle)';
@@ -1305,13 +1321,13 @@ export default function TutanaklarPage() {
             {/* İndirme bilgi notu */}
             <div className="sm:col-span-2">
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
-                style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
-                <i className="ri-download-line mt-0.5 flex-shrink-0" style={{ color: '#3B82F6' }} />
+                style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.12)' }}>
+                <i className="ri-download-line mt-0.5 flex-shrink-0" style={{ color: '#10B981' }} />
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   Kayıt oluşturduktan sonra{' '}
                   <strong style={{ color: 'var(--text-secondary)' }}>Görüntüle</strong>{' '}
                   butonuna tıklayarak tutanağı önizleyebilir ve{' '}
-                  <strong style={{ color: '#3B82F6' }}>Word (.docx)</strong>{' '}
+                  <strong style={{ color: '#10B981' }}>Word (.docx)</strong>{' '}
                   formatında indirebilirsiniz.
                 </p>
               </div>

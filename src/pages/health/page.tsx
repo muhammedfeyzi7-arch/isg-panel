@@ -560,7 +560,7 @@ export default function MuayenelerPage() {
           { label: 'Yaklaşan (≤30g)', value: stats.yaklasan, icon: 'ri-time-line',             color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
           { label: 'Süresi Geçmiş',   value: stats.gecmis,   icon: 'ri-alarm-warning-line',    color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
         ].map(s => (
-          <div key={s.label} className="isg-card rounded-xl p-3 flex items-center gap-3">
+          <div key={s.label} className="isg-card stat-card-interactive rounded-xl p-3 flex items-center gap-3">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
               <i className={`${s.icon} text-base`} style={{ color: s.color }} />
             </div>

@@ -775,30 +775,28 @@ export default function PersonellerPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: 'var(--text-muted)' }}>İŞLEMLER</span>
             </div>
 
-            {/* Satırlar — her biri ayrı kart */}
+            {/* Satırlar — premium kart */}
             <div className="space-y-1.5 pt-1">
               {filtered.map(p => {
                 const foto = getPersonelFoto(p.id);
                 return (
                   <div
                     key={p.id}
-                    className="grid items-center px-4 py-3 rounded-xl transition-all"
+                    className="grid items-center px-4 py-3 rounded-xl transition-all cursor-pointer"
                     style={{
                       gridTemplateColumns: canDelete ? '32px 2fr 1.5fr 1.5fr 1fr 120px' : '2fr 1.5fr 1.5fr 1fr 120px',
                       background: selected.has(p.id) ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)',
                       border: selected.has(p.id) ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
                     }}
                     onMouseEnter={e => {
-                      if (!selected.has(p.id)) {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.04)';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.18)';
-                      }
+                      (e.currentTarget as HTMLElement).style.background = selected.has(p.id) ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = selected.has(p.id) ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)';
+                      (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
                     }}
                     onMouseLeave={e => {
-                      if (!selected.has(p.id)) {
-                        (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-solid)';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
-                      }
+                      (e.currentTarget as HTMLElement).style.background = selected.has(p.id) ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)';
+                      (e.currentTarget as HTMLElement).style.borderColor = selected.has(p.id) ? 'rgba(239,68,68,0.2)' : 'var(--border-subtle)';
+                      (e.currentTarget as HTMLElement).style.transform = 'none';
                     }}
                   >
                     {canDelete && (

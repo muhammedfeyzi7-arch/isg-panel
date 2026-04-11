@@ -20,7 +20,7 @@ export default function DocStatsCards({ documents }: Props) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {stats.map(s => (
-        <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4">
+        <div key={s.label} className="isg-card stat-card-interactive rounded-xl p-4 flex items-center gap-4">
           <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
             <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
           </div>

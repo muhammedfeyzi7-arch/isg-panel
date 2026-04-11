@@ -17,41 +17,27 @@ interface StatCardProps {
 
 export default function StatCard({
   label, value, icon, sub, trend, trendLabel,
-  iconBg, valueColor, accentColor, delay = 0,
+  iconBg, accentColor, delay = 0,
 }: StatCardProps) {
   const animatedValue = useCountUp(value, 900, delay);
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden transition-all duration-250 cursor-default select-none isg-card"
-      style={{ borderRadius: '18px' }}
-      onMouseEnter={e => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.transform = 'translateY(-3px)';
-        el.style.borderColor = accentColor + '45';
-      }}
-      onMouseLeave={e => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.transform = 'translateY(0)';
-        el.style.borderColor = '';
+      className="relative rounded-2xl overflow-hidden cursor-default select-none stat-card-interactive"
+      style={{
+        background: 'var(--bg-card-solid)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: '20px',
       }}
     >
-      {/* Top accent line — hekim stili */}
-      <div
-        className="absolute top-0 left-0 right-0 h-[2px]"
-        style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}55)` }}
-      />
-
       <div className="px-5 py-5">
         {/* Icon + trend row */}
         <div className="flex items-center justify-between mb-4">
           <div
-            className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-            style={{
-              background: iconBg,
-            }}
+            className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{ background: `linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.08))` }}
           >
-            <i className={`${icon} text-white text-base`} />
+            <i className={`${icon} text-sm`} style={{ color: '#10B981' }} />
           </div>
 
           {trend ? (
@@ -68,9 +54,11 @@ export default function StatCard({
             </span>
           ) : (
             <span
-              className="w-2 h-2 rounded-full"
-              style={{ background: accentColor, opacity: 0.4 }}
-            />
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(16,185,129,0.08)', color: '#10B981', border: '1px solid rgba(16,185,129,0.15)' }}
+            >
+              ✓
+            </span>
           )}
         </div>
 
@@ -79,9 +67,7 @@ export default function StatCard({
           className="font-black leading-none tabular-nums mb-2"
           style={{
             fontSize: 'clamp(1.8rem, 4vw, 2.4rem)',
-            background: valueColor,
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            color: 'var(--text-primary)',
             letterSpacing: '-0.05em',
           }}
         >
@@ -97,13 +83,13 @@ export default function StatCard({
         </p>
 
         {/* Thin divider */}
-        <div className="h-px mb-2.5" style={{ background: `${accentColor}18` }} />
+        <div className="h-px mb-2.5" style={{ background: 'var(--border-subtle)' }} />
 
         {/* Sub info */}
         <div className="flex items-center gap-1.5">
           <div
             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-            style={{ background: accentColor, opacity: 0.6 }}
+            style={{ background: '#10B981', opacity: 0.7 }}
           />
           <p
             className="text-[11px] leading-snug"

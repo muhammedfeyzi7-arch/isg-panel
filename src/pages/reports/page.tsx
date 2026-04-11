@@ -93,13 +93,13 @@ function AnimatedKPICard({ label, value, icon, color, sub, trend, delay = 0 }: {
 
   return (
     <div
-      className="rounded-2xl p-5 relative overflow-hidden cursor-default transition-all duration-300"
+      className="rounded-2xl p-5 relative overflow-hidden cursor-default stat-card-interactive"
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-main)',
         transform: visible ? 'translateY(0)' : 'translateY(12px)',
         opacity: visible ? 1 : 0,
-        transition: `transform 0.5s ease ${delay}ms, opacity 0.5s ease ${delay}ms`,
+        transition: `transform 0.5s ease ${delay}ms, opacity 0.5s ease ${delay}ms, box-shadow 0.25s ease`,
       }}
     >
       {/* Glow bg */}
@@ -1317,16 +1317,16 @@ export default function RaporlarPage() {
         style={{
           background: 'var(--bg-card-solid)',
           border: '1px solid var(--border-subtle)',
-          borderTop: '2px solid #6366F1',
+          borderTop: '2px solid #10B981',
         }}
       >
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
               className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}
+              style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}
             >
-              <i className="ri-bar-chart-grouped-line text-lg" style={{ color: '#6366F1' }} />
+              <i className="ri-bar-chart-grouped-line text-lg" style={{ color: '#10B981' }} />
             </div>
             <div>
               <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Raporlar</h1>
@@ -1455,9 +1455,9 @@ export default function RaporlarPage() {
               onClick={() => setFirmaDropdownOpen(v => !v)}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all"
               style={{
-                background: secilenFirma ? 'rgba(99,102,241,0.1)' : 'var(--bg-card)',
-                border: secilenFirma ? '1px solid rgba(99,102,241,0.3)' : '1px solid var(--border-main)',
-                color: secilenFirma ? '#818CF8' : 'var(--text-secondary)',
+                background: secilenFirma ? 'rgba(16,185,129,0.1)' : 'var(--bg-card)',
+                border: secilenFirma ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-main)',
+                color: secilenFirma ? '#10B981' : 'var(--text-secondary)',
                 minWidth: 160,
               }}
             >

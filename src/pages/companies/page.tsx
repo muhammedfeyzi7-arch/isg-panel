@@ -285,7 +285,7 @@ export default function FirmalarPage() {
     <div className="space-y-4">
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #059669, #34D399)' }} />
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399, #059669)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
@@ -459,30 +459,28 @@ export default function FirmalarPage() {
               ))}
             </div>
 
-            {/* Satırlar — her biri ayrı kart */}
+            {/* Satırlar — premium kart */}
             <div className="space-y-1.5 pt-1">
               {filtered.map((firma) => {
                 const logoUrl = firma.logoUrl;
                 return (
                   <div
                     key={firma.id}
-                    className="grid items-center px-4 py-3 rounded-xl transition-all"
+                    className="grid items-center px-4 py-3 rounded-xl transition-all cursor-pointer"
                     style={{
                       gridTemplateColumns: canManageFirma ? '32px 2.5fr 1.5fr 1.5fr 1fr 1fr 1.2fr 100px' : '2.5fr 1.5fr 1.5fr 1fr 1fr 1.2fr 100px',
                       background: selected.has(firma.id) ? 'rgba(16,185,129,0.04)' : 'var(--bg-card-solid)',
                       border: selected.has(firma.id) ? '1px solid rgba(16,185,129,0.2)' : '1px solid var(--border-subtle)',
                     }}
                     onMouseEnter={e => {
-                      if (!selected.has(firma.id)) {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.03)';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.15)';
-                      }
+                      (e.currentTarget as HTMLElement).style.background = selected.has(firma.id) ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.2)';
+                      (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
                     }}
                     onMouseLeave={e => {
-                      if (!selected.has(firma.id)) {
-                        (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-solid)';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
-                      }
+                      (e.currentTarget as HTMLElement).style.background = selected.has(firma.id) ? 'rgba(16,185,129,0.04)' : 'var(--bg-card-solid)';
+                      (e.currentTarget as HTMLElement).style.borderColor = selected.has(firma.id) ? 'rgba(16,185,129,0.2)' : 'var(--border-subtle)';
+                      (e.currentTarget as HTMLElement).style.transform = 'none';
                     }}
                   >
                     {canManageFirma && (
@@ -848,7 +846,8 @@ export default function FirmalarPage() {
   );
 }
 
-function ActionBtn({ icon, color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
+function ActionBtn({ icon, color: _color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
+  const accentColor = '#10B981';
   return (
     <button
       onClick={onClick}
@@ -856,9 +855,9 @@ function ActionBtn({ icon, color, onClick, title }: { icon: string; color: strin
       className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
       style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
       onMouseEnter={e => {
-        e.currentTarget.style.color = color;
-        e.currentTarget.style.background = `${color}18`;
-        e.currentTarget.style.borderColor = `${color}38`;
+        e.currentTarget.style.color = accentColor;
+        e.currentTarget.style.background = `${accentColor}15`;
+        e.currentTarget.style.borderColor = `${accentColor}35`;
       }}
       onMouseLeave={e => {
         e.currentTarget.style.color = 'var(--text-muted)';

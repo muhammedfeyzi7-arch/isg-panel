@@ -265,7 +265,7 @@ async function exportEgitimlerToExcel(
 
 // ── Aksiyon butonu ──
 function ABtn({ icon, color: _color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
-  const accentColor = '#8B5CF6';
+  const accentColor = '#10B981';
   return (
     <button onClick={onClick} title={title}
       className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
@@ -534,11 +534,11 @@ export default function EgitimlerPage() {
     <div className="space-y-5">
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #8B5CF6, #6366F1, #818CF8)' }} />
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #059669, #34D399)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)' }}>
+              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
               <i className="ri-graduation-cap-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -548,7 +548,7 @@ export default function EgitimlerPage() {
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{aktifEgitimler.length} eğitim kayıtlı</span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.18)', color: '#A78BFA' }}>
+                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.18)', color: '#34D399' }}>
                   {stats.toplamKatilimci} katılımcı
                 </span>
               </div>
@@ -559,7 +559,7 @@ export default function EgitimlerPage() {
               <i className="ri-file-excel-2-line text-xs" />Excel
             </button>
             {canEdit && (
-              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)', border: '1px solid rgba(139,92,246,0.4)' }}>
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.4)' }}>
                 <i className="ri-add-line" />
                 Eğitim Ekle
               </button>
@@ -571,12 +571,12 @@ export default function EgitimlerPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Toplam Eğitim', value: stats.toplam, icon: 'ri-graduation-cap-line', color: '#818CF8', bg: 'rgba(129,140,248,0.1)', border: 'rgba(129,140,248,0.2)' },
-          { label: 'Toplam Katılımcı', value: stats.toplamKatilimci, icon: 'ri-team-line', color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', border: 'rgba(96,165,250,0.2)' },
+          { label: 'Toplam Eğitim', value: stats.toplam, icon: 'ri-graduation-cap-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)' },
+          { label: 'Toplam Katılımcı', value: stats.toplamKatilimci, icon: 'ri-team-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)' },
           { label: 'Katılan Kişi', value: stats.toplamKatildi, icon: 'ri-checkbox-circle-line', color: '#34D399', bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.2)' },
           { label: 'Katılım Oranı', value: `%${stats.katilimOrani}`, icon: 'ri-bar-chart-line', color: stats.katilimOrani >= 80 ? '#34D399' : stats.katilimOrani >= 50 ? '#F59E0B' : '#EF4444', bg: stats.katilimOrani >= 80 ? 'rgba(52,211,153,0.1)' : stats.katilimOrani >= 50 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)', border: stats.katilimOrani >= 80 ? 'rgba(52,211,153,0.2)' : stats.katilimOrani >= 50 ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)' },
         ].map(s => (
-          <div key={s.label} className="isg-card rounded-xl p-4 flex items-center gap-4 transition-all duration-200 hover:scale-[1.02]"
+          <div key={s.label} className="isg-card stat-card-interactive rounded-xl p-4 flex items-center gap-4"
             style={{ border: `1px solid ${s.border}`, background: s.bg }}>
             <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${s.color}18` }}>
               <i className={`${s.icon} text-xl`} style={{ color: s.color }} />
@@ -652,8 +652,8 @@ export default function EgitimlerPage() {
                   <div className="flex items-start gap-3">
                     {canEdit && <input type="checkbox" checked={selectedIds.has(eg.id)} onChange={() => toggleOne(eg.id)} className="cursor-pointer mt-1 flex-shrink-0" />}
                     <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                      style={{ background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.2)' }}>
-                      <i className="ri-graduation-cap-line text-sm" style={{ color: '#818CF8' }} />
+                      style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                      <i className="ri-graduation-cap-line text-sm" style={{ color: '#10B981' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
@@ -665,7 +665,7 @@ export default function EgitimlerPage() {
                         {eg.tarih && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{new Date(eg.tarih).toLocaleDateString('tr-TR')}</span>}
                         {eg.egitmen && <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{eg.egitmen}</span>}
                         <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
-                          style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
+                          style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
                           {stats2.toplam} kişi
                         </span>
                       </div>
@@ -683,81 +683,105 @@ export default function EgitimlerPage() {
             })}
           </div>
 
-          {/* Masaüstü */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full table-premium">
-              <thead>
-                <tr>
-                  {canEdit && <th className="w-10 text-center"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" /></th>}
-                  <th className="text-left">Eğitim Adı</th>
-                  <th className="text-left hidden md:table-cell">Firma</th>
-                  <th className="text-left hidden lg:table-cell">Eğitmen</th>
-                  <th className="text-left hidden sm:table-cell">Tarih</th>
-                  <th className="text-left hidden lg:table-cell">Katılımcı</th>
-                  <th className="text-left">Durum</th>
-                  <th className="w-28 text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(eg => {
-                  const stats2 = getKatilimStats(eg, personeller);
-                  return (
-                    <tr key={eg.id} style={{ background: selectedIds.has(eg.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
-                      {canEdit && (
-                        <td className="text-center">
-                          <input type="checkbox" checked={selectedIds.has(eg.id)} onChange={() => toggleOne(eg.id)} className="cursor-pointer" />
-                        </td>
-                      )}
-                      <td>
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                            style={{ background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.2)' }}>
-                            <i className="ri-graduation-cap-line text-sm" style={{ color: '#818CF8' }} />
-                          </div>
-                          <div className="min-w-0">
-                            <button onClick={() => setDetailId(eg.id)}
-                              className="text-sm font-semibold transition-colors cursor-pointer block text-left"
-                              style={{ color: 'var(--text-primary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {eg.ad}
-                            </button>
-                            {eg.aciklama && (
-                              <p className="text-xs mt-0.5 truncate max-w-[180px]" style={{ color: 'var(--text-muted)' }}>{eg.aciklama}</p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="hidden md:table-cell">
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(eg)}</p>
-                      </td>
-                      <td className="hidden lg:table-cell">
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{eg.egitmen || '—'}</p>
-                      </td>
-                      <td className="hidden sm:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                          {eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'}
-                        </span>
-                      </td>
-                      <td className="hidden lg:table-cell">
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                          style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
-                          {stats2.toplam} kişi
-                        </span>
-                      </td>
-                      <td><DurumBadge eg={eg} personeller={personeller} /></td>
-                      <td>
-                        <div className="flex items-center gap-1 justify-end">
-                          <ABtn icon="ri-eye-line" color="" onClick={() => setDetailId(eg.id)} title="Detay" />
-                          {canEdit && <>
-                            <ABtn icon="ri-edit-line" color="" onClick={() => openEdit(eg)} title="Düzenle" />
-                            <ABtn icon="ri-delete-bin-line" color="" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
-                          </>}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* Masaüstü premium kart liste */}
+          <div className="hidden md:block">
+            {/* Sütun başlıkları */}
+            <div className="grid items-center px-4 py-2"
+              style={{
+                gridTemplateColumns: canEdit ? '32px 2.5fr 1.5fr 1fr 1fr 1.2fr 100px' : '2.5fr 1.5fr 1fr 1fr 1.2fr 100px',
+                borderBottom: '1px solid var(--border-subtle)',
+              }}>
+              {canEdit && (
+                <div className="flex items-center justify-center">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                </div>
+              )}
+              {['EĞİTİM', 'FİRMA', 'EĞİTMEN', 'TARİH', 'DURUM', 'İŞLEMLER'].map(h => (
+                <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
+              ))}
+            </div>
+
+            <div className="space-y-1.5 pt-1">
+              {filtered.map(eg => {
+                const stats2 = getKatilimStats(eg, personeller);
+                const isSelected = selectedIds.has(eg.id);
+                return (
+                  <div
+                    key={eg.id}
+                    className="grid items-center px-4 py-3 rounded-xl transition-all cursor-pointer"
+                    style={{
+                      gridTemplateColumns: canEdit ? '32px 2.5fr 1.5fr 1fr 1fr 1.2fr 100px' : '2.5fr 1.5fr 1fr 1fr 1.2fr 100px',
+                      background: isSelected ? 'rgba(16,185,129,0.04)' : 'var(--bg-card-solid)',
+                      border: isSelected ? '1px solid rgba(16,185,129,0.2)' : '1px solid var(--border-subtle)',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.04)';
+                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.2)';
+                      (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(16,185,129,0.04)' : 'var(--bg-card-solid)';
+                      (e.currentTarget as HTMLElement).style.borderColor = isSelected ? 'rgba(16,185,129,0.2)' : 'var(--border-subtle)';
+                      (e.currentTarget as HTMLElement).style.transform = 'none';
+                    }}
+                    onClick={() => setDetailId(eg.id)}
+                  >
+                    {canEdit && (
+                      <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleOne(eg.id)} className="cursor-pointer" />
+                      </div>
+                    )}
+                    {/* Eğitim adı */}
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+                        style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        <i className="ri-graduation-cap-line text-xs" style={{ color: '#10B981' }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{eg.ad}</p>
+                        {eg.aciklama && (
+                          <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{eg.aciklama}</p>
+                        )}
+                      </div>
+                    </div>
+                    {/* Firma */}
+                    <div className="min-w-0 pr-2">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <i className="ri-building-2-line text-[9px]" />
+                        <span className="truncate max-w-[100px]">{getFirmaAd(eg)}</span>
+                      </span>
+                    </div>
+                    {/* Eğitmen */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{eg.egitmen || '—'}</p>
+                    </div>
+                    {/* Tarih */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {eg.tarih ? new Date(eg.tarih).toLocaleDateString('tr-TR') : '—'}
+                      </p>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 inline-block"
+                        style={{ background: 'rgba(16,185,129,0.08)', color: '#10B981', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        {stats2.toplam} kişi
+                      </span>
+                    </div>
+                    {/* Durum */}
+                    <div>
+                      <DurumBadge eg={eg} personeller={personeller} />
+                    </div>
+                    {/* İşlemler */}
+                    <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
+                      <ABtn icon="ri-eye-line" color="" onClick={() => setDetailId(eg.id)} title="Detay" />
+                      {canEdit && <>
+                        <ABtn icon="ri-edit-line" color="" onClick={() => openEdit(eg)} title="Düzenle" />
+                        <ABtn icon="ri-delete-bin-line" color="" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
+                      </>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
