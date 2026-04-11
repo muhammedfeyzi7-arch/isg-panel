@@ -264,15 +264,24 @@ async function exportEgitimlerToExcel(
   }
 
 // ── Aksiyon butonu ──
-function ABtn({ icon, color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
+function ABtn({ icon, color: _color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
+  const accentColor = '#8B5CF6';
   return (
     <button onClick={onClick} title={title}
-      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
-      style={{ color: '#475569' }}
-      onMouseEnter={e => { e.currentTarget.style.color = color; e.currentTarget.style.background = `${color}18`; }}
-      onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'transparent'; }}
+      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+      style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
+      onMouseEnter={e => {
+        e.currentTarget.style.color = accentColor;
+        e.currentTarget.style.background = `${accentColor}15`;
+        e.currentTarget.style.borderColor = `${accentColor}35`;
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.color = 'var(--text-muted)';
+        e.currentTarget.style.background = 'var(--bg-item)';
+        e.currentTarget.style.borderColor = 'var(--border-subtle)';
+      }}
     >
-      <i className={`${icon} text-sm`} />
+      <i className={`${icon} text-xs`} />
     </button>
   );
 }
@@ -663,10 +672,10 @@ export default function EgitimlerPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 justify-end mt-2">
-                    <ABtn icon="ri-eye-line" color="#60A5FA" onClick={() => setDetailId(eg.id)} title="Detay" />
+                    <ABtn icon="ri-eye-line" color="" onClick={() => setDetailId(eg.id)} title="Detay" />
                     {canEdit && <>
-                      <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(eg)} title="Düzenle" />
-                      <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
+                      <ABtn icon="ri-edit-line" color="" onClick={() => openEdit(eg)} title="Düzenle" />
+                      <ABtn icon="ri-delete-bin-line" color="" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
                     </>}
                   </div>
                 </div>
@@ -737,10 +746,10 @@ export default function EgitimlerPage() {
                       <td><DurumBadge eg={eg} personeller={personeller} /></td>
                       <td>
                         <div className="flex items-center gap-1 justify-end">
-                          <ABtn icon="ri-eye-line" color="#60A5FA" onClick={() => setDetailId(eg.id)} title="Detay" />
+                          <ABtn icon="ri-eye-line" color="" onClick={() => setDetailId(eg.id)} title="Detay" />
                           {canEdit && <>
-                            <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(eg)} title="Düzenle" />
-                            <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
+                            <ABtn icon="ri-edit-line" color="" onClick={() => openEdit(eg)} title="Düzenle" />
+                            <ABtn icon="ri-delete-bin-line" color="" onClick={() => setDeleteConfirm(eg.id)} title="Sil" />
                           </>}
                         </div>
                       </td>

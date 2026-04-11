@@ -292,6 +292,19 @@ const emptyForm: MuayeneForm = {
   personelId: '', firmaId: '', muayeneTarihi: '', sonrakiTarih: '', saglikDurumu: '',
 };
 
+function HealthActionBtn({ icon, onClick, title }: { icon: string; onClick: () => void; title: string }) {
+  const accent = '#EC4899';
+  return (
+    <button onClick={onClick} title={title}
+      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+      style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
+      onMouseEnter={e => { e.currentTarget.style.color = accent; e.currentTarget.style.background = `${accent}15`; e.currentTarget.style.borderColor = `${accent}35`; }}
+      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'var(--bg-item)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}>
+      <i className={`${icon} text-xs`} />
+    </button>
+  );
+}
+
 // ─── Ana Sayfa ────────────────────────────────────────────────────────────────
 export default function MuayenelerPage() {
   const { muayeneler, personeller, firmalar, addMuayene, updateMuayene, deleteMuayene, addToast, refreshData } = useApp();
@@ -698,12 +711,8 @@ export default function MuayenelerPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => openEdit(m)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }} title="Düzenle">
-                            <i className="ri-edit-line text-xs" />
-                          </button>
-                          <button onClick={() => setDeleteId(m.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil">
-                            <i className="ri-delete-bin-line text-xs" />
-                          </button>
+                          <HealthActionBtn icon="ri-edit-line" onClick={() => openEdit(m)} title="Düzenle" />
+                          <HealthActionBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(m.id)} title="Sil" />
                         </div>
                       </td>
                     </tr>

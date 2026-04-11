@@ -816,6 +816,20 @@ function sanitizeFileName(name: string): string {
   return `${safe || 'file'}.${ext}`;
 }
 
+// ─── Aksiyon butonu ────────────────────────────────────────────────────────
+function IsIzniBtn({ icon, onClick, title }: { icon: string; onClick: () => void; title: string }) {
+  const accent = '#60A5FA';
+  return (
+    <button onClick={onClick} title={title}
+      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+      style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
+      onMouseEnter={e => { e.currentTarget.style.color = accent; e.currentTarget.style.background = `${accent}15`; e.currentTarget.style.borderColor = `${accent}35`; }}
+      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'var(--bg-item)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}>
+      <i className={`${icon} text-xs`} />
+    </button>
+  );
+}
+
 // ─── Ana Sayfa ──────────────────────────────────────────────────────────────
 const emptyForm = {
   tip: 'Genel' as IsIzniTip,
@@ -1332,39 +1346,15 @@ export default function IsIzniPage() {
                           )}
                           {/* Denetçi: detay görüntüle */}
                           {isDenetci && iz.durum !== 'Onay Bekliyor' && (
-                            <button
-                              onClick={() => setDenetciRecordId(iz.id)}
-                              title="Detay"
-                              className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
-                              style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}
-                            >
-                              <i className="ri-eye-line text-xs" />
-                            </button>
+                            <IsIzniBtn icon="ri-eye-line" onClick={() => setDenetciRecordId(iz.id)} title="Detay" />
                           )}
                           {/* Admin/Member işlemleri */}
                           {!isDenetci && (
                             <>
-                              <button onClick={() => setViewRecordId(iz.id)} title="Detay" className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
-                                <i className="ri-eye-line text-xs" />
-                              </button>
-                              <button
-                                onClick={() => { const f = firmalar.find(x => x.id === iz.firmaId); generateIsIzniPdf(iz, f, personeller.filter(p => iz.calisanlar?.includes(p.adSoyad))); }}
-                                title="PDF"
-                                className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
-                                style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}
-                              >
-                                <i className="ri-file-pdf-line text-xs" />
-                              </button>
-                              {canEdit && (
-                                <button onClick={() => openEdit(iz)} title="Düzenle" className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
-                                  <i className="ri-edit-line text-xs" />
-                                </button>
-                              )}
-                              {canDelete && (
-                                <button onClick={() => setDeleteId(iz.id)} title="Sil" className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                                  <i className="ri-delete-bin-line text-xs" />
-                                </button>
-                              )}
+                              <IsIzniBtn icon="ri-eye-line" onClick={() => setViewRecordId(iz.id)} title="Detay" />
+                              <IsIzniBtn icon="ri-file-pdf-line" onClick={() => { const f = firmalar.find(x => x.id === iz.firmaId); generateIsIzniPdf(iz, f, personeller.filter(p => iz.calisanlar?.includes(p.adSoyad))); }} title="PDF" />
+                              {canEdit && <IsIzniBtn icon="ri-edit-line" onClick={() => openEdit(iz)} title="Düzenle" />}
+                              {canDelete && <IsIzniBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(iz.id)} title="Sil" />}
                             </>
                           )}
                         </div>

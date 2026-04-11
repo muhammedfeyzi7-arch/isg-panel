@@ -375,6 +375,19 @@ const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: s
   'Hurda': { label: 'Hurda', color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ri-delete-bin-line' },
 };
 
+function EkipmanBtn({ icon, onClick, title }: { icon: string; onClick: () => void; title: string }) {
+  const accent = '#FB923C';
+  return (
+    <button onClick={onClick} title={title}
+      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+      style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
+      onMouseEnter={e => { e.currentTarget.style.color = accent; e.currentTarget.style.background = `${accent}15`; e.currentTarget.style.borderColor = `${accent}35`; }}
+      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'var(--bg-item)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}>
+      <i className={`${icon} text-xs`} />
+    </button>
+  );
+}
+
 const defaultForm: Omit<Ekipman, 'id' | 'olusturmaTarihi'> & { belgeGecerlilikTarihi?: string } = {
   ad: '',
   tur: '',
@@ -1060,12 +1073,10 @@ export default function EkipmanlarPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 justify-end mt-2">
-                    {ekipman.dosyaUrl && (
-                      <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} title="İndir"><i className="ri-download-2-line text-sm" /></button>
-                    )}
-                    <button onClick={() => setQrEkipman(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(168,85,247,0.1)', color: '#A855F7' }} title="QR"><i className="ri-qr-code-line text-sm" /></button>
-                    {canEdit && <button onClick={() => openEdit(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>}
-                    {canDelete && <button onClick={() => setDeleteId(ekipman.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>}
+                    {ekipman.dosyaUrl && <EkipmanBtn icon="ri-download-2-line" onClick={() => handleFileDownload(ekipman)} title="İndir" />}
+                    <EkipmanBtn icon="ri-qr-code-line" onClick={() => setQrEkipman(ekipman)} title="QR" />
+                    {canEdit && <EkipmanBtn icon="ri-edit-line" onClick={() => openEdit(ekipman)} title="Düzenle" />}
+                    {canDelete && <EkipmanBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(ekipman.id)} title="Sil" />}
                   </div>
                 </div>
               );
@@ -1153,51 +1164,31 @@ export default function EkipmanlarPage() {
                         </span>
                       </td>
                       <td>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           {hasFileError && (
-                            <button
-                              onClick={() => openEdit(ekipman)}
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded cursor-pointer transition-all whitespace-nowrap"
-                              style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}
-                              title="Dosya yüklenmemiş — düzenleyerek ekleyin"
-                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.2)'; }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.1)'; }}
-                            >
-                              <i className="ri-upload-2-line" />Belge Ekle
-                            </button>
+                            <EkipmanBtn icon="ri-upload-2-line" onClick={() => openEdit(ekipman)} title="Belge Ekle" />
                           )}
                           {ekipman.dosyaUrl && (
-                            <button onClick={async () => {
-                              // Senkron olarak pencereyi hemen aç — mobil popup blocker geçmek için
+                            <EkipmanBtn icon="ri-eye-line" onClick={async () => {
                               const win = window.open('', '_blank');
-                              if (win) {
-                                win.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="font-size:16px">Belge yükleniyor...</p></body></html>');
-                              }
+                              if (win) win.document.write('<html><body style="background:#111;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="font-size:16px">Belge yükleniyor...</p></body></html>');
                               const url = await getSignedUrlFromPath(ekipman.dosyaUrl!);
-                              if (url) {
-                                if (win && !win.closed) {
-                                  win.location.href = url;
-                                } else {
-                                  window.open(url, '_blank');
-                                }
-                              } else {
-                                if (win && !win.closed) win.close();
-                                addToast('Belge erişim linki alınamadı.', 'error');
-                              }
-                            }} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(96,165,250,0.1)', color: '#60A5FA' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.1)'; }} title="Belgeyi Görüntüle"><i className="ri-eye-line text-sm" /></button>
+                              if (url) { if (win && !win.closed) win.location.href = url; else window.open(url, '_blank'); }
+                              else { if (win && !win.closed) win.close(); addToast('Belge erişim linki alınamadı.', 'error'); }
+                            }} title="Belgeyi Görüntüle" />
                           )}
                           {ekipman.dosyaUrl && (
-                            <button onClick={() => handleFileDownload(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Belgeyi İndir"><i className="ri-download-2-line text-sm" /></button>
+                            <EkipmanBtn icon="ri-download-2-line" onClick={() => handleFileDownload(ekipman)} title="Belgeyi İndir" />
                           )}
                           {canEdit && (
-                            <button onClick={() => openKontrolModal(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }} title="Kontrol Kaydı Ekle"><i className="ri-checkbox-circle-line text-sm" /></button>
+                            <EkipmanBtn icon="ri-checkbox-circle-line" onClick={() => openKontrolModal(ekipman)} title="Kontrol Kaydı Ekle" />
                           )}
-                          <button onClick={() => setQrEkipman(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(168,85,247,0.1)', color: '#A855F7' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.1)'; }} title="QR Kod"><i className="ri-qr-code-line text-sm" /></button>
+                          <EkipmanBtn icon="ri-qr-code-line" onClick={() => setQrEkipman(ekipman)} title="QR Kod" />
                           {canEdit && (
-                            <button onClick={() => openEdit(ekipman)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(59,130,246,0.1)', color: '#3B82F6' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} title="Düzenle"><i className="ri-edit-line text-sm" /></button>
+                            <EkipmanBtn icon="ri-edit-line" onClick={() => openEdit(ekipman)} title="Düzenle" />
                           )}
                           {canDelete && (
-                            <button onClick={() => setDeleteId(ekipman.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }} title="Sil"><i className="ri-delete-bin-line text-sm" /></button>
+                            <EkipmanBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(ekipman.id)} title="Sil" />
                           )}
                         </div>
                       </td>

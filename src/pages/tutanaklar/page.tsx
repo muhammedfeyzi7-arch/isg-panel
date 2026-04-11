@@ -1011,25 +1011,11 @@ export default function TutanaklarPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-3 justify-end flex-wrap">
-                    {t.dosyaAdi && (
-                      <button onClick={() => handleFileDownload(t)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399' }}>
-                        <i className="ri-attachment-2" />Dosya
-                      </button>
-                    )}
-                    <button onClick={() => setViewId(t.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>
-                      <i className="ri-eye-line" />Görüntüle
-                    </button>
-                    {canEdit && (
-                      <button onClick={() => openEdit(t)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
-                        <i className="ri-edit-line text-sm" />
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button onClick={() => setDeleteId(t.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                        <i className="ri-delete-bin-line text-sm" />
-                      </button>
-                    )}
+                  <div className="flex items-center gap-1.5 mt-3 justify-end flex-wrap">
+                    {t.dosyaAdi && <TableBtn icon="ri-attachment-2" onClick={() => handleFileDownload(t)} title="Dosya İndir" />}
+                    <TableBtn icon="ri-eye-line" onClick={() => setViewId(t.id)} title="Görüntüle" />
+                    {canEdit && <TableBtn icon="ri-edit-line" onClick={() => openEdit(t)} title="Düzenle" />}
+                    {canDelete && <TableBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(t.id)} title="Sil" />}
                   </div>
                 </div>
               );
@@ -1464,25 +1450,28 @@ export default function TutanaklarPage() {
 }
 
 /* ── Tablo aksiyon butonu ──────────────────────────────────── */
-function TableBtn({ icon, color, onClick, title }: {
-  icon: string; color: string; onClick: () => void; title: string;
+function TableBtn({ icon, onClick, title }: {
+  icon: string; color?: string; onClick: () => void; title: string;
 }) {
+  const accent = '#14B8A6';
   return (
     <button
       onClick={onClick}
       title={title}
-      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 hover:scale-110"
-      style={{ color: '#475569' }}
+      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
+      style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
       onMouseEnter={e => {
-        e.currentTarget.style.color = color;
-        e.currentTarget.style.background = `${color}18`;
+        e.currentTarget.style.color = accent;
+        e.currentTarget.style.background = `${accent}15`;
+        e.currentTarget.style.borderColor = `${accent}35`;
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.color = '#475569';
-        e.currentTarget.style.background = 'transparent';
+        e.currentTarget.style.color = 'var(--text-muted)';
+        e.currentTarget.style.background = 'var(--bg-item)';
+        e.currentTarget.style.borderColor = 'var(--border-subtle)';
       }}
     >
-      <i className={`${icon} text-sm`} />
+      <i className={`${icon} text-xs`} />
     </button>
   );
 }

@@ -685,13 +685,14 @@ export default function EvraklarPage() {
   );
 }
 
-function ABtn({ icon, color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
+function ABtn({ icon, onClick, title }: { icon: string; color?: string; onClick: () => void; title: string }) {
+  const accent = '#F59E0B';
   return (
     <button onClick={onClick} title={title}
-      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 hover:scale-110"
-      style={{ color: '#475569' }}
-      onMouseEnter={e => { e.currentTarget.style.color = color; e.currentTarget.style.background = `${color}18`; }}
-      onMouseLeave={e => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'transparent'; }}
+      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150"
+      style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
+      onMouseEnter={e => { e.currentTarget.style.color = accent; e.currentTarget.style.borderColor = `${accent}50`; e.currentTarget.style.background = `${accent}12`; }}
+      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-item)'; }}
     >
       <i className={`${icon} text-sm`} />
     </button>

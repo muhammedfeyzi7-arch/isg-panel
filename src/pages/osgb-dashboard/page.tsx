@@ -783,11 +783,10 @@ export default function OsgbDashboardPage() {
                         <button
                           onClick={handlePdfExport}
                           disabled={raporExporting !== null}
-                          className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+                          className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer text-white"
                           style={{
-                            background: 'rgba(239,68,68,0.08)',
-                            border: '1.5px solid rgba(239,68,68,0.25)',
-                            color: '#DC2626',
+                            background: 'linear-gradient(135deg, #10B981, #059669)',
+                            border: '1px solid rgba(16,185,129,0.3)',
                             opacity: raporExporting === 'pdf' ? 0.7 : 1,
                           }}
                         >
@@ -798,11 +797,10 @@ export default function OsgbDashboardPage() {
                         <button
                           onClick={handleExcelExport}
                           disabled={raporExporting !== null}
-                          className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+                          className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer text-white"
                           style={{
-                            background: 'rgba(16,185,129,0.08)',
-                            border: '1.5px solid rgba(16,185,129,0.25)',
-                            color: '#059669',
+                            background: 'linear-gradient(135deg, #10B981, #059669)',
+                            border: '1px solid rgba(16,185,129,0.3)',
                             opacity: raporExporting === 'excel' ? 0.7 : 1,
                           }}
                         >
@@ -869,8 +867,9 @@ export default function OsgbDashboardPage() {
                                 >
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                                        <i className="ri-building-2-line text-xs" style={{ color: '#059669' }} />
+                                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                                        <i className="ri-building-2-line" />
                                       </div>
                                       <span className="text-xs font-semibold" style={{ color: textPrimary }}>{f.name}</span>
                                     </div>
@@ -1007,7 +1006,7 @@ export default function OsgbDashboardPage() {
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
                   style={{
                     background: uzmanFormTab === tab.idx ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
-                    border: uzmanFormTab === tab.idx ? '1px solid rgba(16,185,129,0.25)' : '1px solid var(--border-subtle)',
+                    border: uzmanFormTab === tab.idx ? '1.5px solid rgba(16,185,129,0.25)' : '1px solid var(--border-subtle)',
                     color: uzmanFormTab === tab.idx ? '#10B981' : 'var(--text-muted)',
                   }}>
                   <i className={`${tab.icon} text-xs`} />
@@ -1141,7 +1140,7 @@ export default function OsgbDashboardPage() {
                           const color = len < 6 ? '#EF4444' : len < 8 ? '#F59E0B' : len < 12 ? '#10B981' : '#22C55E';
                           return <div key={i} className="flex-1 h-1 rounded-full" style={{ background: active ? color : 'var(--border-subtle)' }} />;
                         })}
-                        <span className="text-[10px] ml-1" style={{ color: uzmanForm.password.length < 6 ? '#EF4444' : uzmanForm.password.length < 8 ? '#F59E0B' : '#10B981' }}>
+                        <span className="text-[10px] ml-1" style={{ color: uzmanForm.password.length < 6 ? '#EF4444' : uzmanForm.password.length < 8 ? '#F59E0B' : uzmanForm.password.length < 12 ? '#10B981' : '#22C55E' }}>
                           {uzmanForm.password.length < 6 ? 'Zayıf' : uzmanForm.password.length < 8 ? 'Orta' : uzmanForm.password.length < 12 ? 'İyi' : 'Güçlü'}
                         </span>
                       </div>
@@ -1171,7 +1170,7 @@ export default function OsgbDashboardPage() {
                   </div>
 
                   <div className="p-3 rounded-xl flex items-start gap-2.5" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                    <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
+                    <i className="ri-information-line text-sm flex-shrink-0" style={{ color: '#10B981' }} />
                     <p className="text-[10.5px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Uzman bu e-posta ve şifre ile sisteme giriş yapabilecek. Şifreyi güvenli bir şekilde iletin.
                     </p>
@@ -1248,13 +1247,6 @@ export default function OsgbDashboardPage() {
                     </div>
                   ) : (
                     <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>Henüz firma eklenmedi.</p>
-                  )}
-
-                  {altFirmalar.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-8 gap-2">
-                      <i className="ri-building-2-line text-2xl" style={{ color: 'var(--text-faint)' }} />
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Henüz firma eklenmedi. Uzmanı önce ekleyip sonra atama yapabilirsiniz.</p>
-                    </div>
                   )}
                 </div>
               )}
@@ -1435,7 +1427,7 @@ export default function OsgbDashboardPage() {
               <button onClick={handleAtamaKaydet}
                 disabled={atamaLoading || !atamaUzmanId || atamaFirmaIds.length === 0}
                 className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)', opacity: (atamaLoading || !atamaUzmanId || atamaFirmaIds.length === 0) ? 0.6 : 1 }}>
+                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: (atamaLoading || !atamaUzmanId || atamaFirmaIds.length === 0) ? 0.6 : 1 }}>
                 {atamaLoading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-links-line" />Atamaları Kaydet</>}
               </button>
             </div>

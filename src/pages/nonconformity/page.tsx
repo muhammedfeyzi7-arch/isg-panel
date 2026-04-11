@@ -10,6 +10,22 @@ import DofImport from './components/DofImport';
 import Modal from '../../components/base/Modal';
 import { usePermissions } from '../../hooks/usePermissions';
 
+function NcBtn({ icon, title, onClick }: { icon: string; title: string; onClick: () => void }) {
+  const accent = '#F97316';
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150"
+      style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
+      onMouseEnter={e => { e.currentTarget.style.color = accent; e.currentTarget.style.borderColor = `${accent}50`; e.currentTarget.style.background = `${accent}12`; }}
+      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-item)'; }}
+    >
+      <i className={`${icon} text-xs`} />
+    </button>
+  );
+}
+
 export default function UygunsuzluklarPage() {
   const {
     uygunsuzluklar, firmalar, personeller,
@@ -196,7 +212,9 @@ export default function UygunsuzluklarPage() {
               </button>
             )}
             {canCreateNonconformity && (
-              <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #F97316, #DC2626)', border: '1px solid rgba(249,115,22,0.4)' }}>
+              <button onClick={() => { setEditRecord(null); setShowForm(true); }}
+                className="whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)', fontSize: '12px' }}>
                 <i className="ri-add-line" />Yeni Kayıt
               </button>
             )}
@@ -355,24 +373,12 @@ export default function UygunsuzluklarPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 mt-3 justify-end">
-                          <button onClick={() => setDetailRecord(u)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
-                            <i className="ri-eye-line" />Detay
-                          </button>
+                          <NcBtn icon="ri-eye-line" title="Detay" onClick={() => setDetailRecord(u)} />
                           {u.durum !== 'Kapandı' && canCloseNonconformity && (
-                            <button onClick={() => setKapatmaRecord(u)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }}>
-                              <i className="ri-checkbox-circle-line" />Kapat
-                            </button>
+                            <NcBtn icon="ri-checkbox-circle-line" title="Kapat" onClick={() => setKapatmaRecord(u)} />
                           )}
-                          {canEdit && (
-                            <button onClick={() => openEdit(u)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>
-                              <i className="ri-edit-line text-sm" />
-                            </button>
-                          )}
-                          {canDelete && (
-                            <button onClick={() => setDeleteId(u.id)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                              <i className="ri-delete-bin-line text-sm" />
-                            </button>
-                          )}
+                          {canEdit && <NcBtn icon="ri-edit-line" title="Düzenle" onClick={() => openEdit(u)} />}
+                          {canDelete && <NcBtn icon="ri-delete-bin-line" title="Sil" onClick={() => setDeleteId(u.id)} />}
                         </div>
                       </div>
                     );
@@ -442,24 +448,12 @@ export default function UygunsuzluklarPage() {
                             </td>
                             <td>
                               <div className="flex items-center gap-1 justify-end">
-                                <button onClick={() => setDetailRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }} title="Detay">
-                                  <i className="ri-eye-line text-xs" />
-                                </button>
+                                <NcBtn icon="ri-eye-line" title="Detay" onClick={() => setDetailRecord(u)} />
                                 {u.durum !== 'Kapandı' && canCloseNonconformity && (
-                                  <button onClick={() => setKapatmaRecord(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E' }} title="Kapatma Yap">
-                                    <i className="ri-checkbox-circle-line text-xs" />
-                                  </button>
+                                  <NcBtn icon="ri-checkbox-circle-line" title="Kapatma Yap" onClick={() => setKapatmaRecord(u)} />
                                 )}
-                                {canEdit && (
-                                  <button onClick={() => openEdit(u)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }} title="Düzenle">
-                                    <i className="ri-edit-line text-xs" />
-                                  </button>
-                                )}
-                                {canDelete && (
-                                  <button onClick={() => setDeleteId(u.id)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }} title="Sil">
-                                    <i className="ri-delete-bin-line text-xs" />
-                                  </button>
-                                )}
+                                {canEdit && <NcBtn icon="ri-edit-line" title="Düzenle" onClick={() => openEdit(u)} />}
+                                {canDelete && <NcBtn icon="ri-delete-bin-line" title="Sil" onClick={() => setDeleteId(u.id)} />}
                               </div>
                             </td>
                           </tr>
