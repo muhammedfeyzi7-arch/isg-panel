@@ -304,6 +304,57 @@ export function useOrganization(user: User | null) {
           return;
         }
 
+        // ── İşyeri Hekimi: Multi-Firma Modeli ─────────────────────────────
+        if (data.osgb_role === 'isyeri_hekimi') {
+          const rawIds = (data as Record<string, unknown>).active_firm_ids;
+          const firmIds: string[] = Array.isArray(rawIds) && rawIds.length > 0
+            ? (rawIds as string[]).filter(Boolean)
+            : data.active_firm_id ? [data.active_firm_id] : [];
+
+          if (firmIds.length === 0) {
+            // Firma atanmamış — OSGB org'una düş, hekim bekleme ekranı gösterilir
+            setOrg({
+              id: o.id,
+              name: o.name,
+              invite_code: o.invite_code,
+              role: data.role ?? 'member',
+              isActive: data.is_active !== false,
+              mustChangePassword: data.must_change_password === true,
+              displayName: data.display_name ?? undefined,
+              email: data.email ?? undefined,
+              orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
+              osgbRole: 'isyeri_hekimi',
+              activeFirmIds: [],
+            });
+            setLoading(false);
+            return;
+          }
+
+          // Hekim: ilk firmanın ID'sini kullan (tüm firmalar HekimPage'de gösterilecek)
+          const primaryFirmId = firmIds[0];
+          const { data: firmaOrg } = await supabase
+            .from('organizations')
+            .select('id, name, invite_code, org_type')
+            .eq('id', primaryFirmId)
+            .maybeSingle();
+
+          setOrg({
+            id: firmaOrg?.id ?? primaryFirmId,
+            name: firmaOrg?.name ?? 'Hekim',
+            invite_code: firmaOrg?.invite_code ?? '',
+            role: 'member',
+            isActive: data.is_active !== false,
+            mustChangePassword: data.must_change_password === true,
+            displayName: data.display_name ?? undefined,
+            email: data.email ?? undefined,
+            orgType: 'firma',
+            osgbRole: 'isyeri_hekimi',
+            activeFirmIds: firmIds,
+          });
+          setLoading(false);
+          return;
+        }
+
         // ── Normal kullanıcı ───────────────────────────────────────────────
         setOrg({
           id: o.id,
