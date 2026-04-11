@@ -1,122 +1,71 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { useApp } from '../../store/AppContext';
 
 interface ProtectedRouteProps {
   children: ReactNode;
 }
 
-type OrgType = 'firma' | 'osgb';
-type OsgbRole = 'osgb_admin' | 'gezici_uzman' | null;
-
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { session, loading } = useAuth();
+  const { session, loading: authLoading } = useAuth();
+  const { org, orgLoading } = useApp();
   const location = useLocation();
-  const [subStatus, setSubStatus] = useState<'checking' | 'ok' | 'expired'>('checking');
-  const [orgType, setOrgType] = useState<OrgType>('firma');
-  const [osgbRole, setOsgbRole] = useState<OsgbRole>(null);
-  const [hasActiveFirm, setHasActiveFirm] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    if (loading || !session) {
-      setSubStatus('ok');
-      return;
-    }
-    (async () => {
-      // Tüm aktif kayıtları çek — osgb_role olan kaydı önceliklendir
-      const { data: uoList } = await supabase
-        .from('user_organizations')
-        .select('organization_id, osgb_role, active_firm_id')
-        .eq('user_id', session.user.id)
-        .eq('is_active', true);
+  // Auth veya org henüz yüklenmedi
+  if (authLoading || orgLoading) return null;
 
-      const uoAll = uoList ?? [];
-      // osgb_admin veya gezici_uzman rolü olan kaydı bul, yoksa ilk kaydı al
-      const uo = uoAll.find(r => r.osgb_role === 'osgb_admin' || r.osgb_role === 'gezici_uzman')
-        ?? uoAll[0]
-        ?? null;
-
-      if (!uo) { setSubStatus('ok'); return; }
-
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('is_active, subscription_end, org_type')
-        .eq('id', uo.organization_id)
-        .maybeSingle();
-
-      if (!org) { setSubStatus('ok'); return; }
-
-      // Super admin kontrolü
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_super_admin')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (profile?.is_super_admin) { setSubStatus('ok'); return; }
-
-      const isExpired = org.subscription_end
-        ? new Date(org.subscription_end) < new Date()
-        : false;
-
-      // osgb_role varsa → OSGB kullanıcısı (org_type'tan bağımsız)
-      const hasOsgbRole = uo.osgb_role === 'osgb_admin' || uo.osgb_role === 'gezici_uzman';
-      setOrgType((hasOsgbRole || org.org_type === 'osgb' ? 'osgb' : 'firma') as OrgType);
-      setOsgbRole((uo.osgb_role as OsgbRole) ?? null);
-
-      // Gezici uzman için active_firm_id kontrolü
-      if (uo.osgb_role === 'gezici_uzman') {
-        setHasActiveFirm(!!uo.active_firm_id);
-      } else {
-        setHasActiveFirm(null);
-      }
-
-      if (!org.is_active || isExpired) {
-        setSubStatus('expired');
-      } else {
-        setSubStatus('ok');
-      }
-    })();
-  }, [session, loading]);
-
-  if (loading || subStatus === 'checking') return null;
+  // Oturum yok → login sayfasına
   if (!session) return <Navigate to="/login" replace />;
-  if (subStatus === 'expired') return <Navigate to="/subscription-expired" replace />;
 
+  // Org yüklenmiş ama null → org yoksa login'e (yeni kullanıcı onboarding ile çözülür)
+  // Bazı durumlarda org hâlâ null gelebilir (yeni kayıt, edge fn bekliyor) — null spinner göster
+  if (!org) return null;
+
+  // ── Abonelik kontrolü ──
+  // org.isActive false ise subscription-expired sayfasına yönlendir
+  if (!org.isActive) {
+    return <Navigate to="/subscription-expired" replace />;
+  }
+
+  const osgbRole = org.osgbRole ?? null;
   const isOsgbPath = location.pathname.startsWith('/osgb');
 
-  // Gezici uzman yönlendirme
+  // ── Gezici Uzman yönlendirme ──
   if (osgbRole === 'gezici_uzman') {
-    if (hasActiveFirm === null) {
-      // Henüz kontrol edilmedi, bekle
-      return null;
-    }
+    const hasActiveFirm = (org.activeFirmIds?.length ?? 0) > 0;
+
     if (!hasActiveFirm) {
-      // Firma atanmamış → uzman bekleme sayfasına
+      // Firma atanmamış → uzman bekleme sayfasında tut
       if (location.pathname !== '/osgb-uzman') {
         return <Navigate to="/osgb-uzman" replace />;
       }
       return <>{children}</>;
     }
-    // Firma atanmış → /osgb-uzman veya osgb path'lerine gitmeye çalışırsa /dashboard'a yönlendir
+
+    // Firma atanmış → OSGB path'lerine girmeye çalışırsa /dashboard'a yönlendir
     if (isOsgbPath) {
       return <Navigate to="/dashboard" replace />;
     }
+
     // Normal firma panelinde çalışsın
     return <>{children}</>;
   }
 
-  // OSGB admin kullanıcısı firma paneline girmeye çalışıyorsa → OSGB paneline yönlendir
-  if (orgType === 'osgb' && !isOsgbPath) {
-    return <Navigate to="/osgb-dashboard" replace />;
+  // ── OSGB Admin yönlendirme ──
+  if (osgbRole === 'osgb_admin') {
+    // OSGB admin firma paneline girmeye çalışıyorsa → OSGB paneline yönlendir
+    if (!isOsgbPath) {
+      return <Navigate to="/osgb-dashboard" replace />;
+    }
+    return <>{children}</>;
   }
 
-  // Firma kullanıcısı /osgb-dashboard veya /osgb-uzman'a erişmeye çalışıyorsa → /dashboard'a yönlendir
+  // ── Normal firma kullanıcısı ──
+  // OSGB sayfalarına erişmeye çalışıyorsa → dashboard'a yönlendir
   const isOsgbDashboard = location.pathname === '/osgb-dashboard';
   const isOsgbUzman = location.pathname === '/osgb-uzman';
-  const isOsgbOnboarding = location.pathname === '/osgb-onboarding';
-  if ((isOsgbDashboard || isOsgbUzman) && orgType === 'firma' && !isOsgbOnboarding) {
+  if (isOsgbDashboard || isOsgbUzman) {
     return <Navigate to="/dashboard" replace />;
   }
 

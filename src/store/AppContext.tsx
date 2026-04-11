@@ -75,6 +75,8 @@ interface AppContextType extends StoreType {
   isSwitching: boolean;
   /** Aktif firmayı değiştir (ref-first, isSwitching guard ile) */
   switchActiveFirma: (firmaId: string) => Promise<{ error: string | null }>;
+  /** Gezici uzman: atanmış firma ID'lerinin isimlerini çek */
+  fetchActiveFirmNames: () => Promise<{ id: string; name: string }[]>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -110,6 +112,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isSwitching,
     orgIdRef,
     switchActiveFirma,
+    fetchActiveFirmNames,
   } = useOrganization(user);
 
   const org = useMemo<OrgInfo | null>(() => {
@@ -755,6 +758,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       realtimeStatus: store.realtimeStatus,
       isSwitching,
       switchActiveFirma,
+      fetchActiveFirmNames,
     }}>
       {children}
     </AppContext.Provider>

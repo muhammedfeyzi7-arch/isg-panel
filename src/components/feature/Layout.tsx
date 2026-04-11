@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import GeziciUzmanBanner from './GeziciUzmanBanner';
 import { useApp } from '../../store/AppContext';
 import { DashboardSkeleton, PageSkeleton } from '../base/Skeleton';
+import { useOrgTransition } from '../../hooks/useOrgTransition';
 
 function ConnectionBanner() {
   const { realtimeStatus } = useApp();
@@ -151,7 +153,11 @@ function ConnectionBanner() {
 }
 
 export default function Layout({ children }: { children: ReactNode }) {
-  const { sidebarCollapsed, theme, activeModule, orgLoading } = useApp();
+  const { sidebarCollapsed, theme, activeModule, orgLoading, org } = useApp();
+  // Gezici uzman + çoklu firma → banner 28px ekstra padding gerekir
+  const hasBanner = org?.osgbRole === 'gezici_uzman' && (org?.activeFirmIds?.length ?? 0) > 1;
+  // Firma değişimi fade animasyonu
+  const { isTransitioning, transitionKey } = useOrgTransition({ duration: 160 });
   const [mobileOpen, setMobileOpen] = useState(false);
   const isDark = theme === 'dark';
   const [animKey, setAnimKey] = useState(0);
@@ -227,13 +233,26 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <Header onMobileMenuToggle={() => setMobileOpen(v => !v)} />
 
+      {/* Context bar — gezici uzman + çoklu firma durumunda header'ın hemen altında */}
+      <GeziciUzmanBanner />
+
       <main
-        className={`transition-all duration-300 pt-[46px] min-h-screen ${
+        className={`transition-all duration-300 min-h-screen ${
           sidebarCollapsed ? 'lg:pl-[48px]' : 'lg:pl-[168px]'
         }`}
+        style={{ paddingTop: hasBanner ? '74px' : '46px' }}
       >
         <div className="px-2 sm:px-3 md:px-5 py-2 sm:py-3 max-w-[1680px]">
-          <div key={animKey} className="page-enter">
+          <div
+            key={`${animKey}_${transitionKey}`}
+            className="page-enter"
+            style={{
+              opacity: isTransitioning ? 0 : 1,
+              transition: isTransitioning
+                ? 'opacity 0.12s ease'
+                : 'opacity 0.22s ease',
+            }}
+          >
             {renderContent()}
           </div>
         </div>

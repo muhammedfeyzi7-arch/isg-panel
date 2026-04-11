@@ -3,7 +3,6 @@ import { Navigate } from "react-router-dom";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import LoginPage from "../pages/login/page";
-import OsgbLoginPage from "../pages/osgb-login/page";
 import OsgbDashboardPage from "../pages/osgb-dashboard/page";
 import OsgbOnboardingPage from "../pages/osgb-onboarding/page";
 import OsgbUzmanPage from "../pages/osgb-uzman/page";
@@ -14,6 +13,7 @@ import QrRedirectPage from "../pages/equipment/QrRedirectPage";
 import SuperAdminLoginPage from "../pages/super-admin/login/page";
 import SuperAdminPage from "../pages/super-admin/page";
 import SubscriptionExpiredPage from "../pages/subscription-expired/page";
+import ResolvePage from "../pages/resolve/page";
 
 // Tüm modül route'ları — her biri Home component'ini render eder
 // Home, URL'deki :module parametresini okuyarak doğru sayfayı gösterir
@@ -40,10 +40,6 @@ const routes: RouteObject[] = [
   {
     path: "/login",
     element: <LoginPage />,
-  },
-  {
-    path: "/osgb-login",
-    element: <OsgbLoginPage />,
   },
   {
     path: "/osgb-dashboard",
@@ -81,10 +77,19 @@ const routes: RouteObject[] = [
     path: "/onboarding",
     element: <Navigate to="/" replace />,
   },
-  // Root → dashboard'a yönlendir
+  // Login sonrası resolve → rol bazlı yönlendirme
+  {
+    path: "/resolve",
+    element: (
+      <ProtectedRoute>
+        <ResolvePage />
+      </ProtectedRoute>
+    ),
+  },
+  // Root → resolve'a yönlendir
   {
     path: "/",
-    element: <Navigate to="/dashboard" replace />,
+    element: <Navigate to="/resolve" replace />,
   },
   // Her modül için ayrı route — element JSX olmalı (değişken geçilemez)
   ...MODULE_SLUGS.map(slug => ({

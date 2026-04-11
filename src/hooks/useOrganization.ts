@@ -168,14 +168,29 @@ export function useOrganization(user: User | null) {
     };
 
     try {
-      const { data, error } = await supabase
+      // OSGB org'u olan kayıtları önce getir (org_type sıralaması için organizations join gerekiyor)
+      // Önce osgb_role'u olan kaydı dene, yoksa normal kaydı al
+      const { data: osgbData, error: osgbError } = await supabase
         .from('user_organizations')
         .select('role, is_active, must_change_password, display_name, email, osgb_role, active_firm_id, active_firm_ids, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .order('joined_at', { ascending: true })
+        .not('osgb_role', 'is', null)
+        .order('joined_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      // osgb_role'lu kayıt varsa onu kullan, yoksa normal sorguya düş
+      const { data, error } = (osgbData && !osgbError)
+        ? { data: osgbData, error: null }
+        : await supabase
+            .from('user_organizations')
+            .select('role, is_active, must_change_password, display_name, email, osgb_role, active_firm_id, active_firm_ids, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .order('joined_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
 
       clearTimeout(timeoutId);
 

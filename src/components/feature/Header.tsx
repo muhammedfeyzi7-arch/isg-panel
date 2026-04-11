@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
 import SupportModal from './SupportModal';
+import FirmaSwitcher from './FirmaSwitcher';
 import { supabase } from '@/lib/supabase';
 
 interface SupportNotification {
@@ -61,7 +62,12 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
     bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku,
     firmalar, personeller, evraklar, tutanaklar, egitimler, muayeneler, ekipmanlar,
     refreshData, dataLoading,
+    org: ctxOrg,
   } = useApp();
+
+  // Gezici uzman + çoklu firma → sayfa başlığına firma suffix ekle
+  const isGeziciMulti = ctxOrg?.osgbRole === 'gezici_uzman' && (ctxOrg?.activeFirmIds?.length ?? 0) > 1;
+  const firmaSuffix = isGeziciMulti ? (ctxOrg?.activeFirmName || ctxOrg?.name) : null;
 
   const [refreshing, setRefreshing] = useState(false);
   const [refreshDone, setRefreshDone] = useState(false);
@@ -288,9 +294,24 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             style={{ background: `${isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.1)'}` }}>
             <i className={`${currentModule?.icon || 'ri-home-line'} text-[11px]`} style={{ color: '#818CF8' }} />
           </div>
-          <span className="text-[12px] sm:text-[13px] font-bold truncate" style={{ color: nameColor, maxWidth: '120px' }}>
-            {currentModule?.label || activeModule}
-          </span>
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="text-[12px] sm:text-[13px] font-bold truncate" style={{ color: nameColor, maxWidth: '120px' }}>
+              {currentModule?.label || activeModule}
+            </span>
+            {firmaSuffix && (
+              <span
+                className="hidden lg:flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                style={{
+                  background: 'rgba(6,182,212,0.1)',
+                  color: '#06B6D4',
+                  border: '1px solid rgba(6,182,212,0.2)',
+                }}
+              >
+                <i className="ri-building-2-line text-[9px]" />
+                <span className="truncate" style={{ maxWidth: '88px' }}>{firmaSuffix}</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* ── Spacer ── */}
@@ -309,6 +330,9 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           <i className={`${statusInfo.icon} text-[9px]`} />
           {statusInfo.text}
         </div>
+
+        {/* ── Firma Switcher (sadece gezici uzman + çoklu firma) ── */}
+        <FirmaSwitcher isDark={isDark} />
 
         {/* ── DESKTOP: Arama ── */}
         <div className="relative hidden md:flex items-center flex-shrink-0" ref={searchRef}>
