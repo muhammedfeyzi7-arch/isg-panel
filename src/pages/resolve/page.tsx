@@ -32,6 +32,12 @@ export default function ResolvePage() {
       return;
     }
 
+    // İşyeri Hekimi → hekim paneli
+    if (osgbRole === 'isyeri_hekimi') {
+      navigate('/hekim', { replace: true });
+      return;
+    }
+
     // Gezici Uzman
     if (osgbRole === 'gezici_uzman') {
       const firmSayisi = activeFirmIds?.length ?? 0;

@@ -13,7 +13,7 @@ export interface OrgInfo {
   displayName?: string;
   email?: string;
   orgType: 'firma' | 'osgb';
-  osgbRole?: 'osgb_admin' | 'gezici_uzman' | null;
+  osgbRole?: 'osgb_admin' | 'gezici_uzman' | 'isyeri_hekimi' | null;
   /** Gezici uzman: atanmış tüm firma ID'leri */
   activeFirmIds?: string[];
   /** Gezici uzman: şu an aktif firma adı (switcher için) */

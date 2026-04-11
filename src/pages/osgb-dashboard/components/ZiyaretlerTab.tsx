@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/store/AppContext';
 import ZiyaretDetayPanel from './ZiyaretDetayPanel';
-import { openZiyaretPdfRapor } from '@/pages/osgb-dashboard/utils/ziyaretPdfRapor';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Ziyaret {
@@ -24,97 +23,165 @@ interface Ziyaret {
   sure_dakika: number | null;
 }
 
-// ─── Excel Export ──────────────────────────────────────────────────────────────
+// ─── Excel Export — Firma Bazlı Multi-Sheet ────────────────────────────────────
 async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   const { default: ExcelJS } = await import('exceljs');
   const wb = new ExcelJS.Workbook();
   wb.creator = 'ISG Yönetim Sistemi';
   wb.created = new Date();
 
-  const ws = wb.addWorksheet('Ziyaretler');
+  // Tarihe göre DESC sırala
+  const sorted = [...ziyaretler].sort(
+    (a, b) => new Date(b.giris_saati).getTime() - new Date(a.giris_saati).getTime()
+  );
 
-  const headerStyle = {
-    font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
-    fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF059669' } },
-    alignment: { horizontal: 'center' as const, vertical: 'middle' as const },
-    border: {
-      top: { style: 'thin' as const }, bottom: { style: 'thin' as const },
-      left: { style: 'thin' as const }, right: { style: 'thin' as const },
-    },
-  };
-  const cellStyle = {
-    alignment: { vertical: 'middle' as const },
-    border: {
-      top: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
-      bottom: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
-      left: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
-      right: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
-    },
-  };
+  // Firma bazında grupla — firma_org_id'ye göre, sonra firma_ad'a fallback
+  const firmaMap = new Map<string, { ad: string; ziyaretler: Ziyaret[] }>();
+  for (const z of sorted) {
+    const key = z.firma_org_id ?? z.firma_ad ?? 'Bilinmiyor';
+    const ad = z.firma_ad ?? 'Bilinmiyor';
+    if (!firmaMap.has(key)) firmaMap.set(key, { ad, ziyaretler: [] });
+    firmaMap.get(key)!.ziyaretler.push(z);
+  }
 
-  ws.columns = [
-    { header: 'Uzman Adı', key: 'uzman', width: 24 },
-    { header: 'Firma Adı', key: 'firma', width: 28 },
-    { header: 'Giriş Tarihi', key: 'giris', width: 20 },
-    { header: 'Çıkış Tarihi', key: 'cikis', width: 20 },
-    { header: 'Süre', key: 'sure', width: 12 },
-    { header: 'Ziyaret Tipi', key: 'tip', width: 14 },
-    { header: 'Durum', key: 'durum', width: 14 },
-  ];
-
-  // Başlık stili
-  ws.getRow(1).eachCell(cell => { Object.assign(cell, headerStyle); });
-  ws.getRow(1).height = 22;
-
-  const fmtDT = (iso: string) =>
-    new Date(iso).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '');
-
+  const fmtTarih = (iso: string) =>
+    new Date(iso).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const fmtSaat = (iso: string) =>
+    new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const fmtSure = (dk: number | null) => {
     if (!dk || dk < 0) return '—';
-    const h = Math.floor(dk / 60); const m = dk % 60;
-    return h > 0 ? `${h}s ${m}d` : `${m} dk`;
+    const h = Math.floor(dk / 60);
+    const m = dk % 60;
+    return h > 0 ? `${h}s ${m}dk` : `${m} dk`;
   };
 
-  ziyaretler.forEach((z, i) => {
-    const row = ws.addRow({
-      uzman: z.uzman_ad ?? z.uzman_email ?? '—',
-      firma: z.firma_ad ?? '—',
-      giris: fmtDT(z.giris_saati),
-      cikis: z.cikis_saati ? fmtDT(z.cikis_saati) : '—',
-      sure: fmtSure(z.sure_dakika),
-      tip: z.qr_ile_giris ? 'QR' : 'Manuel',
-      durum: z.durum === 'aktif' ? 'Devam Ediyor' : 'Tamamlandı',
+  // Kolon tanımları (her sheet aynı)
+  const columns = [
+    { header: 'Tarih', key: 'tarih', width: 14 },
+    { header: 'Uzman Adı', key: 'uzman', width: 26 },
+    { header: 'Giriş Saati', key: 'giris', width: 14 },
+    { header: 'Çıkış Saati', key: 'cikis', width: 14 },
+    { header: 'Süre (dakika)', key: 'sure_dk', width: 16 },
+    { header: 'Süre', key: 'sure', width: 12 },
+    { header: 'Tip', key: 'tip', width: 10 },
+  ];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyHeaderStyle = (ws: any) => {
+    ws.getRow(1).height = 28;
+    ws.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF064E3B' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        bottom: { style: 'medium', color: { argb: 'FF10B981' } },
+      };
     });
-    row.height = 18;
-    row.eachCell(cell => { Object.assign(cell, cellStyle); });
-    // Zebra şeridi
-    if (i % 2 === 1) {
-      row.eachCell(cell => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+  };
+
+  // Her firma için ayrı sheet
+  for (const [, { ad, ziyaretler: fZiyaretler }] of firmaMap) {
+    // Sheet adı max 31 karakter (Excel limiti), özel karakterleri temizle
+    const sheetName = ad.replace(/[\\/?*[\]:]/g, '').slice(0, 31);
+    const ws = wb.addWorksheet(sheetName);
+    ws.columns = columns;
+    applyHeaderStyle(ws);
+
+    fZiyaretler.forEach((z, i) => {
+      const sureDk = z.sure_dakika != null
+        ? z.sure_dakika
+        : z.cikis_saati
+          ? Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000)
+          : null;
+
+      const row = ws.addRow({
+        tarih: fmtTarih(z.giris_saati),
+        uzman: z.uzman_ad ?? z.uzman_email ?? '—',
+        giris: fmtSaat(z.giris_saati),
+        cikis: z.cikis_saati ? fmtSaat(z.cikis_saati) : '—',
+        sure_dk: sureDk ?? '—',
+        sure: fmtSure(sureDk),
+        tip: z.qr_ile_giris ? 'QR' : 'Manuel',
       });
-    }
-    // Durum rengi
-    const durumCell = row.getCell('durum');
-    durumCell.font = { bold: true, color: { argb: z.durum === 'aktif' ? 'FF16A34A' : 'FF64748B' } };
-    // QR badge rengi
-    const tipCell = row.getCell('tip');
-    tipCell.font = { bold: z.qr_ile_giris, color: { argb: z.qr_ile_giris ? 'FF7C3AED' : 'FF475569' } };
-  });
+      row.height = 22;
 
-  // Toplam satır
-  ws.addRow({});
-  const totalRow = ws.addRow({ uzman: `Toplam: ${ziyaretler.length} kayıt`, firma: '', giris: '', cikis: '', sure: '', tip: '', durum: '' });
-  totalRow.getCell('uzman').font = { bold: true, color: { argb: 'FF059669' } };
+      row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+        // Zebra
+        const zebraColor = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDF4';
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: zebraColor } };
+        cell.alignment = { vertical: 'middle', horizontal: colNum === 2 ? 'left' : 'center' };
+        cell.font = { size: 11, name: 'Calibri', color: { argb: 'FF1E293B' } };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        };
+      });
 
-  const dateStr = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
+      // Tip rengi
+      const tipCell = row.getCell('tip');
+      tipCell.font = {
+        bold: true,
+        size: 11,
+        name: 'Calibri',
+        color: { argb: z.qr_ile_giris ? 'FF7C3AED' : 'FF475569' },
+      };
+
+      // Süre dakika rengi (sayısal)
+      const sureDkCell = row.getCell('sure_dk');
+      if (typeof sureDk === 'number') {
+        sureDkCell.font = {
+          bold: true,
+          size: 11,
+          name: 'Calibri',
+          color: { argb: sureDk > 120 ? 'FF059669' : sureDk > 60 ? 'FF0891B2' : 'FF94A3B8' },
+        };
+      }
+    });
+
+    // Toplam satırı
+    ws.addRow({});
+    const sumRow = ws.addRow({
+      tarih: `Toplam: ${fZiyaretler.length} ziyaret`,
+      uzman: '',
+      giris: '',
+      cikis: '',
+      sure_dk: fZiyaretler.reduce((s, z) => {
+        const dk = z.sure_dakika ?? (z.cikis_saati
+          ? Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000)
+          : 0);
+        return s + dk;
+      }, 0),
+      sure: fmtSure(fZiyaretler.reduce((s, z) => {
+        const dk = z.sure_dakika ?? (z.cikis_saati
+          ? Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000)
+          : 0);
+        return s + dk;
+      }, 0)),
+      tip: '',
+    });
+    sumRow.height = 24;
+    sumRow.eachCell({ includeEmpty: true }, cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+      cell.font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF064E3B' } };
+      cell.border = { top: { style: 'medium', color: { argb: 'FF10B981' } } };
+    });
+
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+  }
+
+  // Dosya adı: Ziyaret-Raporu-YYYY-MM.xlsx
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const fileName = `Ziyaret-Raporu-${yyyy}-${mm}.xlsx`;
+
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${dateStr}-Ziyaret-Raporu${donem ? '-' + donem : ''}.xlsx`;
+  a.download = fileName;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 interface ZiyaretlerTabProps {
@@ -232,7 +299,6 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
   const [loading, setLoading] = useState(true);
   const [secilenZiyaret, setSecilenZiyaret] = useState<Ziyaret | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [pdfExporting, setPdfExporting] = useState(false);
 
   // Filtreler
   const [filterTarih, setFilterTarih] = useState<FilterTarih>('bugun');
@@ -258,27 +324,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     }
   }, [ziyaretler, filterTarih, filterOzelBaslangic]);
 
-  const handlePdfExport = useCallback(() => {
-    if (ziyaretler.length === 0) return;
-    setPdfExporting(true);
-    try {
-      const donemLabel = filterTarih === 'bugun' ? 'Bugün'
-        : filterTarih === 'bu_hafta' ? 'Bu Hafta'
-        : filterTarih === 'bu_ay' ? 'Bu Ay'
-        : filterOzelBaslangic
-          ? (filterOzelBitis ? `${filterOzelBaslangic} — ${filterOzelBitis}` : filterOzelBaslangic)
-          : 'Tüm Dönemler';
-      openZiyaretPdfRapor({
-        orgName: org?.name ?? 'OSGB',
-        donem: donemLabel,
-        firmaFilter: filterFirma || undefined,
-        uzmanFilter: filterUzman || undefined,
-        ziyaretler,
-      });
-    } finally {
-      setPdfExporting(false);
-    }
-  }, [ziyaretler, filterTarih, filterOzelBaslangic, filterOzelBitis, filterFirma, filterUzman, org?.name]);
+
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--bg-card-solid)',
@@ -572,24 +618,6 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
             )}
           </div>
 
-          {/* PDF Export */}
-          <button
-            onClick={handlePdfExport}
-            disabled={pdfExporting || ziyaretler.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap transition-all"
-            style={{
-              background: ziyaretler.length > 0 ? 'rgba(239,68,68,0.08)' : 'var(--bg-item)',
-              border: `1px solid ${ziyaretler.length > 0 ? 'rgba(239,68,68,0.25)' : 'var(--border-subtle)'}`,
-              color: ziyaretler.length > 0 ? '#DC2626' : textMuted,
-              opacity: pdfExporting ? 0.7 : 1,
-            }}
-            title="Aktif filtrelere göre PDF rapor oluştur"
-          >
-            {pdfExporting
-              ? <><i className="ri-loader-4-line animate-spin text-xs" />Hazırlanıyor...</>
-              : <><i className="ri-file-pdf-line text-sm" />PDF</>}
-          </button>
-
           {/* Excel Export */}
           <button
             onClick={() => void handleExcelExport()}
@@ -601,7 +629,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               color: ziyaretler.length > 0 ? '#10B981' : textMuted,
               opacity: exporting ? 0.7 : 1,
             }}
-            title="Aktif filtrelere göre Excel indir"
+            title="Her firma için ayrı sekme içeren Excel raporu indir"
           >
             {exporting
               ? <><i className="ri-loader-4-line animate-spin text-xs" />İndiriliyor...</>
@@ -737,28 +765,84 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
         </div>
       )}
 
-      {/* ── KPI KARTLAR ── */}
+      {/* ── KPI KARTLAR — Premium Gradient ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Devam Eden', value: aktifSahaUzman, icon: 'ri-map-pin-user-line', color: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.15)', pulse: aktifSahaUzman > 0 },
-          { label: 'Bu Hafta', value: buHaftaZiyaret, icon: 'ri-calendar-check-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.15)', pulse: false },
-          { label: 'Ort. Süre', value: formatSure(ortalamaSure), icon: 'ri-time-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.15)', pulse: false },
-          { label: 'QR Oranı', value: `%${qrOrani}`, icon: 'ri-qr-code-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.15)', pulse: false },
+          {
+            label: 'Aktif Ziyaret',
+            value: aktifSahaUzman,
+            subLabel: aktifSahaUzman > 0 ? `${aktifSahaUzman} uzman sahada` : 'Şu an kimse yok',
+            icon: 'ri-map-pin-user-line',
+            color: '#22C55E',
+            gradient: 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(16,185,129,0.05) 100%)',
+            border: 'rgba(34,197,94,0.2)',
+            pulse: aktifSahaUzman > 0,
+          },
+          {
+            label: 'Bugünkü Ziyaret',
+            value: (() => {
+              const today = new Date();
+              return ziyaretler.filter(z => new Date(z.giris_saati).toDateString() === today.toDateString()).length;
+            })(),
+            subLabel: 'Bugün toplam',
+            icon: 'ri-calendar-check-line',
+            color: '#10B981',
+            gradient: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.04) 100%)',
+            border: 'rgba(16,185,129,0.2)',
+            pulse: false,
+          },
+          {
+            label: 'Ortalama Süre',
+            value: formatSure(ortalamaSure),
+            subLabel: 'Son 30 günde',
+            icon: 'ri-time-line',
+            color: '#F59E0B',
+            gradient: 'linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(217,119,6,0.04) 100%)',
+            border: 'rgba(245,158,11,0.2)',
+            pulse: false,
+          },
+          {
+            label: 'QR Oranı',
+            value: `%${qrOrani}`,
+            subLabel: 'QR ile giriş',
+            icon: 'ri-qr-code-line',
+            color: '#8B5CF6',
+            gradient: 'linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(124,58,237,0.04) 100%)',
+            border: 'rgba(139,92,246,0.2)',
+            pulse: false,
+          },
         ].map(kpi => (
-          <div key={kpi.label} className="rounded-2xl p-4" style={cardStyle}>
+          <div
+            key={kpi.label}
+            className="rounded-2xl p-4 transition-all"
+            style={{
+              background: kpi.gradient,
+              border: `1px solid ${kpi.border}`,
+              boxShadow: 'none',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+              (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${kpi.border}`;
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+            }}
+          >
             <div className="flex items-center justify-between mb-3">
-              <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: kpi.bg, border: `1px solid ${kpi.border}` }}>
+              <div className="w-9 h-9 flex items-center justify-center rounded-xl"
+                style={{ background: `${kpi.color}18`, border: `1px solid ${kpi.border}` }}>
                 <i className={`${kpi.icon} text-base`} style={{ color: kpi.color }} />
               </div>
               {kpi.pulse && (
                 <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
-                  <span className="text-[9px] font-bold" style={{ color: '#22C55E' }}>CANLI</span>
+                  <span className="w-2 h-2 rounded-full animate-ping" style={{ background: '#22C55E', opacity: 0.7 }} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#22C55E' }}>CANLI</span>
                 </div>
               )}
             </div>
-            <p className="text-2xl font-extrabold leading-none" style={{ color: textPrimary }}>{kpi.value}</p>
-            <p className="text-[11px] font-medium mt-1.5" style={{ color: textMuted }}>{kpi.label}</p>
+            <p className="text-2xl font-black leading-none" style={{ color: textPrimary }}>{kpi.value}</p>
+            <p className="text-[10px] font-medium mt-1.5" style={{ color: textMuted }}>{kpi.subLabel}</p>
           </div>
         ))}
       </div>
@@ -770,20 +854,20 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
           <p className="text-sm" style={{ color: textMuted }}>Ziyaretler yükleniyor...</p>
         </div>
       ) : ziyaretler.length === 0 ? (
-        <div className="rounded-2xl p-12 flex flex-col items-center gap-4" style={cardStyle}>
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
-            <i className="ri-map-pin-2-line text-2xl" style={{ color: '#10B981' }} />
+        <div className="rounded-2xl p-14 flex flex-col items-center gap-5" style={cardStyle}>
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(16,185,129,0.08)', border: '1.5px solid rgba(16,185,129,0.15)' }}>
+            <i className="ri-map-pin-2-line text-3xl" style={{ color: '#10B981' }} />
           </div>
           <div className="text-center">
-            <p className="text-sm font-semibold" style={{ color: textPrimary }}>
-              {filterTarih === 'bugun' ? 'Bugün henüz ziyaret yok' : 'Ziyaret bulunamadı'}
+            <p className="text-sm font-bold" style={{ color: textPrimary }}>
+              {filterTarih === 'bugun' ? 'Henüz ziyaret yok' : 'Ziyaret bulunamadı'}
             </p>
-            <p className="text-xs mt-1 max-w-xs" style={{ color: textMuted }}>
+            <p className="text-xs mt-1.5 max-w-xs" style={{ color: textMuted }}>
               {aktifFilterSayisi > 0
                 ? 'Seçili filtre koşullarında kayıt yok.'
                 : filterTarih === 'bugun'
-                  ? 'Uzmanlar QR kodu veya manuel giriş ile ziyaret başlatabilir.'
+                  ? 'Uzmanlar QR ile ziyaret başlatabilir.'
                   : 'Seçili dönemde ziyaret kaydı bulunamadı.'}
             </p>
           </div>
@@ -797,7 +881,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
         </div>
       ) : (
         <div className="rounded-2xl overflow-hidden" style={cardStyle}>
-          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+          <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
             <p className="text-xs font-semibold" style={{ color: textMuted }}>
               <span className="font-bold" style={{ color: textPrimary }}>{ziyaretler.length}</span> kayıt
             </p>
@@ -809,146 +893,113 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               </button>
             )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px]">
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--table-head-bg)' }}>
-                  {['Uzman', 'Firma', 'Giriş', 'Çıkış', 'Süre', 'Durum', ''].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-[10.5px] font-bold uppercase tracking-wide whitespace-nowrap" style={{ color: textMuted }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ziyaretler.map((z, i) => {
-                  const isAktif = z.durum === 'aktif';
-                  // Uzman son ziyaret badge
-                  const uzmanLastVisit = lastByUzman[z.uzman_user_id];
-                  const uzmanGun = uzmanLastVisit
-                    ? Math.floor((Date.now() - new Date(uzmanLastVisit.giris_saati).getTime()) / 86400000)
-                    : 999;
-                  const uzmanPasif = !isAktif && uzmanGun >= 3;
 
-                  return (
-                    <tr
-                      key={z.id}
-                      onClick={() => setSecilenZiyaret(z)}
-                      className="cursor-pointer transition-all"
-                      style={{
-                        borderBottom: i < ziyaretler.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                        background: isAktif ? (isDark ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.025)') : 'transparent',
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-row-hover)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isAktif ? (isDark ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.025)') : 'transparent'; }}
-                    >
-                      {/* Uzman */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-                            style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : uzmanPasif ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
-                            {(z.uzman_ad ?? z.uzman_email ?? '?').charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold truncate max-w-[130px]" style={{ color: textPrimary }}>{z.uzman_ad ?? '—'}</p>
-                            <p className="text-[10px] truncate max-w-[130px]" style={{ color: textMuted }}>{z.uzman_email ?? ''}</p>
-                          </div>
-                        </div>
-                      </td>
+          {/* ── Card + Hybrid List ── */}
+          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {ziyaretler.map((z, i) => {
+              const isAktif = z.durum === 'aktif';
+              return (
+                <div
+                  key={z.id}
+                  onClick={() => setSecilenZiyaret(z)}
+                  className="flex items-center gap-4 px-5 py-3.5 cursor-pointer transition-all"
+                  style={{
+                    background: isAktif ? (isDark ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.025)') : 'transparent',
+                    animationDelay: `${i * 30}ms`,
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.background = isAktif
+                      ? 'rgba(34,197,94,0.08)'
+                      : 'var(--bg-row-hover)';
+                    (e.currentTarget as HTMLElement).style.paddingLeft = '22px';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.background = isAktif
+                      ? (isDark ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.025)')
+                      : 'transparent';
+                    (e.currentTarget as HTMLElement).style.paddingLeft = '20px';
+                  }}
+                >
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold text-white"
+                      style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                      {(z.uzman_ad ?? z.uzman_email ?? '?').charAt(0).toUpperCase()}
+                    </div>
+                    {isAktif && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse"
+                        style={{ background: '#22C55E', borderColor: 'var(--bg-card-solid)' }} />
+                    )}
+                  </div>
 
-                      {/* Firma */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
-                            style={{ background: 'rgba(16,185,129,0.08)' }}>
-                            <i className="ri-building-2-line text-[10px]" style={{ color: '#059669' }} />
-                          </div>
-                          <div>
-                            <span className="text-xs font-medium truncate block max-w-[120px]" style={{ color: 'var(--text-secondary)' }}>{z.firma_ad ?? '—'}</span>
-                            {/* Son ziyaret badge — firma için */}
-                            {(() => {
-                              const b = getSonZiyaretBadge(lastByFirma[z.firma_org_id]);
-                              return (
-                                <span className="text-[9px] font-semibold" style={{ color: b.color }}>
-                                  {b.label}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      </td>
+                  {/* Orta: uzman + firma */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>
+                      {z.uzman_ad ?? '—'}
+                    </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <i className="ri-building-2-line text-[9px] flex-shrink-0" style={{ color: '#10B981' }} />
+                      <p className="text-[11px] truncate" style={{ color: textMuted }}>{z.firma_ad ?? '—'}</p>
+                    </div>
+                  </div>
 
-                      {/* Giriş */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <p className="text-xs font-semibold" style={{ color: textPrimary }}>{formatSaat(z.giris_saati)}</p>
-                        <p className="text-[10px]" style={{ color: textMuted }}>{formatTarih(z.giris_saati)}</p>
-                      </td>
+                  {/* Giriş saati */}
+                  <div className="flex-shrink-0 text-right hidden sm:block">
+                    <p className="text-xs font-semibold" style={{ color: textPrimary }}>{formatSaat(z.giris_saati)}</p>
+                    <p className="text-[10px]" style={{ color: textMuted }}>{formatTarih(z.giris_saati)}</p>
+                  </div>
 
-                      {/* Çıkış */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {z.cikis_saati ? (
-                          <>
-                            <p className="text-xs font-semibold" style={{ color: textPrimary }}>{formatSaat(z.cikis_saati)}</p>
-                            <p className="text-[10px]" style={{ color: textMuted }}>{formatTarih(z.cikis_saati)}</p>
-                          </>
-                        ) : isAktif ? (
-                          <span className="text-[10px] font-semibold" style={{ color: '#22C55E' }}>Devam ediyor</span>
-                        ) : (
-                          <span className="text-xs" style={{ color: textMuted }}>—</span>
-                        )}
-                      </td>
+                  {/* Süre */}
+                  <div className="flex-shrink-0">
+                    {isAktif ? (
+                      <ElapsedTimer since={z.giris_saati} />
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-lg"
+                        style={{
+                          background: z.sure_dakika ? 'rgba(6,182,212,0.08)' : 'transparent',
+                          color: z.sure_dakika ? '#06B6D4' : textMuted,
+                          border: z.sure_dakika ? '1px solid rgba(6,182,212,0.15)' : 'none',
+                        }}>
+                        {formatSure(z.sure_dakika)}
+                      </span>
+                    )}
+                  </div>
 
-                      {/* Süre */}
-                      <td className="px-4 py-3">
-                        {isAktif ? (
-                          <ElapsedTimer since={z.giris_saati} />
-                        ) : (
-                          <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-                            style={{ background: z.sure_dakika ? 'rgba(6,182,212,0.1)' : 'var(--bg-item)', color: z.sure_dakika ? '#06B6D4' : textMuted }}>
-                            {formatSure(z.sure_dakika)}
-                          </span>
-                        )}
-                      </td>
+                  {/* Durum + QR badge grubu */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {isAktif ? (
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                        <span className="text-[10px] font-bold px-2 py-1 rounded-xl whitespace-nowrap"
+                          style={{ background: 'rgba(34,197,94,0.1)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.2)' }}>
+                          Devam ediyor
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#94A3B8' }} />
+                        <span className="text-[10px] font-bold px-2 py-1 rounded-xl whitespace-nowrap"
+                          style={{ background: 'rgba(148,163,184,0.08)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.15)' }}>
+                          Tamamlandı
+                        </span>
+                      </div>
+                    )}
+                    {z.qr_ile_giris && (
+                      <span className="text-[9px] font-bold px-1.5 py-1 rounded-lg whitespace-nowrap"
+                        style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        <i className="ri-qr-code-line mr-0.5 text-[9px]" />QR
+                      </span>
+                    )}
+                  </div>
 
-                      {/* Durum */}
-                      <td className="px-4 py-3">
-                        {isAktif ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ background: '#22C55E' }} />
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                              style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
-                              Devam Ediyor
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#94A3B8' }} />
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                              style={{ background: 'rgba(148,163,184,0.1)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.2)' }}>
-                              Tamamlandı
-                            </span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Son kolon */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 justify-end">
-                          {z.qr_ile_giris && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap flex-shrink-0"
-                              style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
-                              <i className="ri-qr-code-line mr-0.5" />QR
-                            </span>
-                          )}
-                          <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
-                            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                            <i className="ri-arrow-right-s-line text-sm" style={{ color: '#059669' }} />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  {/* Arrow */}
+                  <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0"
+                    style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+                    <i className="ri-arrow-right-s-line text-sm" style={{ color: textMuted }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -6,6 +6,7 @@ import LoginPage from "../pages/login/page";
 import OsgbDashboardPage from "../pages/osgb-dashboard/page";
 import OsgbOnboardingPage from "../pages/osgb-onboarding/page";
 import OsgbUzmanPage from "../pages/osgb-uzman/page";
+import HekimPage from "../pages/hekim/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
@@ -62,6 +63,14 @@ const routes: RouteObject[] = [
     element: (
       <ProtectedRoute>
         <OsgbUzmanPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/hekim",
+    element: (
+      <ProtectedRoute>
+        <HekimPage />
       </ProtectedRoute>
     ),
   },
