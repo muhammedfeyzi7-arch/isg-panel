@@ -825,8 +825,7 @@ export default function FirmalarPage() {
   );
 }
 
-function ActionBtn({ icon, color: _color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
-  const accentColor = '#0EA5E9';
+function ActionBtn({ icon, color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
   return (
     <button
       onClick={onClick}
@@ -834,9 +833,9 @@ function ActionBtn({ icon, color: _color, onClick, title }: { icon: string; colo
       className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
       style={{ color: 'var(--text-muted)', background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
       onMouseEnter={e => {
-        e.currentTarget.style.color = accentColor;
-        e.currentTarget.style.background = `${accentColor}15`;
-        e.currentTarget.style.borderColor = `${accentColor}35`;
+        e.currentTarget.style.color = color;
+        e.currentTarget.style.background = `${color}18`;
+        e.currentTarget.style.borderColor = `${color}38`;
       }}
       onMouseLeave={e => {
         e.currentTarget.style.color = 'var(--text-muted)';

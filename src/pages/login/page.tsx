@@ -212,39 +212,51 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Feature table rows */}
-            <div className="mt-8 w-full max-w-sm mx-auto space-y-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-widest mb-3"
-                style={{ color: '#2e6a7e' }}>Platform Kapsamı</p>
-              {[
-                { icon: 'ri-building-2-line', label: 'Firma Yönetimi', desc: 'Çoklu firma & personel takibi' },
-                { icon: 'ri-stethoscope-line', label: 'OSGB Paneli', desc: 'Müşteri firma & gezici uzman' },
-                { icon: 'ri-user-star-line', label: 'Gezici Uzman', desc: 'Saha denetimi & raporlama' },
-                { icon: 'ri-shield-check-line', label: 'Uygunsuzluk & DÖF', desc: 'Kayıt, takip ve kapatma' },
-              ].map(f => (
-                <div
-                  key={f.label}
-                  className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl"
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
-                >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.2)' }}>
-                    <i className={`${f.icon} text-sm`} style={{ color: '#22D3EE' }} />
+            {/* Rol pilleri — yan yana */}
+            <div className="mt-8 w-full max-w-sm mx-auto">
+              <p className="text-[11px] font-semibold uppercase tracking-widest mb-4 text-center"
+                style={{ color: '#2e6a7e' }}>Platform Rolleri</p>
+
+              {/* Üst satır: 3 rol */}
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {[
+                  { icon: 'ri-building-4-line', label: 'Firma Yöneticisi' },
+                  { icon: 'ri-stethoscope-line', label: 'OSGB Yöneticisi' },
+                  { icon: 'ri-team-line', label: 'Denetçi' },
+                ].map(r => (
+                  <div key={r.label}
+                    className="flex flex-col items-center gap-2 px-2 py-3 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)' }}>
+                      <i className={`${r.icon} text-base`} style={{ color: '#22D3EE' }} />
+                    </div>
+                    <p className="text-[10.5px] font-semibold text-center leading-tight" style={{ color: '#b8e6f0' }}>{r.label}</p>
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold" style={{ color: '#b8e6f0' }}>{f.label}</p>
-                    <p className="text-[11px]" style={{ color: '#4a7a8a' }}>{f.desc}</p>
+                ))}
+              </div>
+
+              {/* Alt satır: İSG Uzmanı + İş Yeri Hekimi — öne çıkan */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { icon: 'ri-user-star-line', label: 'İSG Uzmanı', color: '#06B6D4', glow: 'rgba(6,182,212,0.18)' },
+                  { icon: 'ri-heart-pulse-line', label: 'İş Yeri Hekimi', color: '#10B981', glow: 'rgba(16,185,129,0.18)' },
+                ].map(r => (
+                  <div key={r.label}
+                    className="flex flex-col items-center gap-2 px-3 py-3.5 rounded-xl"
+                    style={{ background: r.glow, border: `1px solid ${r.color}30` }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: `${r.color}18`, border: `1px solid ${r.color}35` }}>
+                      <i className={`${r.icon} text-lg`} style={{ color: r.color }} />
+                    </div>
+                    <p className="text-[11px] font-bold text-center" style={{ color: r.color === '#06B6D4' ? '#67e8f9' : '#6ee7b7' }}>{r.label}</p>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: `${r.color}20`, color: r.color, border: `1px solid ${r.color}30` }}>
+                      Saha Erişimi
+                    </span>
                   </div>
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    style={{ background: 'rgba(6,182,212,0.4)' }} />
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 

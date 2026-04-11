@@ -152,40 +152,91 @@ export default function OsgbUzmanPage() {
             Atanan firmanız üzerinden denetimlere başlayabilirsiniz.
           </p>
 
-          {/* Status card */}
+          {/* Status table — referans görseldeki premium tablo yapısı */}
           <div className="rounded-xl overflow-hidden mb-6"
-            style={{ border: '1px solid #f1f5f9' }}>
-            {/* Header row */}
-            <div className="flex items-center gap-3 px-4 py-3"
-              style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <i className="ri-time-line text-xs" style={{ color: '#F59E0B' }} />
+            style={{ border: '1px solid #e2e8f0' }}>
+            {/* Table header */}
+            <div className="grid px-4 py-2.5"
+              style={{
+                gridTemplateColumns: '1fr 1fr 1fr',
+                background: '#f8fafc',
+                borderBottom: '1px solid #e2e8f0',
+              }}>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: '#94a3b8' }}>Atanan Firma</p>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: '#94a3b8' }}>Rol</p>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: '#94a3b8' }}>Durum</p>
+            </div>
+
+            {/* Table row */}
+            <div className="grid items-center px-4 py-3"
+              style={{
+                gridTemplateColumns: '1fr 1fr 1fr',
+                borderBottom: '1px solid #f8fafc',
+              }}>
+              {/* Firma sütunu — avatar + text */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
+                  —
+                </div>
+                <div>
+                  <p className="text-[12px] font-semibold" style={{ color: '#374151' }}>Atama Bekleniyor</p>
+                  <p className="text-[10.5px]" style={{ color: '#94a3b8' }}>OSGB tarafından atanacak</p>
+                </div>
               </div>
-              <p className="text-xs font-semibold" style={{ color: '#374151' }}>Atama Durumu</p>
-              <div className="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                style={{ background: 'rgba(245,158,11,0.1)', color: '#92400e', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <span className="w-1 h-1 rounded-full animate-pulse" style={{ background: '#F59E0B' }} />
-                Bekleniyor
+
+              {/* Rol sütunu */}
+              <p className="text-[12px]" style={{ color: '#64748b' }}>ISG Uzmanı</p>
+
+              {/* Durum sütunu — badge */}
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-semibold"
+                  style={{ background: 'rgba(245,158,11,0.1)', color: '#b45309', border: '1px solid rgba(245,158,11,0.25)' }}>
+                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#F59E0B' }} />
+                  Bekleniyor
+                </span>
               </div>
             </div>
 
-            {/* Info rows */}
-            {[
-              { icon: 'ri-building-2-line', label: 'Atanan Firma', value: 'Henüz atama yapılmadı' },
-              { icon: 'ri-user-star-line', label: 'Rol', value: 'ISG Uzmanı' },
-              { icon: 'ri-shield-check-line', label: 'Yetki', value: 'Saha denetimi & raporlama' },
-            ].map((row, idx, arr) => (
-              <div key={row.label}
-                className="flex items-center gap-3 px-4 py-3"
-                style={{ borderBottom: idx < arr.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                  <i className={`${row.icon} text-xs`} style={{ color: '#06B6D4' }} />
-                </div>
-                <p className="text-xs" style={{ color: '#94a3b8' }}>{row.label}</p>
-                <p className="text-xs font-medium ml-auto text-right" style={{ color: '#374151' }}>{row.value}</p>
+            {/* Yetki satırı */}
+            <div className="flex items-center gap-3 px-4 py-3"
+              style={{ borderBottom: '1px solid #f8fafc' }}>
+              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0"
+                style={{ color: '#06B6D4' }}>
+                <i className="ri-shield-check-line text-sm" />
               </div>
-            ))}
+              <p className="text-[11px]" style={{ color: '#94a3b8' }}>Yetki</p>
+              <p className="text-[12px] font-medium ml-auto" style={{ color: '#374151' }}>Saha denetimi &amp; raporlama</p>
+            </div>
+
+            {/* Saha denetimi satırı */}
+            <div className="flex items-center gap-3 px-4 py-3"
+              style={{ borderBottom: '1px solid #f8fafc' }}>
+              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0"
+                style={{ color: '#06B6D4' }}>
+                <i className="ri-map-pin-line text-sm" />
+              </div>
+              <p className="text-[11px]" style={{ color: '#94a3b8' }}>Saha Denetimi</p>
+              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold"
+                style={{ background: 'rgba(6,182,212,0.08)', color: '#0891b2', border: '1px solid rgba(6,182,212,0.18)' }}>
+                <i className="ri-check-line text-[9px]" />
+                Aktif
+              </span>
+            </div>
+
+            {/* Uygunsuzluk satırı */}
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="w-6 h-6 flex items-center justify-center flex-shrink-0"
+                style={{ color: '#06B6D4' }}>
+                <i className="ri-alert-line text-sm" />
+              </div>
+              <p className="text-[11px]" style={{ color: '#94a3b8' }}>Uygunsuzluk Kaydı</p>
+              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold"
+                style={{ background: 'rgba(6,182,212,0.08)', color: '#0891b2', border: '1px solid rgba(6,182,212,0.18)' }}>
+                <i className="ri-check-line text-[9px]" />
+                Aktif
+              </span>
+            </div>
           </div>
 
           {/* Info note */}
