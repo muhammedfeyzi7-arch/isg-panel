@@ -8,6 +8,7 @@ import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHel
 import IsIzniSahaBolumu from './components/IsIzniSahaBolumu';
 import { OfflineBand, PendingModal } from './components/OfflineBand';
 import QrScanner, { loadJsQR } from './components/QrScanner';
+import ZiyaretCheckIn from './components/ZiyaretCheckIn';
 import {
   STATUS_CFG,
   EkipmanDetayPanel,
@@ -18,10 +19,11 @@ import {
 import { uploadFileToStorage } from '@/utils/fileUpload';
 
 // ─── Sekme Tanımları ──────────────────────────────────────────────────────────
-type SahaTab = 'qr' | 'ekipman' | 'izin' | 'uygunsuzluk';
+type SahaTab = 'ziyaret' | 'qr' | 'ekipman' | 'izin' | 'uygunsuzluk';
 
 const TABS: { id: SahaTab; label: string; icon: string; color: string; activeBg: string }[] = [
-  { id: 'qr',           label: 'QR Tara',     icon: 'ri-qr-code-line',         color: '#34D399', activeBg: 'rgba(52,211,153,0.15)' },
+  { id: 'ziyaret',      label: 'Ziyaret',     icon: 'ri-map-pin-user-line',     color: '#34D399', activeBg: 'rgba(52,211,153,0.15)' },
+  { id: 'qr',           label: 'QR Tara',     icon: 'ri-qr-code-line',          color: '#818CF8', activeBg: 'rgba(129,140,248,0.15)' },
   { id: 'ekipman',      label: 'Ekipmanlar',  icon: 'ri-tools-line',            color: '#818CF8', activeBg: 'rgba(129,140,248,0.15)' },
   { id: 'izin',         label: 'İş İzinleri', icon: 'ri-shield-keyhole-line',   color: '#F59E0B', activeBg: 'rgba(245,158,11,0.15)' },
   { id: 'uygunsuzluk',  label: 'Uygunsuzluk', icon: 'ri-error-warning-line',    color: '#F87171', activeBg: 'rgba(248,113,113,0.15)' },
@@ -509,7 +511,7 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
 // ─── Ana Saha Sayfası ─────────────────────────────────────────────────────────
 export default function SahaPage() {
   const { ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, addToast, ekipmanKontrolBildirimi, currentUser, dataLoading, uygunsuzluklar, isIzinleri, org } = useApp();
-  const [activeTab, setActiveTab] = useState<SahaTab>('qr');
+  const [activeTab, setActiveTab] = useState<SahaTab>('ziyaret');
   const [showPendingModal, setShowPendingModal] = useState(false);
 
   // QR redirect'ten gelen ekipman ID'sini sessionStorage'dan oku
@@ -666,7 +668,7 @@ export default function SahaPage() {
       </div>
 
       {/* Sekme Navigasyonu */}
-      <div className="grid grid-cols-4 gap-1.5 mb-5 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="grid grid-cols-5 gap-1 mb-5 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
         {TABS.map(tab => {
           const isActive = activeTab === tab.id;
           const badge = tab.id === 'ekipman' ? ekipmanBadge : tab.id === 'izin' ? izinBadge : tab.id === 'uygunsuzluk' ? uygunsuzlukBadge : 0;
@@ -691,6 +693,9 @@ export default function SahaPage() {
 
       {/* Sekme İçerikleri */}
       <div className="flex-1">
+        {activeTab === 'ziyaret' && (
+          <ZiyaretCheckIn />
+        )}
         {activeTab === 'qr' && (
           <QrTab isOnline={isOnline} onKontrolYapildi={handleKontrolYapildi} onDurumDegistir={handleDurumDegistir} />
         )}

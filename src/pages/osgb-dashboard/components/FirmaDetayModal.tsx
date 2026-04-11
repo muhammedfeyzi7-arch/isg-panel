@@ -221,8 +221,11 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
                     <i className="ri-user-star-line text-[10px]" style={{ color: '#8B5CF6' }} />
                   </div>
                   <span className="text-xs font-semibold" style={{ color: textMuted }}>
-                    Atanmış Uzmanlar
-                    <span className="ml-1.5 font-normal" style={{ color: textFaint }}>({atananUzmanIds.length} seçili)</span>
+                    Bu Firmaya Atanan Uzmanlar
+                    <span className="ml-1.5 font-bold px-1.5 py-0.5 rounded-full text-[10px]"
+                      style={{ background: atananUzmanIds.length > 0 ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)', color: atananUzmanIds.length > 0 ? '#059669' : textFaint }}>
+                      {atananUzmanIds.length} uzman bağlı
+                    </span>
                   </span>
                 </div>
                 <button onClick={handleUzmanAta} disabled={atanmaLoading}
@@ -359,15 +362,17 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
                     })()}
                   </div>
                   <div className="rounded-xl p-4" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-                    <p className="text-xs font-semibold mb-2" style={{ color: textMuted }}>
-                      Atanmış Uzmanlar
-                      {atananUzmanIds.length > 0 && (
-                        <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>
-                          {atananUzmanIds.length}
-                        </span>
-                      )}
-                    </p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold" style={{ color: textMuted }}>
+                        Bu Firmaya Atanan Uzmanlar
+                        {atananUzmanIds.length > 0 && (
+                          <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                            style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>
+                            {atananUzmanIds.length} uzman bağlı
+                          </span>
+                        )}
+                      </p>
+                    </div>
                     {atananUzmanIds.length === 0 ? (
                       <p className="text-xs" style={{ color: textFaint }}>Bu firmaya henüz uzman atanmadı.</p>
                     ) : (
@@ -376,19 +381,37 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
                           const u = uzmanlar.find(x => x.user_id === uid);
                           if (!u) return null;
                           return (
-                            <div key={uid} className="flex items-center gap-3">
+                            <div key={uid} className="flex items-center gap-3 p-2 rounded-xl"
+                              style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#f0fdf4', border: `1px solid rgba(16,185,129,0.15)` }}>
                               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                                 style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                                 {u.display_name.charAt(0).toUpperCase()}
                               </div>
-                              <div>
+                              <div className="flex-1 min-w-0">
                                 <p className="text-xs font-bold" style={{ color: textPrimary }}>{u.display_name}</p>
                                 <p className="text-[10px]" style={{ color: textFaint }}>{u.email}</p>
                               </div>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                                style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>
+                                Gezici Uzman
+                              </span>
+                              <button
+                                onClick={() => toggleUzman(uid)}
+                                title="Atamayı kaldır"
+                                className="w-6 h-6 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+                                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}>
+                                <i className="ri-close-line text-[10px]" />
+                              </button>
                             </div>
                           );
                         })}
                       </div>
+                    )}
+                    {atananUzmanIds.length > 0 && (
+                      <p className="text-[10px] mt-2" style={{ color: textFaint }}>
+                        <i className="ri-information-line mr-0.5" />
+                        X butonuna basıp &quot;Kaydet&quot; ile atamayı kaldırabilirsiniz.
+                      </p>
                     )}
                   </div>
                 </div>

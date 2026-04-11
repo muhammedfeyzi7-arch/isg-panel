@@ -12,6 +12,7 @@ import OsgbHeader from './components/OsgbHeader';
 import OsgbSettings from './components/OsgbSettings';
 import ZiyaretlerTab from './components/ZiyaretlerTab';
 import OsgbLoadingScreen from './components/OsgbLoadingScreen';
+import OsgbOnboarding from './components/OsgbOnboarding';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -98,6 +99,13 @@ export default function OsgbDashboardPage() {
   const [showFirmaModal, setShowFirmaModal] = useState(false);
   const [firmaLoading, setFirmaLoading] = useState(false);
   const [firmaError, setFirmaError] = useState<string | null>(null);
+
+  // Uzman Atama Modal
+  const [showAtamaModal, setShowAtamaModal] = useState(false);
+  const [atamaUzmanId, setAtamaUzmanId] = useState<string>('');
+  const [atamaFirmaIds, setAtamaFirmaIds] = useState<string[]>([]);
+  const [atamaLoading, setAtamaLoading] = useState(false);
+  const [atamaError, setAtamaError] = useState<string | null>(null);
 
   // Uzman Ekle Modal
   const [showUzmanModal, setShowUzmanModal] = useState(false);
@@ -315,6 +323,36 @@ export default function OsgbDashboardPage() {
     }
   };
 
+  // ── Uzman Ata ──
+  const handleAtamaKaydet = async () => {
+    if (!atamaUzmanId || atamaFirmaIds.length === 0) {
+      setAtamaError('Lütfen bir uzman ve en az bir firma seçin.');
+      return;
+    }
+    setAtamaLoading(true);
+    setAtamaError(null);
+    try {
+      const { error } = await supabase
+        .from('user_organizations')
+        .update({
+          active_firm_id: atamaFirmaIds[0],
+          active_firm_ids: atamaFirmaIds,
+        })
+        .eq('user_id', atamaUzmanId)
+        .eq('organization_id', org?.id ?? '');
+      if (error) { setAtamaError(error.message); return; }
+      addToast('Atama başarıyla güncellendi!', 'success');
+      setShowAtamaModal(false);
+      setAtamaUzmanId('');
+      setAtamaFirmaIds([]);
+      await fetchData();
+    } catch (err) {
+      setAtamaError(String(err));
+    } finally {
+      setAtamaLoading(false);
+    }
+  };
+
   const filteredFirmalar = altFirmalar.filter(f =>
     f.name.toLowerCase().includes(searchFirma.toLowerCase())
   );
@@ -440,7 +478,19 @@ export default function OsgbDashboardPage() {
             <>
               {/* ── DASHBOARD ── */}
               {activeTab === 'dashboard' && (
-                <div className="space-y-5 page-enter">
+                <>
+                  {/* Onboarding: firma yoksa veya uzman yoksa veya atama yoksa göster */}
+                  {(altFirmalar.length === 0 || uzmanlar.length === 0 || !altFirmalar.some(f => f.uzmanAd)) ? (
+                    <OsgbOnboarding
+                      firmalar={altFirmalar.map(f => ({ id: f.id, name: f.name, uzmanAd: f.uzmanAd }))}
+                      uzmanlar={uzmanlar}
+                      isDark={isDark}
+                      onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); }}
+                      onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaIds: [] }); }}
+                      onAtamaYap={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(uzmanlar[0]?.user_id ?? ''); setAtamaFirmaIds([]); }}
+                    />
+                  ) : (
+                    <div className="space-y-5 page-enter">
                   {/* Stats */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
@@ -603,7 +653,9 @@ export default function OsgbDashboardPage() {
                       </button>
                     </div>
                   )}
-                </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* ── FİRMALAR TAB ── */}
@@ -664,9 +716,40 @@ export default function OsgbDashboardPage() {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-xs" style={{ color: f.uzmanAd ? 'var(--text-secondary)' : textMuted }}>
-                                  {f.uzmanAd ?? '—'}
-                                </span>
+                                {/* Sorumlu uzman + relation chip */}
+                                {(() => {
+                                  const firmaUzmanlar = uzmanlar.filter(u =>
+                                    (u.active_firm_ids && u.active_firm_ids.includes(f.id)) ||
+                                    u.active_firm_id === f.id
+                                  );
+                                  return firmaUzmanlar.length > 0 ? (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {firmaUzmanlar.map(u => (
+                                        <span key={u.user_id} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                          style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                          <span className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0"
+                                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                                            {u.display_name.charAt(0).toUpperCase()}
+                                          </span>
+                                          {u.display_name.split(' ')[0]}
+                                        </span>
+                                      ))}
+                                      {firmaUzmanlar.length > 1 && (
+                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                                          style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
+                                          {firmaUzmanlar.length} uzman
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(''); setAtamaFirmaIds([f.id]); }}
+                                      className="whitespace-nowrap flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg cursor-pointer transition-all"
+                                      style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}>
+                                      <i className="ri-user-add-line text-[10px]" />+ Uzman Ata
+                                    </button>
+                                  );
+                                })()}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="text-xs font-semibold" style={{ color: textPrimary }}>{f.personelSayisi}</span>
@@ -765,18 +848,37 @@ export default function OsgbDashboardPage() {
                                 <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{u.email}</span>
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  {u.active_firm_name ? (
-                                    <>
-                                      <div className="w-5 h-5 flex items-center justify-center rounded flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                                        <i className="ri-building-2-line text-[10px]" style={{ color: '#059669' }} />
-                                      </div>
-                                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{u.active_firm_name}</span>
-                                    </>
+                                {/* Atanmış firmalar + relation chip */}
+                                {(() => {
+                                  const firmIds = (u.active_firm_ids && u.active_firm_ids.length > 0)
+                                    ? u.active_firm_ids
+                                    : u.active_firm_id ? [u.active_firm_id] : [];
+                                  const firmalar = firmIds.map(id => altFirmalar.find(f => f.id === id)).filter(Boolean);
+                                  return firmalar.length > 0 ? (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {firmalar.slice(0, 2).map(f => f && (
+                                        <span key={f.id} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                          style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                          <i className="ri-building-2-line text-[9px]" />
+                                          {f.name.length > 12 ? f.name.slice(0, 12) + '…' : f.name}
+                                        </span>
+                                      ))}
+                                      {firmalar.length > 2 && (
+                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                                          style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                                          +{firmalar.length - 2}
+                                        </span>
+                                      )}
+                                    </div>
                                   ) : (
-                                    <span className="text-xs" style={{ color: textMuted }}>—</span>
-                                  )}
-                                </div>
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds([]); }}
+                                      className="whitespace-nowrap flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg cursor-pointer transition-all"
+                                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#6366F1' }}>
+                                      <i className="ri-add-line text-[10px]" />+ Firma Ata
+                                    </button>
+                                  );
+                                })()}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
@@ -789,13 +891,21 @@ export default function OsgbDashboardPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <button
-                                  onClick={() => setSecilenUzman(u)}
-                                  className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
-                                  style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#7C3AED' }}
-                                >
-                                  <i className="ri-eye-line text-xs" />Detay
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={e => { e.stopPropagation(); setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds(u.active_firm_ids ?? (u.active_firm_id ? [u.active_firm_id] : [])); }}
+                                    className="whitespace-nowrap flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-all"
+                                    style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}>
+                                    <i className="ri-links-line text-[10px]" />Ata
+                                  </button>
+                                  <button
+                                    onClick={() => setSecilenUzman(u)}
+                                    className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                                    style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#7C3AED' }}
+                                  >
+                                    <i className="ri-eye-line text-xs" />Detay
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1365,6 +1475,144 @@ export default function OsgbDashboardPage() {
                   {uzmanLoading ? <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</> : <><i className="ri-user-add-line" />Uzman Ekle</>}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── UZMAN ATAMA MODAL ── */}
+      {showAtamaModal && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(16px)', zIndex: 99999 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowAtamaModal(false); }}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
+            style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)', maxHeight: '85vh' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+              style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl"
+                  style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <i className="ri-links-line text-base" style={{ color: '#F59E0B' }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Uzman - Firma Ataması</h3>
+                  <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Hangi uzman hangi firmada çalışacak?</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAtamaModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}>
+                <i className="ri-close-line text-sm" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+              {/* Uzman Seçimi */}
+              <div>
+                <label className="block text-[11px] font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Uzman Seç <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {uzmanlar.map(u => {
+                    const secili = atamaUzmanId === u.user_id;
+                    return (
+                      <button key={u.user_id} type="button"
+                        onClick={() => setAtamaUzmanId(u.user_id)}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all text-left"
+                        style={{
+                          background: secili ? 'rgba(245,158,11,0.1)' : 'var(--bg-item)',
+                          border: secili ? '1.5px solid rgba(245,158,11,0.3)' : '1.5px solid var(--border-subtle)',
+                        }}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={secili
+                            ? { background: '#F59E0B' }
+                            : { background: 'var(--bg-input)', border: '1.5px solid var(--border-main)' }}>
+                          {secili && <i className="ri-check-line text-white text-[10px]" />}
+                        </div>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                          style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                          {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: secili ? '#F59E0B' : 'var(--text-primary)' }}>
+                            {u.display_name ?? u.email}
+                          </p>
+                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            {u.active_firm_name ?? 'Firma atanmamış'}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Firma Seçimi */}
+              <div>
+                <label className="block text-[11px] font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Atanacak Firma(lar) <span style={{ color: '#EF4444' }}>*</span>
+                  <span className="ml-1.5 font-normal" style={{ color: 'var(--text-faint)' }}>
+                    ({atamaFirmaIds.length} seçili)
+                  </span>
+                </label>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {altFirmalar.map(f => {
+                    const secili = atamaFirmaIds.includes(f.id);
+                    return (
+                      <button key={f.id} type="button"
+                        onClick={() => setAtamaFirmaIds(prev =>
+                          prev.includes(f.id) ? prev.filter(id => id !== f.id) : [...prev, f.id]
+                        )}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all text-left"
+                        style={{
+                          background: secili ? 'rgba(245,158,11,0.1)' : 'var(--bg-item)',
+                          border: secili ? '1.5px solid rgba(245,158,11,0.3)' : '1.5px solid var(--border-subtle)',
+                        }}>
+                        <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                          style={secili
+                            ? { background: '#F59E0B' }
+                            : { background: 'var(--bg-input)', border: '1.5px solid var(--border-main)' }}>
+                          {secili && <i className="ri-check-line text-white text-[10px]" />}
+                        </div>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                          <i className="ri-building-2-line text-xs" style={{ color: '#059669' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: secili ? '#F59E0B' : 'var(--text-primary)' }}>
+                            {f.name}
+                          </p>
+                          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            {f.uzmanAd ? `${f.uzmanAd} atanmış` : `${f.personelSayisi} personel`}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            {atamaError && (
+              <div className="mx-6 mb-3 flex items-start gap-2 p-3 rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <i className="ri-error-warning-line text-sm flex-shrink-0" style={{ color: '#ef4444' }} />
+                <p className="text-xs" style={{ color: '#dc2626' }}>{atamaError}</p>
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2 px-6 py-4 flex-shrink-0"
+              style={{ borderTop: '1px solid var(--border-subtle)' }}>
+              <button onClick={() => setShowAtamaModal(false)}
+                className="whitespace-nowrap px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer"
+                style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                İptal
+              </button>
+              <button onClick={handleAtamaKaydet}
+                disabled={atamaLoading || !atamaUzmanId || atamaFirmaIds.length === 0}
+                className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)', opacity: (atamaLoading || !atamaUzmanId || atamaFirmaIds.length === 0) ? 0.6 : 1 }}>
+                {atamaLoading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-links-line" />Atamaları Kaydet</>}
+              </button>
             </div>
           </div>
         </div>,

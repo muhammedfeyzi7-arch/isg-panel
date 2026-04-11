@@ -212,6 +212,12 @@ export default function UzmanDetayModal({
                       })
                     : <span className="text-xs" style={{ color: '#94a3b8' }}>Henüz firma atanmadı</span>
                   }
+                  {secilenFirmaIds.length > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.15)' }}>
+                      {secilenFirmaIds.length} firma sorumluluğu
+                    </span>
+                  )}
                 </div>
                 <span className="text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0"
                   style={{
