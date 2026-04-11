@@ -392,65 +392,72 @@ export default function DashboardTab({
           </div>
 
           {altFirmalar.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-3 px-5">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            <div className="flex flex-col items-center justify-center py-8 gap-3 px-5">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center"
                 style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
                 <i className="ri-building-2-line text-xl" style={{ color: '#10B981' }} />
               </div>
               <p className="text-xs text-center" style={{ color: textSecondary }}>Henüz firma eklenmedi</p>
               <button onClick={onFirmaEkle}
-                className="whitespace-nowrap flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
+                className="whitespace-nowrap flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
                 style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                 <i className="ri-add-line" />Firma Ekle
               </button>
             </div>
           ) : (
-            <div className="p-3 space-y-1">
-              {altFirmalar.slice(0, 5).map(f => {
-                const lastVisitDate = firmaLastVisit[f.id];
-                const days = getDaysDiff(lastVisitDate);
-                const isAktif = aktifZiyaretler.some(z => z.firma_id === f.id);
-                const rowBg = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)';
-                const rowHover = isDark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.04)';
-                return (
-                  <div key={f.id}
-                    onClick={() => onFirmaClick({ id: f.id, name: f.name })}
-                    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                    style={{ background: rowBg, transition: 'all 0.18s ease' }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = rowHover;
-                      (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background = rowBg;
-                      (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
-                    }}>
-                    <div className="relative flex-shrink-0">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                        style={{ background: isAktif ? 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,197,94,0.08))' : 'rgba(16,185,129,0.1)' }}>
-                        <i className="ri-building-2-line text-sm" style={{ color: isAktif ? '#22C55E' : '#059669' }} />
+            <>
+              {/* Mini tablo başlığı */}
+              <div className="grid grid-cols-[2fr_1fr_80px] items-center px-4 py-2"
+                style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }}>
+                {['FİRMA', 'PERSONEL', 'ZİYARET'].map(h => (
+                  <div key={h}><span className="text-[9px] font-bold tracking-wider" style={{ color: textSecondary }}>{h}</span></div>
+                ))}
+              </div>
+              <div>
+                {altFirmalar.slice(0, 5).map((f, idx) => {
+                  const lastVisitDate = firmaLastVisit[f.id];
+                  const days = getDaysDiff(lastVisitDate);
+                  const isAktif = aktifZiyaretler.some(z => z.firma_id === f.id);
+                  const rowBg = 'transparent';
+                  const rowHover = isDark ? 'rgba(16,185,129,0.05)' : 'rgba(16,185,129,0.03)';
+                  return (
+                    <div key={f.id}
+                      onClick={() => onFirmaClick({ id: f.id, name: f.name })}
+                      className="grid grid-cols-[2fr_1fr_80px] items-center px-4 py-2.5 cursor-pointer transition-all"
+                      style={{
+                        background: rowBg,
+                        borderBottom: idx < Math.min(altFirmalar.length, 5) - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)'}` : 'none',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowHover; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBg; }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            style={{ background: isAktif ? 'rgba(34,197,94,0.12)' : 'rgba(16,185,129,0.1)' }}>
+                            <i className="ri-building-2-line text-[10px]" style={{ color: isAktif ? '#22C55E' : '#059669' }} />
+                          </div>
+                          {isAktif && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border animate-pulse"
+                              style={{ background: '#22C55E', borderColor: isDark ? '#1e2d3d' : '#ffffff' }} />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{f.name}</p>
+                          {isAktif && <span className="text-[9px] font-bold" style={{ color: '#22C55E' }}>● Aktif</span>}
+                          {!isAktif && <span className="text-[9px]" style={{ color: textSecondary }}>{f.uzmanAd ?? 'Uzman atanmadı'}</span>}
+                        </div>
                       </div>
-                      {isAktif && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse"
-                          style={{ background: '#22C55E', borderColor: isDark ? '#1e2d3d' : '#ffffff' }} />
-                      )}
+                      <div>
+                        <span className="text-xs" style={{ color: textSecondary }}>{f.personelSayisi}</span>
+                      </div>
+                      <div>
+                        <VisitStatusBadge days={days} />
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold truncate" style={{ color: textPrimary }}>{f.name}</p>
-                      <p className="text-[10px] mt-0.5" style={{ color: textSecondary }}>
-                        {isAktif
-                          ? <span style={{ color: '#22C55E', fontWeight: 600 }}>Aktif ziyaret devam ediyor</span>
-                          : (f.uzmanAd ?? 'Uzman atanmadı')}
-                        {' · '}{f.personelSayisi} personel
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <VisitStatusBadge days={days} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
@@ -480,79 +487,77 @@ export default function DashboardTab({
           </div>
 
           {uzmanlar.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-3 px-5">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            <div className="flex flex-col items-center justify-center py-8 gap-3 px-5">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center"
                 style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
                 <i className="ri-user-star-line text-xl" style={{ color: '#8B5CF6' }} />
               </div>
               <p className="text-xs text-center" style={{ color: textSecondary }}>Henüz uzman eklenmedi</p>
               <button onClick={onUzmanEkle}
-                className="whitespace-nowrap flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
+                className="whitespace-nowrap flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
                 style={{ background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)' }}>
                 <i className="ri-user-add-line" />Uzman Ekle
               </button>
             </div>
           ) : (
-            <div className="p-3 space-y-1">
-              {uzmanlar.slice(0, 5).map(u => {
-                const isSahada = aktifUzmanIds.has(u.user_id);
-                const lastVisitDate = uzmanLastVisit[u.user_id];
-                const days = getDaysDiff(lastVisitDate);
-                const rowBg = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)';
-                const rowHover = isDark ? 'rgba(139,92,246,0.07)' : 'rgba(139,92,246,0.04)';
-                const initial = (u.display_name ?? u.email ?? '?').charAt(0).toUpperCase();
-                return (
-                  <div key={u.user_id}
-                    onClick={() => onUzmanClick(u)}
-                    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
-                    style={{ background: rowBg, transition: 'all 0.18s ease' }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = rowHover;
-                      (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background = rowBg;
-                      (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
-                    }}>
-                    <div className="relative flex-shrink-0">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black text-white"
-                        style={{
-                          background: isSahada
-                            ? 'linear-gradient(135deg, #22C55E, #16A34A)'
-                            : u.is_active
-                              ? 'linear-gradient(135deg, #8B5CF6, #7C3AED)'
-                              : 'linear-gradient(135deg, #64748b, #475569)',
-                        }}>
-                        {initial}
+            <>
+              {/* Mini tablo başlığı */}
+              <div className="grid grid-cols-[2fr_1.2fr_1fr] items-center px-4 py-2"
+                style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }}>
+                {['UZMAN', 'FİRMA', 'DURUM'].map(h => (
+                  <div key={h}><span className="text-[9px] font-bold tracking-wider" style={{ color: textSecondary }}>{h}</span></div>
+                ))}
+              </div>
+              <div>
+                {uzmanlar.slice(0, 5).map((u, idx) => {
+                  const isSahada = aktifUzmanIds.has(u.user_id);
+                  const lastVisitDate = uzmanLastVisit[u.user_id];
+                  const days = getDaysDiff(lastVisitDate);
+                  const rowBg = 'transparent';
+                  const rowHover = isDark ? 'rgba(139,92,246,0.05)' : 'rgba(139,92,246,0.03)';
+                  const initial = (u.display_name ?? u.email ?? '?').charAt(0).toUpperCase();
+                  return (
+                    <div key={u.user_id}
+                      onClick={() => onUzmanClick(u)}
+                      className="grid grid-cols-[2fr_1.2fr_1fr] items-center px-4 py-2.5 cursor-pointer transition-all"
+                      style={{
+                        background: rowBg,
+                        borderBottom: idx < Math.min(uzmanlar.length, 5) - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)'}` : 'none',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowHover; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBg; }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black text-white"
+                            style={{ background: isSahada ? 'linear-gradient(135deg, #22C55E, #16A34A)' : u.is_active ? 'linear-gradient(135deg, #8B5CF6, #7C3AED)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                            {initial}
+                          </div>
+                          {isSahada && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border animate-pulse"
+                              style={{ background: '#22C55E', borderColor: isDark ? '#1e2d3d' : '#ffffff' }} />
+                          )}
+                        </div>
+                        <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{u.display_name ?? u.email}</p>
                       </div>
-                      {isSahada && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse"
-                          style={{ background: '#22C55E', borderColor: isDark ? '#1e2d3d' : '#ffffff' }} />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-xs font-bold" style={{ color: textPrimary }}>{u.display_name ?? u.email}</p>
+                      <div>
+                        <p className="text-[10px] truncate" style={{ color: textSecondary }}>{u.active_firm_name ?? '—'}</p>
                       </div>
-                      <p className="text-[10px] mt-0.5 truncate" style={{ color: textSecondary }}>
-                        {u.active_firm_name ?? 'Firma atanmadı'}
-                      </p>
+                      <div>
+                        {isSahada ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
+                            <span className="w-1 h-1 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                            Sahada
+                          </span>
+                        ) : (
+                          <VisitStatusBadge days={days} />
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-shrink-0">
-                      {isSahada ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                          style={{ background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
-                          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
-                          Sahada
-                        </span>
-                      ) : (
-                        <VisitStatusBadge days={days} />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>

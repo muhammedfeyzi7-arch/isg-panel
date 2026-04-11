@@ -631,80 +631,123 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               </div>
 
               {teamLoading ? (
-                <div className="flex items-center justify-center py-12 gap-2" style={{ color: '#94A3B8' }}>
+                <div className="flex items-center justify-center py-10 gap-2" style={{ color: '#94A3B8' }}>
                   <i className="ri-loader-4-line animate-spin text-lg" style={{ color: '#10B981' }} />
                   <span className="text-sm">Yükleniyor...</span>
                 </div>
               ) : members.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
                   <i className="ri-group-line text-2xl" style={{ color: '#94A3B8' }} />
                   <p className="text-sm" style={{ color: '#94A3B8' }}>Henüz üye bulunamadı</p>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-50">
-                  {members.map(member => {
-                    const isMe = member.user_id === user?.id;
-                    const roleConf = getRoleConf(member);
-                    return (
-                      <div key={member.user_id}
-                        className="flex items-center gap-4 px-5 py-4 transition-all"
-                        style={{ opacity: member.is_active ? 1 : 0.65 }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                          style={{ background: member.is_active ? `linear-gradient(135deg, ${roleConf.color}, ${roleConf.color}cc)` : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
-                          {(member.display_name || member.email || '?').charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>
-                              {member.display_name || '—'}
-                              {isMe && <span className="ml-1 text-xs font-normal" style={{ color: '#10B981' }}>(siz)</span>}
-                            </p>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
-                              style={{ background: roleConf.bg, color: roleConf.color }}>
+                <>
+                  {/* Tablo başlığı */}
+                  <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_100px] items-center px-5 py-2"
+                    style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                    {['ÜYE', 'ROL', 'FİRMA', 'DURUM', 'İŞLEM'].map(h => (
+                      <div key={h}>
+                        <span className="text-[10px] font-bold tracking-wider" style={{ color: '#94A3B8' }}>{h}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    {members.map((member, idx) => {
+                      const isMe = member.user_id === user?.id;
+                      const roleConf = getRoleConf(member);
+                      return (
+                        <div key={member.user_id}
+                          className="grid grid-cols-[2fr_1.5fr_1fr_1fr_100px] items-center px-5 py-3 transition-all"
+                          style={{
+                            opacity: member.is_active ? 1 : 0.65,
+                            borderBottom: idx < members.length - 1 ? '1px solid #f8fafc' : 'none',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+
+                          {/* Üye */}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                              style={{ background: member.is_active ? `linear-gradient(135deg, ${roleConf.color}, ${roleConf.color}cc)` : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
+                              {(member.display_name || member.email || '?').charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold truncate" style={{ color: '#0F172A' }}>
+                                {member.display_name || '—'}
+                                {isMe && <span className="ml-1 text-[10px] font-normal" style={{ color: '#10B981' }}>(siz)</span>}
+                              </p>
+                              <p className="text-[10px] truncate" style={{ color: '#94A3B8' }}>{member.email}</p>
+                            </div>
+                          </div>
+
+                          {/* Rol */}
+                          <div>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                              style={{ background: roleConf.bg, color: roleConf.color, border: `1px solid ${roleConf.color}30` }}>
                               <i className={`${roleConf.icon} text-[9px]`} />
                               {roleConf.label}
                             </span>
-                            {!member.is_active && (
-                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                                style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
-                                Pasif
+                          </div>
+
+                          {/* Firma */}
+                          <div>
+                            {(member.osgb_role === 'gezici_uzman' || member.osgb_role === 'isyeri_hekimi') && member.active_firm_ids && member.active_firm_ids.length > 0 ? (
+                              <span className="text-[10px] font-semibold" style={{ color: roleConf.color }}>
+                                <i className="ri-building-3-line text-[9px] mr-0.5" />
+                                {member.active_firm_ids.length} firma
                               </span>
+                            ) : (
+                              <span className="text-[10px]" style={{ color: '#94A3B8' }}>—</span>
                             )}
                           </div>
-                          <p className="text-xs truncate mt-0.5" style={{ color: '#94A3B8' }}>{member.email}</p>
-                          {/* Atanmış firmalar */}
-                          {(member.osgb_role === 'gezici_uzman' || member.osgb_role === 'isyeri_hekimi') && member.active_firm_ids && member.active_firm_ids.length > 0 && (
-                            <p className="text-[10px] mt-0.5 flex items-center gap-1" style={{ color: roleConf.color }}>
-                              <i className="ri-building-3-line text-[9px]" />
-                              {member.active_firm_ids.length} firma atandı
-                            </p>
-                          )}
-                        </div>
-                        {!isMe && (
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <button onClick={() => handleToggleActive(member)} disabled={actionLoadingId === member.user_id}
-                              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
+
+                          {/* Durum */}
+                          <div>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                               style={{
-                                background: member.is_active ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
-                                border: `1px solid ${member.is_active ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
-                                color: member.is_active ? '#EF4444' : '#10B981',
+                                background: member.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
+                                color: member.is_active ? '#10B981' : '#94A3B8',
+                                border: `1px solid ${member.is_active ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)'}`,
                               }}>
-                              {actionLoadingId === member.user_id ? <i className="ri-loader-4-line animate-spin" /> : <i className={member.is_active ? 'ri-pause-circle-line' : 'ri-play-circle-line'} />}
-                              {member.is_active ? 'Pasif' : 'Aktif'}
-                            </button>
-                            <button onClick={() => setDeleteConfirm(member)} disabled={actionLoadingId === member.user_id + '_delete'}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer disabled:opacity-50"
-                              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#EF4444' }}>
-                              <i className="ri-delete-bin-line text-xs" />
-                            </button>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: member.is_active ? '#10B981' : '#94A3B8' }} />
+                              {member.is_active ? 'Aktif' : 'Pasif'}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+
+                          {/* İşlem */}
+                          <div className="flex items-center justify-end gap-1.5">
+                            {!isMe ? (
+                              <>
+                                <button
+                                  onClick={() => handleToggleActive(member)}
+                                  disabled={actionLoadingId === member.user_id}
+                                  title={member.is_active ? 'Pasif yap' : 'Aktif et'}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer disabled:opacity-50 transition-all"
+                                  style={{ background: member.is_active ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)', border: `1px solid ${member.is_active ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}`, color: member.is_active ? '#F59E0B' : '#10B981' }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}>
+                                  {actionLoadingId === member.user_id ? <i className="ri-loader-4-line animate-spin text-[10px]" /> : <i className={`${member.is_active ? 'ri-pause-circle-line' : 'ri-play-circle-line'} text-[10px]`} />}
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirm(member)}
+                                  disabled={actionLoadingId === member.user_id + '_delete'}
+                                  title="Üyeyi kaldır"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer disabled:opacity-50 transition-all"
+                                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#EF4444' }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}>
+                                  <i className="ri-delete-bin-line text-[10px]" />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[10px]" style={{ color: '#94A3B8' }}>—</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
 

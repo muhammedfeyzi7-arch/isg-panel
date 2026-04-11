@@ -523,31 +523,29 @@ export default function OsgbDashboardPage() {
               {/* ── PERSONEL TAB ── */}
               {activeTab === 'uzmanlar' && (
                 <div className="space-y-4 page-enter">
-                  {/* Header */}
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div>
-                      <h2 className="text-base font-bold" style={{ color: textPrimary }}>Personel</h2>
-                      <p className="text-xs mt-0.5" style={{ color: textMuted }}>
-                        {uzmanlar.length > 0
-                          ? `${uzmanlar.filter(u => u.is_active).length} aktif · ${uzmanlar.filter(u => u.osgb_role === 'gezici_uzman').length} uzman · ${uzmanlar.filter(u => u.osgb_role === 'isyeri_hekimi').length} hekim`
-                          : 'Henüz personel eklenmedi'}
-                      </p>
+                  {/* Filtre bar */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative flex-1 min-w-[200px] max-w-lg">
+                      <i className="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-sm" style={{ color: textMuted }} />
+                      <input value={searchUzman} onChange={e => setSearchUzman(e.target.value)}
+                        placeholder="Ad, e-posta veya firma ara..."
+                        className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl outline-none transition-all"
+                        style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-input)', color: textPrimary }}
+                        onFocus={e => { e.currentTarget.style.borderColor = '#10B981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.1)'; }}
+                        onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-input)'; e.currentTarget.style.boxShadow = 'none'; }}
+                      />
                     </div>
-                    <div className="flex items-center gap-2 ml-auto flex-wrap">
-                      <div className="relative">
-                        <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: textMuted }} />
-                        <input value={searchUzman} onChange={e => setSearchUzman(e.target.value)}
-                          placeholder="Personel ara..." className="text-sm pl-9 pr-4 py-2.5 rounded-xl outline-none w-56"
-                          style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary }} />
-                      </div>
-                      <button onClick={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', rol: 'gezici_uzman' as 'gezici_uzman' | 'isyeri_hekimi', password: '', passwordConfirm: '', atananFirmaIds: [] }); }}
-                        className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all"
-                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.02)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(16,185,129,0.35)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
-                        <i className="ri-user-add-line" />+ Personel Ekle
-                      </button>
-                    </div>
+                    <span className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textMuted }}>
+                      ≡ {filteredUzmanlar.length} sonuç
+                    </span>
+                    <button onClick={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', rol: 'gezici_uzman' as 'gezici_uzman' | 'isyeri_hekimi', password: '', passwordConfirm: '', atananFirmaIds: [] }); }}
+                      className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all ml-auto"
+                      style={{ background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.3)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.02)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}>
+                      <i className="ri-user-add-line" />+ Personel Ekle
+                    </button>
                   </div>
 
                   {filteredUzmanlar.length === 0 ? (
@@ -569,138 +567,163 @@ export default function OsgbDashboardPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {filteredUzmanlar.map((u, i) => {
-                        const firmIds = (u.active_firm_ids && u.active_firm_ids.length > 0)
-                          ? u.active_firm_ids
-                          : u.active_firm_id ? [u.active_firm_id] : [];
-                        const atananFirmalar = firmIds.map(id => altFirmalar.find(f => f.id === id)).filter(Boolean) as typeof altFirmalar;
+                    <div className="rounded-2xl overflow-hidden" style={cardStyle}>
+                      {/* Tablo başlığı */}
+                      <div className="grid px-4 py-2.5"
+                        style={{
+                          gridTemplateColumns: '2fr 1.2fr 1fr 1.5fr 1fr 100px',
+                          borderBottom: '1px solid var(--border-subtle)',
+                          background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
+                        }}>
+                        {['PERSONEL', 'ROL', 'DURUM', 'ATANAN FİRMALAR', 'E-POSTA', 'İŞLEMLER'].map(h => (
+                          <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textMuted }}>{h}</span>
+                        ))}
+                      </div>
 
-                        return (
-                          <div
-                            key={u.user_id}
-                            className="rounded-2xl p-4 flex items-center gap-4 transition-all cursor-pointer"
-                            style={{
-                              background: 'var(--bg-card-solid)',
-                              border: '1px solid var(--border-subtle)',
-                              animationDelay: `${i * 40}ms`,
-                            }}
-                            onMouseEnter={e => {
-                              (e.currentTarget as HTMLElement).style.transform = 'translateX(3px)';
-                              (e.currentTarget as HTMLElement).style.boxShadow = isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(15,23,42,0.08)';
-                              (e.currentTarget as HTMLElement).style.borderColor = u.is_active ? 'rgba(16,185,129,0.3)' : 'rgba(100,116,139,0.3)';
-                            }}
-                            onMouseLeave={e => {
-                              (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
-                              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-                              (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
-                            }}
-                          >
-                            {/* Avatar */}
-                            <div className="relative flex-shrink-0">
-                              <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-extrabold text-white"
-                                style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
-                                {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
-                              </div>
-                              {u.is_active && (
-                                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 animate-pulse"
-                                  style={{ background: '#22C55E', borderColor: 'var(--bg-card-solid)' }} />
-                              )}
-                            </div>
+                      {/* Satırlar */}
+                      <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                        {filteredUzmanlar.map((u, i) => {
+                          const firmIds = (u.active_firm_ids && u.active_firm_ids.length > 0)
+                            ? u.active_firm_ids
+                            : u.active_firm_id ? [u.active_firm_id] : [];
+                          const atananFirmalar = firmIds.map(id => altFirmalar.find(f => f.id === id)).filter(Boolean) as typeof altFirmalar;
 
-                            {/* Orta: isim + email + firma sayısı */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-bold" style={{ color: textPrimary }}>
-                                  {u.display_name ?? u.email}
-                                </p>
-                              </div>
-                              <p className="text-[11px] mt-0.5 truncate" style={{ color: textMuted }}>{u.email}</p>
-                              {atananFirmalar.length > 0 && (
-                                <p className="text-[10px] mt-0.5 font-semibold" style={{ color: '#10B981' }}>
-                                  <i className="ri-building-2-line mr-0.5" />
-                                  {atananFirmalar.length} firma sorumluluğu
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Rol badge */}
-                            <div className="flex-shrink-0">
-                              {u.osgb_role === 'isyeri_hekimi' ? (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
-                                  style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
-                                  <i className="ri-heart-pulse-line text-[9px]" />İşyeri Hekimi
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
-                                  style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
-                                  <i className="ri-shield-user-line text-[9px]" />Gezici Uzman
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Firma chips */}
-                            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap max-w-[220px]">
-                              {atananFirmalar.length > 0 ? (
-                                <>
-                                  {atananFirmalar.slice(0, 2).map((f) => (
-                                    <span key={f.id}
-                                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-xl whitespace-nowrap"
-                                      style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
-                                      <i className="ri-building-2-line text-[9px]" />
-                                      {f.name.length > 14 ? f.name.slice(0, 14) + '…' : f.name}
-                                    </span>
-                                  ))}
-                                  {atananFirmalar.length > 2 && (
-                                    <span className="text-[10px] font-bold px-2 py-1 rounded-xl whitespace-nowrap"
-                                      style={{ background: 'rgba(16,185,129,0.06)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
-                                      +{atananFirmalar.length - 2}
-                                    </span>
+                          return (
+                            <div
+                              key={u.user_id}
+                              className="grid px-4 py-3 transition-all"
+                              style={{
+                                gridTemplateColumns: '2fr 1.2fr 1fr 1.5fr 1fr 100px',
+                                animationDelay: `${i * 30}ms`,
+                              }}
+                              onMouseEnter={e => {
+                                (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.03)' : 'rgba(16,185,129,0.025)';
+                                (e.currentTarget as HTMLElement).style.paddingLeft = '18px';
+                              }}
+                              onMouseLeave={e => {
+                                (e.currentTarget as HTMLElement).style.background = 'transparent';
+                                (e.currentTarget as HTMLElement).style.paddingLeft = '16px';
+                              }}
+                            >
+                              {/* Personel adı */}
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="relative flex-shrink-0">
+                                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold text-white"
+                                    style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                                    {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
+                                  </div>
+                                  {u.is_active && (
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse"
+                                      style={{ background: '#22C55E', borderColor: 'var(--bg-card-solid)' }} />
                                   )}
-                                </>
-                              ) : (
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>
+                                    {u.display_name ?? u.email}
+                                  </p>
+                                  {atananFirmalar.length > 0 && (
+                                    <p className="text-[10px]" style={{ color: '#10B981' }}>
+                                      {atananFirmalar.length} firma
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Rol */}
+                              <div className="flex items-center">
+                                {u.osgb_role === 'isyeri_hekimi' ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
+                                    style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
+                                    <i className="ri-heart-pulse-line text-[9px]" />Hekim
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
+                                    style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
+                                    <i className="ri-shield-user-line text-[9px]" />Uzman
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Durum */}
+                              <div className="flex items-center">
+                                {u.is_active ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse" style={{ background: '#22C55E' }} />
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                      style={{ background: 'rgba(34,197,94,0.1)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.2)' }}>
+                                      Aktif
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#94A3B8' }} />
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                      style={{ background: 'rgba(148,163,184,0.08)', color: '#64748B', border: '1px solid rgba(148,163,184,0.15)' }}>
+                                      Pasif
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Firma chips */}
+                              <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                {atananFirmalar.length > 0 ? (
+                                  <>
+                                    {atananFirmalar.slice(0, 1).map((f) => (
+                                      <span key={f.id}
+                                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg whitespace-nowrap max-w-[120px] truncate"
+                                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                        <i className="ri-building-2-line text-[9px] flex-shrink-0" />
+                                        <span className="truncate">{f.name}</span>
+                                      </span>
+                                    ))}
+                                    {atananFirmalar.length > 1 && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg whitespace-nowrap"
+                                        style={{ background: 'rgba(16,185,129,0.06)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                        +{atananFirmalar.length - 1}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds([]); }}
+                                    className="whitespace-nowrap flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg cursor-pointer transition-all"
+                                    style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}>
+                                    <i className="ri-add-line text-[10px]" />Ata
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* E-posta */}
+                              <div className="flex items-center min-w-0">
+                                <span className="text-[10px] truncate" style={{ color: textMuted }}>{u.email}</span>
+                              </div>
+
+                              {/* İşlemler */}
+                              <div className="flex items-center gap-1.5 justify-end">
                                 <button
-                                  onClick={e => { e.stopPropagation(); setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds([]); }}
-                                  className="whitespace-nowrap flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-xl cursor-pointer transition-all"
-                                  style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}>
-                                  <i className="ri-add-line" />+ Firma Ata
+                                  onClick={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds(firmIds); }}
+                                  title="Firma Ata"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.1)'; (e.currentTarget as HTMLElement).style.color = '#F59E0B'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245,158,11,0.25)'; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}>
+                                  <i className="ri-links-line text-xs" />
                                 </button>
-                              )}
+                                <button
+                                  onClick={() => setSecilenUzman(u)}
+                                  title="Detay Gör"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.25)'; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}>
+                                  <i className="ri-eye-line text-xs" />
+                                </button>
+                              </div>
                             </div>
-
-                            {/* Durum badge */}
-                            <div className="flex-shrink-0">
-                              {u.is_active ? (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse" style={{ background: '#22C55E' }} />
-                                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-xl whitespace-nowrap"
-                                    style={{ background: 'rgba(34,197,94,0.1)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.2)' }}>
-                                    Aktif
-                                  </span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#94A3B8' }} />
-                                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-xl whitespace-nowrap"
-                                    style={{ background: 'rgba(148,163,184,0.1)', color: '#64748B', border: '1px solid rgba(148,163,184,0.2)' }}>
-                                    Pasif
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Detay butonu */}
-                            <button
-                              onClick={e => { e.stopPropagation(); setSecilenUzman(u); }}
-                              className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all flex-shrink-0"
-                              style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.1)'; (e.currentTarget as HTMLElement).style.color = '#7C3AED'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.25)'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}>
-                              <i className="ri-eye-line text-xs" />Detay
-                            </button>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

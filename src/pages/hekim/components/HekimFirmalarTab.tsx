@@ -21,14 +21,13 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
   const [search, setSearch] = useState('');
 
   const textPrimary = 'var(--text-primary)';
+  const textMuted = 'var(--text-muted)';
   const textSecondary = isDark ? '#94A3B8' : '#64748B';
 
   const card: React.CSSProperties = {
-    background: isDark
-      ? 'linear-gradient(145deg, rgba(30,41,59,0.95), rgba(15,23,42,0.98))'
-      : 'linear-gradient(145deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95))',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
-    borderRadius: '20px',
+    background: 'var(--bg-card-solid)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: '16px',
   };
 
   useEffect(() => {
@@ -41,7 +40,6 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
     const load = async () => {
       setLoading(true);
       try {
-        // GÜVENLİK: Sadece atanmisFirmaIds içindeki firmalara erişim — başka ID ile sorgu yapılamaz
         const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
         if (safeIds.length === 0) { setFirmalar([]); setLoading(false); return; }
 
@@ -50,17 +48,14 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
           .select('id, name')
           .in('id', safeIds);
 
-        // Her firma için personel sayısını çek (app_data üzerinden)
         const firmaRows: FirmaRow[] = await Promise.all(
           (orgs ?? []).map(async (org) => {
-            // Personel sayısı
             const { count: personelCount } = await supabase
               .from('personeller')
               .select('id', { count: 'exact', head: true })
               .eq('organization_id', org.id)
               .is('deleted_at', null);
 
-            // Son muayene
             const { data: lastMuayene } = await supabase
               .from('muayeneler')
               .select('data')
@@ -109,23 +104,43 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
     return Math.floor((new Date().getTime() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  return (
-    <div className="space-y-5">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-lg font-bold" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>Firmalar</h2>
-          <p className="text-xs mt-0.5" style={{ color: textSecondary }}>
-            Size atanmış {firmalar.length} firma
-          </p>
-        </div>
+  const getMuayeneBadge = (days: number | null) => {
+    if (days === null) return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+        style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: '1px solid rgba(100,116,139,0.15)' }}>
+        <i className="ri-time-line text-[9px]" />Muayene yok
+      </span>
+    );
+    if (days <= 30) return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+        style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
+        <i className="ri-check-line text-[9px]" />{days}g önce
+      </span>
+    );
+    if (days <= 90) return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+        style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+        <i className="ri-alert-line text-[9px]" />{days}g önce
+      </span>
+    );
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+        style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+        <i className="ri-error-warning-line text-[9px]" />{days}g önce
+      </span>
+    );
+  };
 
-        <div className="relative min-w-[220px]">
+  return (
+    <div className="space-y-4">
+      {/* ── Filtre bar ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
           <i className="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-sm" style={{ color: textSecondary }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Firma ara..."
+            placeholder="Firma adı ara..."
             className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl outline-none transition-all"
             style={{
               background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
@@ -142,22 +157,17 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
             }}
           />
         </div>
+        <span className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg ml-auto"
+          style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary }}>
+          ≡ {filtered.length} sonuç
+        </span>
       </div>
 
       {/* ── Loading ── */}
       {loading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="rounded-2xl p-4 animate-pulse" style={card}>
-              <div className="flex items-center gap-4">
-                <div className="w-11 h-11 rounded-xl" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)' }} />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-48 rounded" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)' }} />
-                  <div className="h-3 w-32 rounded" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)' }} />
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="rounded-2xl p-12 flex flex-col items-center gap-3" style={card}>
+          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#0EA5E9' }} />
+          <p className="text-sm" style={{ color: textMuted }}>Yükleniyor...</p>
         </div>
       )}
 
@@ -179,101 +189,79 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
         </div>
       )}
 
-      {/* ── Firma listesi ── */}
+      {/* ── Tablo ── */}
       {!loading && filtered.length > 0 && (
-        <div className="space-y-2">
-          {filtered.map((firma, idx) => {
-            const days = getDaysDiff(firma.sonMuayene);
+        <div className="rounded-2xl overflow-hidden" style={card}>
+          {/* Başlık satırı */}
+          <div className="grid px-4 py-2.5"
+            style={{
+              gridTemplateColumns: '2fr 1fr 1.5fr 1fr',
+              borderBottom: '1px solid var(--border-subtle)',
+              background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
+            }}>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>FİRMA</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>PERSONEL</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>SON MUAYENE</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>DURUM</span>
+          </div>
 
-            return (
-              <div
-                key={firma.id}
-                className="rounded-2xl p-4"
-                style={{
-                  ...card,
-                  cursor: 'default',
-                  animation: `fadeSlideIn 0.3s ease ${idx * 0.04}s both`,
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.transform = 'translateX(3px)';
-                  (e.currentTarget as HTMLElement).style.borderColor = isDark ? 'rgba(14,165,233,0.2)' : 'rgba(14,165,233,0.25)';
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
-                  (e.currentTarget as HTMLElement).style.borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
-                }}
-              >
-                <div className="flex items-center gap-4">
-                  {/* İkon */}
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.15), rgba(14,165,233,0.06))' }}
-                  >
-                    <i className="ri-building-2-fill text-base" style={{ color: '#0EA5E9' }} />
-                  </div>
-
-                  {/* Bilgiler */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold" style={{ color: textPrimary }}>{firma.name}</p>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <span className="text-[11px]" style={{ color: textSecondary }}>
-                        <i className="ri-group-line mr-1 text-[10px]" />
-                        {firma.personelSayisi} personel
-                      </span>
-                      {firma.sonMuayene && (
-                        <>
-                          <span style={{ color: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.2)', fontSize: '10px' }}>·</span>
-                          <span className="text-[11px]" style={{ color: textSecondary }}>
-                            <i className="ri-stethoscope-line mr-1 text-[10px]" />
-                            Son muayene: {formatDate(firma.sonMuayene)}
-                          </span>
-                        </>
-                      )}
+          {/* Satırlar */}
+          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {filtered.map((firma, idx) => {
+              const days = getDaysDiff(firma.sonMuayene);
+              return (
+                <div
+                  key={firma.id}
+                  className="grid px-4 py-3 transition-all cursor-default"
+                  style={{
+                    gridTemplateColumns: '2fr 1fr 1.5fr 1fr',
+                    animationDelay: `${idx * 25}ms`,
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.03)' : 'rgba(14,165,233,0.025)';
+                    (e.currentTarget as HTMLElement).style.paddingLeft = '18px';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    (e.currentTarget as HTMLElement).style.paddingLeft = '16px';
+                  }}
+                >
+                  {/* Firma adı */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.15)' }}>
+                      <i className="ri-building-2-fill text-xs" style={{ color: '#0EA5E9' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{firma.name}</p>
                     </div>
                   </div>
 
-                  {/* Sağ: muayene badge */}
-                  <div className="flex-shrink-0">
-                    {days === null ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                        style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: '1px solid rgba(100,116,139,0.15)' }}>
-                        <i className="ri-time-line" />
-                        Muayene yok
-                      </span>
-                    ) : days <= 30 ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                        style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
-                        <i className="ri-check-line" />
-                        {days}g önce
-                      </span>
-                    ) : days <= 90 ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                        style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
-                        <i className="ri-alert-line" />
-                        {days}g önce
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                        style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>
-                        <i className="ri-error-warning-line" />
-                        {days}g önce
-                      </span>
-                    )}
+                  {/* Personel sayısı */}
+                  <div className="flex items-center">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: textSecondary }}>
+                      <i className="ri-group-line text-[10px]" />
+                      {firma.personelSayisi}
+                    </span>
+                  </div>
+
+                  {/* Son muayene tarihi */}
+                  <div className="flex items-center">
+                    <span className="text-xs" style={{ color: firma.sonMuayene ? textPrimary : textSecondary }}>
+                      {formatDate(firma.sonMuayene) ?? '—'}
+                    </span>
+                  </div>
+
+                  {/* Muayene durumu badge */}
+                  <div className="flex items-center justify-end">
+                    {getMuayeneBadge(days)}
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes fadeSlideIn {
-          from { opacity: 0; transform: translateX(-6px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
     </div>
   );
 }

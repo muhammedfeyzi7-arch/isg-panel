@@ -25,14 +25,13 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
   const [firmaAdMap, setFirmaAdMap] = useState<Record<string, string>>({});
 
   const textPrimary = 'var(--text-primary)';
+  const textMuted = 'var(--text-muted)';
   const textSecondary = isDark ? '#94A3B8' : '#64748B';
 
   const card: React.CSSProperties = {
-    background: isDark
-      ? 'linear-gradient(145deg, rgba(30,41,59,0.95), rgba(15,23,42,0.98))'
-      : 'linear-gradient(145deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95))',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
-    borderRadius: '20px',
+    background: 'var(--bg-card-solid)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: '16px',
   };
 
   useEffect(() => {
@@ -45,7 +44,6 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
     const load = async () => {
       setLoading(true);
       try {
-        // GÜVENLİK: Sadece atanmisFirmaIds içindeki firma ID'leri kullanılır
         const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
         if (safeIds.length === 0) { setPersoneller([]); setLoading(false); return; }
 
@@ -58,7 +56,6 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
         (orgs ?? []).forEach(o => { adMap[o.id] = o.name; });
         setFirmaAdMap(adMap);
 
-        // Tüm firmaların personellerini çek
         const allPersonel: PersonelRow[] = [];
 
         await Promise.all(
@@ -83,7 +80,6 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
               });
             });
 
-            // Muayene bilgilerini çek
             const { data: muayeneler } = await supabase
               .from('muayeneler')
               .select('data')
@@ -103,7 +99,6 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
               }
             });
 
-            // Muayene bilgilerini personellere ekle
             allPersonel.forEach(p => {
               if (p.firmaId === firmaId && muayeneMap[p.id]) {
                 p.sonMuayene = muayeneMap[p.id].tarih;
@@ -137,7 +132,12 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
   };
 
   const getSonucBadge = (sonuc: string | null) => {
-    if (!sonuc) return null;
+    if (!sonuc) return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+        style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: '1px solid rgba(100,116,139,0.15)' }}>
+        —
+      </span>
+    );
     if (sonuc === 'Çalışabilir') return (
       <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
         style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
@@ -162,25 +162,15 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
   };
 
   return (
-    <div className="space-y-5">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-lg font-bold" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>Personeller</h2>
-          <p className="text-xs mt-0.5" style={{ color: textSecondary }}>
-            Tüm atanmış firmalardan {personeller.length} personel
-          </p>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {/* ── Filtre bar ── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-lg">
           <i className="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-sm" style={{ color: textSecondary }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="İsim veya görev ara..."
+            placeholder="Ad, TC kimlik veya görev ara..."
             className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl outline-none transition-all"
             style={{
               background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
@@ -198,9 +188,9 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
             onChange={e => setFirmaFilter(e.target.value)}
             className="py-2.5 px-3 rounded-xl text-sm outline-none cursor-pointer"
             style={{
-              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
-              border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)'}`,
-              color: textPrimary,
+              background: firmaFilter ? 'rgba(14,165,233,0.08)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'),
+              border: `1.5px solid ${firmaFilter ? 'rgba(14,165,233,0.25)' : (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)')}`,
+              color: firmaFilter ? '#0EA5E9' : textPrimary,
             }}
           >
             <option value="">Tüm Firmalar</option>
@@ -210,26 +200,17 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
           </select>
         )}
 
-        <span className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"
+        <span className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg ml-auto"
           style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary }}>
-          {filtered.length} personel
+          ≡ {filtered.length} sonuç
         </span>
       </div>
 
       {/* ── Loading ── */}
       {loading && (
-        <div className="space-y-2">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="rounded-2xl p-4 animate-pulse" style={card}>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)' }} />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-40 rounded" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)' }} />
-                  <div className="h-3 w-28 rounded" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)' }} />
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="rounded-2xl p-12 flex flex-col items-center gap-3" style={card}>
+          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#0EA5E9' }} />
+          <p className="text-sm" style={{ color: textMuted }}>Yükleniyor...</p>
         </div>
       )}
 
@@ -251,83 +232,95 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
         </div>
       )}
 
-      {/* ── Liste ── */}
+      {/* ── Tablo ── */}
       {!loading && filtered.length > 0 && (
-        <div className="space-y-2">
-          {filtered.map((p, idx) => (
-            <div
-              key={p.id}
-              className="rounded-2xl p-4"
+        <div className="rounded-2xl overflow-hidden" style={card}>
+          {/* Tablo başlığı */}
+          <div className="grid gap-0"
+            style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+            <div className="grid px-4 py-2.5"
               style={{
-                ...card,
-                animation: `fadeSlideIn 0.3s ease ${idx * 0.03}s both`,
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.transform = 'translateX(3px)';
-                (e.currentTarget as HTMLElement).style.borderColor = isDark ? 'rgba(14,165,233,0.2)' : 'rgba(14,165,233,0.25)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
-                (e.currentTarget as HTMLElement).style.borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
-              }}
-            >
-              <div className="flex items-center gap-4">
-                {/* Avatar */}
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
-                  style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}
-                >
-                  {p.adSoyad.charAt(0).toUpperCase()}
-                </div>
+                gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr',
+                background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
+              }}>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>PERSONEL</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>FİRMA</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>GÖREV / DEPARTMAN</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>SON MUAYENE</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>SONUÇ</span>
+            </div>
+          </div>
 
-                {/* Bilgiler */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-bold" style={{ color: textPrimary }}>{p.adSoyad}</p>
+          {/* Satırlar */}
+          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {filtered.map((p, idx) => (
+              <div
+                key={p.id}
+                className="grid px-4 py-3 transition-all cursor-default"
+                style={{
+                  gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr',
+                  animationDelay: `${idx * 20}ms`,
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.03)' : 'rgba(14,165,233,0.025)';
+                  (e.currentTarget as HTMLElement).style.paddingLeft = '18px';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLElement).style.paddingLeft = '16px';
+                }}
+              >
+                {/* Personel */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
+                    {p.adSoyad.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{p.adSoyad}</p>
                     {p.durum !== 'Aktif' && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
-                        style={{ background: 'rgba(100,116,139,0.1)', color: '#64748B', border: '1px solid rgba(100,116,139,0.15)' }}>
+                        style={{ background: 'rgba(100,116,139,0.1)', color: '#64748B' }}>
                         {p.durum}
                       </span>
                     )}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <span className="text-[11px]" style={{ color: textSecondary }}>
-                      <i className="ri-briefcase-line mr-1 text-[10px]" />
-                      {p.gorev || '—'}
-                    </span>
-                    <span style={{ color: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.2)', fontSize: '10px' }}>·</span>
-                    <span className="text-[11px]" style={{ color: '#0EA5E9', fontWeight: 600 }}>
-                      <i className="ri-building-3-line mr-1 text-[10px]" />
-                      {p.firmaAd}
-                    </span>
+                    {p.durum === 'Aktif' && (
+                      <p className="text-[10px]" style={{ color: textSecondary }}>Aktif</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Muayene bilgisi */}
-                <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-                  {p.sonMuayene ? (
-                    <span className="text-[10px]" style={{ color: textSecondary }}>
-                      {formatDate(p.sonMuayene)}
-                    </span>
-                  ) : (
-                    <span className="text-[10px]" style={{ color: textSecondary }}>Muayene yok</span>
-                  )}
+                {/* Firma */}
+                <div className="flex items-center min-w-0">
+                  <span className="text-xs font-semibold truncate" style={{ color: '#0EA5E9' }}>
+                    {p.firmaAd}
+                  </span>
+                </div>
+
+                {/* Görev */}
+                <div className="flex items-center min-w-0">
+                  <span className="text-xs truncate" style={{ color: p.gorev ? textPrimary : textSecondary }}>
+                    {p.gorev || '—'}
+                  </span>
+                </div>
+
+                {/* Son muayene */}
+                <div className="flex items-center">
+                  <span className="text-xs" style={{ color: p.sonMuayene ? textPrimary : textSecondary }}>
+                    {formatDate(p.sonMuayene)}
+                  </span>
+                </div>
+
+                {/* Sonuç */}
+                <div className="flex items-center justify-end">
                   {getSonucBadge(p.sonMuayeneSonuc)}
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes fadeSlideIn {
-          from { opacity: 0; transform: translateX(-6px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-      `}</style>
     </div>
   );
 }
