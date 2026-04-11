@@ -624,7 +624,7 @@ export default function MuayenelerPage() {
         </div>
       )}
 
-      {/* Tablo */}
+      {/* Liste */}
       {filtered.length === 0 ? (
         <div className="isg-card rounded-xl py-20 text-center">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
@@ -634,92 +634,106 @@ export default function MuayenelerPage() {
           <button onClick={openAdd} className="btn-primary mt-5"><i className="ri-add-line" /> Kayıt Ekle</button>
         </div>
       ) : (
-        <div className="isg-card rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="table-premium w-full">
-              <thead>
-                <tr>
-                  <th className="text-center w-10">
-                    <div className="flex items-center justify-center w-10 h-10">
-                      <input
-                        type="checkbox"
-                        checked={allFilteredSelected}
-                        onChange={toggleSelectAll}
-                        className="w-4 h-4 cursor-pointer rounded accent-red-500"
-                        title={allFilteredSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
-                      />
+        <div className="space-y-1">
+          {/* Sütun başlıkları */}
+          <div className="grid items-center px-4 py-2"
+            style={{
+              gridTemplateColumns: '32px 2fr 1.5fr 1.2fr 1.2fr 1.3fr 1fr 100px',
+              borderBottom: '1px solid var(--border-subtle)',
+            }}>
+            <div className="flex items-center justify-center">
+              <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="w-4 h-4 cursor-pointer" />
+            </div>
+            {['PERSONEL', 'FİRMA', 'MUAYENE TARİHİ', 'SONRAKİ MUAYENE', 'DURUM', 'SAĞLIK DURUMU', 'İŞLEMLER'].map(h => (
+              <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
+            ))}
+          </div>
+
+          {/* Satırlar — her biri ayrı kart */}
+          <div className="space-y-1.5 pt-1">
+            {filtered.map(m => {
+              const p = personeller.find(x => x.id === m.personelId);
+              const f = firmalar.find(x => x.id === m.firmaId);
+              const days = getDaysUntil(m.sonrakiTarih);
+              const dur = getDurumConfig(days);
+              const saglikDurumu = (m as unknown as { saglikDurumu?: string }).saglikDurumu;
+              const isSelected = selectedIds.has(m.id);
+              return (
+                <div
+                  key={m.id}
+                  className="grid items-center px-4 py-3 rounded-xl transition-all"
+                  style={{
+                    gridTemplateColumns: '32px 2fr 1.5fr 1.2fr 1.2fr 1.3fr 1fr 100px',
+                    background: isSelected ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)',
+                    border: isSelected ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
+                  }}
+                  onMouseEnter={e => {
+                    if (!isSelected) {
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(236,72,153,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(236,72,153,0.15)';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isSelected) {
+                      (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-solid)';
+                      (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-center">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(m.id)} className="w-4 h-4 cursor-pointer" />
+                  </div>
+                  {/* Personel */}
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #EC4899, #DB2777)' }}>
+                      {(p?.adSoyad || '?').charAt(0).toUpperCase()}
                     </div>
-                  </th>
-                  <th className="text-left">Personel</th>
-                  <th className="text-left hidden md:table-cell">Firma</th>
-                  <th className="text-left">Muayene Tarihi</th>
-                  <th className="text-left">Sonraki Muayene</th>
-                  <th className="text-left">Kalan Gün / Durum</th>
-                  <th className="text-left hidden lg:table-cell">Sağlık Durumu</th>
-                  <th className="text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(m => {
-                  const p = personeller.find(x => x.id === m.personelId);
-                  const f = firmalar.find(x => x.id === m.firmaId);
-                  const days = getDaysUntil(m.sonrakiTarih);
-                  const dur = getDurumConfig(days);
-                  const saglikDurumu = (m as unknown as { saglikDurumu?: string }).saglikDurumu;
-                  const isSelected = selectedIds.has(m.id);
-                  return (
-                    <tr
-                      key={m.id}
-                      style={isSelected ? { background: 'rgba(239,68,68,0.05)' } : undefined}
-                    >
-                      <td className="text-center">
-                        <div className="flex items-center justify-center w-10 h-10">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelect(m.id)}
-                            className="w-4 h-4 cursor-pointer rounded accent-red-500"
-                          />
-                        </div>
-                      </td>
-                      <td>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{p?.adSoyad || '—'}</p>
-                        {p?.gorev && <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.gorev}</p>}
-                      </td>
-                      <td className="hidden md:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{f?.ad || '—'}</span>
-                      </td>
-                      <td>
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{fmtDate(m.muayeneTarihi)}</span>
-                      </td>
-                      <td>
-                        <span className="text-sm font-medium" style={{ color: days < 0 ? '#EF4444' : days <= 30 ? '#F59E0B' : 'var(--text-secondary)' }}>
-                          {fmtDate(m.sonrakiTarih)}
-                        </span>
-                      </td>
-                      <td>
-                        {m.sonrakiTarih ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap" style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}` }}>
-                            <i className={`${dur.icon} text-xs`} />{dur.label}
-                          </span>
-                        ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                      <td className="hidden lg:table-cell">
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{saglikDurumu || '—'}</span>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1 justify-end">
-                          <HealthActionBtn icon="ri-edit-line" onClick={() => openEdit(m)} title="Düzenle" />
-                          <HealthActionBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(m.id)} title="Sil" />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{p?.adSoyad || '—'}</p>
+                      {p?.gorev && <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{p.gorev}</p>}
+                    </div>
+                  </div>
+                  {/* Firma */}
+                  <div className="min-w-0 pr-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap max-w-full truncate"
+                      style={{ background: 'rgba(236,72,153,0.08)', color: '#DB2777', border: '1px solid rgba(236,72,153,0.18)' }}>
+                      <i className="ri-building-2-line text-[9px] flex-shrink-0" />
+                      <span className="truncate">{f?.ad || '—'}</span>
+                    </span>
+                  </div>
+                  {/* Muayene tarihi */}
+                  <div>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{fmtDate(m.muayeneTarihi)}</span>
+                  </div>
+                  {/* Sonraki muayene */}
+                  <div>
+                    <span className="text-xs font-medium" style={{ color: days < 0 ? '#EF4444' : days <= 30 ? '#F59E0B' : 'var(--text-secondary)' }}>
+                      {fmtDate(m.sonrakiTarih)}
+                    </span>
+                  </div>
+                  {/* Durum badge */}
+                  <div>
+                    {m.sonrakiTarih ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap" style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}` }}>
+                        <i className={`${dur.icon} text-[9px]`} />{dur.label}
+                      </span>
+                    ) : (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </div>
+                  {/* Sağlık durumu */}
+                  <div>
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{saglikDurumu || '—'}</span>
+                  </div>
+                  {/* İşlemler */}
+                  <div className="flex items-center gap-1 justify-end">
+                    <HealthActionBtn icon="ri-edit-line" onClick={() => openEdit(m)} title="Düzenle" />
+                    <HealthActionBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(m.id)} title="Sil" />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

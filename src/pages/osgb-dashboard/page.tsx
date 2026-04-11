@@ -567,22 +567,21 @@ export default function OsgbDashboardPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="rounded-2xl overflow-hidden" style={cardStyle}>
-                      {/* Tablo başlığı */}
-                      <div className="grid px-4 py-2.5"
+                    <div className="space-y-1">
+                      {/* Sütun başlıkları */}
+                      <div className="grid px-4 py-2"
                         style={{
                           gridTemplateColumns: '2fr 1.2fr 1fr 1.5fr 1fr 100px',
                           borderBottom: '1px solid var(--border-subtle)',
-                          background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
                         }}>
                         {['PERSONEL', 'ROL', 'DURUM', 'ATANAN FİRMALAR', 'E-POSTA', 'İŞLEMLER'].map(h => (
                           <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textMuted }}>{h}</span>
                         ))}
                       </div>
 
-                      {/* Satırlar */}
-                      <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-                        {filteredUzmanlar.map((u, i) => {
+                      {/* Satırlar — her biri ayrı kart */}
+                      <div className="space-y-1.5 pt-1">
+                        {filteredUzmanlar.map((u) => {
                           const firmIds = (u.active_firm_ids && u.active_firm_ids.length > 0)
                             ? u.active_firm_ids
                             : u.active_firm_id ? [u.active_firm_id] : [];
@@ -591,18 +590,19 @@ export default function OsgbDashboardPage() {
                           return (
                             <div
                               key={u.user_id}
-                              className="grid px-4 py-3 transition-all"
+                              className="grid px-4 py-3 rounded-xl transition-all"
                               style={{
                                 gridTemplateColumns: '2fr 1.2fr 1fr 1.5fr 1fr 100px',
-                                animationDelay: `${i * 30}ms`,
+                                background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff',
+                                border: '1px solid var(--border-subtle)',
                               }}
                               onMouseEnter={e => {
-                                (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.03)' : 'rgba(16,185,129,0.025)';
-                                (e.currentTarget as HTMLElement).style.paddingLeft = '18px';
+                                (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)';
+                                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.2)';
                               }}
                               onMouseLeave={e => {
-                                (e.currentTarget as HTMLElement).style.background = 'transparent';
-                                (e.currentTarget as HTMLElement).style.paddingLeft = '16px';
+                                (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff';
+                                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
                               }}
                             >
                               {/* Personel adı */}

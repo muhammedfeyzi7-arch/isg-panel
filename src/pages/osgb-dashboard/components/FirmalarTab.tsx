@@ -194,22 +194,20 @@ export default function FirmalarTab({
         </div>
       )}
 
-      {/* Tablo */}
+      {/* Liste */}
       {filtered.length > 0 && (
-        <div className="rounded-xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
-          {/* Tablo başlığı */}
-          <div className="grid grid-cols-[2.5fr_1.5fr_1fr_1.2fr_100px] items-center px-4 py-2.5"
-            style={{ background: tableHeadBg, borderBottom: `1px solid ${borderColor}` }}>
+        <div className="space-y-1">
+          {/* Sütun başlıkları */}
+          <div className="grid grid-cols-[2.5fr_1.5fr_1fr_1.2fr_100px] items-center px-4 py-2"
+            style={{ borderBottom: `1px solid ${borderColor}` }}>
             {['FİRMA', 'UZMAN', 'PERSONEL', 'SON ZİYARET', 'İŞLEM'].map(h => (
-              <div key={h}>
-                <span className="text-[10px] font-bold tracking-wider" style={{ color: textSecondary }}>{h}</span>
-              </div>
+              <span key={h} className="text-[10px] font-bold tracking-wider uppercase" style={{ color: textSecondary }}>{h}</span>
             ))}
           </div>
 
-          {/* Satırlar */}
-          <div>
-            {filtered.map((f, idx) => {
+          {/* Satırlar — her biri ayrı kart */}
+          <div className="space-y-1.5 pt-1">
+            {filtered.map((f) => {
               const lastVisitDate = firmaLastVisit[f.id];
               const days = getDaysDiff(lastVisitDate);
               const isAktif = aktifFirmaIds.has(f.id);
@@ -219,24 +217,30 @@ export default function FirmalarTab({
               return (
                 <div
                   key={f.id}
-                  className="grid grid-cols-[2.5fr_1.5fr_1fr_1.2fr_100px] items-center px-4 py-3 cursor-pointer transition-all"
+                  className="grid grid-cols-[2.5fr_1.5fr_1fr_1.2fr_100px] items-center px-4 py-3 rounded-xl cursor-pointer transition-all"
                   style={{
-                    borderBottom: idx < filtered.length - 1 ? `1px solid ${borderColor}` : 'none',
-                    background: 'transparent',
+                    background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff',
+                    border: `1px solid ${borderColor}`,
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowHoverBg; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.2)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff';
+                    (e.currentTarget as HTMLElement).style.borderColor = borderColor;
+                  }}
                   onClick={() => onFirmaClick({ id: f.id, name: f.name })}
                 >
                   {/* Firma adı */}
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
                     <div className="relative flex-shrink-0">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ background: isAktif ? 'rgba(34,197,94,0.12)' : 'rgba(16,185,129,0.1)' }}>
-                        <i className="ri-building-2-line text-xs" style={{ color: isAktif ? '#22C55E' : '#10B981' }} />
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold text-white"
+                        style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : 'linear-gradient(135deg, #10B981, #059669)' }}>
+                        {f.name.charAt(0).toUpperCase()}
                       </div>
                       {isAktif && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse"
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse"
                           style={{ background: '#22C55E', borderColor: isDark ? 'rgba(20,30,50,0.98)' : '#ffffff' }} />
                       )}
                     </div>
@@ -244,6 +248,9 @@ export default function FirmalarTab({
                       <p className="text-xs font-bold truncate" style={{ color: textPrimary }}>{f.name}</p>
                       {isAktif && (
                         <span className="text-[9px] font-bold" style={{ color: '#22C55E' }}>● Ziyaret devam ediyor</span>
+                      )}
+                      {!isAktif && (
+                        <span className="text-[9px]" style={{ color: textSecondary }}>Firma</span>
                       )}
                     </div>
                   </div>
@@ -254,7 +261,7 @@ export default function FirmalarTab({
                       <div className="flex items-center gap-1 flex-wrap">
                         {firmaUzmanlar.slice(0, 2).map(u => (
                           <span key={u.user_id}
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                             style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
                             <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0"
                               style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
@@ -264,21 +271,25 @@ export default function FirmalarTab({
                           </span>
                         ))}
                         {firmaUzmanlar.length > 2 && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                             style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
                             +{firmaUzmanlar.length - 2}
                           </span>
                         )}
                       </div>
                     ) : (
-                      <span className="text-[10px] font-semibold" style={{ color: '#F59E0B' }}>Atanmadı</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: 'rgba(245,158,11,0.1)', color: '#D97706', border: '1px solid rgba(245,158,11,0.2)' }}>
+                        Atanmadı
+                      </span>
                     )}
                   </div>
 
                   {/* Personel sayısı */}
                   <div>
-                    <span className="text-xs font-semibold" style={{ color: textSecondary }}>
-                      <i className="ri-group-line mr-1 text-[10px]" />
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary, border: `1px solid ${borderColor}` }}>
+                      <i className="ri-group-line text-[9px]" />
                       {f.personelSayisi}
                     </span>
                   </div>

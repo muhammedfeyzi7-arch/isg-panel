@@ -441,84 +441,107 @@ export default function FirmalarPage() {
             })}
           </div>
 
-          {/* Masaüstü tablo görünümü */}
-          <div className="hidden md:block rounded-xl overflow-hidden isg-card">
-            <div className="overflow-x-auto">
-              <table className="w-full table-premium">
-                <thead>
-                  <tr>
+          {/* Masaüstü liste görünümü */}
+          <div className="hidden md:block space-y-1">
+            {/* Sütun başlıkları */}
+            <div className="grid items-center px-4 py-2"
+              style={{
+                gridTemplateColumns: canManageFirma ? '32px 2.5fr 1.5fr 1.5fr 1fr 1fr 1.2fr 100px' : '2.5fr 1.5fr 1.5fr 1fr 1fr 1.2fr 100px',
+                borderBottom: '1px solid var(--border-subtle)',
+              }}>
+              {canManageFirma && (
+                <div className="flex items-center justify-center">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                </div>
+              )}
+              {['FİRMA ADI', 'YETKİLİ KİŞİ', 'İLETİŞİM', 'TEHLİKE SINIFI', 'DURUM', 'SÖZLEŞME BİTİŞ', 'İŞLEMLER'].map(h => (
+                <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
+              ))}
+            </div>
+
+            {/* Satırlar — her biri ayrı kart */}
+            <div className="space-y-1.5 pt-1">
+              {filtered.map((firma) => {
+                const logoUrl = firma.logoUrl;
+                return (
+                  <div
+                    key={firma.id}
+                    className="grid items-center px-4 py-3 rounded-xl transition-all"
+                    style={{
+                      gridTemplateColumns: canManageFirma ? '32px 2.5fr 1.5fr 1.5fr 1fr 1fr 1.2fr 100px' : '2.5fr 1.5fr 1.5fr 1fr 1fr 1.2fr 100px',
+                      background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)',
+                      border: selected.has(firma.id) ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
+                    }}
+                    onMouseEnter={e => {
+                      if (!selected.has(firma.id)) {
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.03)';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.15)';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!selected.has(firma.id)) {
+                        (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-solid)';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
+                      }
+                    }}
+                  >
                     {canManageFirma && (
-                      <th className="w-10 text-center">
-                        <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                      </th>
+                      <div className="flex items-center justify-center">
+                        <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer" />
+                      </div>
                     )}
-                    <th className="text-left">Firma Adı</th>
-                    <th className="text-left hidden md:table-cell">Yetkili Kişi</th>
-                    <th className="text-left hidden lg:table-cell">İletişim</th>
-                    <th className="text-left hidden md:table-cell">Tehlike Sınıfı</th>
-                    <th className="text-left">Durum</th>
-                    <th className="text-left hidden lg:table-cell">Sözleşme Bitiş</th>
-                    <th className="w-20 text-right">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((firma) => {
-                    const logoUrl = firma.logoUrl;
-                    return (
-                      <tr key={firma.id} style={{ background: selected.has(firma.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
-                        {canDelete && (
-                          <td className="text-center">
-                            <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer" />
-                          </td>
-                        )}
-                        <td>
-                          <button onClick={() => setDetailId(firma.id)} className="group cursor-pointer text-left">
-                            <div className="flex items-center gap-2.5">
-                              {logoUrl ? (
-                                <FirmaLogoImg logoUrl={logoUrl} firmaAd={firma.ad} size="sm" />
-                              ) : (
-                                <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-[11px] font-bold text-white"
-                                  style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}>
-                                  {firma.ad.charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                              <div>
-                                <p className="text-[12.5px] font-semibold group-hover:text-blue-400 transition-colors" style={{ color: 'var(--text-primary)' }}>{firma.ad}</p>
-                                {firma.sgkSicil && <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>SGK: {firma.sgkSicil}</p>}
-                              </div>
-                            </div>
-                          </button>
-                        </td>
-                        <td className="hidden md:table-cell">
-                          <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{firma.yetkiliKisi || '—'}</p>
-                        </td>
-                        <td className="hidden lg:table-cell">
-                          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{firma.telefon || '—'}</p>
-                          <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{firma.email || ''}</p>
-                        </td>
-                        <td className="hidden md:table-cell">
-                          <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
-                        </td>
-                        <td>
-                          <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
-                        </td>
-                        <td className="hidden lg:table-cell">
-                          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                            {firma.sozlesmeBit ? new Date(firma.sozlesmeBit).toLocaleDateString('tr-TR') : '—'}
-                          </p>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-1 justify-end">
-                            <ActionBtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(firma.id)} title="Detay" />
-                            {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
-                            {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    {/* Firma adı */}
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      {logoUrl ? (
+                        <FirmaLogoImg logoUrl={logoUrl} firmaAd={firma.ad} size="sm" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+                          style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
+                          {firma.ad.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <button onClick={() => setDetailId(firma.id)} className="text-xs font-semibold cursor-pointer block text-left truncate transition-colors"
+                          style={{ color: 'var(--text-primary)' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}>
+                          {firma.ad}
+                        </button>
+                        {firma.sgkSicil && <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>SGK: {firma.sgkSicil}</p>}
+                      </div>
+                    </div>
+                    {/* Yetkili kişi */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{firma.yetkiliKisi || '—'}</p>
+                    </div>
+                    {/* İletişim */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{firma.telefon || '—'}</p>
+                      {firma.email && <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-faint)' }}>{firma.email}</p>}
+                    </div>
+                    {/* Tehlike sınıfı */}
+                    <div>
+                      <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
+                    </div>
+                    {/* Durum */}
+                    <div>
+                      <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
+                    </div>
+                    {/* Sözleşme bitiş */}
+                    <div>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {firma.sozlesmeBit ? new Date(firma.sozlesmeBit).toLocaleDateString('tr-TR') : '—'}
+                      </p>
+                    </div>
+                    {/* İşlemler */}
+                    <div className="flex items-center gap-1 justify-end">
+                      <ActionBtn icon="ri-eye-line" color="#10B981" onClick={() => setDetailId(firma.id)} title="Detay" />
+                      {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
+                      {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </>

@@ -189,15 +189,14 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
         </div>
       )}
 
-      {/* ── Tablo ── */}
+      {/* ── Liste ── */}
       {!loading && filtered.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={card}>
-          {/* Başlık satırı */}
-          <div className="grid px-4 py-2.5"
+        <div className="space-y-1">
+          {/* Sütun başlıkları */}
+          <div className="grid px-4 py-2"
             style={{
               gridTemplateColumns: '2fr 1fr 1.5fr 1fr',
               borderBottom: '1px solid var(--border-subtle)',
-              background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
             }}>
             <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>FİRMA</span>
             <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>PERSONEL</span>
@@ -205,42 +204,45 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
             <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>DURUM</span>
           </div>
 
-          {/* Satırlar */}
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {filtered.map((firma, idx) => {
+          {/* Satırlar — her biri ayrı kart */}
+          <div className="space-y-1.5 pt-1">
+            {filtered.map((firma) => {
               const days = getDaysDiff(firma.sonMuayene);
               return (
                 <div
                   key={firma.id}
-                  className="grid px-4 py-3 transition-all cursor-default"
+                  className="grid px-4 py-3 rounded-xl transition-all cursor-default"
                   style={{
                     gridTemplateColumns: '2fr 1fr 1.5fr 1fr',
-                    animationDelay: `${idx * 25}ms`,
+                    background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff',
+                    border: '1px solid var(--border-subtle)',
                   }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.03)' : 'rgba(14,165,233,0.025)';
-                    (e.currentTarget as HTMLElement).style.paddingLeft = '18px';
+                    (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)';
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = 'transparent';
-                    (e.currentTarget as HTMLElement).style.paddingLeft = '16px';
+                    (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
                   }}
                 >
                   {/* Firma adı */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.15)' }}>
-                      <i className="ri-building-2-fill text-xs" style={{ color: '#0EA5E9' }} />
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-extrabold text-white"
+                      style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
+                      {firma.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{firma.name}</p>
+                      <p className="text-[10px]" style={{ color: textSecondary }}>Firma</p>
                     </div>
                   </div>
 
                   {/* Personel sayısı */}
                   <div className="flex items-center">
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: textSecondary }}>
-                      <i className="ri-group-line text-[10px]" />
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary, border: '1px solid var(--border-subtle)' }}>
+                      <i className="ri-group-line text-[9px]" />
                       {firma.personelSayisi}
                     </span>
                   </div>

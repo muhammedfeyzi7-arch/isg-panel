@@ -232,42 +232,40 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
         </div>
       )}
 
-      {/* ── Tablo ── */}
+      {/* ── Liste ── */}
       {!loading && filtered.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={card}>
-          {/* Tablo başlığı */}
-          <div className="grid gap-0"
-            style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-            <div className="grid px-4 py-2.5"
-              style={{
-                gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr',
-                background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
-              }}>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>PERSONEL</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>FİRMA</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>GÖREV / DEPARTMAN</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>SON MUAYENE</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>SONUÇ</span>
-            </div>
+        <div className="space-y-1">
+          {/* Sütun başlıkları */}
+          <div className="grid px-4 py-2"
+            style={{
+              gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr',
+              borderBottom: '1px solid var(--border-subtle)',
+            }}>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>PERSONEL</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>FİRMA</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>GÖREV / DEPARTMAN</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>SON MUAYENE</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>SONUÇ</span>
           </div>
 
-          {/* Satırlar */}
-          <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
-            {filtered.map((p, idx) => (
+          {/* Satırlar — her biri ayrı kart */}
+          <div className="space-y-1.5 pt-1">
+            {filtered.map((p) => (
               <div
                 key={p.id}
-                className="grid px-4 py-3 transition-all cursor-default"
+                className="grid px-4 py-3 rounded-xl transition-all cursor-default"
                 style={{
                   gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr',
-                  animationDelay: `${idx * 20}ms`,
+                  background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff',
+                  border: '1px solid var(--border-subtle)',
                 }}
                 onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.03)' : 'rgba(14,165,233,0.025)';
-                  (e.currentTarget as HTMLElement).style.paddingLeft = '18px';
+                  (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)';
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.background = 'transparent';
-                  (e.currentTarget as HTMLElement).style.paddingLeft = '16px';
+                  (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff';
+                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
                 }}
               >
                 {/* Personel */}
@@ -279,22 +277,26 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{p.adSoyad}</p>
-                    {p.durum !== 'Aktif' && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
-                        style={{ background: 'rgba(100,116,139,0.1)', color: '#64748B' }}>
+                    {p.durum !== 'Aktif' ? (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(100,116,139,0.1)', color: '#64748B', border: '1px solid rgba(100,116,139,0.15)' }}>
                         {p.durum}
                       </span>
-                    )}
-                    {p.durum === 'Aktif' && (
-                      <p className="text-[10px]" style={{ color: textSecondary }}>Aktif</p>
+                    ) : (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                        <p className="text-[10px] font-semibold" style={{ color: '#22C55E' }}>Aktif</p>
+                      </div>
                     )}
                   </div>
                 </div>
 
                 {/* Firma */}
                 <div className="flex items-center min-w-0">
-                  <span className="text-xs font-semibold truncate" style={{ color: '#0EA5E9' }}>
-                    {p.firmaAd}
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap truncate"
+                    style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
+                    <i className="ri-building-2-line text-[9px] flex-shrink-0" />
+                    <span className="truncate">{p.firmaAd}</span>
                   </span>
                 </div>
 

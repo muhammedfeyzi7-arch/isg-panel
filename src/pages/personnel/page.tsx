@@ -755,69 +755,99 @@ export default function PersonellerPage() {
         </div>
       ) : (
         <>
-          {/* Desktop Table */}
-          <div className="rounded-xl overflow-hidden isg-card hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full table-premium">
-                <thead>
-                  <tr>
+          {/* Desktop List */}
+          <div className="hidden md:block space-y-1">
+            {/* Sütun başlıkları */}
+            <div className="grid items-center px-4 py-2"
+              style={{
+                gridTemplateColumns: canDelete ? '32px 2fr 1.5fr 1.5fr 1fr 120px' : '2fr 1.5fr 1.5fr 1fr 120px',
+                borderBottom: '1px solid var(--border-subtle)',
+              }}>
+              {canDelete && (
+                <div className="flex items-center justify-center">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
+                </div>
+              )}
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>PERSONEL</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>FİRMA</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>GÖREV / DEPARTMAN</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>DURUM</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: 'var(--text-muted)' }}>İŞLEMLER</span>
+            </div>
+
+            {/* Satırlar — her biri ayrı kart */}
+            <div className="space-y-1.5 pt-1">
+              {filtered.map(p => {
+                const foto = getPersonelFoto(p.id);
+                return (
+                  <div
+                    key={p.id}
+                    className="grid items-center px-4 py-3 rounded-xl transition-all"
+                    style={{
+                      gridTemplateColumns: canDelete ? '32px 2fr 1.5fr 1.5fr 1fr 120px' : '2fr 1.5fr 1.5fr 1fr 120px',
+                      background: selected.has(p.id) ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)',
+                      border: selected.has(p.id) ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
+                    }}
+                    onMouseEnter={e => {
+                      if (!selected.has(p.id)) {
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.04)';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.18)';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!selected.has(p.id)) {
+                        (e.currentTarget as HTMLElement).style.background = 'var(--bg-card-solid)';
+                        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
+                      }
+                    }}
+                  >
                     {canDelete && (
-                      <th className="w-10 text-center">
-                        <input type="checkbox" checked={allSelected} onChange={toggleAll} className="cursor-pointer" />
-                      </th>
+                      <div className="flex items-center justify-center">
+                        <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleOne(p.id)} className="cursor-pointer" />
+                      </div>
                     )}
-                    <th className="text-left">Personel</th>
-                    <th className="text-left hidden md:table-cell">Firma</th>
-                    <th className="text-left hidden lg:table-cell">Görev / Departman</th>
-                    {canViewSensitiveData && <th className="text-left hidden lg:table-cell">İletişim</th>}
-                    <th className="text-left">Durum</th>
-                    <th className="w-28 text-right">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(p => {
-                    const foto = getPersonelFoto(p.id);
-                    return (
-                      <tr key={p.id} style={{ background: selected.has(p.id) ? 'rgba(239,68,68,0.04)' : undefined }}>
-                        {canDelete && (
-                          <td className="text-center">
-                            <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleOne(p.id)} className="cursor-pointer" />
-                          </td>
-                        )}
-                        <td>
-                          <div className="flex items-center gap-2.5">
-                            <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="sm" />
-                            <div>
-                              <button onClick={() => setDetailId(p.id)} className="text-[12.5px] font-semibold hover:text-blue-400 transition-colors cursor-pointer block text-left" style={{ color: 'var(--text-primary)' }}>{p.adSoyad}</button>
-                              {canViewSensitiveData
-                                ? <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.tc || 'TC yok'}</p>
-                                : <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>—</p>
-                              }
-                            </div>
-                          </div>
-                        </td>
-                        <td className="hidden md:table-cell"><p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{getFirmaAd(p.firmaId)}</p></td>
-                        <td className="hidden lg:table-cell">
-                          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.gorev || '—'}</p>
-                          <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{p.departman || ''}</p>
-                        </td>
-                        {canViewSensitiveData && (
-                          <td className="hidden lg:table-cell"><p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{p.telefon || '—'}</p></td>
-                        )}
-                        <td><Badge label={p.durum} color={getPersonelStatusColor(p.durum)} /></td>
-                        <td>
-                          <div className="flex items-center gap-1 justify-end">
-                            <ABtn icon="ri-contacts-book-2-line" color="#818CF8" onClick={() => setKartvizitId(p.id)} title="Kartvizit" />
-                            <ABtn icon="ri-eye-line" color="#3B82F6" onClick={() => setDetailId(p.id)} title="Detay" />
-                            {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
-                            {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    {/* Personel */}
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="sm" />
+                      <div className="min-w-0">
+                        <button onClick={() => setDetailId(p.id)} className="text-xs font-semibold cursor-pointer block text-left truncate transition-colors" style={{ color: 'var(--text-primary)' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#10B981'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}>
+                          {p.adSoyad}
+                        </button>
+                        {canViewSensitiveData
+                          ? <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.tc || 'TC yok'}</p>
+                          : <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>—</p>
+                        }
+                      </div>
+                    </div>
+                    {/* Firma */}
+                    <div className="min-w-0 pr-2">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap truncate max-w-full"
+                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
+                        <i className="ri-building-2-line text-[9px] flex-shrink-0" />
+                        <span className="truncate">{getFirmaAd(p.firmaId)}</span>
+                      </span>
+                    </div>
+                    {/* Görev */}
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{p.gorev || '—'}</p>
+                      {p.departman && <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-faint)' }}>{p.departman}</p>}
+                    </div>
+                    {/* Durum */}
+                    <div>
+                      <Badge label={p.durum} color={getPersonelStatusColor(p.durum)} />
+                    </div>
+                    {/* İşlemler */}
+                    <div className="flex items-center gap-1 justify-end">
+                      <ABtn icon="ri-contacts-book-2-line" color="#818CF8" onClick={() => setKartvizitId(p.id)} title="Kartvizit" />
+                      <ABtn icon="ri-eye-line" color="#10B981" onClick={() => setDetailId(p.id)} title="Detay" />
+                      {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
+                      {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
