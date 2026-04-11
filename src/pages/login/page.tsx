@@ -212,24 +212,37 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Feature pills */}
-            <div className="flex flex-wrap gap-2 justify-center mt-8">
+            {/* Feature table rows */}
+            <div className="mt-8 w-full max-w-sm mx-auto space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-widest mb-3"
+                style={{ color: '#2e6a7e' }}>Platform Kapsamı</p>
               {[
-                { icon: 'ri-building-2-line', label: 'Firma Yönetimi' },
-                { icon: 'ri-stethoscope-line', label: 'OSGB Paneli' },
-                { icon: 'ri-user-star-line', label: 'Gezici Uzman' },
+                { icon: 'ri-building-2-line', label: 'Firma Yönetimi', desc: 'Çoklu firma & personel takibi' },
+                { icon: 'ri-stethoscope-line', label: 'OSGB Paneli', desc: 'Müşteri firma & gezici uzman' },
+                { icon: 'ri-user-star-line', label: 'Gezici Uzman', desc: 'Saha denetimi & raporlama' },
+                { icon: 'ri-shield-check-line', label: 'Uygunsuzluk & DÖF', desc: 'Kayıt, takip ve kapatma' },
               ].map(f => (
                 <div
                   key={f.label}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+                  className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl"
                   style={{
-                    background: 'rgba(6,182,212,0.1)',
-                    border: '1px solid rgba(6,182,212,0.2)',
-                    color: '#67E8F9',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    transition: 'background 0.15s',
                   }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
                 >
-                  <i className={`${f.icon} text-xs`} />
-                  {f.label}
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.2)' }}>
+                    <i className={`${f.icon} text-sm`} style={{ color: '#22D3EE' }} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold" style={{ color: '#b8e6f0' }}>{f.label}</p>
+                    <p className="text-[11px]" style={{ color: '#4a7a8a' }}>{f.desc}</p>
+                  </div>
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    style={{ background: 'rgba(6,182,212,0.4)' }} />
                 </div>
               ))}
             </div>
