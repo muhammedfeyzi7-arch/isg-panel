@@ -278,11 +278,11 @@ export default function PersonellerPage() {
         (ws3[addr] as XLSXStyle.CellObject).s = s;
       });
     });
-    ws3['!cols'] = [{ wch: 26 }, { wch: 24 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+    ws3['!cols'] = [{ wch: 26 }, { wch: 15 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
     if (!ws3['!rows']) ws3['!rows'] = [];
     (ws3['!rows'] as XLSXStyle.RowInfo[])[0] = { hpt: 28 };
     (ws3['!rows'] as XLSXStyle.RowInfo[])[1] = { hpt: 22 };
-    XLSXStyle.utils.book_append_sheet(wb, ws3, 'Yıldönümleri');
+    XLSXStyle.utils.book_append_sheet(wb, ws3, 'Yıldönümü');
 
     const xlsxData = XLSXStyle.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -623,31 +623,46 @@ export default function PersonellerPage() {
       <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileSelect} className="hidden" />
       <input ref={fotoInputRef} type="file" accept="image/*" onChange={handleFotoSelect} className="hidden" />
 
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Personeller</h1>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[11px] sm:text-[12px]" style={{ color: 'var(--text-muted)' }}>{personeller.filter(p => !p.silinmis).length} personel kayıtlı</span>
-            <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
-            <span className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,182,212,0.1)', color: '#06B6D4' }}>{aktifCount} aktif</span>
+      {/* ── Header — Hekim UI tarzı ── */}
+      <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #0EA5E9, #06B6D4)' }} />
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              <i className="ri-team-line text-white text-sm" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+                Personeller
+              </h1>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  {personeller.filter(p => !p.silinmis).length} personel kayıtlı
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.18)', color: '#34D399' }}>
+                  {aktifCount} aktif
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleDownloadTemplate} className="btn-secondary whitespace-nowrap hidden sm:flex" style={{ fontSize: '12px', padding: '6px 12px' }}>
-            <i className="ri-download-2-line text-xs" />Şablon İndir
-          </button>
-          <button onClick={() => fileInputRef.current?.click()} disabled={importLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px' }}>
-            {importLoading ? <><i className="ri-loader-4-line animate-spin text-xs" /><span className="hidden sm:inline ml-1">Yükleniyor...</span></> : <><i className="ri-upload-2-line text-xs" /><span className="hidden sm:inline ml-1">Excel İçe Aktar</span></>}
-          </button>
-          <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px' }}>
-            <i className="ri-file-excel-2-line text-xs" /><span className="hidden sm:inline ml-1">Excel İndir</span>
-          </button>
-          {canCreate && (
-            <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px' }}>
-              <i className="ri-user-add-line text-sm" /><span className="hidden sm:inline ml-1">Yeni Personel</span>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button onClick={handleDownloadTemplate} className="btn-secondary whitespace-nowrap hidden sm:flex" style={{ fontSize: '12px', padding: '6px 12px', height: 'auto' }}>
+              <i className="ri-download-2-line text-xs" />Şablon İndir
             </button>
-          )}
+            <button onClick={() => fileInputRef.current?.click()} disabled={importLoading} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
+              {importLoading ? <><i className="ri-loader-4-line animate-spin text-xs" /><span className="hidden sm:inline ml-1">Yükleniyor...</span></> : <><i className="ri-upload-2-line text-xs" /><span className="hidden sm:inline ml-1">Excel İçe Aktar</span></>}
+            </button>
+            <button onClick={handleExcelExport} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
+              <i className="ri-file-excel-2-line text-xs" /><span className="hidden sm:inline ml-1">Excel İndir</span>
+            </button>
+            {canCreate && (
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.4)' }}>
+                <i className="ri-user-add-line text-sm" /><span className="hidden sm:inline ml-1">Yeni Personel</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -666,7 +681,9 @@ export default function PersonellerPage() {
             value={search} 
             onChange={e => setSearch(e.target.value)} 
             placeholder="Ad, TC kimlik veya görev ara..." 
-            className="isg-input pl-8 text-[12.5px] w-full" 
+            className="isg-input pl-8 text-[12.5px] w-full"
+            onFocus={e => { e.currentTarget.style.borderColor = '#10B981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.12)'; }}
+            onBlur={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }}
           />
         </div>
         <div className="flex gap-2.5 flex-wrap sm:flex-nowrap">
@@ -1076,7 +1093,7 @@ export default function PersonellerPage() {
                   const st = statusStyle(r.status);
                   return (
                     <div key={i} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5" style={{ background: st.bg, border: `1px solid ${st.border}` }}>
-                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5"><i className={`${st.icon} text-sm`} style={{ color: st.color }} /></div>
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0"><i className={`${st.icon} text-sm`} style={{ color: st.color }} /></div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>Satır {r.row}</span>

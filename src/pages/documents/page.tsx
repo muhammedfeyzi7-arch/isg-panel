@@ -269,25 +269,48 @@ export default function EvraklarPage() {
   return (
     <div className="space-y-4">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Belge Takibi</h1>
-          <p className="text-[12px] mt-1" style={{ color: 'var(--text-muted)' }}>{evraklar.length} toplam evrak — durum otomatik hesaplanır</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={openAdd} className="btn-primary" style={{ fontSize: '12.5px', padding: '7px 14px' }}>
-            <i className="ri-file-add-line text-sm" />
-            Yeni Evrak
-          </button>
-          <button
-            onClick={() => setBulkOpen(true)}
-            className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-[7px] rounded-xl text-[12.5px] font-semibold text-white transition-all duration-200 cursor-pointer"
-            style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
-          >
-            <i className="ri-upload-cloud-2-line text-sm" />
-            Toplu Yükle
-          </button>
-
+      <div
+        className="rounded-2xl px-5 py-4"
+        style={{
+          background: 'var(--bg-card-solid)',
+          border: '1px solid var(--border-subtle)',
+          borderTop: '2px solid #F59E0B',
+        }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' }}
+            >
+              <i className="ri-file-list-3-line text-lg" style={{ color: '#F59E0B' }} />
+            </div>
+            <div>
+              <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Belge Takibi</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Durum otomatik hesaplanır</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  {evraklar.length} Evrak
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={openAdd}
+              className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
+              style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}>
+              <i className="ri-file-add-line text-sm" />
+              Yeni Evrak
+            </button>
+            <button
+              onClick={() => setBulkOpen(true)}
+              className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer"
+              style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: '#F59E0B' }}
+            >
+              <i className="ri-upload-cloud-2-line text-sm" />
+              Toplu Yükle
+            </button>
+          </div>
         </div>
       </div>
 
@@ -299,20 +322,21 @@ export default function EvraklarPage() {
           return (
             <div
               key={key}
-              className="rounded-xl p-3.5 flex items-center gap-3 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
+              className="rounded-xl p-3.5 flex items-center gap-3 cursor-pointer transition-all duration-200"
               style={{
-                background: cfg.bg,
-                border: `1px solid ${isActive ? cfg.color : cfg.border}`,
-                boxShadow: isActive ? `0 0 0 2px ${cfg.color}25` : 'none',
+                background: 'var(--bg-card-solid)',
+                border: `1px solid ${isActive ? cfg.color : 'var(--border-subtle)'}`,
+                borderTop: `2px solid ${cfg.color}`,
+                boxShadow: isActive ? `0 0 0 2px ${cfg.color}20` : 'none',
               }}
               onClick={() => setStatusFilter(statusFilter === key ? '' : key)}
             >
-              <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${cfg.color}20` }}>
+              <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${cfg.color}12`, border: `1px solid ${cfg.color}20` }}>
                 <i className={`${cfg.icon} text-sm`} style={{ color: cfg.color }} />
               </div>
               <div>
-                <p className="text-lg font-extrabold" style={{ color: 'var(--text-primary)' }}>{statusCounts[key]}</p>
-                <p className="text-[10.5px] font-medium" style={{ color: cfg.color }}>{key}</p>
+                <p className="text-xl font-extrabold leading-none" style={{ color: 'var(--text-primary)' }}>{statusCounts[key]}</p>
+                <p className="text-[10.5px] font-semibold mt-0.5" style={{ color: cfg.color }}>{key}</p>
               </div>
             </div>
           );

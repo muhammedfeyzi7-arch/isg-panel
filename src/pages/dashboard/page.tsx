@@ -245,45 +245,38 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
 
-      {/* ── Mobile-First Header ── */}
+      {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #6366F1, #10B981, #F59E0B, #EF4444)' }} />
-        <div className="px-4 py-4">
-          {/* Üst satır: başlık + sistem durumu */}
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)', boxShadow: '0 6px 18px rgba(99,102,241,0.3)' }}>
-                <i className="ri-dashboard-3-line text-white text-base" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-lg font-black leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>
-                  Genel Bakış
-                </h1>
-                <p className="text-[11px] mt-0.5 font-medium truncate" style={{ color: 'var(--text-muted)' }}>
-                  {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-              </div>
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #0EA5E9, #06B6D4, #10B981, #F59E0B, #EF4444)' }} />
+        <div className="px-5 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0891B2)' }}>
+              <i className="ri-dashboard-3-line text-white text-sm" />
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-shrink-0 text-[10px] font-bold"
-              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-              <span className="hidden sm:inline">Sistem </span>Aktif
+            <div className="min-w-0">
+              <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+                Genel Bakış
+              </h1>
+              <p className="text-[11px] mt-0.5 font-medium" style={{ color: 'var(--text-muted)' }}>
+                {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
             </div>
           </div>
-
-          {/* Uyarı badge'leri — sadece varsa göster */}
-          {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold"
-                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
-                  <i className="ri-error-warning-line text-[10px]" />
-                  {riskStats.toplamGecikme + riskStats.uygunDegil} kritik
-                </div>
-              )}
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+            {(riskStats.toplamGecikme + riskStats.uygunDegil) > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
+                <i className="ri-error-warning-line text-[10px]" />
+                {riskStats.toplamGecikme + riskStats.uygunDegil} kritik
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
+              style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.18)', color: '#38BDF8' }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />
+              Sistem Aktif
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -388,9 +381,9 @@ export default function DashboardPage() {
         <AkilliOzet />
         <div className="lg:col-span-2">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-              <i className="ri-bar-chart-2-line text-white text-sm" />
+            <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #0EA5E9, #06B6D4)' }}>
+              <i className="ri-bar-chart-2-line text-white text-xs" />
             </div>
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
           </div>

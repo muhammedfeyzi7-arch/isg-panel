@@ -283,26 +283,42 @@ export default function FirmalarPage() {
 
   return (
     <div className="space-y-4">
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Firmalar</h1>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{aktifFirmalarSayisi} firma kayıtlı</span>
-            <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#34D399' }}>{aktifCount} aktif</span>
-            {cokTehlikeliCount > 0 && (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171' }}>{cokTehlikeliCount} çok tehlikeli</span>
+      {/* ── Header — Hekim UI tarzı ── */}
+      <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #0EA5E9, #06B6D4, #10B981)' }} />
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0891B2)' }}>
+              <i className="ri-building-2-line text-white text-sm" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+                Firmalar
+              </h1>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{aktifFirmalarSayisi} firma kayıtlı</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.18)', color: '#38BDF8' }}>
+                  {aktifCount} aktif
+                </span>
+                {cokTehlikeliCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.18)', color: '#F87171' }}>
+                    {cokTehlikeliCount} çok tehlikeli
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {canManageFirma && (
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12.5px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #0EA5E9, #0891B2)', border: '1px solid rgba(14,165,233,0.4)' }}>
+                <i className="ri-add-line text-sm" />
+                Yeni Firma Ekle
+              </button>
             )}
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {canManageFirma && (
-            <button onClick={openAdd} className="btn-primary" style={{ fontSize: '12.5px', padding: '7px 14px' }}>
-              <i className="ri-add-line text-sm" />
-              Yeni Firma Ekle
-            </button>
-          )}
         </div>
       </div>
 
@@ -326,6 +342,8 @@ export default function FirmalarPage() {
             onChange={e => setSearch(e.target.value)}
             placeholder="Firma adı, yetkili kişi veya vergi no..."
             className="isg-input pl-8 text-[12.5px]"
+            onFocus={e => { e.currentTarget.style.borderColor = '#0EA5E9'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12)'; }}
+            onBlur={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = ''; }}
           />
         </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="isg-input text-[12.5px]" style={{ width: 'auto', minWidth: '140px' }}>

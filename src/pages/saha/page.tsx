@@ -650,20 +650,29 @@ export default function SahaPage() {
   return (
     <div className="flex flex-col h-full min-h-screen pb-6" style={{ maxWidth: '480px', margin: '0 auto' }}>
       {/* Başlık */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetimleri</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Hızlı saha işlemleri</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {pendingCount > 0 && (
-            <button onClick={() => setShowPendingModal(true)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl cursor-pointer" style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)', color: '#FBBF24' }}>
-              <i className="ri-time-line text-xs" />
-              <span className="text-xs font-bold">{pendingCount}</span>
-            </button>
-          )}
-          <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.2)' }}>
-            <i className="ri-shield-check-line text-sm" style={{ color: '#34D399' }} />
+      <div className="rounded-2xl overflow-hidden mb-4" style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.08) 0%, rgba(251,146,60,0.05) 100%)', border: '1px solid rgba(249,115,22,0.2)' }}>
+        <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #F97316, #FB923C, #FCD34D)' }} />
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.25)' }}>
+              <i className="ri-map-pin-user-line text-base" style={{ color: '#FB923C' }} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetimleri</h2>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hızlı saha işlemleri</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {pendingCount > 0 && (
+              <button onClick={() => setShowPendingModal(true)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer" style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)', color: '#FBBF24' }}>
+                <i className="ri-time-line text-xs" />
+                <span className="text-xs font-bold">{pendingCount}</span>
+              </button>
+            )}
+            <span className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-full" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34D399' }} />
+              Aktif
+            </span>
           </div>
         </div>
       </div>

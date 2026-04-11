@@ -236,6 +236,33 @@ export default function SettingsPage() {
   );
 
   return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.06) 100%)', border: '1px solid rgba(99,102,241,0.2)' }}>
+        <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #A78BFA)' }} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)' }}>
+              <i className="ri-settings-3-line text-lg" style={{ color: '#818CF8' }} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Ayarlar</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Profil, güvenlik ve sistem tercihleri</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(99,102,241,0.12)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <i className="ri-user-settings-line" />
+              {currentUser.ad || 'Kullanıcı'}
+            </span>
+            <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+              {org?.role === 'admin' ? 'Admin' : 'Kullanıcı'}
+            </span>
+          </div>
+        </div>
+      </div>
+
     <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-120px)]">
 
       {/* ══════════════════════════════════════
@@ -730,6 +757,7 @@ export default function SettingsPage() {
         )}
 
       </main>
+    </div>
     </div>
   );
 }

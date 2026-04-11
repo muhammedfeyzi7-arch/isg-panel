@@ -233,20 +233,30 @@ export default function FirmaEvraklariPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Firma Belgeleri</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Firmalara ait tüm evrakları merkezi olarak yönetin
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap self-start sm:self-auto">
-          <button onClick={() => setBulkOpen(true)} className="btn-secondary whitespace-nowrap">
-            <i className="ri-stack-line text-base" /> Toplu Yükle
-          </button>
-          <button onClick={openAdd} className="btn-primary whitespace-nowrap">
-            <i className="ri-add-line text-base" /> Evrak Ekle
-          </button>
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(52,211,153,0.08) 0%, rgba(16,185,129,0.05) 100%)', border: '1px solid rgba(52,211,153,0.2)' }}>
+        <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #34D399, #10B981, #059669)' }} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.25)' }}>
+              <i className="ri-folder-shield-2-line text-lg" style={{ color: '#34D399' }} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Firma Belgeleri</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Firmalara ait tüm evrakları merkezi olarak yönetin</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(52,211,153,0.12)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }}>
+              <i className="ri-file-list-3-line" />
+              {documents.length} evrak
+            </span>
+            <button onClick={() => setBulkOpen(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap transition-all" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.1)'; }}>
+              <i className="ri-stack-line" /> Toplu Yükle
+            </button>
+            <button onClick={openAdd} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap text-white transition-all" style={{ background: 'linear-gradient(135deg, #34D399, #10B981)' }} onMouseEnter={e => { e.currentTarget.style.opacity = '0.9'; }} onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
+              <i className="ri-add-line" /> Evrak Ekle
+            </button>
+          </div>
         </div>
       </div>
 

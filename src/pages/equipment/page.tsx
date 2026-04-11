@@ -891,27 +891,50 @@ export default function EkipmanlarPage() {
 
   return (
     <div className="space-y-5">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Ekipman</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Ekipman kayıtlarını ve kontrol durumlarını yönetin</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <button onClick={() => exportEkipmanToExcel(ekipmanlar, firmalar)} className="btn-secondary whitespace-nowrap">
-            <i className="ri-file-excel-2-line mr-1" />Excel Raporu İndir
-          </button>
-          {canCreate && (
-            <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
-              <i className="ri-upload-2-line mr-1" />Excel İçe Aktar
+      {/* ── Header — Hekim UI tarzı ── */}
+      <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #FB923C, #F59E0B, #FBBF24)' }} />
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #FB923C, #EA580C)' }}>
+              <i className="ri-tools-line text-white text-sm" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+                Ekipman
+              </h1>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{aktifEkipmanlar.length} ekipman kayıtlı</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.18)', color: '#FB923C' }}>
+                  {stats.uygun} uygun
+                </span>
+                {stats.uygunDegil > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.18)', color: '#F87171' }}>
+                    {stats.uygunDegil} uygun değil
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button onClick={() => exportEkipmanToExcel(ekipmanlar, firmalar)} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
+              <i className="ri-file-excel-2-line text-xs" />Excel
             </button>
-          )}
-          {canCreate && (
-            <button onClick={openAdd} className="btn-primary whitespace-nowrap self-start sm:self-auto">
-              <i className="ri-add-line text-base" />
-              Ekipman Ekle
-            </button>
-          )}
+            {canCreate && (
+              <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
+                <i className="ri-upload-2-line text-xs" />İçe Aktar
+              </button>
+            )}
+            {canCreate && (
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #FB923C, #EA580C)', border: '1px solid rgba(251,146,60,0.4)' }}>
+                <i className="ri-add-line" />
+                Ekipman Ekle
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

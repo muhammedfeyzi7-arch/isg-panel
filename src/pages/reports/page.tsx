@@ -1312,21 +1312,32 @@ export default function RaporlarPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
-            Raporlar
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            {secilenFirma ? (
-              <span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{secilenFirma.ad}</span>
-                {' '}firmasına ait veriler gösteriliyor
-              </span>
-            ) : 'Sistemdeki tüm verilerin özet analizi ve grafikleri'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div
+        className="rounded-2xl px-5 py-4"
+        style={{
+          background: 'var(--bg-card-solid)',
+          border: '1px solid var(--border-subtle)',
+          borderTop: '2px solid #6366F1',
+        }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}
+            >
+              <i className="ri-bar-chart-grouped-line text-lg" style={{ color: '#6366F1' }} />
+            </div>
+            <div>
+              <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Raporlar</h1>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {secilenFirma ? (
+                  <span><span style={{ color: '#6366F1', fontWeight: 600 }}>{secilenFirma.ad}</span>{' '}firmasına ait veriler</span>
+                ) : 'Tüm verilerin analizi ve grafikleri'}
+              </p>
+            </div>
+          </div>
+        <div className="flex items-center gap-2 flex-wrap mt-3 sm:mt-0">
           {/* Tarih */}
           <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)', color: 'var(--text-muted)' }}>
@@ -1529,6 +1540,7 @@ export default function RaporlarPage() {
             }
           </button>
         </div>
+      </div>
       </div>
 
       {/* Tarih filtresi aktifse bilgi bandı */}

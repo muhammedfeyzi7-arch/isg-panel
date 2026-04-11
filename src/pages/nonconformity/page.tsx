@@ -157,31 +157,50 @@ export default function UygunsuzluklarPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetimleri</h2>
-          <p className="text-sm mt-1" style={{ color: '#64748B' }}>Uygunsuzlukları kaydedin, takip edin ve raporlayın</p>
-        </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          {isReadOnly && (
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'rgba(6,182,212,0.1)', color: '#06B6D4', border: '1px solid rgba(6,182,212,0.25)' }}>
-              <i className="ri-search-eye-line" /> Denetçi — Saha Modu
-            </span>
-          )}
-          <button onClick={() => setShowReport(true)} className="btn-secondary whitespace-nowrap">
-            <i className="ri-file-chart-line mr-1" />DÖF Raporu
-          </button>
-          {canCreate && (
-            <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap">
-              <i className="ri-file-excel-2-line mr-1" />Excel İçe Aktar
+      {/* ── Header — Hekim UI tarzı ── */}
+      <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #F97316, #EF4444, #F43F5E)' }} />
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #F97316, #DC2626)' }}>
+              <i className="ri-map-pin-user-line text-white text-sm" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+                Saha Denetimleri
+              </h1>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{stats.total} kayıt</span>
+                {stats.acik > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.18)', color: '#F87171' }}>
+                    {stats.acik} açık
+                  </span>
+                )}
+                {isReadOnly && (
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(6,182,212,0.1)', color: '#06B6D4', border: '1px solid rgba(6,182,212,0.2)' }}>
+                    <i className="ri-search-eye-line" /> Denetçi
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button onClick={() => setShowReport(true)} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
+              <i className="ri-file-chart-line text-xs" />DÖF Raporu
             </button>
-          )}
-          {canCreateNonconformity && (
-            <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap">
-              <i className="ri-add-line mr-1" />Yeni Kayıt
-            </button>
-          )}
+            {canCreate && (
+              <button onClick={() => setShowImport(true)} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
+                <i className="ri-file-excel-2-line text-xs" />İçe Aktar
+              </button>
+            )}
+            {canCreateNonconformity && (
+              <button onClick={() => { setEditRecord(null); setShowForm(true); }} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #F97316, #DC2626)', border: '1px solid rgba(249,115,22,0.4)' }}>
+                <i className="ri-add-line" />Yeni Kayıt
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

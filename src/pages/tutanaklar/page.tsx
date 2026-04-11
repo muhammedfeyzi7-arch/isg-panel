@@ -870,19 +870,24 @@ export default function TutanaklarPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Tutanak Yönetimi</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Firma bazlı tutanakları yönetin ve Word belgesi oluşturun
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          {canCreate && (
-            <button onClick={openAdd} className="btn-primary whitespace-nowrap">
-              <i className="ri-add-line" /> Yeni Tutanak
-            </button>
-          )}
+      <div className="rounded-2xl px-5 py-4" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderTop: '2px solid #14B8A6' }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(20,184,166,0.12)', border: '1px solid rgba(20,184,166,0.2)' }}>
+              <i className="ri-article-line text-lg" style={{ color: '#14B8A6' }} />
+            </div>
+            <div>
+              <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)' }}>Tutanak Yönetimi</h1>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Firma bazlı tutanakları yönetin ve Word belgesi oluşturun</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {canCreate && (
+              <button onClick={openAdd} className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer" style={{ background: 'linear-gradient(135deg, #14B8A6, #0D9488)' }}>
+                <i className="ri-add-line" /> Yeni Tutanak
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

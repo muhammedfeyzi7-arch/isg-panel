@@ -83,13 +83,29 @@ export default function DokumanlarPage() {
   return (
     <div className="space-y-4">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Dökümanlar</h1>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[11px] sm:text-[12px]" style={{ color: 'var(--text-muted)' }}>AI destekli belge ve plan oluşturma araçları</span>
-            <span className="w-1 h-1 rounded-full" style={{ background: 'var(--border-main)' }} />
-            <span className="text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#818CF8' }}>{tools.length} araç</span>
+      <div
+        className="rounded-2xl px-5 py-4"
+        style={{
+          background: 'var(--bg-card-solid)',
+          border: '1px solid var(--border-subtle)',
+          borderTop: '2px solid #8B5CF6',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}
+          >
+            <i className="ri-file-text-line text-lg" style={{ color: '#8B5CF6' }} />
+          </div>
+          <div className="flex-1">
+            <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Dökümanlar</h1>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>AI destekli belge ve plan oluşturma araçları</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
+                {tools.length} araç
+              </span>
+            </div>
           </div>
         </div>
       </div>

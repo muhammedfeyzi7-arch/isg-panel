@@ -503,26 +503,39 @@ export default function MuayenelerPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Sağlık Durumu</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Personel periyodik muayene tarihlerini takip edin</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <button onClick={downloadTemplate} className="btn-secondary whitespace-nowrap">
-            <i className="ri-file-download-line mr-1" />Şablon İndir
-          </button>
-          <button onClick={() => importRef.current?.click()} disabled={importing} className="btn-secondary whitespace-nowrap">
-            <i className="ri-upload-2-line mr-1" />{importing ? 'Okunuyor...' : 'Excel İçe Aktar'}
-          </button>
-          <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
-          <button onClick={() => exportToExcel(muayeneler, personeller, firmalar)} className="btn-secondary whitespace-nowrap">
-            <i className="ri-file-excel-2-line mr-1" />Excel Dışa Aktar
-          </button>
-          <button onClick={openAdd} className="btn-primary whitespace-nowrap">
-            <i className="ri-add-line" /> Kayıt Ekle
-          </button>
+      {/* ── Header — Hekim UI tarzı ── */}
+      <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #EC4899, #F43F5E, #EF4444)' }} />
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #EC4899, #DB2777)' }}>
+              <i className="ri-heart-pulse-line text-white text-sm" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+                Sağlık Durumu
+              </h1>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Personel periyodik muayene takibi
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button onClick={downloadTemplate} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 12px', height: 'auto' }}>
+              <i className="ri-file-download-line text-xs" />Şablon
+            </button>
+            <button onClick={() => importRef.current?.click()} disabled={importing} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
+              <i className="ri-upload-2-line text-xs" />{importing ? 'Okunuyor...' : 'İçe Aktar'}
+            </button>
+            <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
+            <button onClick={() => exportToExcel(muayeneler, personeller, firmalar)} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
+              <i className="ri-file-excel-2-line text-xs" />Excel
+            </button>
+            <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #EC4899, #DB2777)', border: '1px solid rgba(236,72,153,0.4)' }}>
+              <i className="ri-add-line" /> Kayıt Ekle
+            </button>
+          </div>
         </div>
       </div>
 

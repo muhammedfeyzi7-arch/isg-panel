@@ -225,19 +225,33 @@ export default function CopKutusuPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Çöp Kutusu</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            {totalDeleted} silinen kayıt — geri yükleyebilir veya kalıcı silebilirsiniz
-          </p>
-        </div>
-        {totalDeleted > 0 && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
-            <i className="ri-delete-bin-line" />{totalDeleted} kayıt çöp kutusunda
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(248,113,113,0.05) 100%)', border: '1px solid rgba(239,68,68,0.2)' }}>
+        <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #EF4444, #F87171, #FCA5A5)' }} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <i className="ri-delete-bin-2-line text-lg" style={{ color: '#F87171' }} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Çöp Kutusu</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Silinen kayıtları geri yükleyin veya kalıcı silin</p>
+            </div>
           </div>
-        )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {totalDeleted > 0 && (
+              <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <i className="ri-delete-bin-line" />
+                {totalDeleted} kayıt çöp kutusunda
+              </span>
+            )}
+            {totalDeleted === 0 && (
+              <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }} />
+                Çöp kutusu boş
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Info Banner */}
