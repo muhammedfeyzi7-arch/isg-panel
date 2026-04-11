@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import type {
   Firma, Personel, Evrak, Egitim, Muayene, Uygunsuzluk, Ekipman, Gorev, Tutanak, CurrentUser,
   UygunsuzlukStatus, IsIzni,
@@ -149,6 +149,48 @@ async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
   console.log(`[ISG] DELETE_MANY OK ${table} (${ids.length} rows) ✓`);
 }
 
+/**
+ * dbUpdateDirect — deleted_at veya device_id gibi özel kolonları güncellemek için
+ * tek güvenli yol. organization_id payload'a YAZILMAZ (RLS bypass önlenir).
+ * Sadece mevcut kaydı günceller — INSERT yapmaz.
+ *
+ * Kullanım alanları:
+ * - muayeneler: deleted_at set/clear
+ * - is_izinleri: deleted_at set/clear, data update
+ * - ekipmanlar: data update (denetçi)
+ */
+async function dbUpdateDirect(
+  table: string,
+  id: string,
+  organizationId: string,
+  payload: Record<string, unknown>,
+): Promise<{ rows: number; error: string | null }> {
+  const now = new Date().toISOString();
+  const updatePayload = {
+    ...payload,
+    updated_at: now,
+    device_id: getDeviceId(),
+    // organization_id YAZILMIYOR — RLS bypass önlenir
+  };
+
+  const { data, error } = await supabase
+    .from(table)
+    .update(updatePayload)
+    .eq('id', id)
+    .eq('organization_id', organizationId)
+    .select('id');
+
+  if (error) {
+    const errMsg = error.message || error.details || JSON.stringify(error);
+    console.error(`[ISG] UPDATE_DIRECT ERROR ${table}/${id}:`, errMsg);
+    return { rows: 0, error: errMsg };
+  }
+
+  const rowCount = data?.length ?? 0;
+  console.log(`[ISG] UPDATE_DIRECT OK ${table}/${id} (${rowCount} rows) ✓`);
+  return { rows: rowCount, error: null };
+}
+
 // ──────── IndexedDB Cache ────────
 // localStorage 5MB limitini aşmamak için IndexedDB kullanıyoruz
 const DB_NAME = 'isg_cache';
@@ -201,6 +243,10 @@ export function useStore(
   userId?: string,
   orgLoading?: boolean,
   onRemoteChange?: (module: string) => void,
+  /** isSwitching: true iken tüm write ops bloke edilir (race condition guard) */
+  isSwitching?: boolean,
+  /** orgIdRef: useOrganization'dan gelen ref-first ID — setOrg'dan önce güncelleniyor */
+  externalOrgIdRef?: MutableRefObject<string | null>,
 ) {
   const [firmalar, _setFirmalar] = useState<Firma[]>([]);
   const [personeller, _setPersoneller] = useState<Personel[]>([]);
@@ -236,7 +282,18 @@ export function useStore(
   useEffect(() => { orgIdRef.current = organizationId; }, [organizationId]);
   useEffect(() => { userIdRef.current = userId; }, [userId]);
 
-    // ── Kendi silme işlemlerimizi takip et — realtime'da "başka kullanıcı" bildirimi çıkmasın ──
+  // ── isSwitching guard ref — senkron kontrol için ──
+  const isSwitchingRef = useRef(isSwitching ?? false);
+  useEffect(() => { isSwitchingRef.current = isSwitching ?? false; }, [isSwitching]);
+
+  // ── External orgIdRef (ref-first pattern) bağlantısı ──
+  // Eğer dışarıdan ref geliyorsa (useOrganization'dan), onu kullan — yoksa kendi ref'imizi
+  const getActiveOrgId = useCallback((): string | null => {
+    if (externalOrgIdRef?.current) return externalOrgIdRef.current;
+    return orgIdRef.current;
+  }, [externalOrgIdRef]);
+
+  // ── Kendi silme işlemlerimizi takip et — realtime'da "başka kullanıcı" bildirimi çıkmasın ──
   const ownDeletesRef = useRef<Set<string>>(new Set());
 
   // ── Pending saves queue ──
@@ -315,7 +372,16 @@ export function useStore(
 
   // ── DB write helpers ──
   const saveToDb = useCallback(async (table: string, item: { id: string } & Record<string, unknown>, throwOnError = false): Promise<void> => {
-    const orgId = orgIdRef.current;
+    // ── GUARD: isSwitching true ise write'ı engelle ──
+    if (isSwitchingRef.current) {
+      const msg = `Firma değişimi devam ediyor. Lütfen değişim tamamlandıktan sonra tekrar deneyin. (${table})`;
+      console.warn(`[ISG] SAVE BLOCKED (isSwitching): ${table}/${item.id}`);
+      onSaveErrorRef.current?.(msg);
+      if (throwOnError) throw new Error(msg);
+      return;
+    }
+
+    const orgId = getActiveOrgId();
     const uid = userIdRef.current;
     if (!orgId || !uid) {
       console.warn(`[ISG] SAVE QUEUED ${table}/${item.id}: orgId=${orgId} userId=${uid} not ready yet`);
@@ -331,9 +397,15 @@ export function useStore(
       onSaveErrorRef.current?.(`Kayıt hatası (${table}): ${msg}`);
       if (throwOnError) throw err;
     }
-  }, []);
+  }, [getActiveOrgId]);
 
   const deleteFromDb = useCallback(async (table: string, id: string) => {
+    // ── GUARD: isSwitching true ise delete'i engelle ──
+    if (isSwitchingRef.current) {
+      console.warn(`[ISG] DELETE BLOCKED (isSwitching): ${table}/${id}`);
+      onSaveErrorRef.current?.(`Firma değişimi devam ediyor. Silme işlemi iptal edildi. (${table})`);
+      return;
+    }
     try {
       await dbDelete(table, id);
     } catch (err) {
@@ -341,8 +413,55 @@ export function useStore(
     }
   }, []);
 
+  /**
+   * updateDirectInDb — deleted_at veya device_id gibi özel kolonlar için
+   * TEK güvenli direkt update entrypoint.
+   *
+   * GUARD: isSwitching=true → throw — optimistic rollback caller'a bırakılır.
+   * organization_id: getActiveOrgId() — tek source of truth.
+   * organization_id payload'a YAZILMAZ — RLS bypass önlenir.
+   */
+  const updateDirectInDb = useCallback(async (
+    table: string,
+    id: string,
+    payload: Record<string, unknown>,
+    throwOnError = false,
+  ): Promise<{ rows: number; error: string | null }> => {
+    // ── GUARD: isSwitching ──
+    if (isSwitchingRef.current) {
+      const msg = `Firma değişimi devam ediyor. Güncelleme işlemi iptal edildi. (${table})`;
+      console.warn(`[ISG] UPDATE_DIRECT BLOCKED (isSwitching): ${table}/${id}`);
+      onSaveErrorRef.current?.(msg);
+      if (throwOnError) throw new Error(msg);
+      return { rows: 0, error: msg };
+    }
+
+    // ── organization_id: tek source of truth ──
+    const orgId = getActiveOrgId();
+    if (!orgId) {
+      const msg = `Organizasyon bilgisi hazır değil. Güncelleme iptal edildi. (${table})`;
+      console.error(`[ISG] UPDATE_DIRECT ABORT: orgId null (${table}/${id})`);
+      onSaveErrorRef.current?.(msg);
+      if (throwOnError) throw new Error(msg);
+      return { rows: 0, error: msg };
+    }
+
+    const result = await dbUpdateDirect(table, id, orgId, payload);
+    if (result.error) {
+      onSaveErrorRef.current?.(`Güncelleme hatası (${table}): ${result.error}`);
+      if (throwOnError) throw new Error(result.error);
+    }
+    return result;
+  }, [getActiveOrgId]);
+
   const deleteManyFromDb = useCallback(async (table: string, ids: string[]) => {
     if (ids.length === 0) return;
+    // ── GUARD: isSwitching true ise delete'i engelle ──
+    if (isSwitchingRef.current) {
+      console.warn(`[ISG] DELETE_MANY BLOCKED (isSwitching): ${table} (${ids.length} ids)`);
+      onSaveErrorRef.current?.(`Firma değişimi devam ediyor. Toplu silme işlemi iptal edildi. (${table})`);
+      return;
+    }
     try {
       await dbDeleteMany(table, ids);
     } catch (err) {
@@ -452,7 +571,7 @@ export function useStore(
   // ── Per-table fetch functions (lazy load, cache-first) ──
   const fetchFirmalar = useCallback(async (orgId: string) => {
     await fetchWithCache<Firma>('firmalar', orgId, setFirmalar);
-  }, [fetchWithCache, setFirmalar]);
+  }, [fetchWithCache, setFirmalar]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchPersoneller = useCallback(async (orgId: string) => {
     await fetchWithCache<Personel>('personeller', orgId, setPersoneller, p => ({
@@ -1135,6 +1254,7 @@ export function useStore(
   // ──────── EĞİTİM ────────
   const addEgitim = useCallback((egitim: Omit<Egitim, 'id' | 'olusturmaTarihi'>) => {
     const id = genId();
+    // belgeDosyaVeri (base64) artık kabul edilmiyor — sadece belgeUrl kullanılır
     const { belgeDosyaVeri: _ignored, ...rest } = egitim as Egitim & { belgeDosyaVeri?: string };
     const newEgitim: Egitim = { ...rest, id, olusturmaTarihi: new Date().toISOString() };
     setEgitimler(prev => [newEgitim, ...prev]);
@@ -1221,33 +1341,16 @@ export function useStore(
     }));
     if (updated) {
       // deleted_at kolonunu da açıkça set et — fetchAllRows .is('deleted_at', null) filtresi için kritik
-      const orgId = orgIdRef.current;
-      const uid = userIdRef.current;
-      if (orgId && uid) {
-        supabase
-          .from('muayeneler')
-          .update({
-            data: updated,
-            updated_at: now,
-            deleted_at: now,
-            device_id: getDeviceId(),
-          })
-          .eq('id', id)
-          .eq('organization_id', orgId)
-          .then(({ error }) => {
-            if (error) {
-              console.error('[ISG] deleteMuayene DB error:', error.message);
-              // Rollback — kaydı geri getir
-              setMuayeneler(prev => prev.map(m => m.id === id ? { ...m, silinmis: false as const, silinmeTarihi: undefined } : m));
-              onSaveErrorRef.current?.(`Muayene silinemedi: ${error.message}`);
-            } else {
-              console.log(`[ISG] deleteMuayene OK: ${id} deleted_at=${now}`);
-            }
-          });
-      } else {
-        // orgId henüz hazır değil — pending queue'ya ekle (silinmis=true ile upsert)
-        saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
-      }
+      // updateDirectInDb: isSwitching guard + getActiveOrgId() tek source of truth
+      updateDirectInDb('muayeneler', id, { data: updated, deleted_at: now })
+        .then(({ error }) => {
+          if (error) {
+            // Rollback — optimistic update geri al
+            setMuayeneler(prev => prev.map(m => m.id === id ? { ...m, silinmis: false as const, silinmeTarihi: undefined } : m));
+          } else {
+            console.log(`[ISG] deleteMuayene OK: ${id} deleted_at=${now}`);
+          }
+        });
     }
     logFnRef.current?.('muayene_deleted', 'Sağlık', id, undefined, 'Sağlık evrakı silindi.');
   }, [setMuayeneler, saveToDb]);
@@ -1262,30 +1365,16 @@ export function useStore(
     }));
     if (updated) {
       // deleted_at'i null'a çek — yoksa fetchAllRows geri getirmez
-      const orgId = orgIdRef.current;
-      const uid = userIdRef.current;
-      if (orgId && uid) {
-        supabase
-          .from('muayeneler')
-          .update({
-            data: updated,
-            updated_at: now,
-            deleted_at: null,
-            device_id: getDeviceId(),
-          })
-          .eq('id', id)
-          .eq('organization_id', orgId)
-          .then(({ error }) => {
-            if (error) {
-              console.error('[ISG] restoreMuayene DB error:', error.message);
-              setMuayeneler(prev => prev.map(m => m.id === id ? { ...m, silinmis: true as const } : m));
-            } else {
-              console.log(`[ISG] restoreMuayene OK: ${id} deleted_at=null`);
-            }
-          });
-      } else {
-        saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
-      }
+      // updateDirectInDb: isSwitching guard + getActiveOrgId() tek source of truth
+      updateDirectInDb('muayeneler', id, { data: updated, deleted_at: null })
+        .then(({ error }) => {
+          if (error) {
+            // Rollback
+            setMuayeneler(prev => prev.map(m => m.id === id ? { ...m, silinmis: true as const } : m));
+          } else {
+            console.log(`[ISG] restoreMuayene OK: ${id} deleted_at=null`);
+          }
+        });
     }
   }, [setMuayeneler, saveToDb]);
 
@@ -1298,6 +1387,7 @@ export function useStore(
     _setMuayeneler(prev => prev.filter(m => m.id !== id));
     try {
       await dbDelete('muayeneler', id);
+      console.log(`[ISG] permanentDeleteMuayene OK: ${id}`);
     } catch (err) {
       console.error('[ISG] permanentDeleteMuayene FAILED, rolling back:', err);
       ownDeletesRef.current.delete(id);
@@ -1495,24 +1585,17 @@ export function useStore(
     }));
 
     if (updated) {
-      const now = new Date().toISOString();
-      const orgId = orgIdRef.current;
-      // Denetçi için direkt UPDATE — organization_id payload'a yazılmıyor (RLS sorunu önlenir)
-      // device_id mutlaka yazılsın — realtime sync için kritik
-      supabase
-        .from('ekipmanlar')
-        .update({ data: updated, updated_at: now, device_id: getDeviceId() })
-        .eq('id', id)
-        .eq('organization_id', orgId)
+      // updateDirectInDb: isSwitching guard + getActiveOrgId() tek source of truth
+      // organization_id payload'a YAZILMIYOR — RLS bypass önlenir
+      updateDirectInDb('ekipmanlar', id, { data: updated })
         .then(({ error }) => {
           if (error) {
-            console.error('[ISG] updateEkipman DB error:', error.message);
+            // Rollback — optimistic update geri al
             if (snapshot) setEkipmanlar(prev => prev.map(e => e.id === id ? snapshot! : e));
-            onSaveErrorRef.current?.(`Ekipman güncellenemedi: ${error.message}`);
           }
         });
     }
-  }, [setEkipmanlar]);
+  }, [setEkipmanlar, updateDirectInDb]);
 
   const deleteEkipman = useCallback((id: string) => {
     let updated: Ekipman | null = null;
@@ -1699,64 +1782,34 @@ export function useStore(
     if (updated) {
       const now = new Date().toISOString();
       try {
-        const orgId = orgIdRef.current;
-        const uid = userIdRef.current;
         const deviceId = getDeviceId();
+        // orgId kontrolü updateDirectInDb içinde yapılıyor — getActiveOrgId() single source
+        console.log(`[ISG] updateIsIzni: id=${id} device=${deviceId} durum=${(updated as IsIzni).durum}`);
 
-        // orgId null ise güncelleme yapma — RLS bypass eder ve veri kaybı olur
-        if (!orgId) {
-          console.error('[ISG] updateIsIzni ABORT: orgId is null!');
-          if (snapshot) setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
-          throw new Error('Organizasyon bilgisi hazır değil. Sayfayı yenileyip tekrar deneyin.');
-        }
+        // updateDirectInDb: isSwitching guard + getActiveOrgId() tek source of truth
+        // organization_id payload'a YAZILMIYOR — RLS bypass önlenir
+        const { rows, error: updateErr } = await updateDirectInDb('is_izinleri', id, { data: updated }, true);
 
-        console.log(`[ISG] updateIsIzni: id=${id} org=${orgId} device=${deviceId} durum=${(updated as IsIzni).durum}`);
+        console.log(`[ISG] updateIsIzni result: rows=${rows} error=${updateErr ?? 'none'}`);
 
-        // Direkt UPDATE — organization_id payload'a YAZILMIYOR (RLS bypass sorunu önlenir)
-        // device_id mutlaka yazılsın — realtime sync için kritik (karşı cihaz skip etmesin)
-        const { data: updatedRows, error } = await supabase
-          .from('is_izinleri')
-          .update({
-            data: updated,
-            updated_at: now,
-            device_id: deviceId,
-          })
-          .eq('id', id)
-          .eq('organization_id', orgId)
-          .select('id');
-
-        console.log(`[ISG] updateIsIzni result: rows=${updatedRows?.length ?? 0} error=${error?.message}`);
-
-        if (error) {
-          const errMsg = error.message || error.details || JSON.stringify(error);
-          console.error('[ISG] updateIsIzni DB error:', errMsg, error);
+        if (updateErr) {
           if (snapshot) {
             setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
           }
-          if (errMsg.includes('row-level security') || errMsg.includes('RLS') || errMsg.includes('policy')) {
-            throw new Error(`Yetki hatası: Bu işlem için yetkiniz yok. (${errMsg})`);
+          if (updateErr.includes('row-level security') || updateErr.includes('RLS') || updateErr.includes('policy')) {
+            throw new Error(`Yetki hatası: Bu işlem için yetkiniz yok. (${updateErr})`);
           }
-          throw new Error(errMsg);
+          throw new Error(updateErr);
         }
 
-        if (!updatedRows || updatedRows.length === 0) {
-          // orgId filtresi olmadan tekrar dene — kayıt başka orgId ile kaydedilmiş olabilir
-          console.warn(`[ISG] updateIsIzni: 0 rows — retrying without org filter`);
-          const { data: fallbackRows, error: err2 } = await supabase
-            .from('is_izinleri')
-            .update({ data: updated, updated_at: now, device_id: deviceId })
-            .eq('id', id)
-            .select('id');
-
-          if (err2 || !fallbackRows?.length) {
-            console.error(`[ISG] updateIsIzni fallback failed:`, err2?.message);
-            if (snapshot) setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
-            throw new Error(err2?.message ?? 'İş izni güncellenemedi.');
-          }
-          console.log(`[ISG] updateIsIzni fallback OK: ${id}`);
-        } else {
-          console.log(`[ISG] updateIsIzni OK: ${id} (${updatedRows.length} rows)`);
+        if (rows === 0) {
+          // 0 rows: kayıt farklı org ile kaydedilmiş olabilir — rollback + hata
+          console.error(`[ISG] updateIsIzni: 0 rows updated for id=${id}`);
+          if (snapshot) setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
+          throw new Error('İş izni güncellenemedi. Kayıt bulunamadı.');
         }
+
+        console.log(`[ISG] updateIsIzni OK: ${id} (${rows} rows)`);
       } catch (err) {
         if (snapshot) {
           setIsIzinleri(prev => prev.map(iz => iz.id === id ? snapshot! : iz));
@@ -1765,7 +1818,7 @@ export function useStore(
       }
     }
     logFnRef.current?.('is_izni_updated', 'İş İzinleri', id, updates.izinNo, 'İş izni güncellendi.');
-  }, [setIsIzinleri]);
+  }, [setIsIzinleri, updateDirectInDb]);
 
   const deleteIsIzni = useCallback((id: string) => {
     const now = new Date().toISOString();
@@ -1774,23 +1827,19 @@ export function useStore(
     if (!current) return;
     const updated: IsIzni = { ...current, silinmis: true as const, silinmeTarihi: now };
     setIsIzinleri(prev => prev.map(iz => iz.id === id ? updated : iz));
-    // is_izinleri tablosu deleted_at kolonunu kullanıyor — direkt update
-    supabase
-      .from('is_izinleri')
-      .update({ deleted_at: now, data: updated, updated_at: now, device_id: getDeviceId() })
-      .eq('id', id)
+    // updateDirectInDb: isSwitching guard + getActiveOrgId() tek source of truth
+    // is_izinleri tablosu deleted_at kolonunu kullanıyor
+    updateDirectInDb('is_izinleri', id, { deleted_at: now, data: updated })
       .then(({ error }) => {
         if (error) {
-          console.error('[ISG] deleteIsIzni DB error:', error);
-          // Rollback
+          // Rollback — optimistic update geri al
           setIsIzinleri(prev => prev.map(iz => iz.id === id ? current : iz));
-          onSaveErrorRef.current?.(`İş izni silme hatası: ${error.message}`);
         } else {
           console.log('[ISG] deleteIsIzni OK:', id);
         }
       });
     logFnRef.current?.('is_izni_deleted', 'İş İzinleri', id, undefined, 'İş izni silindi.');
-  }, [setIsIzinleri]);
+  }, [setIsIzinleri, updateDirectInDb]);
 
   const restoreIsIzni = useCallback((id: string) => {
     const now = new Date().toISOString();
@@ -1798,20 +1847,18 @@ export function useStore(
     if (!current) return;
     const updated: IsIzni = { ...current, silinmis: false as const, silinmeTarihi: undefined };
     setIsIzinleri(prev => prev.map(iz => iz.id === id ? updated : iz));
+    // updateDirectInDb: isSwitching guard + getActiveOrgId() tek source of truth
     // is_izinleri tablosu deleted_at kolonunu kullanıyor — null'a çek
-    supabase
-      .from('is_izinleri')
-      .update({ deleted_at: null, data: updated, updated_at: now, device_id: getDeviceId() })
-      .eq('id', id)
+    updateDirectInDb('is_izinleri', id, { deleted_at: null, data: updated })
       .then(({ error }) => {
         if (error) {
-          console.error('[ISG] restoreIsIzni DB error:', error);
+          // Rollback
           setIsIzinleri(prev => prev.map(iz => iz.id === id ? current : iz));
         } else {
           console.log(`[ISG] restoreIsIzni OK: ${id}`);
         }
       });
-  }, [setIsIzinleri]);
+  }, [setIsIzinleri, updateDirectInDb]);
 
   const isIzinleriRef2 = useRef<IsIzni[]>([]);
   useEffect(() => { isIzinleriRef2.current = isIzinleri; }, [isIzinleri]);

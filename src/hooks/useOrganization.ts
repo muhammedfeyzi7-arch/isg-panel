@@ -14,8 +14,10 @@ export interface OrgInfo {
   email?: string;
   orgType: 'firma' | 'osgb';
   osgbRole?: 'osgb_admin' | 'gezici_uzman' | null;
-  /** Gezici uzman için atanmış tüm firma ID'leri */
+  /** Gezici uzman: atanmış tüm firma ID'leri */
   activeFirmIds?: string[];
+  /** Gezici uzman: şu an aktif firma adı (switcher için) */
+  activeFirmName?: string;
 }
 
 // ... existing code ...
@@ -24,7 +26,21 @@ export function useOrganization(user: User | null) {
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // ── isSwitching: firma değişimi devam ediyor mu?
+  // true iken tüm DB write operasyonları engellenir (race condition önlemi)
+  const [isSwitching, setIsSwitching] = useState(false);
+  // ── orgIdRef: INSERT için senkron, her zaman güncel aktif firma ID'si
+  // setOrg async, orgIdRef senkron — ref-first pattern
+  const orgIdRef = useRef<string | null>(null);
   const autoCreateDoneRef = useRef<string | null>(null);
+
+  // orgIdRef'i org.id değişikliğinde senkron tut
+  // NOT: switchActiveFirma içinde orgIdRef ÖNCE güncellenir, sonra setOrg çağrılır
+  useEffect(() => {
+    if (org?.id) {
+      orgIdRef.current = org.id;
+    }
+  }, [org?.id]);
 
   const loadOrg = useCallback(async () => {
     if (!user) {
@@ -179,57 +195,101 @@ export function useOrganization(user: User | null) {
         const o = (Array.isArray(rawOrg) ? rawOrg[0] : rawOrg) as { id: string; name: string; invite_code: string; org_type?: string };
 
         if (data.osgb_role === 'gezici_uzman') {
-          // active_firm_ids (çoklu) veya active_firm_id (tekli legacy) destekle
+          // ── Gezici Uzman: Multi-Firma Switcher Modeli ──────────────────
+          // active_firm_ids: atanmış tüm firmalar
+          // active_firm_id:  switcher'dan seçilen aktif firma
+          //                  NULL ise → active_firm_ids[0] default atanır
+
           const rawIds = (data as Record<string, unknown>).active_firm_ids;
           const firmIds: string[] = Array.isArray(rawIds) && rawIds.length > 0
             ? (rawIds as string[]).filter(Boolean)
             : data.active_firm_id ? [data.active_firm_id] : [];
 
-          // İlk firmayı "aktif" org olarak kullan (store'un organizasyon bazlı veri çekmesi için)
-          if (firmIds.length > 0) {
-            const { data: firmaOrg } = await supabase
-              .from('organizations')
-              .select('id, name, invite_code, org_type')
-              .eq('id', firmIds[0])
-              .maybeSingle();
-
-            if (firmaOrg) {
-              setOrg({
-                id: firmaOrg.id,
-                name: firmaOrg.name,
-                invite_code: firmaOrg.invite_code,
-                role: 'member',
-                isActive: data.is_active !== false,
-                mustChangePassword: data.must_change_password === true,
-                displayName: data.display_name ?? undefined,
-                email: data.email ?? undefined,
-                orgType: 'firma',
-                osgbRole: 'gezici_uzman',
-                // Tüm atanmış firma ID'lerini tut
-                activeFirmIds: firmIds,
-              });
-              setLoading(false);
-              return;
-            }
+          if (firmIds.length === 0) {
+            // Hiç firma atanmamış — OSGB org'una düş
+            setOrg({
+              id: o.id,
+              name: o.name,
+              invite_code: o.invite_code,
+              role: data.role ?? 'member',
+              isActive: data.is_active !== false,
+              mustChangePassword: data.must_change_password === true,
+              displayName: data.display_name ?? undefined,
+              email: data.email ?? undefined,
+              orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
+              osgbRole: 'gezici_uzman',
+              activeFirmIds: [],
+            });
+            setLoading(false);
+            return;
           }
-          // Hiç firma atanmamış
+
+          // ── Aktif firma belirleme: DB'deki active_firm_id → fallback: firmIds[0] ──
+          const rawActiveFirmId = (data as Record<string, unknown>).active_firm_id as string | null;
+          // Geçerli bir active_firm_id varsa kullan, yoksa ilkini al
+          const resolvedActiveFirmId = (rawActiveFirmId && firmIds.includes(rawActiveFirmId))
+            ? rawActiveFirmId
+            : firmIds[0];
+
+          // active_firm_id DB'de NULL ise veya geçersizse → güncelle
+          if (resolvedActiveFirmId !== rawActiveFirmId) {
+            console.log(`[ISG] gezici_uzman: active_firm_id NULL/invalid, setting to ${resolvedActiveFirmId}`);
+            supabase
+              .from('user_organizations')
+              .update({ active_firm_id: resolvedActiveFirmId })
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .eq('osgb_role', 'gezici_uzman')
+              .then(({ error: updErr }) => {
+                if (updErr) console.warn('[ISG] active_firm_id auto-set failed:', updErr.message);
+              });
+          }
+
+          // Aktif firmanın org bilgisini çek
+          const { data: firmaOrg } = await supabase
+            .from('organizations')
+            .select('id, name, invite_code, org_type')
+            .eq('id', resolvedActiveFirmId)
+            .maybeSingle();
+
+          if (firmaOrg) {
+            setOrg({
+              id: firmaOrg.id,          // ← Her zaman aktif firma ID'si
+              name: firmaOrg.name,
+              invite_code: firmaOrg.invite_code,
+              role: 'member',
+              isActive: data.is_active !== false,
+              mustChangePassword: data.must_change_password === true,
+              displayName: data.display_name ?? undefined,
+              email: data.email ?? undefined,
+              orgType: 'firma',
+              osgbRole: 'gezici_uzman',
+              activeFirmIds: firmIds,    // ← Tüm atanmış firmalar (switcher için)
+              activeFirmName: firmaOrg.name,
+            });
+            setLoading(false);
+            return;
+          }
+
+          // Aktif firma bilgisi çekilemedi — ilk firmaya fallback
           setOrg({
-            id: o.id,
-            name: o.name,
-            invite_code: o.invite_code,
-            role: data.role ?? 'member',
+            id: resolvedActiveFirmId,
+            name: 'Firma',
+            invite_code: '',
+            role: 'member',
             isActive: data.is_active !== false,
             mustChangePassword: data.must_change_password === true,
             displayName: data.display_name ?? undefined,
             email: data.email ?? undefined,
-            orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
+            orgType: 'firma',
             osgbRole: 'gezici_uzman',
-            activeFirmIds: [],
+            activeFirmIds: firmIds,
           });
           setLoading(false);
           return;
         }
 
+        // ── Normal kullanıcı ───────────────────────────────────────────────
         setOrg({
           id: o.id,
           name: o.name,
@@ -297,6 +357,89 @@ export function useOrganization(user: User | null) {
       // silent
     }
   };
+
+  // ── Aktif firma değiştir (Gezici Uzman Switcher) ───────────────────────────
+  // REF-FIRST PATTERN:
+  // 1. orgIdRef.current = newId   (SENKRON — INSERT için anında doğru)
+  // 2. isSwitching = true         (UI lock — kullanıcı INSERT yapamaz)
+  // 3. DB update (await)          (Persist)
+  // 4. firmaOrg fetch             (Firma adı)
+  // 5. setOrg(...)                (UI güncelle)
+  // 6. isSwitching = false        (UI lock kaldır)
+  const switchActiveFirma = useCallback(async (firmaId: string): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Kullanıcı bulunamadı.' };
+    if (!org?.activeFirmIds?.includes(firmaId)) {
+      return { error: 'Bu firmaya erişim yetkiniz yok.' };
+    }
+    if (isSwitching) {
+      return { error: 'Firma değişimi devam ediyor, lütfen bekleyin.' };
+    }
+
+    // ADIM 1: orgIdRef ANINDA güncelle (senkron) — INSERT güvenliği
+    orgIdRef.current = firmaId;
+
+    // ADIM 2: UI lock başlat
+    setIsSwitching(true);
+
+    try {
+      // ADIM 3: DB'ye persist et
+      const { error: dbError } = await supabase
+        .from('user_organizations')
+        .update({ active_firm_id: firmaId })
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .eq('osgb_role', 'gezici_uzman');
+
+      if (dbError) {
+        // Rollback: ref'i geri al
+        orgIdRef.current = org.id;
+        console.error('[ISG] switchActiveFirma DB error:', dbError.message);
+        return { error: dbError.message };
+      }
+
+      // ADIM 4: Firma bilgisini çek
+      const { data: firmaOrg } = await supabase
+        .from('organizations')
+        .select('id, name, invite_code, org_type')
+        .eq('id', firmaId)
+        .maybeSingle();
+
+      if (!firmaOrg) {
+        orgIdRef.current = org.id;
+        return { error: 'Firma bulunamadı.' };
+      }
+
+      // ADIM 5: UI state güncelle (async, ref zaten doğru)
+      setOrg(prev => prev ? {
+        ...prev,
+        id: firmaOrg.id,
+        name: firmaOrg.name,
+        invite_code: firmaOrg.invite_code,
+        orgType: 'firma',
+        activeFirmName: firmaOrg.name,
+      } : null);
+
+      console.log(`[ISG] switchActiveFirma → ${firmaId} (${firmaOrg.name}) [ref-first ✓]`);
+      return { error: null };
+    } catch (e) {
+      // Exception: rollback ref
+      orgIdRef.current = org.id;
+      return { error: String(e) };
+    } finally {
+      // ADIM 6: UI lock kaldır
+      setIsSwitching(false);
+    }
+  }, [user, org, isSwitching]);
+
+  // ── Atanmış firmaların adlarını çek (switcher dropdown için) ──────────────
+  const fetchActiveFirmNames = useCallback(async (): Promise<{ id: string; name: string }[]> => {
+    if (!org?.activeFirmIds?.length) return [];
+    const { data } = await supabase
+      .from('organizations')
+      .select('id, name')
+      .in('id', org.activeFirmIds);
+    return (data ?? []) as { id: string; name: string }[];
+  }, [org?.activeFirmIds]);
 
   const createOrg = async (name: string, userId: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Kullanıcı bulunamadı.' };
@@ -388,8 +531,6 @@ export function useOrganization(user: User | null) {
   const clearMustChangePassword = async (): Promise<void> => {
     if (!user) return;
     try {
-      // RLS gezici uzman için client-side update'i engelleyebileceğinden
-      // service role kullanan edge function üzerinden güncelliyoruz.
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session) return;
 
@@ -409,7 +550,6 @@ export function useOrganization(user: User | null) {
         return;
       }
 
-      // Local state'i hemen güncelle — sayfa yenilemede tekrar çıkmasın
       setOrg(prev => prev ? { ...prev, mustChangePassword: false } : null);
     } catch (e) {
       console.error('[clearMustChangePassword] exception:', e);
@@ -420,10 +560,14 @@ export function useOrganization(user: User | null) {
     org,
     loading,
     loadError,
+    isSwitching,
+    orgIdRef,
     createOrg,
     joinOrg,
     regenerateInviteCode,
     refetch: loadOrg,
     clearMustChangePassword,
+    switchActiveFirma,
+    fetchActiveFirmNames,
   };
 }

@@ -16,35 +16,44 @@ export interface ActivityLogPayload {
 /**
  * Writes an activity log entry to the activity_logs table.
  *
- * SECURITY NOTE:
- * - RLS policy enforces: user_id = auth.uid() AND organization_id = get_my_org_id()
- * - Client CANNOT spoof user_id — RLS rejects if user_id !== auth.uid()
- * - user_name and user_role are informational only — not used for access control
- * - organization_id is validated server-side via get_my_org_id()
- * - FIX 2: user_id is taken from auth.uid() on backend, not from payload
+ * MİMARİ NOT (Multi-firma):
+ * - DB trigger'ları kaldırıldı — organization_id artık frontend'den explicit gelir
+ * - organization_id = org.id (aktif firma — switcher'dan seçilen)
+ * - RLS WITH CHECK: can_access_org(organization_id) ile doğrulanır
+ * - Yanlış org_id gönderilirse RLS reddeder (403) → veri tutarlılığı garanti
+ *
+ * SECURITY:
+ * - user_id her zaman auth.uid() — client'tan gelen userId asla kullanılmaz
+ * - organizationId RLS'de can_access_org() ile sunucu tarafında doğrulanır
  */
 export async function logActivity(payload: ActivityLogPayload): Promise<void> {
   try {
-    // SECURITY: user_id is sent from client but RLS WITH CHECK enforces user_id = auth.uid()
-    // So even if client sends wrong user_id, RLS will reject it.
-    // user_id column is NOT NULL so we must send it — but RLS validates it server-side.
+    // organizationId boşsa log yaz — veriyi yanlış org'a yazmaktan daha iyi
+    if (!payload.organizationId) {
+      console.warn('[ISG] logActivity: organizationId empty, skipping log');
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.id) return; // Not authenticated — skip log
+    if (!user?.id) return; // Oturum yok — log atla
 
     const { error } = await supabase.from('activity_logs').insert({
+      // organization_id: aktif firmadan geliyor (DB trigger override etmiyor artık)
       organization_id: payload.organizationId,
-      user_id: user.id, // Always use auth.uid() — never trust payload.userId
+      user_id: user.id,           // Her zaman auth.uid() — payload'dan asla
       user_email: payload.userEmail,
       user_name: payload.userName,
-      user_role: payload.userRole,   // informational only
+      user_role: payload.userRole,
       action_type: payload.actionType,
       module: payload.module ?? null,
       record_id: payload.recordId ?? null,
       record_name: payload.recordName ?? null,
       description: payload.description ?? null,
     });
+
     if (error) {
-      console.warn('[ISG] Activity log write failed:', error.message);
+      // can_access_org false ise RLS reddeder — bu durumda organizationId yanlış demektir
+      console.warn('[ISG] Activity log write failed:', error.message, '| orgId:', payload.organizationId);
     }
   } catch (err) {
     console.warn('[ISG] Activity log exception:', err);

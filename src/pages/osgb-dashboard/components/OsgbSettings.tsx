@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/store/AuthContext';
 import { supabase } from '@/lib/supabase';
+
+const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
 type SettingsTab = 'profil' | 'guvenlik' | 'ekip' | 'sistem';
 
@@ -11,8 +14,10 @@ interface OsgbMember {
   display_name: string;
   email: string;
   osgb_role: string;
+  role: string;
   is_active: boolean;
-  created_at: string;
+  created_at?: string;
+  joined_at?: string;
   active_firm_name: string | null;
 }
 
@@ -68,49 +73,128 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
   // ── Team ──
   const [members, setMembers] = useState<OsgbMember[]>([]);
   const [teamLoading, setTeamLoading] = useState(false);
-  const [toggleLoadingId, setToggleLoadingId] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<OsgbMember | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg({ type, text });
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const getAuthHeader = useCallback(async (): Promise<string> => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) return `Bearer ${token}`;
+    const { data: r } = await supabase.auth.refreshSession();
+    if (r.session?.access_token) return `Bearer ${r.session.access_token}`;
+    throw new Error('Oturum bulunamadı.');
+  }, []);
 
   const fetchMembers = useCallback(async () => {
     if (!orgId) return;
     setTeamLoading(true);
     try {
-      const { data } = await supabase
-        .from('user_organizations')
-        .select('user_id, display_name, email, osgb_role, is_active, created_at, active_firm_id')
-        .eq('organization_id', orgId)
-        .order('created_at', { ascending: false });
-
-      const enriched: OsgbMember[] = await Promise.all(
-        (data ?? []).map(async m => {
-          let active_firm_name: string | null = null;
-          if (m.active_firm_id) {
-            const { data: f } = await supabase.from('organizations').select('name').eq('id', m.active_firm_id).maybeSingle();
-            active_firm_name = f?.name ?? null;
-          }
-          return { ...m, active_firm_name };
-        })
-      );
-      setMembers(enriched);
+      const authHeader = await getAuthHeader();
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+        body: JSON.stringify({ action: 'list', organization_id: orgId }),
+      });
+      const json = await res.json();
+      if (json.members) {
+        // Edge function'dan gelen member listesini OsgbMember formatına dönüştür
+        const enriched: OsgbMember[] = json.members.map((m: {
+          user_id: string;
+          display_name?: string;
+          email?: string;
+          osgb_role?: string;
+          role?: string;
+          is_active?: boolean;
+          joined_at?: string;
+        }) => ({
+          user_id: m.user_id,
+          display_name: m.display_name ?? '',
+          email: m.email ?? '',
+          osgb_role: m.osgb_role ?? m.role ?? '',
+          role: m.role ?? '',
+          is_active: m.is_active ?? true,
+          joined_at: m.joined_at,
+          active_firm_name: null,
+        }));
+        setMembers(enriched);
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Üye listesi yüklenemedi.', 'error');
     } finally {
       setTeamLoading(false);
     }
-  }, [orgId]);
+  }, [orgId, getAuthHeader]);
 
   useEffect(() => {
     if (activeTab === 'ekip') fetchMembers();
   }, [activeTab, fetchMembers]);
 
   const handleToggleActive = async (member: OsgbMember) => {
-    setToggleLoadingId(member.user_id);
+    setActionLoadingId(member.user_id);
     try {
-      await supabase
-        .from('user_organizations')
-        .update({ is_active: !member.is_active })
-        .eq('user_id', member.user_id)
-        .eq('organization_id', orgId);
-      setMembers(prev => prev.map(m => m.user_id === member.user_id ? { ...m, is_active: !m.is_active } : m));
+      const authHeader = await getAuthHeader();
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+        body: JSON.stringify({
+          action: 'update',
+          organization_id: orgId,
+          target_user_id: member.user_id,
+          is_active: !member.is_active,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        showToast(json.error, 'error');
+      } else {
+        showToast(
+          member.is_active
+            ? `${member.display_name || member.email} pasif yapıldı.`
+            : `${member.display_name || member.email} aktif yapıldı.`
+        );
+        setMembers(prev => prev.map(m =>
+          m.user_id === member.user_id ? { ...m, is_active: !m.is_active } : m
+        ));
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Güncelleme sırasında hata oluştu.', 'error');
     } finally {
-      setToggleLoadingId(null);
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDeleteMember = async () => {
+    if (!deleteConfirm) return;
+    setActionLoadingId(deleteConfirm.user_id + '_delete');
+    try {
+      const authHeader = await getAuthHeader();
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+        body: JSON.stringify({
+          action: 'delete',
+          organization_id: orgId,
+          target_user_id: deleteConfirm.user_id,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        showToast(json.error, 'error');
+      } else {
+        showToast(`${deleteConfirm.display_name || deleteConfirm.email} organizasyondan kaldırıldı.`);
+        setDeleteConfirm(null);
+        await fetchMembers();
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Silme işlemi sırasında hata oluştu.', 'error');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -480,61 +564,96 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                 </div>
               ) : (
                 <div className="divide-y divide-slate-50">
-                  {members.map(member => (
-                    <div key={member.user_id} className="flex items-center gap-4 px-5 py-4 transition-all"
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-                      {/* Avatar */}
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                        style={{ background: member.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
-                        {(member.display_name || member.email || '?').charAt(0).toUpperCase()}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{member.display_name || '—'}</p>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                            style={{ background: roleBg(member.osgb_role), color: roleColor(member.osgb_role) }}>
-                            {roleLabel(member.osgb_role)}
-                          </span>
+                  {members.map(member => {
+                    const isMe = member.user_id === user?.id;
+                    const isDeleting = actionLoadingId === member.user_id + '_delete';
+                    const isToggling = actionLoadingId === member.user_id;
+                    return (
+                      <div key={member.user_id} className="flex items-center gap-4 px-5 py-4 transition-all"
+                        style={{ opacity: member.is_active ? 1 : 0.65 }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                        {/* Avatar */}
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                          style={{ background: member.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
+                          {(member.display_name || member.email || '?').charAt(0).toUpperCase()}
                         </div>
-                        <p className="text-xs truncate mt-0.5" style={{ color: '#94A3B8' }}>{member.email}</p>
-                        {member.active_firm_name && (
-                          <p className="text-[10px] mt-0.5 flex items-center gap-1" style={{ color: '#64748B' }}>
-                            <i className="ri-building-2-line text-[10px]" style={{ color: '#10B981' }} />
-                            {member.active_firm_name}
-                          </p>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>
+                              {member.display_name || '—'}
+                              {isMe && <span className="ml-1 text-xs font-normal" style={{ color: '#10B981' }}>(siz)</span>}
+                            </p>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              style={{ background: roleBg(member.osgb_role), color: roleColor(member.osgb_role) }}>
+                              {roleLabel(member.osgb_role)}
+                            </span>
+                            {!member.is_active && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
+                                Pasif
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs truncate mt-0.5" style={{ color: '#94A3B8' }}>{member.email}</p>
+                        </div>
+
+                        {/* Actions */}
+                        {!isMe && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* Aktif/Pasif toggle */}
+                            <button
+                              onClick={() => handleToggleActive(member)}
+                              disabled={isToggling}
+                              title={member.is_active ? 'Pasif yap' : 'Aktif yap'}
+                              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all disabled:opacity-50"
+                              style={{
+                                background: member.is_active ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
+                                border: `1px solid ${member.is_active ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
+                                color: member.is_active ? '#EF4444' : '#10B981',
+                              }}
+                            >
+                              {isToggling ? (
+                                <i className="ri-loader-4-line animate-spin" />
+                              ) : (
+                                <i className={member.is_active ? 'ri-pause-circle-line' : 'ri-play-circle-line'} />
+                              )}
+                              {member.is_active ? 'Pasif' : 'Aktif'}
+                            </button>
+
+                            {/* Sil butonu */}
+                            <button
+                              onClick={() => setDeleteConfirm(member)}
+                              disabled={isDeleting}
+                              title="Üyeyi kaldır"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all disabled:opacity-50"
+                              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#EF4444' }}
+                            >
+                              {isDeleting ? (
+                                <i className="ri-loader-4-line animate-spin text-xs" />
+                              ) : (
+                                <i className="ri-delete-bin-line text-xs" />
+                              )}
+                            </button>
+                          </div>
                         )}
                       </div>
-
-                      {/* Status + toggle */}
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <span className="text-[10px] font-semibold px-2 py-1 rounded-full hidden sm:inline-flex"
-                          style={{ background: member.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)', color: member.is_active ? '#10B981' : '#94A3B8' }}>
-                          {member.is_active ? 'Aktif' : 'Pasif'}
-                        </span>
-                        <button
-                          onClick={() => handleToggleActive(member)}
-                          disabled={toggleLoadingId === member.user_id}
-                          title={member.is_active ? 'Pasif yap' : 'Aktif yap'}
-                          className="w-10 h-5 rounded-full relative cursor-pointer transition-all duration-300 flex-shrink-0 disabled:opacity-50"
-                          style={{ background: member.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'rgba(15,23,42,0.15)' }}
-                        >
-                          {toggleLoadingId === member.user_id ? (
-                            <span className="absolute inset-0 flex items-center justify-center">
-                              <i className="ri-loader-4-line animate-spin text-[10px] text-white" />
-                            </span>
-                          ) : (
-                            <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300"
-                              style={{ left: member.is_active ? 'calc(100% - 18px)' : '2px', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
+            </div>
+
+            {/* Info note */}
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
+              style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
+              <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
+              <p className="text-xs leading-relaxed" style={{ color: '#64748B' }}>
+                <strong style={{ color: '#059669' }}>OSGB Admin:</strong> Tüm firma ve uzman yönetimi &bull;&nbsp;
+                <strong style={{ color: '#8B5CF6' }}>Gezici Uzman:</strong> Atanan firmalara erişim ve denetim yetkisi
+              </p>
             </div>
           </div>
         )}
@@ -608,6 +727,67 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
         )}
 
       </main>
+
+      {/* ── Toast ── */}
+      {toastMsg && createPortal(
+        <div className="fixed bottom-6 right-6 z-[99999] flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white"
+          style={{ background: toastMsg.type === 'success' ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #EF4444, #DC2626)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+          <i className={toastMsg.type === 'success' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'} />
+          {toastMsg.text}
+        </div>,
+        document.body
+      )}
+
+      {/* ── Delete Confirm Modal ── */}
+      {deleteConfirm && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
+          onClick={e => { if (e.target === e.currentTarget) setDeleteConfirm(null); }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4"
+            style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.15)' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <i className="ri-delete-bin-line text-base" style={{ color: '#EF4444' }} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: '#0F172A' }}>Üyeyi Kaldır</h3>
+                <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz</p>
+              </div>
+            </div>
+
+            <div className="px-3 py-3 rounded-xl"
+              style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
+              <p className="text-sm" style={{ color: '#0F172A' }}>
+                <strong>{deleteConfirm.display_name || deleteConfirm.email}</strong> adlı üyeyi OSGB organizasyonundan kaldırmak istediğinize emin misiniz?
+              </p>
+              <p className="text-xs mt-1.5" style={{ color: '#64748B' }}>
+                Kullanıcı organizasyondan çıkarılacak ve hesabı silinecektir.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setDeleteConfirm(null)}
+                className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+                style={{ background: 'rgba(15,23,42,0.05)', border: '1px solid rgba(15,23,42,0.1)', color: '#64748B' }}>
+                İptal
+              </button>
+              <button
+                onClick={handleDeleteMember}
+                disabled={actionLoadingId === deleteConfirm.user_id + '_delete'}
+                className="flex-1 whitespace-nowrap flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer disabled:opacity-70"
+                style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}>
+                {actionLoadingId === deleteConfirm.user_id + '_delete' ? (
+                  <><i className="ri-loader-4-line animate-spin" />Kaldırılıyor...</>
+                ) : (
+                  <><i className="ri-delete-bin-line" />Evet, Kaldır</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

@@ -71,6 +71,10 @@ interface AppContextType extends StoreType {
   refetchOrg: () => Promise<void>;
   logAction: (actionType: string, module: string, recordId: string, recordName?: string, description?: string) => void;
   refreshData: () => Promise<void>;
+  /** Gezici uzman firma değişimi devam ediyor mu — true iken write ops bloke */
+  isSwitching: boolean;
+  /** Aktif firmayı değiştir (ref-first, isSwitching guard ile) */
+  switchActiveFirma: (firmaId: string) => Promise<{ error: string | null }>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -103,6 +107,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     regenerateInviteCode,
     refetch: refetchOrg,
     clearMustChangePassword: clearMustChangePw,
+    isSwitching,
+    orgIdRef,
+    switchActiveFirma,
   } = useOrganization(user);
 
   const org = useMemo<OrgInfo | null>(() => {
@@ -192,6 +199,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     user?.id,
     orgLoading,
     onRemoteChangeCb,
+    isSwitching,
+    orgIdRef,
   );
 
   // Gezici uzman için atanmış tüm firmaları Supabase'den çekip firmalar listesine inject et
@@ -744,6 +753,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       pageLoading: store.pageLoading,
       partialLoading: store.partialLoading,
       realtimeStatus: store.realtimeStatus,
+      isSwitching,
+      switchActiveFirma,
     }}>
       {children}
     </AppContext.Provider>

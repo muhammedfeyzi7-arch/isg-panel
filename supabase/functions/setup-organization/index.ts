@@ -36,6 +36,67 @@ async function ensureProfileRecord(
   }
 }
 
+/**
+ * Idempotent RLS policy bootstrap — migration bağımlılığını sıfırlar.
+ * Yeni kurulumda veya güncellenen üyeliklerde arka planda çalışır.
+ * DO $$ IF NOT EXISTS $$ — mevcut policy varsa sessizce geçer.
+ *
+ * Politikalar:
+ * 1. firmalar tablosu — gezici uzman SELECT (can_access_org)
+ * 2. activity_logs INSERT — gezici uzman (can_access_org)
+ */
+async function bootstrapRlsPolicies(supabase: ReturnType<typeof createClient>): Promise<void> {
+  const queries = [
+    // ── firmalar: gezici uzman SELECT ──────────────────────────────────
+    `DO $do$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename  = 'firmalar'
+      AND policyname = 'firmalar_gezici_uzman_select'
+  ) THEN
+    CREATE POLICY firmalar_gezici_uzman_select
+      ON public.firmalar
+      FOR SELECT
+      USING (can_access_org(organization_id));
+    RAISE NOTICE '[RLS Bootstrap] firmalar_gezici_uzman_select created';
+  END IF;
+END $do$;`,
+
+    // ── activity_logs: gezici uzman INSERT (can_access_org) ─────────────
+    `DO $do$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename  = 'activity_logs'
+      AND policyname = 'activity_logs_gezici_uzman_insert'
+  ) THEN
+    CREATE POLICY activity_logs_gezici_uzman_insert
+      ON public.activity_logs
+      FOR INSERT
+      WITH CHECK (can_access_org(organization_id));
+    RAISE NOTICE '[RLS Bootstrap] activity_logs_gezici_uzman_insert created';
+  END IF;
+END $do$;`,
+  ];
+
+  for (const sql of queries) {
+    try {
+      // Service role client ile direkt SQL çalıştır
+      const { error } = await (supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => { error: { message: string } | null } })
+        .rpc('exec_sql_ddl', { sql_query: sql });
+      if (error) {
+        // RPC yoksa skip — migration.sql ile manuel yapılabilir
+        console.warn('[setup-org bootstrap] exec_sql_ddl not available:', error.message);
+      }
+    } catch (e) {
+      console.warn('[setup-org bootstrap] policy bootstrap skipped (RPC unavailable):', e);
+    }
+  }
+}
+
 const VALID_ROLES = ['admin', 'denetci', 'member'];
 
 function normalizeRole(role: unknown): string {
@@ -120,7 +181,6 @@ Deno.serve(async (req) => {
       metaOrgId = (meta.organization_id as string) || '';
       metaRole = (meta.role as string) || '';
       metaOsgbRole = (meta.osgb_role as string) || '';
-      // active_firm_ids: array of UUIDs assigned to gezici uzman
       const rawFirmIds = meta.active_firm_ids;
       if (Array.isArray(rawFirmIds)) {
         metaActiveFirmIds = rawFirmIds.filter((id): id is string => typeof id === 'string' && id.length > 0);
@@ -180,6 +240,12 @@ Deno.serve(async (req) => {
       }
 
       await ensureProfileRecord(supabase, user.id);
+
+      // ── Arka planda idempotent RLS policy bootstrap ──
+      // Migration bağımlılığını sıfırlamak için — her login'de kontrol edilir
+      bootstrapRlsPolicies(supabase).catch(e =>
+        console.warn('[setup-org] bootstrapRlsPolicies silently failed:', e)
+      );
 
       return new Response(JSON.stringify({
         organization: org,
@@ -269,6 +335,11 @@ Deno.serve(async (req) => {
         } catch (e) {
           console.warn('[setup-org] Could not clear metadata:', e);
         }
+
+        // Bootstrap yeni atama için de çalıştır
+        bootstrapRlsPolicies(supabase).catch(e =>
+          console.warn('[setup-org] bootstrapRlsPolicies (assign) silently failed:', e)
+        );
 
         return new Response(JSON.stringify({
           organization: targetOrg,
@@ -378,6 +449,11 @@ Deno.serve(async (req) => {
       record_name: orgName,
       description: `Organizasyon otomatik oluşturuldu: ${orgName}`,
     }).catch(() => { /* silent */ });
+
+    // ── Yeni org için de bootstrap çalıştır ──
+    bootstrapRlsPolicies(supabase).catch(e =>
+      console.warn('[setup-org] bootstrapRlsPolicies (new org) silently failed:', e)
+    );
 
     return new Response(JSON.stringify({
       organization: { ...newOrg, org_type: 'firma' },

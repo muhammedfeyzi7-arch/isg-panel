@@ -9,14 +9,12 @@ const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-us
 interface Member {
   user_id: string;
   role: string;
-  osgb_role?: string | null;
   is_active: boolean;
   must_change_password: boolean;
   display_name: string;
   email: string;
   joined_at: string;
   firm_id?: string;
-  active_firm_ids?: string[] | null;
 }
 
 interface AddUserForm {
@@ -24,7 +22,6 @@ interface AddUserForm {
   email: string;
   password: string;
   role: string;
-  osgb_role: string;
   firm_id: string;
 }
 
@@ -39,58 +36,19 @@ interface FetchOptions {
   body: string;
 }
 
-const emptyForm: AddUserForm = {
-  display_name: '', email: '', password: '',
-  role: 'member', osgb_role: '', firm_id: '',
-};
+const emptyForm: AddUserForm = { display_name: '', email: '', password: '', role: 'member', firm_id: '' };
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; gradient: string }> = {
   admin: { label: 'Admin Kullanıcı', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', gradient: 'linear-gradient(135deg, #F59E0B, #EA580C)' },
   denetci: { label: 'Saha Personeli', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', gradient: 'linear-gradient(135deg, #06B6D4, #0891B2)' },
   member: { label: 'Evrak/Dökümantasyon Denetçi', color: '#818CF8', bg: 'rgba(99,102,241,0.1)', gradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)' },
   firma_user: { label: 'Firma Yetkilisi', color: '#10B981', bg: 'rgba(16,185,129,0.1)', gradient: 'linear-gradient(135deg, #10B981, #059669)' },
-  osgb_admin: { label: 'OSGB Admin', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', gradient: 'linear-gradient(135deg, #F59E0B, #EA580C)' },
-  gezici_uzman: { label: 'Gezici Uzman', color: '#10B981', bg: 'rgba(16,185,129,0.1)', gradient: 'linear-gradient(135deg, #10B981, #059669)' },
 };
-
-function getMemberRoleConf(member: Member) {
-  if (member.osgb_role === 'osgb_admin') return ROLE_CONFIG.osgb_admin;
-  if (member.osgb_role === 'gezici_uzman') return ROLE_CONFIG.gezici_uzman;
-  return ROLE_CONFIG[member.role] ?? ROLE_CONFIG.member;
-}
 
 export default function TeamMembersSection() {
   const { org, orgLoading, theme, addToast } = useApp();
   const { user } = useAuth();
   const isDark = theme === 'dark';
-
-  // OSGB Admin kontrolü: osgb_admin VEYA normal admin
-  const isOsgbAdmin = org?.osgbRole === 'osgb_admin';
-  const isNormalAdmin = org?.role === 'admin';
-  const canManageTeam = isNormalAdmin || isOsgbAdmin;
-
-  // OSGB Admin için kendi gerçek org_id'sini bul
-  const [osgbOrgId, setOsgbOrgId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOsgbAdmin || !user) return;
-    // user_organizations'dan OSGB organizasyon id'sini çek (osgb_role = osgb_admin olan kayıt)
-    supabase
-      .from('user_organizations')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('osgb_role', 'osgb_admin')
-      .eq('is_active', true)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.organization_id) {
-          setOsgbOrgId(data.organization_id as string);
-        }
-      });
-  }, [isOsgbAdmin, user]);
-
-  // Edge function çağrılarında kullanılacak organization_id
-  const effectiveOrgId = isOsgbAdmin ? (osgbOrgId ?? org?.id) : org?.id;
 
   const [members, setMembers] = useState<Member[]>([]);
   const [listLoading, setListLoading] = useState(false);
@@ -109,29 +67,44 @@ export default function TeamMembersSection() {
   const [firmalar, setFirmalar] = useState<Firma[]>([]);
 
   const getAuthHeader = useCallback(async (): Promise<string> => {
+    // Önce mevcut session'ı al
     const { data: sessionData } = await supabase.auth.getSession();
     const currentToken = sessionData.session?.access_token;
+
     if (currentToken) {
+      // Token var, expire kontrolü yap
       const payload = currentToken.split('.')[1];
       if (payload) {
         try {
           const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
           const exp = decoded.exp as number;
           const now = Math.floor(Date.now() / 1000);
-          if (exp && exp - now > 60) return `Bearer ${currentToken}`;
-        } catch { /* ignore */ }
+          // 60 saniyeden fazla süresi varsa direkt kullan
+          if (exp && exp - now > 60) {
+            return `Bearer ${currentToken}`;
+          }
+        } catch {
+          // decode başarısız, refresh dene
+        }
       }
     }
+
+    // Token yok veya expire yakın, refresh dene
     try {
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
       if (!refreshError && refreshData.session?.access_token) {
         return `Bearer ${refreshData.session.access_token}`;
       }
-    } catch { /* ignore */ }
+    } catch {
+      // ignore
+    }
+
+    // Son çare: mevcut token'ı kullan
     if (currentToken) return `Bearer ${currentToken}`;
     throw new Error('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
   }, []);
 
+  // Fetch with 30s timeout + auto-retry on network errors
   const fetchWithRetry = useCallback(async (
     url: string,
     options: FetchOptions,
@@ -139,6 +112,7 @@ export default function TeamMembersSection() {
   ): Promise<Response> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
@@ -151,11 +125,17 @@ export default function TeamMembersSection() {
         err.message.includes('NetworkError') ||
         err.message.includes('network')
       );
+
       if ((isAbort || isNetwork) && retries > 0) {
         await new Promise(r => setTimeout(r, 1000));
         const freshHeader = await getAuthHeader();
-        return fetchWithRetry(url, { ...options, headers: { ...options.headers, Authorization: freshHeader } }, retries - 1);
+        return fetchWithRetry(
+          url,
+          { ...options, headers: { ...options.headers, Authorization: freshHeader } },
+          retries - 1,
+        );
       }
+
       if (isAbort) throw new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.');
       if (isNetwork) throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
       throw err;
@@ -163,27 +143,27 @@ export default function TeamMembersSection() {
   }, [getAuthHeader]);
 
   const fetchMembers = useCallback(async () => {
-    if (!effectiveOrgId) return;
+    if (!org?.id) return;
     setListLoading(true);
     try {
       const authHeader = await getAuthHeader();
       const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
-        body: JSON.stringify({ action: 'list', organization_id: effectiveOrgId }),
+        body: JSON.stringify({ action: 'list', organization_id: org.id }),
       });
       const json = await res.json();
       if (json.error) {
         addToast(json.error, 'error');
       } else if (json.members) {
-        setMembers(json.members as Member[]);
+        setMembers(json.members);
       }
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Üye listesi yüklenemedi.', 'error');
     } finally {
       setListLoading(false);
     }
-  }, [effectiveOrgId, getAuthHeader, fetchWithRetry, addToast]);
+  }, [org?.id, getAuthHeader, fetchWithRetry, addToast]);
 
   const fetchFirmalar = useCallback(async () => {
     try {
@@ -198,40 +178,37 @@ export default function TeamMembersSection() {
           .sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
         setFirmalar(list);
       }
-    } catch { /* silent */ }
+    } catch {
+      // silent
+    }
   }, []);
 
   useEffect(() => {
-    if (!canManageTeam) return;
-    // OSGB Admin için osgbOrgId yüklenince fetch et
-    if (isOsgbAdmin && !osgbOrgId) return;
-    fetchMembers();
-    if (!isOsgbAdmin) fetchFirmalar();
-  }, [canManageTeam, isOsgbAdmin, osgbOrgId, fetchMembers, fetchFirmalar]);
+    if (org?.role === 'admin') {
+      fetchMembers();
+      fetchFirmalar();
+    }
+  }, [org?.role, fetchMembers, fetchFirmalar]);
 
   const handleAddUser = async () => {
     setFormError(null);
     if (!form.display_name.trim()) { setFormError('Ad Soyad zorunludur.'); return; }
     if (!form.email.trim() || !form.email.includes('@')) { setFormError('Geçerli bir e-posta girin.'); return; }
     if (!form.password || form.password.length < 8) { setFormError('Şifre en az 8 karakter olmalıdır.'); return; }
-    if (!isOsgbAdmin && form.role === 'firma_user' && !form.firm_id) {
-      setFormError('Firma Yetkilisi rolü için firma seçimi zorunludur.'); return;
-    }
+    if (form.role === 'firma_user' && !form.firm_id) { setFormError('Firma Yetkilisi rolü için firma seçimi zorunludur.'); return; }
 
     setFormLoading(true);
     try {
       const authHeader = await getAuthHeader();
       const payload: Record<string, unknown> = {
         action: 'create',
-        organization_id: effectiveOrgId,
+        organization_id: org?.id,
         email: form.email.trim().toLowerCase(),
         password: form.password,
         display_name: form.display_name.trim(),
-        role: isOsgbAdmin ? 'member' : form.role,
+        role: form.role,
       };
-      if (isOsgbAdmin) {
-        payload.osgb_role = form.osgb_role || 'gezici_uzman';
-      } else if (form.role === 'firma_user' && form.firm_id) {
+      if (form.role === 'firma_user' && form.firm_id) {
         payload.firm_id = form.firm_id;
       }
       const res = await fetchWithRetry(EDGE_URL, {
@@ -281,7 +258,7 @@ export default function TeamMembersSection() {
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
           action: 'update',
-          organization_id: effectiveOrgId,
+          organization_id: org?.id,
           target_user_id: member.user_id,
           is_active: !member.is_active,
         }),
@@ -309,26 +286,22 @@ export default function TeamMembersSection() {
     setActionLoading(member.user_id + '_role');
     try {
       const authHeader = await getAuthHeader();
-      const updatePayload: Record<string, unknown> = {
-        action: 'update',
-        organization_id: effectiveOrgId,
-        target_user_id: member.user_id,
-      };
-      if (isOsgbAdmin) {
-        updatePayload.osgb_role = newRole;
-      } else {
-        updatePayload.role = newRole;
-      }
       const res = await fetchWithRetry(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
-        body: JSON.stringify(updatePayload),
+        body: JSON.stringify({
+          action: 'update',
+          organization_id: org?.id,
+          target_user_id: member.user_id,
+          role: newRole,
+        }),
       });
       const json = await res.json();
       if (json.error) {
         addToast(json.error, 'error');
       } else {
-        addToast('Rol güncellendi.', 'success');
+        const roleLabel = ROLE_CONFIG[newRole]?.label ?? newRole;
+        addToast(`Rol ${roleLabel} olarak güncellendi.`, 'success');
         await fetchMembers();
       }
     } catch (err) {
@@ -348,7 +321,7 @@ export default function TeamMembersSection() {
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
           action: 'delete',
-          organization_id: effectiveOrgId,
+          organization_id: org?.id,
           target_user_id: deleteConfirm.user_id,
         }),
       });
@@ -382,7 +355,7 @@ export default function TeamMembersSection() {
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
           action: 'reset_password',
-          organization_id: effectiveOrgId,
+          organization_id: org?.id,
           target_user_id: resetTarget.user_id,
           new_password: resetPassword,
         }),
@@ -404,7 +377,7 @@ export default function TeamMembersSection() {
   };
 
   if (orgLoading) return null;
-  if (!canManageTeam) return null;
+  if (!org || org.role !== 'admin') return null;
 
   const cardStyle = {
     background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.8)',
@@ -433,12 +406,6 @@ export default function TeamMembersSection() {
     color: isDark ? '#94A3B8' : '#475569',
   };
 
-  // Stats
-  const totalCount = members.length;
-  const activeCount = members.filter(m => m.is_active).length;
-  const passwordCount = members.filter(m => m.must_change_password).length;
-  const passiveCount = members.filter(m => !m.is_active).length;
-
   return (
     <>
       <div style={cardStyle} className="p-6 space-y-5">
@@ -455,11 +422,9 @@ export default function TeamMembersSection() {
               <i className="ri-group-line text-base" style={{ color: '#10B981' }} />
             </div>
             <div>
-              <h4 className="text-sm font-bold" style={{ color: sectionTitleColor }}>
-                {isOsgbAdmin ? 'OSGB Ekip Yönetimi' : 'Kullanıcı Yönetimi'}
-              </h4>
+              <h4 className="text-sm font-bold" style={{ color: sectionTitleColor }}>Kullanıcı Yönetimi</h4>
               <p className="text-xs mt-0.5" style={{ color: subColor }}>
-                {isOsgbAdmin ? 'OSGB uzmanlarını yönetin' : 'Organizasyonunuzdaki kullanıcıları yönetin'}
+                Organizasyonunuzdaki kullanıcıları yönetin
               </p>
             </div>
           </div>
@@ -469,17 +434,17 @@ export default function TeamMembersSection() {
             style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
           >
             <i className="ri-user-add-line" />
-            {isOsgbAdmin ? 'Uzman Ekle' : 'Kullanıcı Ekle'}
+            Kullanıcı Ekle
           </button>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-4 gap-3">
           {[
-            { label: 'Toplam Üye', value: totalCount, color: '#6366F1', bg: 'rgba(99,102,241,0.1)' },
-            { label: 'Aktif', value: activeCount, color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
-            { label: 'Şifre Bekliyor', value: passwordCount, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
-            { label: 'Pasif', value: passiveCount, color: '#64748B', bg: 'rgba(100,116,139,0.1)' },
+            { label: 'Toplam Üye', value: members.length, color: '#6366F1', bg: 'rgba(99,102,241,0.1)' },
+            { label: 'Aktif', value: members.filter(m => m.is_active).length, color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+            { label: 'Şifre Bekliyor', value: members.filter(m => m.must_change_password).length, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
+            { label: 'Pasif', value: members.filter(m => !m.is_active).length, color: '#64748B', bg: 'rgba(100,116,139,0.1)' },
           ].map(s => (
             <div
               key={s.label}
@@ -504,19 +469,13 @@ export default function TeamMembersSection() {
               <i className="ri-group-line text-xl" style={{ color: subColor }} />
             </div>
             <p className="text-sm" style={{ color: subColor }}>Henüz üye bulunmuyor</p>
-            <p className="text-xs" style={{ color: subColor }}>
-              {isOsgbAdmin ? '"Uzman Ekle" butonuyla yeni uzman ekleyin' : '"Kullanıcı Ekle" butonuyla başlayın'}
-            </p>
           </div>
         ) : (
           <div className="space-y-2">
             {members.map(member => {
               const isMe = member.user_id === user?.id;
               const isDeleting = actionLoading === member.user_id + '_delete';
-              const roleConf = getMemberRoleConf(member);
-              const roleLabel = member.osgb_role === 'osgb_admin' ? 'OSGB Admin'
-                : member.osgb_role === 'gezici_uzman' ? 'Gezici Uzman'
-                : roleConf.label;
+              const roleConf = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.member;
               return (
                 <div
                   key={member.user_id}
@@ -546,7 +505,7 @@ export default function TeamMembersSection() {
                         className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                         style={{ background: roleConf.bg, color: roleConf.color }}
                       >
-                        {roleLabel}
+                        {roleConf.label}
                       </span>
                       {member.must_change_password && (
                         <span
@@ -567,12 +526,6 @@ export default function TeamMembersSection() {
                       )}
                     </div>
                     <p className="text-xs mt-0.5 truncate" style={{ color: subColor }}>{member.email}</p>
-                    {isOsgbAdmin && member.active_firm_ids && member.active_firm_ids.length > 0 && (
-                      <p className="text-[10px] mt-0.5 flex items-center gap-1" style={{ color: '#10B981' }}>
-                        <i className="ri-building-2-line" />
-                        {member.active_firm_ids.length} firmaya atanmış
-                      </p>
-                    )}
                     <p className="text-[10px] mt-0.5" style={{ color: isDark ? '#334155' : '#CBD5E1' }}>
                       {new Date(member.joined_at).toLocaleDateString('tr-TR')} tarihinde eklendi
                     </p>
@@ -580,9 +533,8 @@ export default function TeamMembersSection() {
 
                   {!isMe && (
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {/* Rol değiştirme */}
                       <select
-                        value={member.osgb_role ?? member.role}
+                        value={member.role}
                         onChange={e => handleChangeRole(member, e.target.value)}
                         disabled={actionLoading === member.user_id + '_role'}
                         className="text-xs px-2 py-1.5 rounded-lg cursor-pointer"
@@ -593,22 +545,12 @@ export default function TeamMembersSection() {
                           outline: 'none',
                         }}
                       >
-                        {isOsgbAdmin ? (
-                          <>
-                            <option value="osgb_admin">OSGB Admin</option>
-                            <option value="gezici_uzman">Gezici Uzman</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="admin">Admin Kullanıcı</option>
-                            <option value="denetci">Saha Personeli</option>
-                            <option value="member">Evrak/Dökümantasyon Denetçi</option>
-                            <option value="firma_user">Firma Yetkilisi</option>
-                          </>
-                        )}
+                        <option value="admin">Admin Kullanıcı</option>
+                        <option value="denetci">Saha Personeli</option>
+                        <option value="member">Evrak/Dökümantasyon Denetçi</option>
+                        <option value="firma_user">Firma Yetkilisi</option>
                       </select>
 
-                      {/* Şifre sıfırla */}
                       <button
                         onClick={() => { setResetTarget(member); setResetPassword(''); setResetError(null); setResetShowPassword(false); }}
                         title="Şifreyi Sıfırla"
@@ -618,7 +560,6 @@ export default function TeamMembersSection() {
                         <i className="ri-lock-password-line text-xs" />
                       </button>
 
-                      {/* Pasif / Aktif toggle */}
                       <button
                         onClick={() => handleToggleActive(member)}
                         disabled={actionLoading === member.user_id}
@@ -638,7 +579,6 @@ export default function TeamMembersSection() {
                         {member.is_active ? 'Pasif' : 'Aktif'}
                       </button>
 
-                      {/* Sil */}
                       <button
                         onClick={() => setDeleteConfirm(member)}
                         disabled={isDeleting}
@@ -673,18 +613,11 @@ export default function TeamMembersSection() {
           }}
         >
           <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#64748B' }} />
-          {isOsgbAdmin ? (
-            <p className="text-xs leading-relaxed" style={{ color: subColor }}>
-              <strong style={{ color: nameColor }}>OSGB Admin:</strong> Tam yetki &bull;&nbsp;
-              <strong style={{ color: '#10B981' }}>Gezici Uzman:</strong> Atandıkları firmalara erişim
-            </p>
-          ) : (
-            <p className="text-xs leading-relaxed" style={{ color: subColor }}>
-              <strong style={{ color: nameColor }}>Admin Kullanıcı:</strong> Tam yetki &bull;&nbsp;
-              <strong style={{ color: '#06B6D4' }}>Saha Personeli:</strong> Saha denetim, tutanaklar ve raporlar &bull;&nbsp;
-              <strong style={{ color: '#818CF8' }}>Evrak/Dökümantasyon Denetçi:</strong> Tüm modüller (ayarlar hariç)
-            </p>
-          )}
+          <p className="text-xs leading-relaxed" style={{ color: subColor }}>
+            <strong style={{ color: nameColor }}>Admin Kullanıcı:</strong> Tam yetki &bull;&nbsp;
+            <strong style={{ color: '#06B6D4' }}>Saha Personeli:</strong> Saha denetim, tutanaklar ve raporlar &bull;&nbsp;
+            <strong style={{ color: '#818CF8' }}>Evrak/Dökümantasyon Denetçi:</strong> Tüm modüller (ayarlar hariç)
+          </p>
         </div>
       </div>
 
@@ -711,10 +644,8 @@ export default function TeamMembersSection() {
                   <i className="ri-user-add-line text-base" style={{ color: '#10B981' }} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold" style={{ color: nameColor }}>
-                    {isOsgbAdmin ? 'Yeni Uzman Ekle' : 'Yeni Kullanıcı Ekle'}
-                  </h3>
-                  <p className="text-xs mt-0.5" style={{ color: subColor }}>Organizasyona otomatik bağlanır</p>
+                  <h3 className="text-sm font-bold" style={{ color: nameColor }}>Yeni Kullanıcı Ekle</h3>
+                  <p className="text-xs mt-0.5" style={{ color: subColor }}>Aynı organizasyona otomatik bağlanır</p>
                 </div>
               </div>
               <button
@@ -769,61 +700,53 @@ export default function TeamMembersSection() {
                   Kullanıcı ilk girişte şifresini değiştirmek zorundadır.
                 </p>
               </div>
+              <div>
+                <label style={labelStyle}>Rol</label>
+                <select
+                  value={form.role}
+                  onChange={e => setForm(p => ({ ...p, role: e.target.value, firm_id: '' }))}
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                >
+                  <option value="member">Evrak/Dökümantasyon Denetçi</option>
+                  <option value="denetci">Saha Personeli</option>
+                  <option value="admin">Admin Kullanıcı</option>
+                  <option value="firma_user">Firma Yetkilisi</option>
+                </select>
+              </div>
 
-              {/* OSGB Admin: sadece osgb_role seçimi */}
-              {isOsgbAdmin ? (
+              {form.role === 'firma_user' && (
                 <div>
-                  <label style={labelStyle}>Uzman Rolü</label>
+                  <label style={labelStyle}>
+                    Firma Seç *
+                    <span style={{ color: '#EF4444', marginLeft: '2px' }}>(zorunlu)</span>
+                  </label>
                   <select
-                    value={form.osgb_role || 'gezici_uzman'}
-                    onChange={e => setForm(p => ({ ...p, osgb_role: e.target.value }))}
-                    style={{ ...inputStyle, cursor: 'pointer' }}
+                    value={form.firm_id}
+                    onChange={e => setForm(p => ({ ...p, firm_id: e.target.value }))}
+                    style={{ ...inputStyle, cursor: 'pointer', borderColor: !form.firm_id ? 'rgba(239,68,68,0.4)' : undefined }}
                   >
-                    <option value="gezici_uzman">Gezici Uzman</option>
-                    <option value="osgb_admin">OSGB Admin</option>
+                    <option value="">-- Firma seçin --</option>
+                    {firmalar.map(f => (
+                      <option key={f.id} value={f.id}>{f.ad}</option>
+                    ))}
                   </select>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label style={labelStyle}>Rol</label>
-                    <select
-                      value={form.role}
-                      onChange={e => setForm(p => ({ ...p, role: e.target.value, firm_id: '' }))}
-                      style={{ ...inputStyle, cursor: 'pointer' }}
-                    >
-                      <option value="member">Evrak/Dökümantasyon Denetçi</option>
-                      <option value="denetci">Saha Personeli</option>
-                      <option value="admin">Admin Kullanıcı</option>
-                      <option value="firma_user">Firma Yetkilisi</option>
-                    </select>
-                  </div>
-
-                  {form.role === 'firma_user' && (
-                    <div>
-                      <label style={labelStyle}>
-                        Firma Seç *
-                        <span style={{ color: '#EF4444', marginLeft: '2px' }}>(zorunlu)</span>
-                      </label>
-                      <select
-                        value={form.firm_id}
-                        onChange={e => setForm(p => ({ ...p, firm_id: e.target.value }))}
-                        style={{ ...inputStyle, cursor: 'pointer', borderColor: !form.firm_id ? 'rgba(239,68,68,0.4)' : undefined }}
-                      >
-                        <option value="">-- Firma seçin --</option>
-                        {firmalar.map(f => (
-                          <option key={f.id} value={f.id}>{f.ad}</option>
-                        ))}
-                      </select>
-                      {firmalar.length === 0 && (
-                        <p className="text-[10px] mt-1" style={{ color: '#F59E0B' }}>
-                          Henüz firma bulunamadı.
-                        </p>
-                      )}
-                    </div>
+                  {firmalar.length === 0 && (
+                    <p className="text-[10px] mt-1" style={{ color: '#F59E0B' }}>
+                      Henüz firma bulunamadı. Önce firma eklemeniz gerekiyor.
+                    </p>
                   )}
-                </>
+                </div>
               )}
+            </div>
+
+            <div
+              className="flex items-center gap-3 p-3 rounded-xl"
+              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
+            >
+              <i className="ri-building-2-line text-sm" style={{ color: '#6366F1' }} />
+              <p className="text-xs flex-1 min-w-0" style={{ color: '#818CF8' }}>
+                <strong>{org.name}</strong> organizasyonuna otomatik olarak eklenecek
+              </p>
             </div>
 
             {formError && (
@@ -861,7 +784,7 @@ export default function TeamMembersSection() {
                 {formLoading ? (
                   <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</>
                 ) : (
-                  <><i className="ri-user-add-line" />{isOsgbAdmin ? 'Uzman Ekle' : 'Kullanıcı Ekle'}</>
+                  <><i className="ri-user-add-line" />Kullanıcı Ekle</>
                 )}
               </button>
             </div>
@@ -958,9 +881,9 @@ export default function TeamMembersSection() {
             </div>
             <div className="px-3 py-3 rounded-xl" style={{ background: isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
               <p className="text-sm" style={{ color: nameColor }}>
-                <strong>{deleteConfirm.display_name || deleteConfirm.email}</strong> kullanıcısını organizasyondan kaldırmak istediğinize emin misiniz?
+                <strong>{deleteConfirm.display_name || deleteConfirm.email}</strong> kullanıcısını organizasyondan kaldırmak ve hesabını silmek istediğinize emin misiniz?
               </p>
-              <p className="text-xs mt-1.5" style={{ color: subColor }}>Kullanıcı kaldırılacak ve hesabı silinecektir.</p>
+              <p className="text-xs mt-1.5" style={{ color: subColor }}>Kullanıcı organizasyondan çıkarılacak ve hesabı tamamen silinecektir. Bir daha giriş yapamayacaktır.</p>
             </div>
             <div className="flex gap-3 pt-1">
               <button onClick={() => setDeleteConfirm(null)} className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.1)', color: subColor }}>

@@ -27,7 +27,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       // Tüm aktif kayıtları çek — osgb_role olan kaydı önceliklendir
       const { data: uoList } = await supabase
         .from('user_organizations')
-        .select('organization_id, osgb_role, active_firm_id, active_firm_ids')
+        .select('organization_id, osgb_role, active_firm_id')
         .eq('user_id', session.user.id)
         .eq('is_active', true);
 
@@ -65,11 +65,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       setOrgType((hasOsgbRole || org.org_type === 'osgb' ? 'osgb' : 'firma') as OrgType);
       setOsgbRole((uo.osgb_role as OsgbRole) ?? null);
 
-      // Gezici uzman için active_firm_id veya active_firm_ids kontrolü
+      // Gezici uzman için active_firm_id kontrolü
       if (uo.osgb_role === 'gezici_uzman') {
-        const hasSingleFirm = !!uo.active_firm_id;
-        const hasMultiFirm = Array.isArray(uo.active_firm_ids) && uo.active_firm_ids.length > 0;
-        setHasActiveFirm(hasSingleFirm || hasMultiFirm);
+        setHasActiveFirm(!!uo.active_firm_id);
       } else {
         setHasActiveFirm(null);
       }

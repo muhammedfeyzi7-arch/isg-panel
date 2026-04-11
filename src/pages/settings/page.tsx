@@ -67,19 +67,17 @@ export default function SettingsPage() {
   const passwordsMismatch = !!(pwdData.confirmPassword && pwdData.newPassword !== pwdData.confirmPassword);
 
   // Filter nav items based on role
-  const isOsgbAdminUser = org?.osgbRole === 'osgb_admin';
-  const canManageTeam = org?.role === 'admin' || isOsgbAdminUser;
   const visibleNavItems = NAV_ITEMS.filter(item => {
-    if (item.adminOnly && !canManageTeam) return false;
+    if (item.adminOnly && org?.role !== 'admin') return false;
     return true;
   });
 
   // Ensure activeTab is valid after org loads
   useEffect(() => {
-    if (!orgLoading && !canManageTeam && activeTab === 'ekip') {
+    if (!orgLoading && org?.role !== 'admin' && activeTab === 'ekip') {
       setActiveTab('profil');
     }
-  }, [orgLoading, canManageTeam, activeTab]);
+  }, [orgLoading, org?.role, activeTab]);
 
   // ── Theme tokens ──
   const bg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.85)';

@@ -39,27 +39,17 @@ export default function CompanyDocumentsWidget() {
     let cancelled = false;
     async function fetchData() {
       setLoading(true);
-
-      const docsRes = await supabase
-        .from('company_documents')
-        .select('id, title, document_type, valid_until, company_id')
-        .order('valid_until', { ascending: true });
-
-      const fetchedDocs: DocRow[] = docsRes.data ?? [];
-
-      // company_documents.company_id → organizations.id ilişkisi
-      // Sadece gerçekten kullanılan org id'lerini sorgula
-      const uniqueCompanyIds = [...new Set(fetchedDocs.map(d => d.company_id).filter(Boolean))];
-
-      const companiesRes = uniqueCompanyIds.length > 0
-        ? await supabase
-            .from('organizations')
-            .select('id, name')
-            .in('id', uniqueCompanyIds)
-        : { data: [] };
-
+      const [docsRes, companiesRes] = await Promise.all([
+        supabase
+          .from('company_documents')
+          .select('id, title, document_type, valid_until, company_id')
+          .order('valid_until', { ascending: true }),
+        supabase
+          .from('companies')
+          .select('id, name'),
+      ]);
       if (!cancelled) {
-        setDocs(fetchedDocs);
+        setDocs(docsRes.data ?? []);
         setCompanies(companiesRes.data ?? []);
         setLoading(false);
       }
