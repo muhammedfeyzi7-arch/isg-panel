@@ -6,6 +6,7 @@ import HekimSidebar, { type HekimTab } from './components/HekimSidebar';
 import HekimFirmalarTab from './components/HekimFirmalarTab';
 import HekimPersonellerTab from './components/HekimPersonellerTab';
 import HekimSaglikTab from './components/HekimSaglikTab';
+import HekimCopTab from './components/HekimCopTab';
 
 interface FirmaOption {
   id: string;
@@ -159,8 +160,9 @@ export default function HekimPage() {
 
   const tabTitles: Record<HekimTab, { title: string; subtitle: string; icon: string }> = {
     firmalar: { title: 'Firmalar', subtitle: 'Atanmış firmaların genel durumu', icon: 'ri-building-3-line' },
-    personeller: { title: 'Personeller', subtitle: 'Tüm firmalardaki çalışanlar', icon: 'ri-group-line' },
-    saglik: { title: 'Sağlık Takibi', subtitle: 'Periyodik muayene kayıtları', icon: 'ri-heart-pulse-line' },
+    personeller: { title: 'Personel', subtitle: 'Tüm firmalardaki çalışanlar', icon: 'ri-group-line' },
+    saglik: { title: 'Sağlık Durumu', subtitle: 'Periyodik muayene kayıtları', icon: 'ri-heart-pulse-line' },
+    cop: { title: 'Çöp Kutusu', subtitle: 'Silinen kayıtları görüntüle', icon: 'ri-delete-bin-6-line' },
   };
 
   const current = tabTitles[activeTab];
@@ -173,6 +175,8 @@ export default function HekimPage() {
         return <HekimPersonellerTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
       case 'saglik':
         return <HekimSaglikTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
+      case 'cop':
+        return <HekimCopTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
       default:
         return null;
     }

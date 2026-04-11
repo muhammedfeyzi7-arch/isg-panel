@@ -36,18 +36,8 @@ async function ensureProfileRecord(
   }
 }
 
-/**
- * Idempotent RLS policy bootstrap — migration bağımlılığını sıfırlar.
- * Yeni kurulumda veya güncellenen üyeliklerde arka planda çalışır.
- * DO $$ IF NOT EXISTS $$ — mevcut policy varsa sessizce geçer.
- *
- * Politikalar:
- * 1. firmalar tablosu — gezici uzman SELECT (can_access_org)
- * 2. activity_logs INSERT — gezici uzman (can_access_org)
- */
 async function bootstrapRlsPolicies(supabase: ReturnType<typeof createClient>): Promise<void> {
   const queries = [
-    // ── firmalar: gezici uzman SELECT ──────────────────────────────────
     `DO $do$
 BEGIN
   IF NOT EXISTS (
@@ -63,8 +53,6 @@ BEGIN
     RAISE NOTICE '[RLS Bootstrap] firmalar_gezici_uzman_select created';
   END IF;
 END $do$;`,
-
-    // ── activity_logs: gezici uzman INSERT (can_access_org) ─────────────
     `DO $do$
 BEGIN
   IF NOT EXISTS (
@@ -84,11 +72,9 @@ END $do$;`,
 
   for (const sql of queries) {
     try {
-      // Service role client ile direkt SQL çalıştır
       const { error } = await (supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => { error: { message: string } | null } })
         .rpc('exec_sql_ddl', { sql_query: sql });
       if (error) {
-        // RPC yoksa skip — migration.sql ile manuel yapılabilir
         console.warn('[setup-org bootstrap] exec_sql_ddl not available:', error.message);
       }
     } catch (e) {
@@ -211,15 +197,31 @@ Deno.serve(async (req) => {
   const user = { id: userId, email: resolvedEmail, display_name: resolvedDisplayName };
 
   try {
-    // ── Check for existing active membership ──
-    const { data: existingMembership } = await supabase
+    // ── CRITICAL FIX: osgb_role'u olan kaydı önce ara ──
+    // Önce osgb_role olan kaydı çek (gezici_uzman, isyeri_hekimi, osgb_admin)
+    const { data: osgbMembership } = await supabase
       .from('user_organizations')
-      .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_ids, organizations(id, name, invite_code, org_type)')
+      .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_ids, active_firm_id, organizations(id, name, invite_code, org_type)')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .order('joined_at', { ascending: true })
+      .not('osgb_role', 'is', null)
+      .order('joined_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    // Sonra normal kaydı çek (fallback)
+    const { data: normalMembership } = osgbMembership
+      ? { data: null }
+      : await supabase
+          .from('user_organizations')
+          .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_ids, active_firm_id, organizations(id, name, invite_code, org_type)')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+    const existingMembership = osgbMembership ?? normalMembership;
 
     if (existingMembership?.organizations) {
       const org = existingMembership.organizations as { id: string; name: string; invite_code: string; org_type?: string };
@@ -241,11 +243,14 @@ Deno.serve(async (req) => {
 
       await ensureProfileRecord(supabase, user.id);
 
-      // ── Arka planda idempotent RLS policy bootstrap ──
-      // Migration bağımlılığını sıfırlamak için — her login'de kontrol edilir
       bootstrapRlsPolicies(supabase).catch(e =>
         console.warn('[setup-org] bootstrapRlsPolicies silently failed:', e)
       );
+
+      // active_firm_ids: DB'den gelen değeri kullan
+      const activeFirmIds: string[] = Array.isArray(existingMembership.active_firm_ids)
+        ? (existingMembership.active_firm_ids as string[]).filter(Boolean)
+        : (existingMembership.active_firm_id ? [existingMembership.active_firm_id as string] : []);
 
       return new Response(JSON.stringify({
         organization: org,
@@ -256,7 +261,7 @@ Deno.serve(async (req) => {
         display_name: existingMembership.display_name || user.display_name,
         email: existingMembership.email || user.email,
         osgb_role: existingMembership.osgb_role ?? null,
-        active_firm_ids: existingMembership.active_firm_ids ?? [],
+        active_firm_ids: activeFirmIds,
         created: false,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -282,7 +287,10 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         const osgbPayload = assignedOsgbRole ? { osgb_role: assignedOsgbRole } : {};
-        const firmIdsPayload = assignedFirmIds ? { active_firm_ids: assignedFirmIds } : {};
+        const firmIdsPayload = assignedFirmIds ? {
+          active_firm_ids: assignedFirmIds,
+          active_firm_id: assignedFirmIds[0],
+        } : {};
 
         if (inactiveMembership) {
           await supabase
@@ -336,7 +344,6 @@ Deno.serve(async (req) => {
           console.warn('[setup-org] Could not clear metadata:', e);
         }
 
-        // Bootstrap yeni atama için de çalıştır
         bootstrapRlsPolicies(supabase).catch(e =>
           console.warn('[setup-org] bootstrapRlsPolicies (assign) silently failed:', e)
         );
@@ -398,7 +405,7 @@ Deno.serve(async (req) => {
       if (memberError.code === '23505') {
         const { data: retryMembership } = await supabase
           .from('user_organizations')
-          .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_ids, organizations(id, name, invite_code, org_type)')
+          .select('organization_id, role, is_active, must_change_password, display_name, email, kvkk_accepted, osgb_role, active_firm_ids, active_firm_id, organizations(id, name, invite_code, org_type)')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .order('joined_at', { ascending: true })
@@ -408,6 +415,9 @@ Deno.serve(async (req) => {
         if (retryMembership?.organizations) {
           const org = retryMembership.organizations as { id: string; name: string; invite_code: string; org_type?: string };
           await ensureProfileRecord(supabase, user.id);
+          const retryFirmIds: string[] = Array.isArray(retryMembership.active_firm_ids)
+            ? (retryMembership.active_firm_ids as string[]).filter(Boolean)
+            : (retryMembership.active_firm_id ? [retryMembership.active_firm_id as string] : []);
           return new Response(JSON.stringify({
             organization: org,
             role: retryMembership.role ?? 'admin',
@@ -417,7 +427,7 @@ Deno.serve(async (req) => {
             display_name: retryMembership.display_name || user.display_name,
             email: retryMembership.email || user.email,
             osgb_role: retryMembership.osgb_role ?? null,
-            active_firm_ids: retryMembership.active_firm_ids ?? [],
+            active_firm_ids: retryFirmIds,
             created: false,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -450,7 +460,6 @@ Deno.serve(async (req) => {
       description: `Organizasyon otomatik oluşturuldu: ${orgName}`,
     }).catch(() => { /* silent */ });
 
-    // ── Yeni org için de bootstrap çalıştır ──
     bootstrapRlsPolicies(supabase).catch(e =>
       console.warn('[setup-org] bootstrapRlsPolicies (new org) silently failed:', e)
     );

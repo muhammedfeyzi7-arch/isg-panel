@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import GeziciUzmanBanner from './GeziciUzmanBanner';
@@ -154,6 +155,15 @@ function ConnectionBanner() {
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { sidebarCollapsed, theme, activeModule, orgLoading, org } = useApp();
+  const navigate = useNavigate();
+
+  // ── İşyeri Hekimi Guard: Normal layout'ta olmamalı ──
+  useEffect(() => {
+    if (!orgLoading && org?.osgbRole === 'isyeri_hekimi') {
+      navigate('/hekim', { replace: true });
+    }
+  }, [org?.osgbRole, orgLoading, navigate]);
+
   // Gezici uzman + çoklu firma → banner 28px ekstra padding gerekir
   const hasBanner = org?.osgbRole === 'gezici_uzman' && (org?.activeFirmIds?.length ?? 0) > 1;
   // Firma değişimi fade animasyonu

@@ -28,7 +28,7 @@ const navGroups = [
     label: 'YÖNETİM',
     items: [
       { id: 'firmalar' as Tab, label: 'Firmalar', icon: 'ri-building-3-line' },
-      { id: 'uzmanlar' as Tab, label: 'Uzmanlar', icon: 'ri-shield-user-line' },
+      { id: 'uzmanlar' as Tab, label: 'Personel', icon: 'ri-shield-user-line' },
       { id: 'ziyaretler' as Tab, label: 'Ziyaretler', icon: 'ri-map-pin-2-line' },
     ],
   },

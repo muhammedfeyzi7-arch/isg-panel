@@ -11,7 +11,6 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
 }
 
 const VALID_ROLES      = ['admin', 'denetci', 'member', 'firma_user'] as const;
-// isyeri_hekimi eklendi
 const VALID_OSGB_ROLES = ['osgb_admin', 'gezici_uzman', 'isyeri_hekimi'] as const;
 
 const ACTIONS = {
@@ -295,7 +294,7 @@ async function handleRequest(
     }
 
     const normalizedEmail  = newEmail.toLowerCase().trim();
-    const assignedRole     = normalizeRole(role);
+    const assignedRole     = normalizeRole(role ?? 'member');
     const assignedOsgbRole = osgb_role && (VALID_OSGB_ROLES as readonly string[]).includes(osgb_role) ? osgb_role : null;
 
     if (assignedRole === 'firma_user' && !firm_id) {
@@ -385,10 +384,15 @@ async function handleRequest(
 
     const { error: memberError } = await adminClient.from('user_organizations').insert(insertPayload);
     if (memberError) {
+      // Üyelik eklenemedi — Auth'tan da silelim (orphan user oluşmasın)
       if (memberError.code === '23505') {
         return new Response(JSON.stringify({ error: 'Bu kullanıcı zaten organizasyonda kayıtlı.' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      }
+      // Yeni oluşturulan auth user'ı temizle
+      if (!existingAuthUser) {
+        try { await adminClient.auth.admin.deleteUser(newUserId); } catch { /* ignore */ }
       }
       return new Response(JSON.stringify({ error: 'Kullanıcı organizasyona eklenemedi: ' + memberError.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -674,6 +678,16 @@ async function handleRequest(
       });
     }
 
+    // Önce log yaz (silmeden önce)
+    const targetName = (target.display_name as string) || (target.email as string) || target_user_id;
+    await logAction({
+      action: ACTIONS.USER_DELETE, targetId: target_user_id, targetName,
+      description: `${targetName} kullanıcısı organizasyondan kaldırıldı.`,
+      metadata: { email: target.email, role: target.role, osgb_role: target.osgb_role },
+      severity: 'critical',
+    });
+
+    // user_organizations kaydını sil
     const { error: deleteError } = await adminClient.from('user_organizations')
       .delete().eq('user_id', target_user_id).eq('organization_id', orgId);
 
@@ -683,25 +697,33 @@ async function handleRequest(
       });
     }
 
+    // Başka aktif org üyeliği var mı kontrol et
     const { data: others } = await adminClient.from('user_organizations')
       .select('organization_id').eq('user_id', target_user_id).limit(1);
 
     const hadOtherOrgs = (others?.length ?? 0) > 0;
+
+    // Başka org yoksa Auth'tan da sil
     if (!hadOtherOrgs) {
       try {
-        await adminClient.auth.admin.deleteUser(target_user_id);
-      } catch (e) { console.error('[DELETE] Auth delete exception:', e); }
+        const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(target_user_id);
+        if (authDeleteError) {
+          console.error('[DELETE] Auth delete error:', authDeleteError.message);
+          // Auth silme başarısız olsa bile user_organizations zaten silindi — devam et
+        } else {
+          console.log('[DELETE] Auth user deleted:', target_user_id);
+        }
+      } catch (e) {
+        console.error('[DELETE] Auth delete exception:', e);
+      }
+    } else {
+      console.log('[DELETE] User has other orgs, keeping auth account:', target_user_id, 'orgs remaining:', others?.length);
     }
 
-    const targetName = (target.display_name as string) || (target.email as string) || target_user_id;
-    await logAction({
-      action: ACTIONS.USER_DELETE, targetId: target_user_id, targetName,
-      description: `${targetName} kullanıcısı organizasyondan kaldırıldı.`,
-      metadata: { email: target.email, role: target.role, osgb_role: target.osgb_role, had_other_orgs: hadOtherOrgs },
-      severity: 'critical',
-    });
-
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      auth_deleted: !hadOtherOrgs,
+    }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

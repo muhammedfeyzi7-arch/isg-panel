@@ -5,7 +5,7 @@ import SupportModal from '@/components/feature/SupportModal';
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
 
-export type HekimTab = 'firmalar' | 'personeller' | 'saglik';
+export type HekimTab = 'firmalar' | 'personeller' | 'saglik' | 'cop';
 
 interface HekimSidebarProps {
   activeTab: HekimTab;
@@ -17,8 +17,9 @@ interface HekimSidebarProps {
 
 const navItems: { id: HekimTab; label: string; icon: string }[] = [
   { id: 'firmalar', label: 'Firmalar', icon: 'ri-building-3-line' },
-  { id: 'personeller', label: 'Personeller', icon: 'ri-group-line' },
-  { id: 'saglik', label: 'Sağlık', icon: 'ri-heart-pulse-line' },
+  { id: 'personeller', label: 'Personel', icon: 'ri-group-line' },
+  { id: 'saglik', label: 'Sağlık Durumu', icon: 'ri-heart-pulse-line' },
+  { id: 'cop', label: 'Çöp Kutusu', icon: 'ri-delete-bin-6-line' },
 ];
 
 export default function HekimSidebar({

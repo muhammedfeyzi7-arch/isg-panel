@@ -144,8 +144,43 @@ export function useOrganization(user: User | null) {
           email?: string;
           created?: boolean;
           osgb_role?: string | null;
+          active_firm_ids?: string[] | null;
         };
         if (resData?.organization) {
+          const edgeFirmIds: string[] = Array.isArray(resData.active_firm_ids)
+            ? (resData.active_firm_ids as string[]).filter(Boolean)
+            : [];
+          const edgeOsgbRole = resData.osgb_role as 'osgb_admin' | 'gezici_uzman' | 'isyeri_hekimi' | null ?? null;
+
+          // Gezici uzman veya işyeri hekimi için firma bilgisini çek
+          if ((edgeOsgbRole === 'gezici_uzman' || edgeOsgbRole === 'isyeri_hekimi') && edgeFirmIds.length > 0) {
+            const primaryFirmId = edgeFirmIds[0];
+            try {
+              const { data: firmaOrg } = await supabase
+                .from('organizations')
+                .select('id, name, invite_code, org_type')
+                .eq('id', primaryFirmId)
+                .maybeSingle();
+              if (firmaOrg) {
+                setOrg({
+                  id: firmaOrg.id,
+                  name: firmaOrg.name,
+                  invite_code: firmaOrg.invite_code,
+                  role: resData.role ?? 'member',
+                  isActive: resData.is_active !== false,
+                  mustChangePassword: resData.must_change_password === true,
+                  displayName: resData.display_name ?? undefined,
+                  email: resData.email ?? undefined,
+                  orgType: 'firma',
+                  osgbRole: edgeOsgbRole,
+                  activeFirmIds: edgeFirmIds,
+                  activeFirmName: firmaOrg.name,
+                });
+                return true;
+              }
+            } catch { /* fallthrough */ }
+          }
+
           setOrg({
             id: resData.organization.id,
             name: resData.organization.name,
@@ -156,7 +191,8 @@ export function useOrganization(user: User | null) {
             displayName: resData.display_name ?? undefined,
             email: resData.email ?? undefined,
             orgType: (resData.organization.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
-            osgbRole: (resData.osgb_role as 'osgb_admin' | 'gezici_uzman' | null) ?? null,
+            osgbRole: edgeOsgbRole,
+            activeFirmIds: edgeFirmIds.length > 0 ? edgeFirmIds : undefined,
           });
           return true;
         }
