@@ -293,7 +293,7 @@ const emptyForm: MuayeneForm = {
 };
 
 function HealthActionBtn({ icon, onClick, title }: { icon: string; onClick: () => void; title: string }) {
-  const accent = '#EC4899';
+  const accent = '#10B981';
   return (
     <button onClick={onClick} title={title}
       className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
@@ -518,11 +518,11 @@ export default function MuayenelerPage() {
     <div className="space-y-5">
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #EC4899, #F43F5E, #EF4444)' }} />
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #059669, #34D399)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #EC4899, #DB2777)' }}>
+              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
               <i className="ri-heart-pulse-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -545,7 +545,7 @@ export default function MuayenelerPage() {
             <button onClick={() => exportToExcel(muayeneler, personeller, firmalar)} className="btn-secondary whitespace-nowrap" style={{ fontSize: '12px', padding: '6px 10px', height: 'auto' }}>
               <i className="ri-file-excel-2-line text-xs" />Excel
             </button>
-            <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #EC4899, #DB2777)', border: '1px solid rgba(236,72,153,0.4)' }}>
+            <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.4)' }}>
               <i className="ri-add-line" /> Kayıt Ekle
             </button>
           </div>
@@ -669,8 +669,8 @@ export default function MuayenelerPage() {
                   }}
                   onMouseEnter={e => {
                     if (!isSelected) {
-                      (e.currentTarget as HTMLElement).style.background = 'rgba(236,72,153,0.03)';
-                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(236,72,153,0.15)';
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.15)';
                     }
                   }}
                   onMouseLeave={e => {
@@ -686,7 +686,7 @@ export default function MuayenelerPage() {
                   {/* Personel */}
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                      style={{ background: 'linear-gradient(135deg, #EC4899, #DB2777)' }}>
+                      style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                       {(p?.adSoyad || '?').charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
@@ -697,7 +697,7 @@ export default function MuayenelerPage() {
                   {/* Firma */}
                   <div className="min-w-0 pr-2">
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap max-w-full truncate"
-                      style={{ background: 'rgba(236,72,153,0.08)', color: '#DB2777', border: '1px solid rgba(236,72,153,0.18)' }}>
+                      style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
                       <i className="ri-building-2-line text-[9px] flex-shrink-0" />
                       <span className="truncate">{f?.ad || '—'}</span>
                     </span>

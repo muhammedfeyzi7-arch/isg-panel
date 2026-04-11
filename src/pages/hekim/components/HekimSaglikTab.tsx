@@ -34,7 +34,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
   const tableBg = isDark ? 'rgba(20,30,50,0.98)' : '#ffffff';
   const tableHeadBg = isDark ? 'rgba(15,23,42,0.8)' : '#f8fafc';
   const borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
-  const rowHoverBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(14,165,233,0.03)';
+  const rowHoverBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(16,185,129,0.03)';
 
   useEffect(() => {
     if (atanmisFirmaIds.length === 0) { setMuayeneler([]); setLoading(false); return; }
@@ -126,7 +126,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
       {!loading && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
-            { label: 'Toplam', value: totalMuayene, color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)', icon: 'ri-stethoscope-line' },
+            { label: 'Toplam', value: totalMuayene, color: '#10B981', bg: 'rgba(16,185,129,0.08)', icon: 'ri-stethoscope-line' },
             { label: 'Çalışabilir', value: calisabilir, color: '#10B981', bg: 'rgba(16,185,129,0.08)', icon: 'ri-checkbox-circle-line' },
             { label: 'Kısıtlı', value: kisitli, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', icon: 'ri-alert-line' },
             { label: 'Yaklaşan (30g)', value: yaklasiyor, color: '#EF4444', bg: 'rgba(239,68,68,0.08)', icon: 'ri-calendar-event-line' },
@@ -151,7 +151,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
           <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: textSecondary }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ara..." className="w-full pl-9 pr-3 py-2 text-sm rounded-xl outline-none"
             style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1.5px solid ${borderColor}`, color: textPrimary }}
-            onFocus={e => { e.currentTarget.style.borderColor = '#0EA5E9'; }}
+            onFocus={e => { e.currentTarget.style.borderColor = '#10B981'; }}
             onBlur={e => { e.currentTarget.style.borderColor = borderColor; }} />
         </div>
         <div className="flex items-center gap-1">
@@ -159,9 +159,9 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
             <button key={opt.key} onClick={() => setFilter(opt.key)}
               className="whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
               style={{
-                background: filter === opt.key ? 'rgba(14,165,233,0.12)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'),
-                color: filter === opt.key ? '#0EA5E9' : textSecondary,
-                border: `1px solid ${filter === opt.key ? 'rgba(14,165,233,0.3)' : borderColor}`,
+                background: filter === opt.key ? 'rgba(16,185,129,0.12)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'),
+                color: filter === opt.key ? '#10B981' : textSecondary,
+                border: `1px solid ${filter === opt.key ? 'rgba(16,185,129,0.3)' : borderColor}`,
               }}>
               {opt.label}
             </button>
@@ -177,7 +177,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
       {loading && (
         <div className="rounded-xl p-10 flex items-center justify-center gap-2"
           style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
-          <i className="ri-loader-4-line animate-spin text-lg" style={{ color: '#0EA5E9' }} />
+          <i className="ri-loader-4-line animate-spin text-lg" style={{ color: '#10B981' }} />
           <span className="text-sm" style={{ color: textSecondary }}>Yükleniyor...</span>
         </div>
       )}
@@ -186,8 +186,8 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
       {!loading && filtered.length === 0 && (
         <div className="rounded-xl p-12 flex flex-col items-center gap-4 text-center"
           style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.08)', border: '1.5px solid rgba(14,165,233,0.15)' }}>
-            <i className="ri-heart-pulse-line text-2xl" style={{ color: '#0EA5E9' }} />
+          <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1.5px solid rgba(16,185,129,0.15)' }}>
+            <i className="ri-heart-pulse-line text-2xl" style={{ color: '#10B981' }} />
           </div>
           <div>
             <p className="text-sm font-bold mb-1" style={{ color: textPrimary }}>Kayıt bulunamadı</p>
@@ -199,9 +199,10 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
       {/* Tablo */}
       {!loading && filtered.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
+          <div className="overflow-x-auto">
           {/* Tablo başlığı */}
-          <div className="grid grid-cols-[2fr_1.2fr_1.2fr_1.2fr_1fr_80px] gap-0"
-            style={{ background: tableHeadBg, borderBottom: `1px solid ${borderColor}` }}>
+          <div className="grid gap-0 min-w-[700px]"
+            style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 1.2fr 1fr 80px', background: tableHeadBg, borderBottom: `1px solid ${borderColor}` }}>
             {['PERSONEL', 'FİRMA', 'MUAYENE TARİHİ', 'SONRAKİ TARİH', 'SONUÇ', 'İŞLEM'].map(h => (
               <div key={h} className="px-4 py-2.5">
                 <span className="text-[10px] font-bold tracking-wider" style={{ color: textSecondary }}>{h}</span>
@@ -222,7 +223,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
                 <div key={m.id} style={{ borderBottom: idx < filtered.length - 1 ? `1px solid ${borderColor}` : 'none' }}>
                   <div
                     className="grid grid-cols-[2fr_1.2fr_1.2fr_1.2fr_1fr_80px] items-center cursor-pointer transition-all"
-                    style={{ background: isExpanded ? (isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)') : 'transparent' }}
+                    style={{ background: isExpanded ? (isDark ? 'rgba(16,185,129,0.05)' : 'rgba(16,185,129,0.03)') : 'transparent' }}
                     onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = rowHoverBg; }}
                     onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                     onClick={() => setExpandedId(isExpanded ? null : m.id)}
@@ -238,7 +239,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
 
                     {/* Firma */}
                     <div className="px-4 py-3">
-                      <span className="text-xs truncate" style={{ color: '#0EA5E9', fontWeight: 600 }}>{m.firmaAd}</span>
+                      <span className="text-xs truncate" style={{ color: '#10B981', fontWeight: 600 }}>{m.firmaAd}</span>
                     </div>
 
                     {/* Muayene Tarihi */}
@@ -276,10 +277,10 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
                       <button
                         onClick={() => setExpandedId(isExpanded ? null : m.id)}
                         className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                        style={{ background: isExpanded ? 'rgba(14,165,233,0.1)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'), border: `1px solid ${isExpanded ? 'rgba(14,165,233,0.3)' : borderColor}` }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.12)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.3)'; }}
+                        style={{ background: isExpanded ? 'rgba(16,185,129,0.1)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'), border: `1px solid ${isExpanded ? 'rgba(16,185,129,0.3)' : borderColor}` }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.12)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.3)'; }}
                         onMouseLeave={e => { if (!isExpanded) { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; } }}>
-                        <i className={`${isExpanded ? 'ri-arrow-up-s-line' : 'ri-eye-line'} text-xs`} style={{ color: isExpanded ? '#0EA5E9' : textSecondary }} />
+                        <i className={`${isExpanded ? 'ri-arrow-up-s-line' : 'ri-eye-line'} text-xs`} style={{ color: isExpanded ? '#10B981' : textSecondary }} />
                       </button>
                     </div>
                   </div>
@@ -287,15 +288,15 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="px-5 py-3 flex flex-wrap gap-4"
-                      style={{ background: isDark ? 'rgba(14,165,233,0.04)' : 'rgba(14,165,233,0.02)', borderTop: `1px solid rgba(14,165,233,0.12)` }}>
+                      style={{ background: isDark ? 'rgba(16,185,129,0.04)' : 'rgba(16,185,129,0.02)', borderTop: `1px solid rgba(16,185,129,0.12)` }}>
                       {[
                         { label: 'Hastane', value: m.hastane, icon: 'ri-hospital-line' },
                         { label: 'Doktor', value: m.doktor, icon: 'ri-user-heart-line' },
                         { label: 'Notlar', value: m.notlar, icon: 'ri-sticky-note-line' },
                       ].filter(f => f.value).map(f => (
                         <div key={f.label} className="flex items-center gap-2">
-                          <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,0.1)' }}>
-                            <i className={`${f.icon} text-[10px]`} style={{ color: '#0EA5E9' }} />
+                          <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                            <i className={`${f.icon} text-[10px]`} style={{ color: '#10B981' }} />
                           </div>
                           <div>
                             <p className="text-[9px] font-semibold" style={{ color: textSecondary }}>{f.label}</p>
@@ -311,6 +312,7 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark }: HekimSaglikT
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       )}

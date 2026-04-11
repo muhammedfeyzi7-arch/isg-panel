@@ -114,7 +114,7 @@ export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir }:
               </div>
               {ziyaret.qr_ile_giris && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md mt-1 inline-block"
-                  style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}>
+                  style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
                   QR ile giriş
                 </span>
               )}
@@ -180,7 +180,7 @@ export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir }:
                 <div className="flex items-center gap-1">
                   <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
                   <div className="px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0"
-                    style={{ background: isAktif ? 'rgba(34,197,94,0.1)' : 'rgba(6,182,212,0.1)', color: isAktif ? '#22C55E' : '#06B6D4' }}>
+                    style={{ background: isAktif ? 'rgba(34,197,94,0.1)' : 'rgba(16,185,129,0.1)', color: isAktif ? '#22C55E' : '#10B981' }}>
                     {isAktif ? calcElapsed(ziyaret.giris_saati) : formatSure(ziyaret.sure_dakika)}
                   </div>
                   <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />

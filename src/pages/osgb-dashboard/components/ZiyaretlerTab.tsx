@@ -806,9 +806,9 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
             value: `%${qrOrani}`,
             subLabel: 'QR ile giriş',
             icon: 'ri-qr-code-line',
-            color: '#8B5CF6',
-            gradient: 'linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(124,58,237,0.04) 100%)',
-            border: 'rgba(139,92,246,0.2)',
+            color: '#10B981',
+            gradient: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.04) 100%)',
+            border: 'rgba(16,185,129,0.2)',
             pulse: false,
           },
         ].map(kpi => (
@@ -986,7 +986,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                     )}
                     {z.qr_ile_giris && (
                       <span className="text-[9px] font-bold px-1.5 py-1 rounded-lg whitespace-nowrap"
-                        style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
                         <i className="ri-qr-code-line mr-0.5 text-[9px]" />QR
                       </span>
                     )}

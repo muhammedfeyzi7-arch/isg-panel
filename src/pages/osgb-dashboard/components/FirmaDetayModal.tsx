@@ -51,15 +51,15 @@ export default function FirmaDetayModal({
     yetkili?: string; telefon?: string; email?: string; sgkSicil?: string; adres?: string;
   } | null>(null);
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9';
-  const textPrimary = isDark ? '#e2e8f0' : '#0f172a';
-  const textMuted = isDark ? '#94a3b8' : '#64748b';
-  const textFaint = isDark ? '#475569' : '#94a3b8';
-  const modalBg = isDark ? '#1e293b' : '#ffffff';
-  const modalBorder = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
-  const inputBg = isDark ? 'rgba(255,255,255,0.06)' : '#ffffff';
-  const inputBorder = isDark ? 'rgba(255,255,255,0.12)' : '#e2e8f0';
+  const cardBg = 'var(--bg-item)';
+  const cardBorder = 'var(--border-subtle)';
+  const textPrimary = 'var(--text-primary)';
+  const textMuted = 'var(--text-muted)';
+  const textFaint = 'var(--text-faint)';
+  const modalBg = 'var(--modal-bg)';
+  const modalBorder = 'var(--modal-border)';
+  const inputBg = 'var(--bg-input)';
+  const inputBorder = 'var(--border-input)';
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -302,14 +302,14 @@ export default function FirmaDetayModal({
                 </button>
                 <button onClick={() => setSilOnay(false)}
                   className="px-2 py-1 rounded-lg text-[10px] font-semibold cursor-pointer whitespace-nowrap"
-                  style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)', color: textMuted }}>
+                  style={{ background: 'var(--bg-item)', color: textMuted }}>
                   Vazgeç
                 </button>
               </div>
             )}
             <button onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)', color: textMuted }}>
+              style={{ background: 'var(--bg-item)', color: textMuted }}>
               <i className="ri-close-line text-sm" />
             </button>
           </div>
@@ -324,11 +324,11 @@ export default function FirmaDetayModal({
           <div className="flex-1 overflow-auto">
 
             {/* ── UZMAN ATAMA (TEK KAYNAK) ── */}
-            <div className="px-6 py-4" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc', borderBottom: `1px solid ${cardBorder}` }}>
+            <div className="px-6 py-4" style={{ background: 'var(--bg-item)', borderBottom: `1px solid ${cardBorder}` }}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(139,92,246,0.1)' }}>
-                    <i className="ri-user-star-line text-[10px]" style={{ color: '#8B5CF6' }} />
+                  <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                    <i className="ri-user-star-line text-[10px]" style={{ color: '#10B981' }} />
                   </div>
                   <span className="text-xs font-semibold" style={{ color: textMuted }}>
                     Bu firmaya atanan uzmanlar
@@ -365,7 +365,7 @@ export default function FirmaDetayModal({
                       <button key={u.user_id} type="button" onClick={() => toggleUzman(u.user_id)}
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all text-left"
                         style={{
-                          background: secili ? 'rgba(16,185,129,0.07)' : inputBg,
+                          background: secili ? 'rgba(16,185,129,0.07)' : 'var(--bg-card-solid)',
                           border: secili ? '1.5px solid rgba(16,185,129,0.28)' : `1.5px solid ${inputBorder}`,
                           transform: 'translateX(0)',
                         }}
@@ -374,7 +374,7 @@ export default function FirmaDetayModal({
                         <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                           style={secili
                             ? { background: 'linear-gradient(135deg, #10B981, #059669)' }
-                            : { background: isDark ? 'rgba(255,255,255,0.08)' : '#fff', border: `1.5px solid ${inputBorder}` }}>
+                            : { background: 'var(--bg-card-solid)', border: `1.5px solid ${inputBorder}` }}>
                           {secili && <i className="ri-check-line text-white text-[10px]" />}
                         </div>
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
@@ -421,8 +421,8 @@ export default function FirmaDetayModal({
                   label: 'Toplam Personel',
                   value: personelSayisi,
                   icon: 'ri-group-line',
-                  color: '#06B6D4',
-                  bg: 'rgba(6,182,212,0.1)',
+                  color: '#10B981',
+                  bg: 'rgba(16,185,129,0.1)',
                 },
                 {
                   label: 'Toplam Ziyaret',
@@ -443,8 +443,8 @@ export default function FirmaDetayModal({
                   label: 'Ort. Ziyaret Süresi',
                   value: avgSure !== null ? `${avgSure}dk` : '—',
                   icon: 'ri-timer-line',
-                  color: '#8B5CF6',
-                  bg: 'rgba(139,92,246,0.1)',
+                  color: '#F59E0B',
+                  bg: 'rgba(245,158,11,0.1)',
                   isText: true,
                 },
               ].map(s => (
@@ -608,7 +608,7 @@ export default function FirmaDetayModal({
                       <div key={z.id}
                         className="flex items-center gap-3 p-3 rounded-xl transition-all"
                         style={{
-                          background: aktif ? (isDark ? 'rgba(34,197,94,0.06)' : '#f0fdf4') : cardBg,
+                          background: aktif ? 'rgba(34,197,94,0.06)' : cardBg,
                           border: `1px solid ${aktif ? 'rgba(34,197,94,0.2)' : cardBorder}`,
                         }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)'; }}
@@ -637,13 +637,13 @@ export default function FirmaDetayModal({
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {sure && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                              style={{ background: 'rgba(139,92,246,0.1)', color: '#7C3AED' }}>
+                              style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
                               {sure}
                             </span>
                           )}
                           {z.qr_ile_giris && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                              style={{ background: 'rgba(6,182,212,0.1)', color: '#0891B2' }}>
+                              style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
                               QR
                             </span>
                           )}

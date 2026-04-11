@@ -157,7 +157,7 @@ export async function downloadOsgbReportExcel(data: OsgbRaporData): Promise<void
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.border = { bottom: { style: 'medium', color: { argb: 'FF8B5CF6' } } };
+    cell.border = { bottom: { style: 'medium', color: { argb: 'FF10B981' } } };
   });
 
   uzmanlar.forEach((u, i) => {

@@ -567,162 +567,161 @@ export default function OsgbDashboardPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-1">
-                      {/* Sütun başlıkları */}
-                      <div className="grid px-4 py-2"
-                        style={{
-                          gridTemplateColumns: '2fr 1.2fr 1fr 1.5fr 1fr 100px',
-                          borderBottom: '1px solid var(--border-subtle)',
-                        }}>
-                        {['PERSONEL', 'ROL', 'DURUM', 'ATANAN FİRMALAR', 'E-POSTA', 'İŞLEMLER'].map(h => (
-                          <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textMuted }}>{h}</span>
-                        ))}
-                      </div>
+                    <div className="rounded-2xl overflow-hidden" style={cardStyle}>
+                      <div className="overflow-x-auto">
+                        {/* Sütun başlıkları */}
+                        <div className="px-4 py-2 min-w-[700px]"
+                          style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                          <div className="grid"
+                            style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1.5fr 1fr 100px' }}>
+                            {['PERSONEL', 'ROL', 'DURUM', 'ATANAN FİRMALAR', 'E-POSTA', 'İŞLEMLER'].map(h => (
+                              <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textMuted }}>{h}</span>
+                            ))}
+                          </div>
+                        </div>
 
-                      {/* Satırlar — her biri ayrı kart */}
-                      <div className="space-y-1.5 pt-1">
-                        {filteredUzmanlar.map((u) => {
-                          const firmIds = (u.active_firm_ids && u.active_firm_ids.length > 0)
-                            ? u.active_firm_ids
-                            : u.active_firm_id ? [u.active_firm_id] : [];
-                          const atananFirmalar = firmIds.map(id => altFirmalar.find(f => f.id === id)).filter(Boolean) as typeof altFirmalar;
+                        {/* Satırlar */}
+                        <div className="divide-y min-w-[700px]" style={{ borderColor: 'var(--border-subtle)' }}>
+                          {filteredUzmanlar.map((u) => {
+                            const firmIds = (u.active_firm_ids && u.active_firm_ids.length > 0)
+                              ? u.active_firm_ids
+                              : u.active_firm_id ? [u.active_firm_id] : [];
+                            const atananFirmalar = firmIds.map(id => altFirmalar.find(f => f.id === id)).filter(Boolean) as typeof altFirmalar;
 
-                          return (
-                            <div
-                              key={u.user_id}
-                              className="grid px-4 py-3 rounded-xl transition-all"
-                              style={{
-                                gridTemplateColumns: '2fr 1.2fr 1fr 1.5fr 1fr 100px',
-                                background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff',
-                                border: '1px solid var(--border-subtle)',
-                              }}
-                              onMouseEnter={e => {
-                                (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)';
-                                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.2)';
-                              }}
-                              onMouseLeave={e => {
-                                (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff';
-                                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
-                              }}
-                            >
-                              {/* Personel adı */}
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="relative flex-shrink-0">
-                                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold text-white"
-                                    style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
-                                    {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
-                                  </div>
-                                  {u.is_active && (
-                                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse"
-                                      style={{ background: '#22C55E', borderColor: 'var(--bg-card-solid)' }} />
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>
-                                    {u.display_name ?? u.email}
-                                  </p>
-                                  {atananFirmalar.length > 0 && (
-                                    <p className="text-[10px]" style={{ color: '#10B981' }}>
-                                      {atananFirmalar.length} firma
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Rol */}
-                              <div className="flex items-center">
-                                {u.osgb_role === 'isyeri_hekimi' ? (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
-                                    style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
-                                    <i className="ri-heart-pulse-line text-[9px]" />Hekim
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
-                                    style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
-                                    <i className="ri-shield-user-line text-[9px]" />Uzman
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Durum */}
-                              <div className="flex items-center">
-                                {u.is_active ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse" style={{ background: '#22C55E' }} />
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                                      style={{ background: 'rgba(34,197,94,0.1)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.2)' }}>
-                                      Aktif
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#94A3B8' }} />
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                                      style={{ background: 'rgba(148,163,184,0.08)', color: '#64748B', border: '1px solid rgba(148,163,184,0.15)' }}>
-                                      Pasif
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Firma chips */}
-                              <div className="flex items-center gap-1 flex-wrap min-w-0">
-                                {atananFirmalar.length > 0 ? (
-                                  <>
-                                    {atananFirmalar.slice(0, 1).map((f) => (
-                                      <span key={f.id}
-                                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg whitespace-nowrap max-w-[120px] truncate"
-                                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
-                                        <i className="ri-building-2-line text-[9px] flex-shrink-0" />
-                                        <span className="truncate">{f.name}</span>
-                                      </span>
-                                    ))}
-                                    {atananFirmalar.length > 1 && (
-                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg whitespace-nowrap"
-                                        style={{ background: 'rgba(16,185,129,0.06)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
-                                        +{atananFirmalar.length - 1}
-                                      </span>
+                            return (
+                              <div
+                                key={u.user_id}
+                                className="grid px-4 py-3 transition-all"
+                                style={{
+                                  gridTemplateColumns: '2fr 1.2fr 1fr 1.5fr 1fr 100px',
+                                  background: 'transparent',
+                                }}
+                                onMouseEnter={e => {
+                                  (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)';
+                                }}
+                                onMouseLeave={e => {
+                                  (e.currentTarget as HTMLElement).style.background = 'transparent';
+                                }}
+                              >
+                                {/* Personel adı */}
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="relative flex-shrink-0">
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold text-white"
+                                      style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                                      {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    {u.is_active && (
+                                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse"
+                                        style={{ background: '#22C55E', borderColor: 'var(--bg-card-solid)' }} />
                                     )}
-                                  </>
-                                ) : (
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>
+                                      {u.display_name ?? u.email}
+                                    </p>
+                                    {atananFirmalar.length > 0 && (
+                                      <p className="text-[10px]" style={{ color: '#10B981' }}>
+                                        {atananFirmalar.length} firma
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Rol */}
+                                <div className="flex items-center">
+                                  {u.osgb_role === 'isyeri_hekimi' ? (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
+                                      style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                      <i className="ri-heart-pulse-line text-[9px]" />Hekim
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
+                                      style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
+                                      <i className="ri-shield-user-line text-[9px]" />Uzman
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Durum */}
+                                <div className="flex items-center">
+                                  {u.is_active ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse" style={{ background: '#22C55E' }} />
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                        style={{ background: 'rgba(34,197,94,0.1)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.2)' }}>
+                                        Aktif
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#94A3B8' }} />
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                        style={{ background: 'rgba(148,163,184,0.08)', color: '#64748B', border: '1px solid rgba(148,163,184,0.15)' }}>
+                                        Pasif
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Firma chips */}
+                                <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                  {atananFirmalar.length > 0 ? (
+                                    <>
+                                      {atananFirmalar.slice(0, 1).map((f) => (
+                                        <span key={f.id}
+                                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg whitespace-nowrap max-w-[120px] truncate"
+                                          style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                          <i className="ri-building-2-line text-[9px] flex-shrink-0" />
+                                          <span className="truncate">{f.name}</span>
+                                        </span>
+                                      ))}
+                                      {atananFirmalar.length > 1 && (
+                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg whitespace-nowrap"
+                                          style={{ background: 'rgba(16,185,129,0.06)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                          +{atananFirmalar.length - 1}
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds([]); }}
+                                      className="whitespace-nowrap flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg cursor-pointer transition-all"
+                                      style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}>
+                                      <i className="ri-add-line text-[10px]" />Ata
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* E-posta */}
+                                <div className="flex items-center min-w-0">
+                                  <span className="text-[10px] truncate" style={{ color: textMuted }}>{u.email}</span>
+                                </div>
+
+                                {/* İşlemler */}
+                                <div className="flex items-center gap-1.5 justify-end">
                                   <button
-                                    onClick={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds([]); }}
-                                    className="whitespace-nowrap flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg cursor-pointer transition-all"
-                                    style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}>
-                                    <i className="ri-add-line text-[10px]" />Ata
+                                    onClick={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds(firmIds); }}
+                                    title="Firma Ata"
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                                    style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
+                                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.1)'; (e.currentTarget as HTMLElement).style.color = '#F59E0B'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245,158,11,0.25)'; }}
+                                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}>
+                                    <i className="ri-links-line text-xs" />
                                   </button>
-                                )}
+                                  <button
+                                    onClick={() => setSecilenUzman(u)}
+                                    title="Detay Gör"
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                                    style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
+                                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; (e.currentTarget as HTMLElement).style.color = '#10B981'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.25)'; }}
+                                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}>
+                                    <i className="ri-eye-line text-xs" />
+                                  </button>
+                                </div>
                               </div>
-
-                              {/* E-posta */}
-                              <div className="flex items-center min-w-0">
-                                <span className="text-[10px] truncate" style={{ color: textMuted }}>{u.email}</span>
-                              </div>
-
-                              {/* İşlemler */}
-                              <div className="flex items-center gap-1.5 justify-end">
-                                <button
-                                  onClick={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(u.user_id); setAtamaFirmaIds(firmIds); }}
-                                  title="Firma Ata"
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
-                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.1)'; (e.currentTarget as HTMLElement).style.color = '#F59E0B'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(245,158,11,0.25)'; }}
-                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}>
-                                  <i className="ri-links-line text-xs" />
-                                </button>
-                                <button
-                                  onClick={() => setSecilenUzman(u)}
-                                  title="Detay Gör"
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                                  style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
-                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.25)'; }}
-                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}>
-                                  <i className="ri-eye-line text-xs" />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -818,7 +817,7 @@ export default function OsgbDashboardPage() {
                       { label: 'Seçili Firma', value: filteredRaporFirmalar.length, icon: 'ri-building-2-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
                       { label: 'Toplam Personel', value: filteredRaporFirmalar.reduce((s, f) => s + f.personelSayisi, 0), icon: 'ri-group-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)' },
                       { label: 'Açık Uygunsuzluk', value: filteredRaporFirmalar.reduce((s, f) => s + f.uygunsuzluk, 0), icon: 'ri-alert-line', color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
-                      { label: 'Toplam Tutanak', value: filteredRaporFirmalar.reduce((s, f) => s + f.tutanakSayisi, 0), icon: 'ri-file-list-3-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
+                      { label: 'Toplam Tutanak', value: filteredRaporFirmalar.reduce((s, f) => s + f.tutanakSayisi, 0), icon: 'ri-file-list-3-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
                     ].map(s => (
                       <div key={s.label} className="rounded-2xl p-5" style={cardStyle}>
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
@@ -884,7 +883,7 @@ export default function OsgbDashboardPage() {
                                     </span>
                                   </td>
                                   <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#10B981' }}>{f.kapatilan}</td>
-                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#8B5CF6' }}>{f.tutanakSayisi}</td>
+                                  <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#10B981' }}>{f.tutanakSayisi}</td>
                                   <td className="px-4 py-3 text-xs font-semibold" style={{ color: '#06B6D4' }}>{f.egitimSayisi}</td>
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
@@ -918,7 +917,7 @@ export default function OsgbDashboardPage() {
                               <td className="px-4 py-3 text-xs font-bold" style={{ color: '#10B981' }}>
                                 {filteredRaporFirmalar.reduce((s, f) => s + f.kapatilan, 0)}
                               </td>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#8B5CF6' }}>
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: '#10B981' }}>
                                 {filteredRaporFirmalar.reduce((s, f) => s + f.tutanakSayisi, 0)}
                               </td>
                               <td className="px-4 py-3 text-xs font-bold" style={{ color: '#06B6D4' }}>
@@ -1037,7 +1036,7 @@ export default function OsgbDashboardPage() {
                     <div className="flex gap-2">
                       {([
                         { val: 'gezici_uzman', label: 'Gezici Uzman', icon: 'ri-shield-user-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)' },
-                        { val: 'isyeri_hekimi', label: 'İşyeri Hekimi', icon: 'ri-heart-pulse-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)', border: 'rgba(14,165,233,0.3)' },
+                        { val: 'isyeri_hekimi', label: 'İşyeri Hekimi', icon: 'ri-heart-pulse-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)' },
                       ] as const).map(opt => (
                         <button key={opt.val} type="button"
                           onClick={() => setUzmanForm(p => ({ ...p, rol: opt.val }))}
@@ -1057,7 +1056,7 @@ export default function OsgbDashboardPage() {
                   {/* Avatar önizleme */}
                   <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-extrabold text-white flex-shrink-0"
-                      style={{ background: uzmanForm.ad ? (uzmanForm.rol === 'isyeri_hekimi' ? 'linear-gradient(135deg, #0EA5E9, #0284C7)' : 'linear-gradient(135deg, #10B981, #059669)') : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                      style={{ background: uzmanForm.ad ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
                       {uzmanForm.ad ? uzmanForm.ad.charAt(0).toUpperCase() : <i className="ri-user-line text-xl" />}
                     </div>
                     <div>
@@ -1066,7 +1065,7 @@ export default function OsgbDashboardPage() {
                       </p>
                       <span className="text-[9px] font-bold px-2 py-0.5 rounded-full inline-block mt-1"
                         style={uzmanForm.rol === 'isyeri_hekimi'
-                          ? { background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }
+                          ? { background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }
                           : { background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
                         {uzmanForm.rol === 'isyeri_hekimi' ? 'İşyeri Hekimi' : 'Gezici Uzman'}
                       </span>
@@ -1481,7 +1480,7 @@ export default function OsgbDashboardPage() {
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
                   style={{
                     background: firmaFormTab === tab.idx ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
-                    border: firmaFormTab === tab.idx ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid var(--border-subtle)',
+                    border: firmaFormTab === tab.idx ? '1.5px solid rgba(16,185,129,0.3)' : '1px solid var(--border-subtle)',
                     color: firmaFormTab === tab.idx ? '#10B981' : 'var(--text-muted)',
                   }}>
                   <i className={`${tab.icon} text-xs`} />
@@ -1695,7 +1694,8 @@ export default function OsgbDashboardPage() {
                           type="date"
                           value={firmaForm.sozlesmeBas}
                           onChange={e => setFirmaForm(p => ({ ...p, sozlesmeBas: e.target.value }))}
-                          style={{ ...inputStyle, colorScheme: isDark ? 'dark' : 'light' }}
+                          className="text-sm px-3 py-2 rounded-xl outline-none"
+                          style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-input)', color: 'var(--text-primary)' }}
                           onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.5)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 0 0 3px rgba(16,185,129,0.08)'; }}
                           onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-input)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
                         />
@@ -1706,7 +1706,8 @@ export default function OsgbDashboardPage() {
                           type="date"
                           value={firmaForm.sozlesmeBit}
                           onChange={e => setFirmaForm(p => ({ ...p, sozlesmeBit: e.target.value }))}
-                          style={{ ...inputStyle, colorScheme: isDark ? 'dark' : 'light' }}
+                          className="text-sm px-3 py-2 rounded-xl outline-none"
+                          style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-input)', color: 'var(--text-primary)' }}
                           onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.5)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 0 0 3px rgba(16,185,129,0.08)'; }}
                           onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-input)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
                         />

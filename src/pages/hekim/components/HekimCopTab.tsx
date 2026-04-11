@@ -92,8 +92,8 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
 
       {/* Bilgi banneri */}
       <div className="rounded-xl p-3.5 flex items-start gap-2.5"
-        style={{ background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)' }}>
-        <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#0EA5E9' }} />
+        style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+        <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
         <p className="text-xs leading-relaxed" style={{ color: textSecondary }}>
           Bu bölümde yalnızca silinen kayıtları <strong style={{ color: textPrimary }}>görüntüleyebilirsiniz</strong>. Geri yükleme veya kalıcı silme için OSGB yöneticinizle iletişime geçin.
         </p>
@@ -109,9 +109,9 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
           <button key={opt.key} onClick={() => setActiveType(opt.key)}
             className="whitespace-nowrap px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
             style={{
-              background: activeType === opt.key ? 'rgba(14,165,233,0.12)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'),
-              color: activeType === opt.key ? '#0EA5E9' : textSecondary,
-              border: `1px solid ${activeType === opt.key ? 'rgba(14,165,233,0.3)' : borderColor}`,
+              background: activeType === opt.key ? 'rgba(16,185,129,0.12)' : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'),
+              color: activeType === opt.key ? '#10B981' : textSecondary,
+              border: `1px solid ${activeType === opt.key ? 'rgba(16,185,129,0.3)' : borderColor}`,
             }}>
             {opt.label}
           </button>
@@ -121,7 +121,7 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
       {/* Loading */}
       {loading && (
         <div className="rounded-xl p-10 flex items-center justify-center gap-2" style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
-          <i className="ri-loader-4-line animate-spin text-lg" style={{ color: '#0EA5E9' }} />
+          <i className="ri-loader-4-line animate-spin text-lg" style={{ color: '#10B981' }} />
           <span className="text-sm" style={{ color: textSecondary }}>Yükleniyor...</span>
         </div>
       )}
@@ -142,9 +142,10 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
       {/* Tablo */}
       {!loading && filtered.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
+          <div className="overflow-x-auto">
           {/* Tablo başlığı */}
-          <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr] items-center"
-            style={{ background: tableHeadBg, borderBottom: `1px solid ${borderColor}` }}>
+          <div className="grid items-center min-w-[600px]"
+            style={{ gridTemplateColumns: 'auto 1fr 1fr 1fr 1fr', background: tableHeadBg, borderBottom: `1px solid ${borderColor}` }}>
             <div className="px-4 py-2.5 w-10" />
             {['KAYIT', 'TİP', 'FİRMA', 'SİLİNME TARİHİ'].map(h => (
               <div key={h} className="px-4 py-2.5">
@@ -190,7 +191,7 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
 
                   {/* Firma */}
                   <div className="px-4 py-3">
-                    <span className="text-xs font-medium truncate" style={{ color: '#0EA5E9' }}>{item.firmaAd}</span>
+                    <span className="text-xs font-medium truncate" style={{ color: '#10B981' }}>{item.firmaAd}</span>
                   </div>
 
                   {/* Silinme tarihi */}
@@ -200,6 +201,7 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       )}

@@ -117,21 +117,21 @@ export default function OsgbOnboardingPage() {
 
         .osgb-input {
           transition: border-color 0.2s ease, box-shadow 0.2s ease;
-          background: #f8fafc;
-          border: 1.5px solid #e2e8f0;
+          background: var(--bg-input, #f8fafc);
+          border: 1.5px solid var(--border-input, #e2e8f0);
           border-radius: 12px;
-          color: #1e293b;
+          color: var(--text-primary, #1e293b);
           font-size: 14px;
           width: 100%;
           outline: none;
           padding: 13px 16px 13px 44px;
           font-family: 'Inter', sans-serif;
         }
-        .osgb-input::placeholder { color: #94a3b8; }
+        .osgb-input::placeholder { color: var(--text-faint, #94a3b8); }
         .osgb-input:focus {
           border-color: #10B981;
           box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
-          background: #f0fdf8;
+          background: var(--bg-input, #f0fdf8);
         }
 
         .osgb-btn {
@@ -240,7 +240,7 @@ export default function OsgbOnboardingPage() {
       {/* ═══ RIGHT PANEL ═══ */}
       <div
         className={`w-full lg:w-[500px] xl:w-[540px] flex-shrink-0 flex flex-col justify-start lg:justify-center overflow-y-auto px-6 sm:px-12 py-10 relative ${mounted ? 'slide-right' : 'opacity-0'}`}
-        style={{ background: '#ffffff', minHeight: '100vh' }}
+        style={{ background: 'var(--bg-card-solid)', minHeight: '100vh', borderLeft: '1px solid var(--border-subtle)' }}
       >
         {/* Subtle accent glow */}
         <div className="absolute top-0 right-0 pointer-events-none"
@@ -251,8 +251,8 @@ export default function OsgbOnboardingPage() {
         <div className="lg:hidden flex items-center gap-3 mb-8">
           <img src={LOGO_URL} alt="ISG" className="w-8 h-8 object-contain" />
           <div>
-            <p className="text-sm font-bold" style={{ color: '#0f172a' }}>ISG Denetim</p>
-            <p className="text-xs" style={{ color: '#64748b' }}>OSGB Yönetim Platformu</p>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>ISG Denetim</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>OSGB Yönetim Platformu</p>
           </div>
         </div>
 
@@ -264,10 +264,10 @@ export default function OsgbOnboardingPage() {
               <i className="ri-stethoscope-line text-xs" />
               OSGB Kurulumu
             </div>
-            <h2 className="text-2xl font-extrabold mb-1.5" style={{ color: '#0f172a', letterSpacing: '-0.03em' }}>
+            <h2 className="text-2xl font-extrabold mb-1.5" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
               OSGB Hesabınızı Kurun
             </h2>
-            <p className="text-sm" style={{ color: '#64748b' }}>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
               Bilgilerinizi girerek yönetim panelinizi etkinleştirin.
             </p>
           </div>
@@ -275,7 +275,7 @@ export default function OsgbOnboardingPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#374151' }}>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                 OSGB / Kurum Adı <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <div className="relative">
@@ -292,7 +292,7 @@ export default function OsgbOnboardingPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: '#374151' }}>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                 Yetkili Adı Soyadı <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <div className="relative">
@@ -332,9 +332,9 @@ export default function OsgbOnboardingPage() {
           </form>
 
           {/* What you get — tablo listesi */}
-          <div className="mt-6 rounded-xl overflow-hidden" style={{ border: '1px solid #f1f5f9' }}>
-            <div className="px-4 py-2.5" style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+          <div className="mt-6 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+            <div className="px-4 py-2.5" style={{ background: 'var(--bg-item)', borderBottom: '1px solid var(--border-subtle)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
                 Kurulum Sonrası Yapabilecekleriniz
               </p>
             </div>
@@ -346,39 +346,39 @@ export default function OsgbOnboardingPage() {
             ].map((item, idx, arr) => (
               <div key={item.text}
                 className="flex items-center gap-3 px-4 py-3"
-                style={{ borderBottom: idx < arr.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                style={{ borderBottom: idx < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                 <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
                   <i className={`${item.icon} text-sm`} style={{ color: '#10B981' }} />
                 </div>
-                <p className="text-xs" style={{ color: '#475569' }}>{item.text}</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.text}</p>
                 <i className="ri-check-line text-xs ml-auto" style={{ color: '#10B981' }} />
               </div>
             ))}
           </div>
 
           {/* Mobile feature list */}
-          <div className="lg:hidden mt-5 rounded-xl overflow-hidden" style={{ border: '1px solid #f1f5f9' }}>
-            <div className="px-4 py-2.5" style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+          <div className="lg:hidden mt-5 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+            <div className="px-4 py-2.5" style={{ background: 'var(--bg-item)', borderBottom: '1px solid var(--border-subtle)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
                 OSGB Panel Kapsamı
               </p>
             </div>
             {OSGB_FEATURES.map((f, idx) => (
               <div key={f.label}
                 className="flex items-center gap-3 px-4 py-3"
-                style={{ borderBottom: idx < OSGB_FEATURES.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                style={{ borderBottom: idx < OSGB_FEATURES.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                 <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
                   <i className={`${f.icon} text-sm`} style={{ color: '#10B981' }} />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold" style={{ color: '#374151' }}>{f.label}</p>
-                  <p className="text-[11px]" style={{ color: '#94a3b8' }}>{f.desc}</p>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{f.desc}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          <p className="text-center text-[11px] mt-7" style={{ color: '#cbd5e1' }}>
+          <p className="text-center text-[11px] mt-7" style={{ color: 'var(--text-faint)' }}>
             ISG Denetim &copy; {new Date().getFullYear()}
           </p>
         </div>

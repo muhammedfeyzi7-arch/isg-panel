@@ -71,7 +71,7 @@ export function buildOsgbReportHtml(data: OsgbRaporData): string {
         </span>
       </td>
       <td style="padding:10px 12px;border-bottom:1px solid #E5E7EB;text-align:center;font-size:12px;color:#16A34A;font-weight:600;">${f.kapatilan}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #E5E7EB;text-align:center;font-size:12px;color:#6366F1;font-weight:600;">${f.tutanakSayisi}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #E5E7EB;text-align:center;font-size:12px;color:#059669;font-weight:600;">${f.tutanakSayisi}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #E5E7EB;text-align:center;font-size:12px;color:#0891B2;font-weight:600;">${f.egitimSayisi}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #E5E7EB;text-align:center;">
         <div style="width:60px;height:6px;background:#E5E7EB;border-radius:3px;margin:0 auto;overflow:hidden;">
@@ -139,7 +139,7 @@ export function buildOsgbReportHtml(data: OsgbRaporData): string {
     ${kpiBadge('Müşteri Firma', firmalar.length, '#10B981', 'rgba(16,185,129,0.06)')}
     ${kpiBadge('Toplam Personel', totalPersonel, '#0891B2', 'rgba(8,145,178,0.06)')}
     ${kpiBadge('Açık Uygunsuzluk', totalUygunsuzluk - totalKapatilan, '#DC2626', 'rgba(220,38,38,0.06)')}
-    ${kpiBadge('Tutanak Sayısı', totalTutanak, '#6366F1', 'rgba(99,102,241,0.06)')}
+    ${kpiBadge('Tutanak Sayısı', totalTutanak, '#059669', 'rgba(5,150,105,0.06)')}
     ${kpiBadge('Eğitim Sayısı', totalEgitim, '#0891B2', 'rgba(8,145,178,0.06)')}
     ${kpiBadge('Kapanma Oranı', `${kapanmaOran}%`, '#059669', 'rgba(5,150,105,0.06)')}
   </div>
@@ -172,7 +172,7 @@ export function buildOsgbReportHtml(data: OsgbRaporData): string {
         <td style="padding:10px 12px;text-align:center;color:#94A3B8;">—</td>
         <td style="padding:10px 12px;text-align:center;font-weight:800;color:#DC2626;">${totalUygunsuzluk - totalKapatilan}</td>
         <td style="padding:10px 12px;text-align:center;font-weight:800;color:#16A34A;">${totalKapatilan}</td>
-        <td style="padding:10px 12px;text-align:center;font-weight:800;color:#6366F1;">${totalTutanak}</td>
+        <td style="padding:10px 12px;text-align:center;font-weight:800;color:#059669;">${totalTutanak}</td>
         <td style="padding:10px 12px;text-align:center;font-weight:800;color:#0891B2;">${totalEgitim}</td>
         <td style="padding:10px 12px;text-align:center;font-weight:800;color:#059669;">${kapanmaOran}%</td>
       </tr>
@@ -181,16 +181,16 @@ export function buildOsgbReportHtml(data: OsgbRaporData): string {
 
   <!-- Uzman Tablosu -->
   <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#64748B;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-    <div style="width:3px;height:14px;background:#8B5CF6;border-radius:2px;"></div>
+    <div style="width:3px;height:14px;background:#10B981;border-radius:2px;"></div>
     Gezici Uzman Listesi
   </div>
   <table style="width:100%;border-collapse:collapse;border:1px solid #D1D5DB;font-size:12px;margin-bottom:24px;">
     <thead>
       <tr style="background:#0F172A;">
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:3px solid #8B5CF6;">Ad Soyad</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:3px solid #8B5CF6;">E-posta</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:3px solid #8B5CF6;">Atandığı Firma</th>
-        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:3px solid #8B5CF6;">Durum</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:3px solid #10B981;">Ad Soyad</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:3px solid #10B981;">E-posta</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:3px solid #10B981;">Atandığı Firma</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#E2E8F0;border-bottom:3px solid #10B981;">Durum</th>
       </tr>
     </thead>
     <tbody>

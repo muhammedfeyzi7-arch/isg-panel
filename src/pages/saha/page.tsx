@@ -556,7 +556,7 @@ export default function SahaPage() {
 
   useEffect(() => { void loadJsQR(); }, []);
 
-  const prevSyncingRef = useRef(isSyncing);
+  const prevSyncingRef = useRef(false);
   useEffect(() => {
     if (prevSyncingRef.current && !isSyncing && pendingCount === 0 && isOnline) {
       addToast('Çevrimdışı işlemler başarıyla senkronize edildi!', 'success');
@@ -574,8 +574,6 @@ export default function SahaPage() {
     const sonrakiStr = sonraki.toISOString().split('T')[0];
     const gecikmisDi = ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi) < new Date() : false;
 
-    // addEkipmanKontrolKaydi artık durum + sonKontrolTarihi'ni de güncelliyor
-    // Sadece sonrakiKontrolTarihi için updateEkipman çağırıyoruz
     addEkipmanKontrolKaydi(ekipmanId, {
       tarih: now,
       kontrolEden: currentUser?.ad || 'Saha Kullanıcısı',
@@ -583,7 +581,6 @@ export default function SahaPage() {
       durum: 'Uygun',
       kaynak: 'qr',
     });
-    // sonrakiKontrolTarihi'ni güncelle (durum zaten addEkipmanKontrolKaydi'de güncellendi)
     updateEkipman(ekipmanId, { sonrakiKontrolTarihi: sonrakiStr });
     ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
 
@@ -606,7 +603,6 @@ export default function SahaPage() {
     const now = new Date().toISOString();
     const orgId = org?.id ?? 'unknown';
 
-    // Fotoğraf varsa yükle
     let fotoUrl: string | undefined;
     if (foto && orgId !== 'unknown') {
       try {
@@ -615,7 +611,6 @@ export default function SahaPage() {
       } catch { /* fotoğraf yüklenemese de devam et */ }
     }
 
-    // addEkipmanKontrolKaydi artık durum'u da güncelliyor — ayrıca updateEkipman çağırmaya gerek yok
     addEkipmanKontrolKaydi(ekipmanId, {
       tarih: now,
       kontrolEden: currentUser?.ad || 'Saha Kullanıcısı',
@@ -648,31 +643,76 @@ export default function SahaPage() {
   }, [ekipmanlar, uygunsuzluklar, isIzinleri]);
 
   return (
-    <div className="flex flex-col h-full min-h-screen pb-6" style={{ maxWidth: '480px', margin: '0 auto' }}>
-      {/* Başlık */}
-      <div className="rounded-2xl overflow-hidden mb-4" style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.08) 0%, rgba(251,146,60,0.05) 100%)', border: '1px solid rgba(249,115,22,0.2)' }}>
-        <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #F97316, #FB923C, #FCD34D)' }} />
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.25)' }}>
-              <i className="ri-map-pin-user-line text-base" style={{ color: '#FB923C' }} />
+    <div className="flex flex-col min-h-screen pb-8" style={{ maxWidth: '520px', margin: '0 auto', fontFamily: "'Inter', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
+
+      {/* ── Premium Başlık Kartı ── */}
+      <div className="rounded-2xl overflow-hidden mb-4" style={{ background: 'var(--bg-card-solid, rgba(17,24,39,0.8))', border: '1px solid rgba(16,185,129,0.2)' }}>
+        {/* Üst gradient çizgi */}
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10B981 0%, #34D399 50%, #059669 100%)' }} />
+        
+        <div className="px-4 pt-3.5 pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* İkon */}
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}>
+                <i className="ri-map-pin-user-line text-lg" style={{ color: '#10B981' }} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary, #f1f5f9)', letterSpacing: '-0.02em' }}>Saha Denetimleri</h2>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted, #64748b)' }}>Hızlı saha işlemleri</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Saha Denetimleri</h2>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hızlı saha işlemleri</p>
+            
+            <div className="flex items-center gap-2">
+              {/* Bekleyen işlem butonu */}
+              {pendingCount > 0 && (
+                <button
+                  onClick={() => setShowPendingModal(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)', color: '#FBBF24' }}
+                >
+                  <i className="ri-time-line text-xs" />
+                  <span className="text-xs font-bold">{pendingCount}</span>
+                </button>
+              )}
+              {/* Online badge */}
+              <span className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-full whitespace-nowrap"
+                style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+                {isOnline ? 'Aktif' : 'Çevrimdışı'}
+              </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {pendingCount > 0 && (
-              <button onClick={() => setShowPendingModal(true)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer" style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)', color: '#FBBF24' }}>
-                <i className="ri-time-line text-xs" />
-                <span className="text-xs font-bold">{pendingCount}</span>
-              </button>
-            )}
-            <span className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-full" style={{ background: 'rgba(52,211,153,0.1)', color: '#34D399', border: '1px solid rgba(52,211,153,0.2)' }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34D399' }} />
-              Aktif
-            </span>
+
+          {/* İstatistik satırı */}
+          <div className="flex items-center gap-4 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 flex items-center justify-center">
+                <i className="ri-error-warning-line text-xs" style={{ color: uygunsuzlukBadge > 0 ? '#F87171' : '#334155' }} />
+              </div>
+              <span className="text-[11px] font-semibold" style={{ color: uygunsuzlukBadge > 0 ? '#F87171' : '#334155' }}>
+                {uygunsuzlukBadge} açık
+              </span>
+            </div>
+            <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.08)' }} />
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 flex items-center justify-center">
+                <i className="ri-tools-line text-xs" style={{ color: ekipmanBadge > 0 ? '#FBBF24' : '#334155' }} />
+              </div>
+              <span className="text-[11px] font-semibold" style={{ color: ekipmanBadge > 0 ? '#FBBF24' : '#334155' }}>
+                {ekipmanBadge} ekipman
+              </span>
+            </div>
+            <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.08)' }} />
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 flex items-center justify-center">
+                <i className="ri-shield-keyhole-line text-xs" style={{ color: izinBadge > 0 ? '#F59E0B' : '#334155' }} />
+              </div>
+              <span className="text-[11px] font-semibold" style={{ color: izinBadge > 0 ? '#F59E0B' : '#334155' }}>
+                {izinBadge} bekleyen izin
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -682,8 +722,11 @@ export default function SahaPage() {
         <OfflineBand isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} lastSyncAt={lastSyncAt} syncError={syncError} onSyncNow={syncNow} onShowDetails={() => setShowPendingModal(true)} />
       </div>
 
-      {/* Sekme Navigasyonu */}
-      <div className={`grid gap-1 mb-5 p-1 rounded-2xl`} style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)`, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      {/* ── Premium Sekme Navigasyonu ── */}
+      <div
+        className="flex items-center gap-0.5 mb-5 p-1 rounded-2xl overflow-x-auto"
+        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', scrollbarWidth: 'none' }}
+      >
         {visibleTabs.map(tab => {
           const isActive = activeTab === tab.id;
           const badge = tab.id === 'ekipman' ? ekipmanBadge : tab.id === 'izin' ? izinBadge : tab.id === 'uygunsuzluk' ? uygunsuzlukBadge : 0;
@@ -691,22 +734,29 @@ export default function SahaPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="relative flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl cursor-pointer transition-all duration-200 whitespace-nowrap"
-              style={{ background: isActive ? tab.activeBg : 'transparent', border: isActive ? `1px solid ${tab.color}40` : '1px solid transparent' }}
+              className="relative flex flex-col items-center justify-center gap-1 py-2.5 px-2 rounded-xl cursor-pointer transition-all duration-200 whitespace-nowrap flex-1 min-w-0"
+              style={{
+                background: isActive ? tab.activeBg : 'transparent',
+                border: isActive ? `1px solid ${tab.color}38` : '1px solid transparent',
+              }}
             >
               {badge > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: '#EF4444' }}>{badge > 9 ? '9+' : badge}</span>
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: '#EF4444', zIndex: 1 }}>
+                  {badge > 9 ? '9+' : badge}
+                </span>
               )}
               <div className="w-5 h-5 flex items-center justify-center">
                 <i className={`${tab.icon} text-sm`} style={{ color: isActive ? tab.color : '#475569' }} />
               </div>
-              <span className="text-[10px] font-bold" style={{ color: isActive ? tab.color : '#475569' }}>{tab.label}</span>
+              <span className="text-[10px] font-bold leading-none" style={{ color: isActive ? tab.color : '#475569' }}>
+                {tab.label}
+              </span>
             </button>
           );
         })}
       </div>
 
-      {/* Sekme İçerikleri */}
+      {/* ── Sekme İçerikleri ── */}
       <div className="flex-1">
         {activeTab === 'ziyaret' && (
           <ZiyaretCheckIn />

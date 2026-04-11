@@ -74,9 +74,9 @@ export default function OsgbOnboarding({
       title: 'Uzman Ekle',
       description: 'Sahada çalışacak gezici uzmanı sisteme ekleyin.',
       detail: 'İsim, e-posta ve şifre bilgileriyle uzman hesabı oluşturun.',
-      color: '#8B5CF6',
-      colorBg: 'rgba(139,92,246,0.1)',
-      colorBorder: 'rgba(139,92,246,0.2)',
+      color: '#10B981',
+      colorBg: 'rgba(16,185,129,0.1)',
+      colorBorder: 'rgba(16,185,129,0.2)',
       done: uzmanVar,
       active: firmaVar && !uzmanVar,
       locked: !firmaVar,
@@ -106,7 +106,7 @@ export default function OsgbOnboarding({
       : progress >= 66
       ? 'linear-gradient(90deg, #10B981, #F59E0B)'
       : progress >= 33
-      ? 'linear-gradient(90deg, #10B981, #8B5CF6)'
+      ? 'linear-gradient(90deg, #10B981, #34D399)'
       : 'linear-gradient(90deg, #10B981, #10B981)';
 
   const progressLabel =
@@ -135,7 +135,7 @@ export default function OsgbOnboarding({
           <i className="ri-settings-3-line text-6xl" style={{ color: '#10B981' }} />
         </div>
         <div className="absolute bottom-2 right-32 opacity-5">
-          <i className="ri-building-2-line text-5xl" style={{ color: '#8B5CF6' }} />
+          <i className="ri-building-2-line text-5xl" style={{ color: '#10B981' }} />
         </div>
 
         <div className="relative z-10">

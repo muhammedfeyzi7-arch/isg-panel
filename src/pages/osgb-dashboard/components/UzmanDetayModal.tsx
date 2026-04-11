@@ -179,10 +179,10 @@ export default function UzmanDetayModal({
     ? Math.round(tamamlananZiyaretler.reduce((s, z) => s + (z.sure_dakika ?? 0), 0) / tamamlananZiyaretler.length)
     : 0;
 
-  const textPrimary = '#0f172a';
-  const textMuted = '#94a3b8';
-  const cardBg = '#f8fafc';
-  const border = '#f1f5f9';
+  const textPrimary = 'var(--text-primary)';
+  const textMuted = 'var(--text-muted)';
+  const cardBg = 'var(--bg-item)';
+  const border = 'var(--border-subtle)';
 
   const kpiCards = [
     {
@@ -209,7 +209,7 @@ export default function UzmanDetayModal({
     >
       <div
         className="w-full max-w-2xl rounded-2xl flex flex-col"
-        style={{ background: '#fff', border: '1px solid #e2e8f0', maxHeight: '90vh', boxShadow: '0 24px 64px rgba(15,23,42,0.18)' }}
+        style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)', maxHeight: '90vh' }}
       >
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 py-5 flex-shrink-0"
@@ -222,8 +222,8 @@ export default function UzmanDetayModal({
                 {(uzman.display_name ?? uzman.email ?? '?').charAt(0).toUpperCase()}
               </div>
               {aktifZiyaret && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white animate-pulse"
-                  style={{ background: '#22C55E' }} />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 animate-pulse"
+                  style={{ background: '#22C55E', borderColor: 'var(--modal-bg)' }} />
               )}
             </div>
             <div>
@@ -253,9 +253,9 @@ export default function UzmanDetayModal({
             </span>
             <button onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-xl cursor-pointer transition-all"
-              style={{ background: '#f1f5f9', color: '#64748b' }}
+              style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; (e.currentTarget as HTMLElement).style.color = '#64748b'; }}>
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}>
               <i className="ri-close-line text-sm" />
             </button>
           </div>
@@ -270,7 +270,7 @@ export default function UzmanDetayModal({
           <div className="flex-1 overflow-auto">
 
             {/* ── Atanmış Firmalar Bandı ── */}
-            <div className="px-6 py-4" style={{ background: cardBg, borderBottom: `1px solid ${border}` }}>
+            <div className="px-6 py-4" style={{ background: 'var(--bg-item)', borderBottom: `1px solid ${border}` }}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <i className="ri-building-2-line text-sm" style={{ color: '#10B981' }} />
@@ -292,9 +292,9 @@ export default function UzmanDetayModal({
                       return f ? (
                         <span key={id} className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-xl"
                           style={{
-                            background: idx === 0 ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.08)',
-                            color: idx === 0 ? '#059669' : '#6366F1',
-                            border: `1px solid ${idx === 0 ? 'rgba(16,185,129,0.25)' : 'rgba(99,102,241,0.2)'}`,
+                            background: 'rgba(16,185,129,0.1)',
+                            color: '#059669',
+                            border: '1px solid rgba(16,185,129,0.25)',
                           }}>
                           <i className="ri-building-2-line text-[9px]" />
                           {f.name}
@@ -312,7 +312,7 @@ export default function UzmanDetayModal({
               {kpiCards.map(k => (
                 <div key={k.label}
                   className="rounded-2xl p-4 flex flex-col gap-2"
-                  style={{ background: cardBg, border: `1px solid ${border}` }}>
+                  style={{ background: 'var(--bg-item)', border: `1px solid ${border}` }}>
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: k.bg }}>
                     {k.pulse ? (
                       <div className="relative w-4 h-4 flex items-center justify-center">
@@ -445,8 +445,8 @@ export default function UzmanDetayModal({
                         {ziyaretler.slice(0, 3).map(z => (
                           <div key={z.id} className="flex items-center gap-2.5">
                             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                              style={{ background: z.durum === 'aktif' ? '#22C55E' : '#cbd5e1' }} />
-                            <span className="text-xs font-medium truncate flex-1" style={{ color: '#475569' }}>
+                              style={{ background: z.durum === 'aktif' ? '#22C55E' : 'var(--border-main)' }} />
+                            <span className="text-xs font-medium truncate flex-1" style={{ color: textMuted }}>
                               {z.firma_ad ?? '—'}
                             </span>
                             <span className="text-[10px] flex-shrink-0" style={{ color: textMuted }}>
@@ -549,7 +549,7 @@ export default function UzmanDetayModal({
                           {/* QR badge */}
                           {z.qr_ile_giris && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-lg whitespace-nowrap flex-shrink-0"
-                              style={{ background: 'rgba(139,92,246,0.1)', color: '#7C3AED', border: '1px solid rgba(139,92,246,0.2)' }}>
+                              style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
                               <i className="ri-qr-code-line mr-0.5" />QR
                             </span>
                           )}
@@ -577,9 +577,9 @@ export default function UzmanDetayModal({
                       className="relative cursor-pointer flex-shrink-0"
                       style={{ width: '44px', height: '24px' }}>
                       <div className="w-full h-full rounded-full transition-colors"
-                        style={{ background: isActive ? '#10B981' : '#e2e8f0' }} />
+                        style={{ background: isActive ? '#10B981' : 'var(--border-main)' }} />
                       <div className="absolute top-1 transition-all rounded-full"
-                        style={{ width: '16px', height: '16px', background: '#fff', left: isActive ? '24px' : '4px' }} />
+                        style={{ width: '16px', height: '16px', background: 'var(--modal-bg)', left: isActive ? '24px' : '4px' }} />
                     </button>
                   </div>
 
@@ -607,12 +607,12 @@ export default function UzmanDetayModal({
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all text-left"
                             style={{
                               background: secili ? 'rgba(16,185,129,0.08)' : cardBg,
-                              border: secili ? '1.5px solid rgba(16,185,129,0.3)' : '1.5px solid #e2e8f0',
+                              border: secili ? '1.5px solid rgba(16,185,129,0.3)' : `1.5px solid ${border}`,
                             }}>
                             <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                               style={secili
                                 ? { background: 'linear-gradient(135deg, #10B981, #059669)' }
-                                : { background: '#fff', border: '1.5px solid #cbd5e1' }}>
+                                : { background: 'var(--bg-card-solid)', border: `1.5px solid ${border}` }}>
                               {secili && <i className="ri-check-line text-white text-[10px]" />}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -639,7 +639,7 @@ export default function UzmanDetayModal({
                   <div className="flex gap-3 pt-1">
                     <button onClick={onClose}
                       className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
-                      style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b' }}>
+                      style={{ background: 'var(--bg-item)', border: `1px solid ${border}`, color: textMuted }}>
                       İptal
                     </button>
                     <button onClick={handleKaydet} disabled={loading}

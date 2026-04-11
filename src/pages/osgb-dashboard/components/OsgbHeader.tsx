@@ -338,7 +338,7 @@ export default function OsgbHeader({
               }}
             >
               {/* Renkli üst bant */}
-              <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #10B981, #059669, #8B5CF6, #06B6D4, #F59E0B)' }} />
+              <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #10B981, #059669, #34D399, #06B6D4, #F59E0B)' }} />
 
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
@@ -411,8 +411,8 @@ export default function OsgbHeader({
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { icon: 'ri-file-list-3-line', label: 'Ziyaret Ekle', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', tab: 'ziyaretler' as Tab },
-                      { icon: 'ri-bar-chart-grouped-line', label: 'Raporlar', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', tab: 'raporlar' as Tab },
-                      { icon: 'ri-map-pin-2-line', label: 'Ziyaretler', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', tab: 'ziyaretler' as Tab },
+                      { icon: 'ri-bar-chart-grouped-line', label: 'Raporlar', color: '#10B981', bg: 'rgba(16,185,129,0.1)', tab: 'raporlar' as Tab },
+                      { icon: 'ri-map-pin-2-line', label: 'Ziyaretler', color: '#10B981', bg: 'rgba(16,185,129,0.1)', tab: 'ziyaretler' as Tab },
                       { icon: 'ri-settings-3-line', label: 'Ayarlar', color: '#64748B', bg: 'rgba(100,116,139,0.1)', tab: 'ayarlar' as Tab },
                     ].map(item => (
                       <button

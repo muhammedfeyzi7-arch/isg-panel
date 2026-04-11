@@ -312,8 +312,8 @@ export default function DashboardTab({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.2), rgba(6,182,212,0.08))' }}>
-                <i className="ri-calendar-check-fill text-sm" style={{ color: '#06B6D4' }} />
+                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.08))' }}>
+                <i className="ri-calendar-check-fill text-sm" style={{ color: '#10B981' }} />
               </div>
               <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: textSecondary }}>
                 Bugünkü Ziyaret
@@ -467,8 +467,8 @@ export default function DashboardTab({
             style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}` }}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(139,92,246,0.06))' }}>
-                <i className="ri-user-star-fill text-sm" style={{ color: '#8B5CF6' }} />
+                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.06))' }}>
+                <i className="ri-user-star-fill text-sm" style={{ color: '#10B981' }} />
               </div>
               <div>
                 <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Gezici Uzmanlar</h3>
@@ -479,9 +479,9 @@ export default function DashboardTab({
             </div>
             <button onClick={() => setActiveTab('uzmanlar')}
               className="flex items-center gap-1 text-[11px] font-semibold cursor-pointer px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap"
-              style={{ color: '#8B5CF6', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.14)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.08)'; }}>
+              style={{ color: '#10B981', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.14)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.08)'; }}>
               Tümünü Gör <i className="ri-arrow-right-s-line" />
             </button>
           </div>
@@ -489,13 +489,13 @@ export default function DashboardTab({
           {uzmanlar.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 gap-3 px-5">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
-                <i className="ri-user-star-line text-xl" style={{ color: '#8B5CF6' }} />
+                style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
+                <i className="ri-user-star-line text-xl" style={{ color: '#10B981' }} />
               </div>
               <p className="text-xs text-center" style={{ color: textSecondary }}>Henüz uzman eklenmedi</p>
               <button onClick={onUzmanEkle}
                 className="whitespace-nowrap flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)' }}>
+                style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                 <i className="ri-user-add-line" />Uzman Ekle
               </button>
             </div>
@@ -514,7 +514,7 @@ export default function DashboardTab({
                   const lastVisitDate = uzmanLastVisit[u.user_id];
                   const days = getDaysDiff(lastVisitDate);
                   const rowBg = 'transparent';
-                  const rowHover = isDark ? 'rgba(139,92,246,0.05)' : 'rgba(139,92,246,0.03)';
+                  const rowHover = isDark ? 'rgba(16,185,129,0.05)' : 'rgba(16,185,129,0.03)';
                   const initial = (u.display_name ?? u.email ?? '?').charAt(0).toUpperCase();
                   return (
                     <div key={u.user_id}
@@ -529,7 +529,7 @@ export default function DashboardTab({
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="relative flex-shrink-0">
                           <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black text-white"
-                            style={{ background: isSahada ? 'linear-gradient(135deg, #22C55E, #16A34A)' : u.is_active ? 'linear-gradient(135deg, #8B5CF6, #7C3AED)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                            style={{ background: isSahada ? 'linear-gradient(135deg, #22C55E, #16A34A)' : u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
                             {initial}
                           </div>
                           {isSahada && (
@@ -569,8 +569,8 @@ export default function DashboardTab({
             style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}` }}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.2), rgba(6,182,212,0.06))' }}>
-                <i className="ri-route-fill text-sm" style={{ color: '#06B6D4' }} />
+                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.06))' }}>
+                <i className="ri-route-fill text-sm" style={{ color: '#10B981' }} />
               </div>
               <div>
                 <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Bugün Saha Nasıl?</h3>
@@ -579,7 +579,7 @@ export default function DashboardTab({
             </div>
             <button onClick={() => setActiveTab('ziyaretler')}
               className="flex items-center gap-1 text-[11px] font-semibold cursor-pointer px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap"
-              style={{ color: '#06B6D4', background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.15)' }}
+              style={{ color: '#10B981', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(6,182,212,0.14)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(6,182,212,0.08)'; }}>
               Tümünü Gör <i className="ri-arrow-right-s-line" />
@@ -677,7 +677,7 @@ export default function DashboardTab({
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             {z.ziyaret_tipi === 'qr' && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
-                                style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6', border: '1px solid rgba(139,92,246,0.2)' }}>
+                                style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
                                 QR
                               </span>
                             )}
@@ -709,8 +709,8 @@ export default function DashboardTab({
       {!loading && son5.length === 0 && altFirmalar.length > 0 && (
         <div className="rounded-2xl p-8 flex flex-col items-center gap-4 text-center" style={card}>
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.12)' }}>
-            <i className="ri-route-line text-2xl" style={{ color: '#06B6D4' }} />
+            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
+            <i className="ri-route-line text-2xl" style={{ color: '#10B981' }} />
           </div>
           <div>
             <p className="text-sm font-bold mb-1" style={{ color: textPrimary }}>Henüz ziyaret kaydı yok</p>
@@ -720,7 +720,7 @@ export default function DashboardTab({
           </div>
           <button onClick={() => setActiveTab('ziyaretler')}
             className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer"
-            style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)', color: '#06B6D4' }}>
+            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}>
             <i className="ri-map-pin-line" />Ziyaretler Sayfasına Git
           </button>
         </div>

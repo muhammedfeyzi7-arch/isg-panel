@@ -29,10 +29,10 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
 
   const qrData = JSON.stringify({ type: 'firm', id: firmaId });
 
-  const modalBg = isDark ? '#1e293b' : '#ffffff';
-  const modalBorder = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
-  const textPrimary = isDark ? '#e2e8f0' : '#0f172a';
-  const textMuted = isDark ? '#94a3b8' : '#64748b';
+  const modalBg = 'var(--modal-bg)';
+  const modalBorder = 'var(--modal-border)';
+  const textPrimary = 'var(--text-primary)';
+  const textMuted = 'var(--text-muted)';
 
   // QRCode.js CDN'den yüklü değilse yükle, sonra oluştur
   useEffect(() => {
@@ -220,7 +220,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
           {/* QR data özeti */}
           <div
             className="w-full px-3 py-2 rounded-xl flex items-center gap-2"
-            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc', border: `1px solid ${modalBorder}` }}
+            style={{ background: 'var(--bg-item)', border: `1px solid ${modalBorder}` }}
           >
             <i className="ri-code-line text-xs flex-shrink-0" style={{ color: textMuted }} />
             <span className="text-[10px] font-mono flex-1 truncate" style={{ color: textMuted }}>
