@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
+import FirmaQrModal from './FirmaQrModal';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -29,6 +30,8 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
   const [durumLoading, setDurumLoading] = useState(false);
   const [silOnay, setSilOnay] = useState(false);
   const [silLoading, setSilLoading] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [sonZiyaretTarih, setSonZiyaretTarih] = useState<string | null>(null);
 
   const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9';
@@ -62,6 +65,9 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
     setPersoneller(personelData ?? []);
     setUygunsuzluklar(uygunsuzlukData ?? []);
     setAtamaGecmisi((ziyaretData ?? []) as AtamaGecmisi[]);
+    // Son ziyaret tarihini kaydet
+    const sonZiyaret = (ziyaretData ?? [])[0] as AtamaGecmisi | undefined;
+    setSonZiyaretTarih(sonZiyaret?.giris_saati ?? null);
     setFirmaDurum((orgData as { is_active?: boolean } | null)?.is_active !== false ? 'aktif' : 'pasif');
     // Bu firmaya atanmış uzmanları bul (active_firm_ids içinde firmaId geçenler)
     const atananlar = uzmanlar.filter(u =>
@@ -153,7 +159,7 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
   const uyOnem = (o: string | null) => o === 'Yüksek' || o === 'Kritik' ? { bg: 'rgba(239,68,68,0.1)', color: '#DC2626' } : o === 'Orta' ? { bg: 'rgba(245,158,11,0.1)', color: '#D97706' } : { bg: 'rgba(16,185,129,0.1)', color: '#059669' };
   const durumStyle = (d: string) => d === 'Kapatıldı' ? { bg: 'rgba(16,185,129,0.1)', color: '#059669' } : d === 'Devam Ediyor' ? { bg: 'rgba(245,158,11,0.1)', color: '#D97706' } : { bg: 'rgba(99,102,241,0.1)', color: '#6366F1' };
 
-  return createPortal(
+  const modal = createPortal(
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)', zIndex: 99999 }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-2xl rounded-2xl flex flex-col" style={{ background: modalBg, border: `1px solid ${modalBorder}`, maxHeight: '90vh' }}>
 
@@ -164,16 +170,42 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
               <i className="ri-building-2-line text-base" style={{ color: '#059669' }} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-bold" style={{ color: textPrimary }}>{firmaAdi}</h3>
                 <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: firmaDurum === 'aktif' ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.12)', color: firmaDurum === 'aktif' ? '#10B981' : '#64748B', border: `1px solid ${firmaDurum === 'aktif' ? 'rgba(16,185,129,0.25)' : 'rgba(100,116,139,0.25)'}` }}>
                   {firmaDurum === 'aktif' ? '● Aktif' : '○ Pasif'}
                 </span>
+                {/* Son ziyaret badge */}
+                {(() => {
+                  if (!sonZiyaretTarih) return (
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(148,163,184,0.12)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.25)' }}>
+                      <i className="ri-map-pin-2-line mr-0.5" />Ziyaret edilmedi
+                    </span>
+                  );
+                  const gunSayisi = Math.floor((Date.now() - new Date(sonZiyaretTarih).getTime()) / 86400000);
+                  const color = gunSayisi <= 2 ? '#22C55E' : gunSayisi <= 7 ? '#F59E0B' : '#EF4444';
+                  const bg = gunSayisi <= 2 ? 'rgba(34,197,94,0.12)' : gunSayisi <= 7 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
+                  const border = gunSayisi <= 2 ? 'rgba(34,197,94,0.25)' : gunSayisi <= 7 ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.25)';
+                  return (
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: bg, color, border: `1px solid ${border}` }}>
+                      <i className="ri-map-pin-2-line mr-0.5" />Son ziyaret: {gunSayisi === 0 ? 'Bugün' : `${gunSayisi}g önce`}
+                    </span>
+                  );
+                })()}
               </div>
               <p className="text-[10.5px] mt-0.5" style={{ color: textFaint }}>Firma Detayları · ISG Yönetimi</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* QR Kodu */}
+            <button
+              onClick={() => setShowQrModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#10B981' }}
+              title="Ziyaret QR Kodu">
+              <i className="ri-qr-code-line text-xs" />
+              QR
+            </button>
             {/* Durum Değiştir */}
             <button onClick={handleDurumDegistir} disabled={durumLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
@@ -497,5 +529,19 @@ export default function FirmaDetayModal({ firmaId, firmaAdi, orgId, uzmanlar, on
       </div>
     </div>,
     document.body
+  );
+
+  return (
+    <>
+      {modal}
+      {showQrModal && (
+        <FirmaQrModal
+          firmaId={firmaId}
+          firmaAdi={firmaAdi}
+          isDark={isDark}
+          onClose={() => setShowQrModal(false)}
+        />
+      )}
+    </>
   );
 }

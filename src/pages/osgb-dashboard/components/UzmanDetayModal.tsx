@@ -2,6 +2,37 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 
+function SonZiyaretBadge({ userId }: { userId: string }) {
+  const [gunSayisi, setGunSayisi] = useState<number | null>(null);
+  useEffect(() => {
+    supabase
+      .from('osgb_ziyaretler')
+      .select('giris_saati')
+      .eq('uzman_user_id', userId)
+      .order('giris_saati', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.giris_saati) {
+          setGunSayisi(Math.floor((Date.now() - new Date(data.giris_saati).getTime()) / 86400000));
+        } else {
+          setGunSayisi(999);
+        }
+      });
+  }, [userId]);
+
+  if (gunSayisi === null) return null;
+  const color = gunSayisi === 999 ? '#94A3B8' : gunSayisi >= 5 ? '#EF4444' : gunSayisi >= 3 ? '#F59E0B' : '#22C55E';
+  const bg = gunSayisi === 999 ? 'rgba(148,163,184,0.12)' : gunSayisi >= 5 ? 'rgba(239,68,68,0.12)' : gunSayisi >= 3 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)';
+  const label = gunSayisi === 999 ? 'Hiç ziyaret yok' : gunSayisi === 0 ? 'Bugün aktif' : `Son ziyaret: ${gunSayisi}g önce`;
+  return (
+    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+      style={{ background: bg, color, border: `1px solid ${color}40` }}>
+      <i className="ri-map-pin-2-line mr-0.5" />{label}
+    </span>
+  );
+}
+
 interface AltFirma {
   id: string;
   name: string;
@@ -227,6 +258,7 @@ export default function UzmanDetayModal({
                   }}>
                   {isActive ? '● Aktif' : '○ Pasif'}
                 </span>
+                <SonZiyaretBadge userId={uzman.user_id} />
               </div>
             </div>
 

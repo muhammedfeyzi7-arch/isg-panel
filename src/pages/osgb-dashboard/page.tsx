@@ -7,6 +7,7 @@ import { downloadOsgbReportPdf } from './utils/osgbReportPdf';
 import { downloadOsgbReportExcel } from './utils/osgbReportExcel';
 import FirmaDetayModal from './components/FirmaDetayModal';
 import UzmanDetayModal from './components/UzmanDetayModal';
+import DashboardTab from './components/DashboardTab';
 import OsgbSidebar from './components/OsgbSidebar';
 import OsgbHeader from './components/OsgbHeader';
 import OsgbSettings from './components/OsgbSettings';
@@ -363,7 +364,6 @@ export default function OsgbDashboardPage() {
 
   const totalPersonel = altFirmalar.reduce((s, f) => s + f.personelSayisi, 0);
   const totalUygunsuzluk = altFirmalar.reduce((s, f) => s + f.uygunsuzluk, 0);
-  const aktifUzman = uzmanlar.filter(u => u.is_active).length;
 
   const navItems: { id: Tab; icon: string; label: string }[] = [
     { id: 'dashboard', icon: 'ri-dashboard-line', label: 'Genel Bakış' },
@@ -420,8 +420,6 @@ export default function OsgbDashboardPage() {
   const cardStyle: React.CSSProperties = {
     background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderRadius: '16px',
   };
-  const rowBgBase = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)';
-  const rowBgHover = isDark ? 'rgba(16,185,129,0.07)' : '#f0fdf4';
   const textPrimary = 'var(--text-primary)';
   const textMuted = 'var(--text-muted)';
 
@@ -490,170 +488,18 @@ export default function OsgbDashboardPage() {
                       onAtamaYap={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(uzmanlar[0]?.user_id ?? ''); setAtamaFirmaIds([]); }}
                     />
                   ) : (
-                    <div className="space-y-5 page-enter">
-                  {/* Stats */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[
-                      { label: 'Müşteri Firma', value: altFirmalar.length, icon: 'ri-building-2-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.15)' },
-                      { label: 'Toplam Personel', value: totalPersonel, icon: 'ri-group-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.15)' },
-                      { label: 'Açık Uygunsuzluk', value: totalUygunsuzluk, icon: 'ri-alert-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.15)' },
-                      { label: 'Aktif Uzman', value: aktifUzman, icon: 'ri-user-star-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.15)' },
-                    ].map((s, i) => (
-                      <div key={s.label} className="rounded-2xl p-5 stat-card stagger-item" style={{ ...cardStyle, animationDelay: `${i * 0.06}s` }}>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
-                            <i className={`${s.icon} text-lg`} style={{ color: s.color }} />
-                          </div>
-                          <div className="w-8 h-8 flex items-center justify-center rounded-lg" style={{ background: s.bg }}>
-                            <i className="ri-arrow-right-up-line text-xs" style={{ color: s.color }} />
-                          </div>
-                        </div>
-                        <p className="text-2xl font-extrabold mb-1" style={{ color: textPrimary }}>{s.value}</p>
-                        <p className="text-xs font-medium" style={{ color: textMuted }}>{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Firmalar özet */}
-                    <div className="rounded-2xl p-5" style={cardStyle}>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                            <i className="ri-building-2-line text-xs" style={{ color: '#10B981' }} />
-                          </div>
-                          <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Müşteri Firmalar</h3>
-                        </div>
-                        <button onClick={() => setActiveTab('firmalar')} className="text-xs font-semibold cursor-pointer flex items-center gap-1" style={{ color: '#10B981' }}>
-                          Tümünü Gör <i className="ri-arrow-right-line text-xs" />
-                        </button>
-                      </div>
-                      {altFirmalar.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-8 gap-3">
-                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                            <i className="ri-building-2-line text-xl" style={{ color: '#10B981' }} />
-                          </div>
-                          <p className="text-xs" style={{ color: textMuted }}>Henüz firma eklenmedi</p>
-                          <button onClick={() => { setShowFirmaModal(true); setFirmaError(null); }}
-                            className="whitespace-nowrap flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                            <i className="ri-add-line" />Firma Ekle
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {altFirmalar.slice(0, 5).map(f => (
-                            <div key={f.id}
-                              onClick={() => setSecilenFirma({ id: f.id, name: f.name })}
-                              className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                              style={{ background: rowBgBase }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowBgHover; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBgBase; }}
-                            >
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                                <i className="ri-building-2-line text-sm" style={{ color: '#059669' }} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{f.name}</p>
-                                <p className="text-[10px]" style={{ color: textMuted }}>
-                                  {f.uzmanAd ?? 'Uzman atanmadı'} · {f.personelSayisi} personel
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                {f.uygunsuzluk > 0 && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                    style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
-                                    {f.uygunsuzluk}
-                                  </span>
-                                )}
-                                <i className="ri-arrow-right-s-line text-sm" style={{ color: textMuted }} />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Uzmanlar özet */}
-                    <div className="rounded-2xl p-5" style={cardStyle}>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(139,92,246,0.1)' }}>
-                            <i className="ri-user-star-line text-xs" style={{ color: '#8B5CF6' }} />
-                          </div>
-                          <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Gezici Uzmanlar</h3>
-                        </div>
-                        <button onClick={() => setActiveTab('uzmanlar')} className="text-xs font-semibold cursor-pointer flex items-center gap-1" style={{ color: '#10B981' }}>
-                          Tümünü Gör <i className="ri-arrow-right-line text-xs" />
-                        </button>
-                      </div>
-                      {uzmanlar.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-8 gap-3">
-                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
-                            <i className="ri-user-star-line text-xl" style={{ color: '#8B5CF6' }} />
-                          </div>
-                          <p className="text-xs" style={{ color: textMuted }}>Henüz uzman eklenmedi</p>
-                          <button onClick={() => setShowUzmanModal(true)}
-                            className="whitespace-nowrap flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                            style={{ background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)' }}>
-                            <i className="ri-user-add-line" />Uzman Ekle
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {uzmanlar.slice(0, 5).map(u => (
-                            <div key={u.user_id}
-                              onClick={() => setSecilenUzman(u)}
-                              className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                              style={{ background: rowBgBase }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowBgHover; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBgBase; }}
-                            >
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                                style={{ background: u.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
-                                {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{u.display_name ?? u.email}</p>
-                                <p className="text-[10px] truncate" style={{ color: textMuted }}>{u.active_firm_name ?? 'Firma atanmadı'}</p>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="w-2 h-2 rounded-full" style={{ background: u.is_active ? '#10B981' : '#64748b' }} />
-                                <i className="ri-arrow-right-s-line text-sm" style={{ color: textMuted }} />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Uyarı Bandı — uzman atanmamış firmalar */}
-                  {altFirmalar.filter(f => !f.uzmanAd).length > 0 && (
-                    <div className="rounded-2xl p-4 flex items-start gap-4"
-                      style={{ background: 'rgba(245,158,11,0.06)', border: '1.5px solid rgba(245,158,11,0.2)' }}>
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(245,158,11,0.12)' }}>
-                        <i className="ri-alert-line text-base" style={{ color: '#F59E0B' }} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold" style={{ color: '#F59E0B' }}>
-                          {altFirmalar.filter(f => !f.uzmanAd).length} firmaya uzman atanmadı
-                        </p>
-                        <p className="text-[10px] mt-1" style={{ color: textMuted }}>
-                          {altFirmalar.filter(f => !f.uzmanAd).map(f => f.name).join(', ')} — hemen atama yapın.
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setActiveTab('firmalar')}
-                        className="whitespace-nowrap text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer flex-shrink-0"
-                        style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#F59E0B' }}
-                      >
-                        Firmalara Git →
-                      </button>
-                    </div>
-                  )}
-                    </div>
+                    <DashboardTab
+                      altFirmalar={altFirmalar}
+                      uzmanlar={uzmanlar}
+                      isDark={isDark}
+                      orgId={org?.id ?? ''}
+                      onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); }}
+                      onUzmanEkle={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', uzmanlik: '', password: '', passwordConfirm: '', atananFirmaIds: [] }); }}
+                      onAtamaYap={() => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(uzmanlar[0]?.user_id ?? ''); setAtamaFirmaIds([]); }}
+                      onFirmaClick={(f) => setSecilenFirma(f)}
+                      onUzmanClick={(u) => setSecilenUzman(u)}
+                      setActiveTab={setActiveTab}
+                    />
                   )}
                 </>
               )}

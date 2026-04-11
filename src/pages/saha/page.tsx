@@ -511,7 +511,13 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
 // ─── Ana Saha Sayfası ─────────────────────────────────────────────────────────
 export default function SahaPage() {
   const { ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, addToast, ekipmanKontrolBildirimi, currentUser, dataLoading, uygunsuzluklar, isIzinleri, org } = useApp();
-  const [activeTab, setActiveTab] = useState<SahaTab>('ziyaret');
+
+  // Ziyaret sekmesi sadece gezici uzmanlar için görünür
+  const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
+
+  const visibleTabs = isGeziciUzman ? TABS : TABS.filter(t => t.id !== 'ziyaret');
+
+  const [activeTab, setActiveTab] = useState<SahaTab>(() => isGeziciUzman ? 'ziyaret' : 'qr');
   const [showPendingModal, setShowPendingModal] = useState(false);
 
   // QR redirect'ten gelen ekipman ID'sini sessionStorage'dan oku
@@ -668,8 +674,8 @@ export default function SahaPage() {
       </div>
 
       {/* Sekme Navigasyonu */}
-      <div className="grid grid-cols-5 gap-1 mb-5 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        {TABS.map(tab => {
+      <div className={`grid gap-1 mb-5 p-1 rounded-2xl`} style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)`, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        {visibleTabs.map(tab => {
           const isActive = activeTab === tab.id;
           const badge = tab.id === 'ekipman' ? ekipmanBadge : tab.id === 'izin' ? izinBadge : tab.id === 'uygunsuzluk' ? uygunsuzlukBadge : 0;
           return (

@@ -45,22 +45,33 @@ export default function ZiyaretCheckIn() {
     return () => clearInterval(interval);
   }, [aktifZiyaret]);
 
-  // Kullanıcıya atanmış firmaları çek
+  // Kullanıcıya atanmış firmaları çek — active_firm_ids (array) üzerinden
   const fetchAtanmisFirmalar = useCallback(async () => {
-    if (!user?.id || !org?.id) return;
-    // user_organizations'dan active_firm_ids al
+    if (!user?.id) return;
+
+    // org context'ten activeFirmIds varsa direkt kullan (daha hızlı)
+    if (org?.activeFirmIds && org.activeFirmIds.length > 0) {
+      const { data: firmData } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .in('id', org.activeFirmIds);
+      setAtanmisFirmalar(firmData ?? []);
+      return;
+    }
+
+    // Fallback: DB'den çek (osgb_role = gezici_uzman kaydından)
     const { data: uoData } = await supabase
       .from('user_organizations')
-      .select('active_firm_ids, active_firm_id')
+      .select('active_firm_ids')
       .eq('user_id', user.id)
-      .eq('organization_id', org.id)
+      .eq('osgb_role', 'gezici_uzman')
       .maybeSingle();
 
     if (!uoData) return;
 
-    const firmIds: string[] = (uoData.active_firm_ids && uoData.active_firm_ids.length > 0)
-      ? uoData.active_firm_ids
-      : uoData.active_firm_id ? [uoData.active_firm_id] : [];
+    const firmIds: string[] = (uoData.active_firm_ids && Array.isArray(uoData.active_firm_ids) && uoData.active_firm_ids.length > 0)
+      ? (uoData.active_firm_ids as string[]).filter(Boolean)
+      : [];
 
     if (firmIds.length === 0) return;
 
@@ -70,7 +81,7 @@ export default function ZiyaretCheckIn() {
       .in('id', firmIds);
 
     setAtanmisFirmalar(firmData ?? []);
-  }, [user?.id, org?.id]);
+  }, [user?.id, org?.activeFirmIds]);
 
   // Aktif ziyareti ve geçmişi çek
   const fetchZiyaret = useCallback(async () => {
@@ -196,13 +207,39 @@ export default function ZiyaretCheckIn() {
     }
   }, [aktifZiyaret, user?.id, addToast, fetchZiyaret]);
 
-  // QR scan sonucu
+  // QR scan sonucu — yeni format: {"type":"firm","id":"..."} veya legacy UUID
   const handleQrResult = useCallback((text: string) => {
     setShowQr(false);
-    // QR içeriği: firma org UUID veya URL ile firma_id içeren link
-    const uuidMatch = text.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-    const urlFirmaId = text.match(/firma[_-]?id=([0-9a-f-]{36})/i)?.[1];
-    const firmaId = uuidMatch ? text.trim() : urlFirmaId ?? null;
+
+    let firmaId: string | null = null;
+
+    // 1) Yeni format: JSON {"type":"firm","id":"uuid"}
+    try {
+      const parsed = JSON.parse(text) as { type?: string; id?: string };
+      if (parsed.type === 'firm' && parsed.id) {
+        firmaId = parsed.id;
+      }
+    } catch { /* JSON değil, devam */ }
+
+    // 2) Direkt UUID
+    if (!firmaId) {
+      const uuidMatch = text.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      if (uuidMatch) firmaId = text.trim();
+    }
+
+    // 3) URL içinde firma_id parametresi
+    if (!firmaId) {
+      firmaId = text.match(/firma[_-]?id=([0-9a-f-]{36})/i)?.[1] ?? null;
+    }
+
+    // 4) URL path'inden son UUID segment
+    if (!firmaId) {
+      const segments = text.replace(/[?#].*/, '').split('/').filter(Boolean);
+      const last = segments[segments.length - 1] ?? '';
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(last)) {
+        firmaId = last;
+      }
+    }
 
     if (!firmaId) {
       addToast('Geçersiz QR kodu. Firma QR\'ı değil veya okunamadı.', 'error');
@@ -210,13 +247,13 @@ export default function ZiyaretCheckIn() {
     }
 
     if (aktifZiyaret) {
-      // Aktif ziyaret varsa ve aynı firma ise check-out
       if (aktifZiyaret.firma_org_id === firmaId) {
         void handleCheckOut();
       } else {
         addToast(`Farklı firmada aktif ziyaretiniz var (${aktifZiyaret.firma_ad}). Önce bitirin.`, 'error');
       }
     } else {
+      // QR ile check-in — firma atanmış olmasına gerek yok
       void handleCheckIn(firmaId, true);
     }
   }, [aktifZiyaret, handleCheckIn, handleCheckOut, addToast]);
@@ -390,12 +427,22 @@ export default function ZiyaretCheckIn() {
           )}
 
           {atanmisFirmalar.length === 0 && !showQr && (
-            <div className="flex items-start gap-3 p-4 rounded-xl"
-              style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
-              <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
-              <p className="text-xs" style={{ color: '#92400e' }}>
-                Henüz size firma atanmadı. OSGB admininize başvurun veya QR kodu okutarak check-in yapın.
-              </p>
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(52,211,153,0.05)', border: '1px dashed rgba(52,211,153,0.3)' }}>
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                  style={{ background: 'rgba(52,211,153,0.1)' }}>
+                  <i className="ri-qr-scan-2-line text-base" style={{ color: '#34D399' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    QR kod okutarak ziyaret başlatabilirsiniz
+                  </p>
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: '#64748B' }}>
+                    Firmanın QR kodunu tarat — sistem otomatik check-in yapar.
+                    Manuel seçim için OSGB admininizden firma ataması talep edin.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>
