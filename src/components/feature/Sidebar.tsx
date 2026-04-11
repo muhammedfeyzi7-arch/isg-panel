@@ -13,7 +13,6 @@ const ROLE_MODULES: Record<string, string[]> = {
   denetci: [
     'dashboard', 'firmalar', 'personeller',
     'ekipmanlar', 'uygunsuzluklar', 'saha',
-    // muayeneler kasıtlı olarak yok — KVKK uyumu
   ],
   member: [
     'dashboard', 'firmalar', 'personeller',
@@ -28,7 +27,6 @@ const ROLE_MODULES: Record<string, string[]> = {
   ],
 };
 
-// Gezici uzman için izin verilen modüller — firma yönetimi dahil, ayarlar hariç
 const GEZICI_UZMAN_MODULES = [
   'dashboard', 'firmalar', 'personeller',
   'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
@@ -81,12 +79,9 @@ const menuGroups: { label: string; items: MenuItem[] }[] = [
   },
 ];
 
-const ROLE_LABELS: Record<string, { label: string; color: string; dot: string }> = {
-  admin:      { label: 'Admin Kullanıcı',              color: '#F59E0B', dot: '#F59E0B' },
-  denetci:    { label: 'Saha Personeli',               color: '#22D3EE', dot: '#22D3EE' },
-  member:     { label: 'Evrak/Dökümantasyon Denetçi',  color: '#A78BFA', dot: '#A78BFA' },
-  firma_user: { label: 'Firma Yetkilisi',              color: '#34D399', dot: '#34D399' },
-};
+// Accent: #0EA5E9 (sky-500 cyan) — hekim temasıyla aynı
+const ACCENT = '#0EA5E9';
+const ACCENT_DARK = '#0284C7';
 
 interface SidebarProps {
   onMobileClose?: () => void;
@@ -95,19 +90,18 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = false }: SidebarProps) {
-  const { activeModule, setActiveModule, sidebarCollapsed, currentUser, firmalar, personeller, evraklar, org, orgLoading } = useApp();
-  const { logout } = useAuth();
+  const { activeModule, setActiveModule, sidebarCollapsed, setSidebarCollapsed, currentUser, firmalar, personeller, evraklar, org, orgLoading } = useApp();
+  const { logout, user } = useAuth();
   const [supportOpen, setSupportOpen] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   const userRole = org?.role ?? 'member';
   const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
-  // org yüklenene kadar (loading veya null) tüm modüllere izin ver — yanlış kısıtlama olmasın
   const allowedModules = (orgLoading || !org)
     ? getAllowedModules('admin')
     : isGeziciUzman
       ? GEZICI_UZMAN_MODULES
       : getAllowedModules(userRole);
-  const roleInfo = ROLE_LABELS[userRole] ?? ROLE_LABELS.member;
 
   useEffect(() => {
     if (!allowedModules.includes(activeModule)) {
@@ -126,366 +120,336 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
     .filter(group => group.items.length > 0);
 
   const collapsed = sidebarCollapsed;
-  const dark = isDark;
 
-  // ── Design tokens ──
-  const sidebarBg = dark
-    ? 'var(--bg-sidebar)'
-    : '#FFFFFF';
-  const sidebarBorder = dark
-    ? '1px solid var(--border-subtle)'
-    : '1px solid rgba(15,23,42,0.08)';
-  const logoBorderBottom = dark
-    ? '1px solid var(--border-main)'
-    : '1px solid rgba(15,23,42,0.07)';
-  const groupLabelColor = dark ? 'rgba(255,255,255,0.32)' : '#94A3B8';
-  const groupDividerBg  = dark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)';
-  const statsBg         = dark ? 'rgba(255,255,255,0.04)' : '#F8FAFC';
-  const statsBorder     = dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.07)';
-  const statsDivider    = dark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)';
-  const statsLabelColor = dark ? 'rgba(255,255,255,0.38)' : '#94A3B8';
-  const profileBg       = dark ? 'rgba(255,255,255,0.04)' : '#F8FAFC';
-  const profileBorder   = dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(15,23,42,0.07)';
-  const profileNameColor= dark ? '#E2E8F0' : '#0F172A';
-  const logoutColor     = dark ? 'rgba(255,255,255,0.35)' : '#94A3B8';
-  const logoTitleColor  = dark ? '#F1F5F9' : '#0F172A';
-  const logoSubColor    = dark ? 'rgba(165,180,252,0.7)' : '#64748B';
+  // Design tokens (matching hekim sidebar)
+  const sidebarBg     = isDark ? '#111827' : '#ffffff';
+  const borderColor   = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
+  const labelColor    = isDark ? 'rgba(255,255,255,0.28)' : '#cbd5e1';
+  const textPrimary   = isDark ? '#f1f5f9' : '#0f172a';
+  const textMuted     = isDark ? '#64748b' : '#64748b';
+  const textFaint     = isDark ? '#334155' : '#cbd5e1';
+  const statsBg       = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)';
+  const profileBg     = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)';
+  const hoverBg       = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)';
+
+  const orgDisplayName = org?.displayName ?? org?.name ?? 'Organizasyon';
+  const userInitial = (currentUser.ad || user?.email || 'U').charAt(0).toUpperCase();
+  const userName = currentUser.ad || user?.email?.split('@')[0] || 'Kullanıcı';
+
+  const ROLE_LABEL: Record<string, string> = {
+    admin: 'Admin',
+    denetci: 'Saha Personeli',
+    member: 'Evrak/Dok. Denetçi',
+    firma_user: 'Firma Yetkilisi',
+  };
+  const roleLabel = isGeziciUzman ? 'Gezici Uzman' : (ROLE_LABEL[userRole] ?? 'Kullanıcı');
 
   return (
     <>
-    <aside
-      className={`
-        fixed left-0 top-0 h-screen flex flex-col z-[42]
-        ${collapsed ? 'w-[48px]' : 'w-[168px]'}
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}
-      style={{
-        background: sidebarBg,
-        borderRight: sidebarBorder,
-        transition: 'width 0.26s cubic-bezier(0.4,0,0.2,1), transform 0.26s cubic-bezier(0.4,0,0.2,1)',
-        maxWidth: '200px',
-      }}
-    >
-      {/* ── Logo ── */}
-      <div
-        className={`flex items-center ${collapsed ? 'justify-center px-2' : 'px-3.5 gap-2'}`}
+      <aside
+        className={`
+          fixed left-0 top-0 h-screen flex flex-col z-[42]
+          ${collapsed ? 'w-[64px]' : 'w-[220px]'}
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
         style={{
-          borderBottom: logoBorderBottom,
-          height: '46px',
-          minHeight: '46px',
-          flexShrink: 0,
+          background: sidebarBg,
+          borderRight: `1px solid ${borderColor}`,
+          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.26s cubic-bezier(0.4,0,0.2,1)',
         }}
       >
+        {/* ── Logo ── */}
         <div
-          className="flex items-center justify-center flex-shrink-0"
-          style={{
-            width: '26px',
-            height: '26px',
-            borderRadius: '8px',
-            background: dark
-              ? 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(99,102,241,0.1))'
-              : 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.06))',
-            border: dark ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(99,102,241,0.2)',
-          }}
+          className={`flex items-center flex-shrink-0 ${collapsed ? 'justify-center px-0 h-[56px]' : 'px-4 h-[56px] gap-3'}`}
+          style={{ borderBottom: `1px solid ${borderColor}` }}
         >
-          <img
-            src="https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518"
-            alt="ISG Logo"
-            style={{
-              height: '15px',
-              width: 'auto',
-              objectFit: 'contain',
-              display: 'block',
-              filter: dark ? 'brightness(1.15) drop-shadow(0 0 5px rgba(99,102,241,0.4))' : 'none',
-              transition: 'all 0.26s ease',
-            }}
-          />
-        </div>
-
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <p
-              className="text-[11px] font-bold leading-tight truncate"
-              style={{ color: logoTitleColor, letterSpacing: '-0.02em' }}
-            >
-              ISG Denetim
-            </p>
-            <p
-              className="text-[8px] mt-0.5 font-semibold truncate"
-              style={{ color: logoSubColor, letterSpacing: '0.01em' }}
-            >
-              Yönetim Sistemi
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* ── Navigation ── */}
-      <nav className="flex-1 overflow-y-auto py-2 px-1.5 space-y-3">
-        {filteredGroups.map(group => (
-          <div key={group.label}>
-            {!collapsed && (
-              <p
-                className="text-[8.5px] font-bold uppercase px-2 mb-1 select-none tracking-[0.14em]"
-                style={{ color: groupLabelColor }}
-              >
-                {group.label}
-              </p>
-            )}
-            {collapsed && (
-              <div className="h-px mx-1.5 mb-2" style={{ background: groupDividerBg }} />
-            )}
-
-            <ul className="space-y-0.5">
-              {group.items.map(item => {
-                const isActive = activeModule === item.id;
-                const badge = badges[item.id];
-                // mobileOnly öğeler sadece mobil sidebar'da (mobileOpen=true) gösterilir
-                if (item.mobileOnly && !mobileOpen) return null;
-
-                const activeBg = dark
-                  ? 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(99,102,241,0.08))'
-                  : 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.05))';
-                const activeBorderColor = dark ? 'rgba(99,102,241,0.35)' : 'rgba(99,102,241,0.3)';
-                const activeTextColor   = dark ? '#C7D2FE' : '#4338CA';
-                const activeIconColor   = dark ? '#818CF8' : '#4F46E5';
-                const inactiveTextColor = dark ? '#94A3B8' : '#64748B';
-                const inactiveIconColor = dark ? '#64748B' : '#94A3B8';
-                const hoverBg = dark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)';
-
-                return (
-                  <li key={item.id}>
-                    <button
-                      id={`sidebar-${item.id}`}
-                      onClick={() => { setActiveModule(item.id); onMobileClose?.(); }}
-                      title={collapsed ? item.label : ''}
-                      className="w-full flex items-center gap-2 text-left cursor-pointer relative"
-                      style={{
-                        padding: collapsed ? '7px 0' : '6.5px 8px',
-                        borderRadius: '8px',
-                        justifyContent: collapsed ? 'center' : undefined,
-                        background: isActive ? activeBg : 'transparent',
-                        border: isActive
-                          ? `1px solid ${activeBorderColor}`
-                          : '1px solid transparent',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={e => {
-                        if (!isActive) {
-                          e.currentTarget.style.background = hoverBg;
-                          e.currentTarget.style.borderColor = dark
-                            ? 'rgba(255,255,255,0.055)'
-                            : 'rgba(15,23,42,0.07)';
-                        }
-                      }}
-                      onMouseLeave={e => {
-                        if (!isActive) {
-                          e.currentTarget.style.background = 'transparent';
-                          e.currentTarget.style.borderColor = 'transparent';
-                        }
-                      }}
-                    >
-                      {/* Active left accent bar */}
-                      {isActive && !collapsed && (
-                        <span
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full"
-                          style={{
-                            height: '60%',
-                            background: 'linear-gradient(180deg, #818CF8, #6366F1)',
-                          }}
-                        />
-                      )}
-
-                      {/* Icon */}
-                      <span
-                        className="flex items-center justify-center flex-shrink-0"
-                        style={{
-                          width: '16px',
-                          height: '16px',
-                          color: isActive ? activeIconColor : inactiveIconColor,
-                          transition: 'color 0.15s ease',
-                          marginLeft: isActive && !collapsed ? '5px' : undefined,
-                        }}
-                      >
-                        <i className={`${item.icon} text-[13px]`} />
-                      </span>
-
-                      {/* Label + badge */}
-                      {!collapsed && (
-                        <>
-                          <span
-                            className="text-[11px] flex-1 leading-none truncate"
-                            style={{
-                              color: isActive ? activeTextColor : inactiveTextColor,
-                              fontWeight: isActive ? 600 : 500,
-                              transition: 'color 0.15s ease',
-                            }}
-                          >
-                            {item.label}
-                          </span>
-                          {badge != null && badge > 0 && (
-                            <span
-                              className="text-[8.5px] font-bold text-white rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-1 flex-shrink-0"
-                              style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}
-                            >
-                              {badge > 9 ? '9+' : badge}
-                            </span>
-                          )}
-                        </>
-                      )}
-
-                      {/* Badge dot when collapsed */}
-                      {collapsed && badge != null && badge > 0 && (
-                        <span
-                          className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
-                          style={{ background: '#EF4444' }}
-                        />
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
-
-      {/* ── Mini Stats ── */}
-      {!collapsed && (
-        <div className="px-2 pb-1.5">
           <div
-            className="rounded-lg p-2.5 flex gap-0"
-            style={{ background: statsBg, border: statsBorder }}
+            className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{
+              background: `rgba(14,165,233,0.12)`,
+              border: `1px solid rgba(14,165,233,0.22)`,
+            }}
           >
-            {[
-              { value: firmalar.filter(f => !f.silinmis).length,   label: 'Firma',   color: '#818CF8' },
-              { value: personeller.filter(p => !p.silinmis).length, label: 'Personel', color: '#34D399' },
-              { value: evraklar.filter(e => !e.silinmis).length,    label: 'Evrak',   color: '#FCD34D' },
-            ].map((stat, i) => (
-              <Fragment key={stat.label}>
-                {i > 0 && (
-                  <div className="w-px self-stretch mx-1.5" style={{ background: statsDivider }} />
-                )}
-                <div className="flex-1 text-center">
-                  <p className="text-[12px] font-bold leading-none" style={{ color: stat.color }}>{stat.value}</p>
-                  <p className="text-[8.5px] font-semibold mt-0.5" style={{ color: statsLabelColor }}>{stat.label}</p>
-                </div>
-              </Fragment>
-            ))}
+            <img
+              src="https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518"
+              alt="ISG Logo"
+              style={{ height: '16px', width: 'auto', objectFit: 'contain' }}
+            />
           </div>
-        </div>
-      )}
 
-      {/* ── Support Button ── */}
-      <div className="px-2 pb-1.5">
-        <button
-          onClick={() => setSupportOpen(true)}
-          title={collapsed ? 'Destek / Sorun Bildir' : ''}
-          className={`w-full flex items-center cursor-pointer rounded-lg transition-all duration-150 ${collapsed ? 'justify-center p-1.5' : 'gap-2 px-2.5 py-1.5'}`}
-          style={{
-            background: dark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.06)',
-            border: '1px solid rgba(16,185,129,0.18)',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = dark ? 'rgba(16,185,129,0.13)' : 'rgba(16,185,129,0.11)';
-            e.currentTarget.style.borderColor = 'rgba(16,185,129,0.32)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = dark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.06)';
-            e.currentTarget.style.borderColor = 'rgba(16,185,129,0.18)';
-          }}
-        >
-          <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-            <i className="ri-customer-service-2-line text-xs" style={{ color: '#10B981' }} />
-          </div>
           {!collapsed && (
-            <span className="text-[11px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>
-              Destek
-            </span>
-          )}
-          {!collapsed && (
-            <i className="ri-arrow-right-s-line text-xs" style={{ color: 'rgba(16,185,129,0.5)' }} />
-          )}
-        </button>
-      </div>
-
-      {/* ── Profile ── */}
-      <div
-        className={`mx-2 mb-2.5 rounded-lg flex items-center gap-2 cursor-pointer ${collapsed ? 'justify-center p-1.5' : 'px-2.5 py-2'}`}
-        style={{
-          background: profileBg,
-          border: profileBorder,
-          transition: 'all 0.15s ease',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = dark
-            ? 'rgba(255,255,255,0.05)'
-            : '#F1F5F9';
-          e.currentTarget.style.borderColor = dark
-            ? 'rgba(255,255,255,0.09)'
-            : 'rgba(15,23,42,0.12)';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = profileBg;
-          e.currentTarget.style.borderColor = dark
-            ? 'rgba(255,255,255,0.055)'
-            : 'rgba(15,23,42,0.07)';
-        }}
-      >
-        {/* Avatar */}
-        <div
-          className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
-          style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}
-        >
-          {(currentUser.ad || 'U').charAt(0).toUpperCase()}
-        </div>
-
-        {!collapsed && (
-          <>
             <div className="flex-1 min-w-0">
-              <p
-                className="text-[11px] font-semibold truncate leading-tight"
-                style={{ color: profileNameColor }}
-              >
-                {currentUser.ad || 'Kullanıcı'}
+              <p className="text-[12.5px] font-bold truncate leading-tight" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>
+                ISG Denetim
               </p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span
-                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ background: roleInfo.dot }}
-                />
-                <p className="text-[9px] font-semibold truncate" style={{ color: roleInfo.color }}>
-                  {roleInfo.label}
+              <p className="text-[9.5px] font-semibold mt-0.5 truncate" style={{ color: ACCENT, letterSpacing: '0.04em' }}>
+                Yönetim Sistemi
+              </p>
+            </div>
+          )}
+
+          <button
+            onClick={() => setSidebarCollapsed(!collapsed)}
+            title={collapsed ? 'Genişlet' : 'Daralt'}
+            className="hidden lg:flex items-center justify-center w-6 h-6 rounded-md cursor-pointer flex-shrink-0 transition-all duration-150"
+            style={{ color: textFaint, background: 'transparent', border: 'none' }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = `rgba(14,165,233,0.1)`;
+              (e.currentTarget as HTMLElement).style.color = ACCENT;
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+              (e.currentTarget as HTMLElement).style.color = textFaint;
+            }}
+          >
+            <i className="ri-side-bar-line text-[11px]" style={{ transform: collapsed ? 'scaleX(-1)' : 'none', display: 'block' }} />
+          </button>
+        </div>
+
+        {/* ── Org Badge ── */}
+        {!collapsed && (
+          <div className="mx-3 mt-3">
+            <div
+              className="px-3 py-2.5 rounded-xl"
+              style={{ background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.12)' }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: ACCENT, boxShadow: `0 0 5px rgba(14,165,233,0.6)` }} />
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color: 'rgba(14,165,233,0.65)' }}>
+                  Organizasyon
                 </p>
               </div>
+              <p className="text-[12px] font-bold mt-1 truncate" style={{ color: ACCENT }}>{orgDisplayName}</p>
             </div>
-            <button
-              onClick={logout}
-              title="Çıkış Yap"
-              className="flex items-center justify-center cursor-pointer rounded-md w-5 h-5 flex-shrink-0"
-              style={{
-                color: logoutColor,
-                background: 'transparent',
-                border: 'none',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = '#EF4444';
-                e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = logoutColor;
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <i className="ri-logout-box-r-line text-xs" />
-            </button>
-          </>
+          </div>
         )}
-      </div>
-    </aside>
 
-    <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+        {/* ── Navigation ── */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2.5" style={{ scrollbarWidth: 'none' }}>
+          {filteredGroups.map((group, gi) => (
+            <div key={group.label} className={gi > 0 ? 'mt-4' : ''}>
+              {!collapsed ? (
+                <p
+                  className="text-[9px] font-bold uppercase px-2 mb-2 select-none tracking-[0.14em]"
+                  style={{ color: labelColor }}
+                >
+                  {group.label}
+                </p>
+              ) : (
+                gi > 0 && <div className="h-px mx-2 mb-3 mt-1" style={{ background: borderColor }} />
+              )}
+
+              <ul className="space-y-0.5">
+                {group.items.map(item => {
+                  const isActive = activeModule === item.id;
+                  const isHovered = hoveredItem === item.id;
+                  const badge = badges[item.id];
+                  if (item.mobileOnly && !mobileOpen) return null;
+
+                  return (
+                    <li key={item.id}>
+                      <button
+                        id={`sidebar-${item.id}`}
+                        onClick={() => { setActiveModule(item.id); onMobileClose?.(); }}
+                        onMouseEnter={() => setHoveredItem(item.id)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        title={collapsed ? item.label : ''}
+                        className="w-full flex items-center text-left cursor-pointer relative overflow-hidden"
+                        style={{
+                          padding: collapsed ? '9px 0' : '8px 10px',
+                          borderRadius: '10px',
+                          justifyContent: collapsed ? 'center' : undefined,
+                          gap: collapsed ? undefined : '10px',
+                          background: isActive
+                            ? 'rgba(14,165,233,0.1)'
+                            : isHovered ? hoverBg : 'transparent',
+                          border: isActive
+                            ? '1px solid rgba(14,165,233,0.2)'
+                            : '1px solid transparent',
+                          transition: 'all 0.18s ease',
+                        }}
+                      >
+                        {/* Left accent bar */}
+                        {isActive && !collapsed && (
+                          <span
+                            className="absolute left-0 top-1/2 -translate-y-1/2 rounded-r-full"
+                            style={{
+                              width: '3px',
+                              height: '55%',
+                              background: `linear-gradient(180deg, #38BDF8, ${ACCENT_DARK})`,
+                              boxShadow: '0 0 6px rgba(14,165,233,0.4)',
+                            }}
+                          />
+                        )}
+
+                        {/* Icon */}
+                        <span
+                          className="flex items-center justify-center flex-shrink-0"
+                          style={{
+                            width: '17px',
+                            height: '17px',
+                            marginLeft: isActive && !collapsed ? '6px' : undefined,
+                            transition: 'transform 0.18s ease',
+                            transform: isHovered && !isActive ? 'translateX(1px)' : 'none',
+                          }}
+                        >
+                          <i
+                            className={`${item.icon} text-[14px]`}
+                            style={{
+                              color: isActive ? ACCENT : isHovered ? (isDark ? '#94a3b8' : '#475569') : textMuted,
+                              transition: 'color 0.18s ease',
+                            }}
+                          />
+                        </span>
+
+                        {/* Label + badge */}
+                        {!collapsed && (
+                          <>
+                            <span
+                              className="flex-1 leading-none text-[12px] truncate"
+                              style={{
+                                color: isActive ? ACCENT : isHovered ? textPrimary : textMuted,
+                                fontWeight: isActive ? 600 : 500,
+                                transition: 'color 0.18s ease',
+                              }}
+                            >
+                              {item.label}
+                            </span>
+                            {badge != null && badge > 0 && (
+                              <span
+                                className="text-[8.5px] font-bold text-white rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-1 flex-shrink-0"
+                                style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}
+                              >
+                                {badge > 9 ? '9+' : badge}
+                              </span>
+                            )}
+                            {/* Active dot */}
+                            {isActive && badge == null && (
+                              <span
+                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                style={{ background: ACCENT, boxShadow: '0 0 5px rgba(14,165,233,0.6)' }}
+                              />
+                            )}
+                          </>
+                        )}
+
+                        {/* Badge dot when collapsed */}
+                        {collapsed && badge != null && badge > 0 && (
+                          <span
+                            className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
+                            style={{ background: '#EF4444' }}
+                          />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+
+        {/* ── Mini Stats ── */}
+        {!collapsed && (
+          <div className="px-3 pb-2">
+            <div
+              className="rounded-xl p-3 flex gap-0"
+              style={{ background: statsBg, border: `1px solid ${borderColor}` }}
+            >
+              {[
+                { value: firmalar.filter(f => !f.silinmis).length,    label: 'Firma',    color: ACCENT },
+                { value: personeller.filter(p => !p.silinmis).length, label: 'Personel', color: '#34D399' },
+                { value: evraklar.filter(e => !e.silinmis).length,    label: 'Evrak',    color: '#FCD34D' },
+              ].map((stat, i) => (
+                <Fragment key={stat.label}>
+                  {i > 0 && (
+                    <div className="w-px self-stretch mx-2" style={{ background: borderColor }} />
+                  )}
+                  <div className="flex-1 text-center">
+                    <p className="text-[12px] font-bold leading-none" style={{ color: stat.color }}>{stat.value}</p>
+                    <p className="text-[8.5px] font-semibold mt-0.5" style={{ color: textMuted }}>{stat.label}</p>
+                  </div>
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Support Button ── */}
+        <div className={`px-2.5 pb-2 ${collapsed ? 'flex justify-center' : ''}`}>
+          <button
+            onClick={() => setSupportOpen(true)}
+            title={collapsed ? 'Destek / Sorun Bildir' : ''}
+            className={`cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'w-10 h-10 flex items-center justify-center' : 'w-full flex items-center gap-2.5 px-3 py-2'}`}
+            style={{
+              background: 'rgba(14,165,233,0.06)',
+              border: '1px solid rgba(14,165,233,0.14)',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.12)';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.28)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.06)';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.14)';
+            }}
+          >
+            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+              <i className="ri-customer-service-2-line text-xs" style={{ color: ACCENT }} />
+            </div>
+            {!collapsed && (
+              <>
+                <span className="text-[11.5px] font-semibold flex-1 text-left" style={{ color: ACCENT }}>Destek</span>
+                <i className="ri-arrow-right-s-line text-xs" style={{ color: 'rgba(14,165,233,0.4)' }} />
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* ── Profile ── */}
+        <div
+          className={`mx-2.5 mb-3 rounded-xl flex items-center ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2.5'}`}
+          style={{ background: profileBg, border: `1px solid ${borderColor}` }}
+        >
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
+            style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_DARK})` }}
+          >
+            {userInitial}
+          </div>
+          {!collapsed && (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11.5px] font-semibold truncate leading-tight" style={{ color: textPrimary }}>
+                  {userName}
+                </p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACCENT, boxShadow: '0 0 4px rgba(14,165,233,0.6)' }} />
+                  <p className="text-[9.5px] font-semibold" style={{ color: ACCENT }}>{roleLabel}</p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                title="Çıkış Yap"
+                className="flex items-center justify-center cursor-pointer rounded-md w-6 h-6 flex-shrink-0 transition-all duration-150"
+                style={{ color: textFaint, background: 'transparent', border: 'none' }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.color = '#F87171';
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.color = textFaint;
+                  (e.currentTarget as HTMLElement).style.background = 'transparent';
+                }}
+              >
+                <i className="ri-logout-box-r-line text-xs" />
+              </button>
+            </>
+          )}
+        </div>
+      </aside>
+
+      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
     </>
   );
 }

@@ -254,18 +254,17 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           HEADER — Mobile-First
       ══════════════════════════════════════════════════════ */}
       <header
-        className={`fixed top-0 right-0 z-30 flex items-center left-0 ${sidebarCollapsed ? 'lg:left-[48px]' : 'lg:left-[168px]'}`}
+        className={`fixed top-0 right-0 z-30 flex items-center left-0 ${sidebarCollapsed ? 'lg:left-[64px]' : 'lg:left-[220px]'}`}
         style={{
-          height: '46px',
+          height: '56px',
           background: headerBg,
-          backdropFilter: 'blur(28px)',
-          WebkitBackdropFilter: 'blur(28px)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
           borderBottom: `1px solid ${headerBorder}`,
-          boxShadow: isDark ? '0 1px 8px rgba(0,0,0,0.25)' : '0 1px 6px rgba(15,23,42,0.06)',
-          transition: 'left 0.26s cubic-bezier(0.4,0,0.2,1), background 0.3s ease',
-          paddingLeft: '10px',
-          paddingRight: '10px',
-          gap: '6px',
+          transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1), background 0.3s ease',
+          paddingLeft: '20px',
+          paddingRight: '16px',
+          gap: '8px',
         }}
       >
         {/* ── MOBİL: Hamburger ── */}
@@ -289,26 +288,21 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         </button>
 
         {/* ── Sayfa Başlığı (Mobil: orta, Desktop: sol) ── */}
-        <div className="flex items-center gap-1.5 flex-shrink-0 min-w-0">
-          <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
-            style={{ background: `${isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.1)'}` }}>
-            <i className={`${currentModule?.icon || 'ri-home-line'} text-[11px]`} style={{ color: '#818CF8' }} />
+        <div className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
+          <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+            <i className={`${currentModule?.icon || 'ri-home-line'} text-sm`} style={{ color: '#0EA5E9' }} />
           </div>
-          <div className="flex items-center gap-1 min-w-0">
-            <span className="text-[12px] sm:text-[13px] font-bold truncate" style={{ color: nameColor, maxWidth: '120px' }}>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold leading-tight truncate" style={{ color: nameColor, maxWidth: '160px' }}>
               {currentModule?.label || activeModule}
             </span>
             {firmaSuffix && (
               <span
-                className="hidden lg:flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                style={{
-                  background: 'rgba(6,182,212,0.1)',
-                  color: '#06B6D4',
-                  border: '1px solid rgba(6,182,212,0.2)',
-                }}
+                className="hidden lg:flex items-center gap-1 text-[10px] font-semibold leading-none mt-0.5"
+                style={{ color: '#0EA5E9' }}
               >
                 <i className="ri-building-2-line text-[9px]" />
-                <span className="truncate" style={{ maxWidth: '88px' }}>{firmaSuffix}</span>
+                <span className="truncate" style={{ maxWidth: '120px' }}>{firmaSuffix}</span>
               </span>
             )}
           </div>
@@ -414,10 +408,21 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
 
         {/* ── Hızlı Ekle ── */}
         <button onClick={() => { setQuickOpen(true); setNotifOpen(false); setProfileOpen(false); }}
-          className="btn-primary flex-shrink-0 flex"
-          style={{ padding: '5px 10px', fontSize: '11px', borderRadius: '8px' }}>
+          className="whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 cursor-pointer font-semibold transition-all duration-150"
+          style={{
+            padding: '6px 14px',
+            fontSize: '12px',
+            borderRadius: '10px',
+            background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+            color: '#ffffff',
+            border: 'none',
+            boxShadow: '0 2px 10px rgba(14,165,233,0.35)',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(14,165,233,0.5)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 10px rgba(14,165,233,0.35)'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}
+        >
           <i className="ri-add-line text-sm" />
-          <span className="hidden lg:inline ml-1">Hızlı Ekle</span>
+          <span className="hidden lg:inline">Hızlı Ekle</span>
         </button>
 
         {/* ── Support Notifications (Supabase) ── */}
@@ -677,7 +682,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             {/* Avatar */}
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 2px 8px rgba(99,102,241,0.3)' }}
+              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 2px 8px rgba(14,165,233,0.3)' }}
             >
               {(currentUser.ad || 'U').charAt(0).toUpperCase()}
             </div>
@@ -700,7 +705,7 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
                 <div className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
+                    style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 4px 12px rgba(14,165,233,0.3)' }}
                   >
                     {(currentUser.ad || 'U').charAt(0).toUpperCase()}
                   </div>
