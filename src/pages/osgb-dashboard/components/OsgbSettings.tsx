@@ -19,7 +19,23 @@ interface OsgbMember {
   created_at?: string;
   joined_at?: string;
   active_firm_name: string | null;
+  active_firm_ids?: string[] | null;
 }
+
+interface FirmaOption { id: string; name: string; }
+
+interface AddUserForm {
+  display_name: string;
+  email: string;
+  password: string;
+  osgb_role: 'gezici_uzman' | 'isyeri_hekimi';
+  active_firm_ids: string[];
+}
+
+const emptyForm: AddUserForm = {
+  display_name: '', email: '', password: '',
+  osgb_role: 'gezici_uzman', active_firm_ids: [],
+};
 
 function getPasswordStrength(pwd: string): { score: number; label: string; color: string } {
   if (!pwd) return { score: 0, label: '', color: '' };
@@ -42,6 +58,12 @@ const NAV_ITEMS: { id: SettingsTab; label: string; icon: string; desc: string }[
   { id: 'ekip',     label: 'Ekip Yönetimi', icon: 'ri-group-line',          desc: 'OSGB üyeleri ve uzmanlar' },
   { id: 'sistem',   label: 'Sistem',        icon: 'ri-information-line',    desc: 'Versiyon ve OSGB bilgisi' },
 ];
+
+const OSGB_ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+  osgb_admin:    { label: 'OSGB Admin',     color: '#10B981', bg: 'rgba(16,185,129,0.1)',   icon: 'ri-shield-star-line' },
+  gezici_uzman:  { label: 'Gezici Uzman',   color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)',   icon: 'ri-user-star-line' },
+  isyeri_hekimi: { label: 'İşyeri Hekimi', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)',   icon: 'ri-heart-pulse-line' },
+};
 
 interface OsgbSettingsProps {
   orgId: string;
@@ -77,6 +99,15 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
   const [deleteConfirm, setDeleteConfirm] = useState<OsgbMember | null>(null);
   const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // ── Add User ──
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState<AddUserForm>(emptyForm);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [showAddPassword, setShowAddPassword] = useState(false);
+  const [firmalar, setFirmalar] = useState<FirmaOption[]>([]);
+  const [firmalarLoading, setFirmalarLoading] = useState(false);
+
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMsg({ type, text });
     setTimeout(() => setToastMsg(null), 3000);
@@ -103,15 +134,10 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
       });
       const json = await res.json();
       if (json.members) {
-        // Edge function'dan gelen member listesini OsgbMember formatına dönüştür
         const enriched: OsgbMember[] = json.members.map((m: {
-          user_id: string;
-          display_name?: string;
-          email?: string;
-          osgb_role?: string;
-          role?: string;
-          is_active?: boolean;
-          joined_at?: string;
+          user_id: string; display_name?: string; email?: string;
+          osgb_role?: string; role?: string; is_active?: boolean;
+          joined_at?: string; active_firm_ids?: string[] | null;
         }) => ({
           user_id: m.user_id,
           display_name: m.display_name ?? '',
@@ -121,6 +147,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
           is_active: m.is_active ?? true,
           joined_at: m.joined_at,
           active_firm_name: null,
+          active_firm_ids: m.active_firm_ids ?? null,
         }));
         setMembers(enriched);
       }
@@ -131,9 +158,85 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
     }
   }, [orgId, getAuthHeader]);
 
+  // Atanmış firmaları çek (OSGB'nin müşteri firmaları)
+  const fetchFirmalar = useCallback(async () => {
+    if (!orgId) return;
+    setFirmalarLoading(true);
+    try {
+      // OSGB'nin müşteri firma organizasyonları — osgb_org_id ile bağlı
+      // Önce uzmanların active_firm_ids üzerinden çek, yoksa organizations tablosundan
+      const { data } = await supabase
+        .from('osgb_ziyaretler')
+        .select('firma_org_id, firma_ad')
+        .eq('osgb_org_id', orgId)
+        .not('firma_org_id', 'is', null);
+
+      const seenIds = new Set<string>();
+      const list: FirmaOption[] = [];
+
+      (data ?? []).forEach(row => {
+        const id = row.firma_org_id as string;
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          list.push({ id, name: row.firma_ad as string || id });
+        }
+      });
+
+      // Eğer ziyaret verisi yoksa veya az ise organizations tablosundan da bak
+      if (list.length === 0) {
+        // OSGB admin olarak oluşturulan firma org'larını çek
+        // FirmalarTab'dan aldığımız verileri kullanabiliriz - organizations tablosu
+        const { data: orgs } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .eq('created_by', user?.id)
+          .neq('org_type', 'osgb')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        (orgs ?? []).forEach(o => {
+          if (!seenIds.has(o.id)) {
+            seenIds.add(o.id);
+            list.push({ id: o.id, name: o.name });
+          }
+        });
+      }
+
+      // Uzmanların active_firm_ids'inden de çek
+      const { data: uzmanRows } = await supabase
+        .from('user_organizations')
+        .select('active_firm_ids, active_firm_id')
+        .eq('organization_id', orgId)
+        .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi']);
+
+      const extraIds: string[] = [];
+      (uzmanRows ?? []).forEach(u => {
+        const ids: string[] = (u.active_firm_ids as string[] | null) ?? (u.active_firm_id ? [u.active_firm_id as string] : []);
+        ids.forEach(id => { if (!seenIds.has(id)) { seenIds.add(id); extraIds.push(id); } });
+      });
+
+      if (extraIds.length > 0) {
+        const { data: extraOrgs } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .in('id', extraIds);
+        (extraOrgs ?? []).forEach(o => list.push({ id: o.id, name: o.name }));
+      }
+
+      setFirmalar(list.sort((a, b) => a.name.localeCompare(b.name, 'tr')));
+    } catch {
+      // silent
+    } finally {
+      setFirmalarLoading(false);
+    }
+  }, [orgId, user?.id]);
+
   useEffect(() => {
-    if (activeTab === 'ekip') fetchMembers();
-  }, [activeTab, fetchMembers]);
+    if (activeTab === 'ekip') {
+      fetchMembers();
+      fetchFirmalar();
+    }
+  }, [activeTab, fetchMembers, fetchFirmalar]);
 
   const handleToggleActive = async (member: OsgbMember) => {
     setActionLoadingId(member.user_id);
@@ -143,24 +246,16 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({
-          action: 'update',
-          organization_id: orgId,
-          target_user_id: member.user_id,
-          is_active: !member.is_active,
+          action: 'update', organization_id: orgId,
+          target_user_id: member.user_id, is_active: !member.is_active,
         }),
       });
       const json = await res.json();
       if (json.error) {
         showToast(json.error, 'error');
       } else {
-        showToast(
-          member.is_active
-            ? `${member.display_name || member.email} pasif yapıldı.`
-            : `${member.display_name || member.email} aktif yapıldı.`
-        );
-        setMembers(prev => prev.map(m =>
-          m.user_id === member.user_id ? { ...m, is_active: !m.is_active } : m
-        ));
+        showToast(member.is_active ? `${member.display_name || member.email} pasif yapıldı.` : `${member.display_name || member.email} aktif yapıldı.`);
+        setMembers(prev => prev.map(m => m.user_id === member.user_id ? { ...m, is_active: !m.is_active } : m));
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Güncelleme sırasında hata oluştu.', 'error');
@@ -177,11 +272,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
       const res = await fetch(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
-        body: JSON.stringify({
-          action: 'delete',
-          organization_id: orgId,
-          target_user_id: deleteConfirm.user_id,
-        }),
+        body: JSON.stringify({ action: 'delete', organization_id: orgId, target_user_id: deleteConfirm.user_id }),
       });
       const json = await res.json();
       if (json.error) {
@@ -198,6 +289,59 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
     }
   };
 
+  const handleAddUser = async () => {
+    setAddError(null);
+    if (!addForm.display_name.trim()) { setAddError('Ad Soyad zorunludur.'); return; }
+    if (!addForm.email.trim() || !addForm.email.includes('@')) { setAddError('Geçerli bir e-posta girin.'); return; }
+    if (!addForm.password || addForm.password.length < 8) { setAddError('Şifre en az 8 karakter olmalıdır.'); return; }
+    if (addForm.active_firm_ids.length === 0) {
+      setAddError(`${addForm.osgb_role === 'isyeri_hekimi' ? 'İşyeri Hekimi' : 'Gezici Uzman'} için en az bir firma seçmelisiniz.`);
+      return;
+    }
+
+    setAddLoading(true);
+    try {
+      const authHeader = await getAuthHeader();
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+        body: JSON.stringify({
+          action: 'create',
+          organization_id: orgId,
+          email: addForm.email.trim().toLowerCase(),
+          password: addForm.password,
+          display_name: addForm.display_name.trim(),
+          role: 'member',
+          osgb_role: addForm.osgb_role,
+          active_firm_ids: addForm.active_firm_ids,
+          active_firm_id: addForm.active_firm_ids[0] ?? null,
+        }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        setAddError(json.error);
+      } else {
+        showToast(`${addForm.display_name} başarıyla eklendi.`);
+        setShowAddModal(false);
+        setAddForm(emptyForm);
+        await fetchMembers();
+      }
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'Bilinmeyen hata oluştu.');
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const toggleFirmaSelection = (firmaId: string) => {
+    setAddForm(prev => ({
+      ...prev,
+      active_firm_ids: prev.active_firm_ids.includes(firmaId)
+        ? prev.active_firm_ids.filter(id => id !== firmaId)
+        : [...prev.active_firm_ids, firmaId],
+    }));
+  };
+
   const handleProfileSave = async () => {
     if (!displayName.trim()) { setProfileNotif({ type: 'error', message: 'Ad Soyad boş olamaz.' }); return; }
     setProfileLoading(true);
@@ -205,7 +349,6 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
     try {
       const { error } = await supabase.auth.updateUser({ data: { full_name: displayName.trim() } });
       if (error) throw error;
-      // user_organizations tablosunu da güncelle
       await supabase.from('user_organizations').update({ display_name: displayName.trim() }).eq('user_id', user!.id).eq('organization_id', orgId);
       setProfileNotif({ type: 'success', message: 'Profil bilgileri güncellendi.' });
     } catch {
@@ -271,13 +414,10 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
     </div>
   );
 
-  const roleLabel = (role: string) => {
-    if (role === 'osgb_admin') return 'OSGB Admin';
-    if (role === 'gezici_uzman') return 'Gezici Uzman';
-    return role || 'Üye';
+  const getRoleConf = (member: OsgbMember) => {
+    if (member.osgb_role && OSGB_ROLE_CONFIG[member.osgb_role]) return OSGB_ROLE_CONFIG[member.osgb_role];
+    return OSGB_ROLE_CONFIG.osgb_admin;
   };
-  const roleColor = (role: string) => role === 'osgb_admin' ? '#10B981' : '#8B5CF6';
-  const roleBg = (role: string) => role === 'osgb_admin' ? 'rgba(16,185,129,0.1)' : 'rgba(139,92,246,0.1)';
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-120px)]">
@@ -285,7 +425,6 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
       {/* ── LEFT NAV ── */}
       <aside className="w-64 flex-shrink-0 hidden lg:block">
         <div className="sticky top-4 rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
-          {/* User card */}
           <div className="px-5 py-5" style={{ borderBottom: '1px solid #f1f5f9' }}>
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
@@ -302,8 +441,6 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               </div>
             </div>
           </div>
-
-          {/* Nav */}
           <nav className="p-2">
             {NAV_ITEMS.map(item => {
               const isActive = activeTab === item.id;
@@ -312,8 +449,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left cursor-pointer transition-all duration-150 mb-0.5"
                   style={{ background: isActive ? 'rgba(16,185,129,0.08)' : 'transparent', border: isActive ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent' }}
                   onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(15,23,42,0.04)'; }}
-                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-                >
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
                   <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
                     style={{ background: isActive ? 'rgba(16,185,129,0.15)' : 'rgba(15,23,42,0.05)' }}>
                     <i className={`${item.icon} text-sm`} style={{ color: isActive ? '#10B981' : '#94A3B8' }} />
@@ -327,8 +463,6 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               );
             })}
           </nav>
-
-          {/* Footer */}
           <div className="px-4 py-3 mx-2 mb-2 rounded-xl" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
             <div className="flex items-center gap-2 mb-1">
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
@@ -360,10 +494,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
         {activeTab === 'profil' && (
           <div className="rounded-2xl p-7" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
             <SectionHeader icon="ri-user-settings-line" iconBg="rgba(16,185,129,0.1)" iconColor="#10B981" title="Profil Bilgileri" desc="Hesabınıza ait kişisel bilgileri güncelleyin" />
-
-            {/* Avatar card */}
-            <div className="flex items-center gap-5 p-5 rounded-2xl mb-7"
-              style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
+            <div className="flex items-center gap-5 p-5 rounded-2xl mb-7" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
                 style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 6px 20px rgba(16,185,129,0.35)' }}>
                 {(displayName || user?.email || 'O').charAt(0).toUpperCase()}
@@ -372,53 +503,35 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                 <p className="text-base font-bold truncate" style={{ color: '#0F172A' }}>{displayName || user?.email?.split('@')[0]}</p>
                 <p className="text-sm mt-0.5 truncate" style={{ color: '#64748B' }}>{user?.email}</p>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                    style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
-                    OSGB Admin
-                  </span>
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1"
-                    style={{ background: 'rgba(15,23,42,0.05)', color: '#475569' }}>
-                    <i className="ri-building-2-line text-[10px]" />
-                    {orgName}
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>OSGB Admin</span>
+                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1" style={{ background: 'rgba(15,23,42,0.05)', color: '#475569' }}>
+                    <i className="ri-building-2-line text-[10px]" />{orgName}
                   </span>
                 </div>
               </div>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label style={labelStyle}>Ad Soyad</label>
-                <input value={displayName} onChange={e => setDisplayName(e.target.value)}
-                  style={inputStyle} placeholder="Ad Soyad giriniz" onFocus={onFocus} onBlur={onBlur} />
+                <input value={displayName} onChange={e => setDisplayName(e.target.value)} style={inputStyle} placeholder="Ad Soyad giriniz" onFocus={onFocus} onBlur={onBlur} />
               </div>
               <div>
                 <label style={labelStyle}>E-posta Adresi</label>
                 <div className="relative">
-                  <input value={user?.email ?? ''} readOnly
-                    style={{ ...inputStyle, opacity: 0.55, cursor: 'not-allowed', paddingRight: '36px' }} />
+                  <input value={user?.email ?? ''} readOnly style={{ ...inputStyle, opacity: 0.55, cursor: 'not-allowed', paddingRight: '36px' }} />
                   <i className="ri-lock-line absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#64748B' }} />
                 </div>
-                <p className="text-[10px] mt-1.5" style={{ color: '#94A3B8' }}>E-posta Supabase üzerinden yönetilir</p>
               </div>
-              <div>
-                <label style={labelStyle}>Rol</label>
-                <input value="OSGB Admin" readOnly style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} />
-              </div>
-              <div>
-                <label style={labelStyle}>OSGB Adı</label>
-                <input value={orgName} readOnly style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} />
-              </div>
+              <div><label style={labelStyle}>Rol</label><input value="OSGB Admin" readOnly style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} /></div>
+              <div><label style={labelStyle}>OSGB Adı</label><input value={orgName} readOnly style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} /></div>
             </div>
-
             {profileNotif && <div className="mt-5"><Notif n={profileNotif} /></div>}
-
-            <div className="mt-6 flex items-center gap-3">
+            <div className="mt-6">
               <button onClick={handleProfileSave} disabled={profileLoading}
-                className="whitespace-nowrap flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.3)', opacity: profileLoading ? 0.7 : 1 }}>
-                {profileLoading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-save-line" />Değişiklikleri Kaydet</>}
+                className="whitespace-nowrap flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: profileLoading ? 0.7 : 1 }}>
+                {profileLoading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-save-line" />Kaydet</>}
               </button>
-              <p className="text-xs" style={{ color: '#94A3B8' }}>Son güncelleme: {new Date().toLocaleDateString('tr-TR')}</p>
             </div>
           </div>
         )}
@@ -426,56 +539,25 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
         {/* ── GÜVENLİK ── */}
         {activeTab === 'guvenlik' && (
           <div className="rounded-2xl p-7" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
-            <SectionHeader icon="ri-shield-keyhole-line" iconBg="rgba(234,88,12,0.1)" iconColor="#EA580C" title="Güvenlik Ayarları" desc="Şifrenizi güncelleyin ve hesap güvenliğinizi yönetin" />
-
-            {/* Security cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-7">
-              {[
-                { icon: 'ri-shield-check-line', label: 'Hesap Korumalı', desc: 'Supabase Auth aktif', color: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)' },
-                { icon: 'ri-lock-2-line', label: 'RLS Aktif', desc: 'Veri izolasyonu sağlandı', color: '#6366F1', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)' },
-                { icon: 'ri-building-line', label: 'OSGB İzolasyon', desc: 'OSGB\u0027ye özel erişim', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-3 p-4 rounded-xl" style={{ background: item.bg, border: `1px solid ${item.border}` }}>
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${item.color}18` }}>
-                    <i className={`${item.icon} text-base`} style={{ color: item.color }} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold" style={{ color: item.color }}>{item.label}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: '#64748B' }}>{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Password form */}
+            <SectionHeader icon="ri-shield-keyhole-line" iconBg="rgba(234,88,12,0.1)" iconColor="#EA580C" title="Güvenlik Ayarları" desc="Şifrenizi güncelleyin" />
             <div className="p-5 rounded-2xl space-y-5" style={{ background: 'rgba(15,23,42,0.02)', border: '1px solid rgba(15,23,42,0.08)' }}>
-              <div className="flex items-center gap-2">
-                <i className="ri-lock-password-line text-sm" style={{ color: '#EA580C' }} />
-                <h4 className="text-sm font-bold" style={{ color: '#334155' }}>Şifre Değiştir</h4>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label style={labelStyle}>Yeni Şifre</label>
                   <div className="relative">
                     <input type={showNew ? 'text' : 'password'} value={pwdData.newPwd}
                       onChange={e => setPwdData(p => ({ ...p, newPwd: e.target.value }))}
-                      style={{ ...inputStyle, paddingRight: '40px' }} placeholder="Yeni şifrenizi girin"
-                      onFocus={onFocus} onBlur={onBlur} />
-                    <button type="button" onClick={() => setShowNew(!showNew)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer" style={{ color: '#64748B' }}>
+                      style={{ ...inputStyle, paddingRight: '40px' }} placeholder="Yeni şifrenizi girin" onFocus={onFocus} onBlur={onBlur} />
+                    <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer" style={{ color: '#64748B' }}>
                       <i className={`${showNew ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
                     </button>
                   </div>
                   {pwdData.newPwd && (
-                    <div className="mt-2 space-y-1">
+                    <div className="mt-2">
                       <div className="flex gap-1">
-                        {[1,2,3,4,5].map(i => (
-                          <div key={i} className="h-1 flex-1 rounded-full transition-all"
-                            style={{ background: i <= pwdStrength.score ? pwdStrength.color : 'rgba(15,23,42,0.08)' }} />
-                        ))}
+                        {[1,2,3,4,5].map(i => <div key={i} className="h-1 flex-1 rounded-full" style={{ background: i <= pwdStrength.score ? pwdStrength.color : 'rgba(15,23,42,0.08)' }} />)}
                       </div>
-                      <p className="text-[11px] font-semibold" style={{ color: pwdStrength.color }}>{pwdStrength.label}</p>
+                      <p className="text-[11px] mt-1 font-semibold" style={{ color: pwdStrength.color }}>{pwdStrength.label}</p>
                     </div>
                   )}
                 </div>
@@ -485,13 +567,9 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                     <input type={showConfirm ? 'text' : 'password'} value={pwdData.confirmPwd}
                       onChange={e => setPwdData(p => ({ ...p, confirmPwd: e.target.value }))}
                       style={{ ...inputStyle, paddingRight: '64px', borderColor: passwordsMatch ? 'rgba(34,197,94,0.5)' : passwordsMismatch ? 'rgba(239,68,68,0.5)' : undefined }}
-                      placeholder="Şifrenizi tekrar girin"
-                      onFocus={onFocus} onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }} />
+                      placeholder="Şifrenizi tekrar girin" onFocus={onFocus} onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }} />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      {pwdData.confirmPwd && (
-                        <i className={`text-sm ${passwordsMatch ? 'ri-checkbox-circle-line' : passwordsMismatch ? 'ri-close-circle-line' : ''}`}
-                          style={{ color: passwordsMatch ? '#22C55E' : '#EF4444' }} />
-                      )}
+                      {pwdData.confirmPwd && <i className={`text-sm ${passwordsMatch ? 'ri-checkbox-circle-line' : passwordsMismatch ? 'ri-close-circle-line' : ''}`} style={{ color: passwordsMatch ? '#22C55E' : '#EF4444' }} />}
                       <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="cursor-pointer" style={{ color: '#64748B' }}>
                         <i className={`${showConfirm ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
                       </button>
@@ -501,19 +579,10 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                   {passwordsMatch && <p className="text-[11px] mt-1" style={{ color: '#22C55E' }}>Şifreler eşleşiyor</p>}
                 </div>
               </div>
-
-              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(15,23,42,0.03)', border: '1px solid rgba(15,23,42,0.08)' }}>
-                <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#64748B' }} />
-                <p className="text-xs leading-relaxed" style={{ color: '#64748B' }}>
-                  En az <strong style={{ color: '#0F172A' }}>6 karakter</strong>. Güvenlik için büyük harf, rakam ve özel karakter önerilir.
-                </p>
-              </div>
-
               {pwdNotif && <Notif n={pwdNotif} />}
-
               <button onClick={handlePasswordChange} disabled={pwdLoading || !pwdData.newPwd}
                 className="whitespace-nowrap flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #EA580C, #F97316)', boxShadow: '0 4px 14px rgba(234,88,12,0.3)', opacity: (pwdLoading || !pwdData.newPwd) ? 0.6 : 1 }}>
+                style={{ background: 'linear-gradient(135deg, #EA580C, #F97316)', opacity: (pwdLoading || !pwdData.newPwd) ? 0.6 : 1 }}>
                 {pwdLoading ? <><i className="ri-loader-4-line animate-spin" />Güncelleniyor...</> : <><i className="ri-lock-password-line" />Şifreyi Güncelle</>}
               </button>
             </div>
@@ -529,7 +598,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                 { label: 'Toplam Üye', value: members.length, icon: 'ri-group-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
                 { label: 'OSGB Admin', value: members.filter(m => m.osgb_role === 'osgb_admin').length, icon: 'ri-shield-star-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
                 { label: 'Gezici Uzman', value: members.filter(m => m.osgb_role === 'gezici_uzman').length, icon: 'ri-user-star-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)' },
-                { label: 'Aktif Üye', value: members.filter(m => m.is_active).length, icon: 'ri-user-follow-line', color: '#06B6D4', bg: 'rgba(6,182,212,0.08)' },
+                { label: 'İşyeri Hekimi', value: members.filter(m => m.osgb_role === 'isyeri_hekimi').length, icon: 'ri-heart-pulse-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)' },
               ].map(s => (
                 <div key={s.label} className="rounded-2xl p-4" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ background: s.bg }}>
@@ -545,9 +614,20 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
             <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
               <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <h3 className="text-sm font-bold" style={{ color: '#0F172A' }}>OSGB Üyeleri</h3>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
-                  {members.length} üye
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
+                    {members.length} üye
+                  </span>
+                  {/* Kullanıcı Ekle butonu */}
+                  <button
+                    onClick={() => { setShowAddModal(true); setAddForm(emptyForm); setAddError(null); }}
+                    className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
+                    style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
+                  >
+                    <i className="ri-user-add-line text-xs" />
+                    Kullanıcı Ekle
+                  </button>
+                </div>
               </div>
 
               {teamLoading ? (
@@ -557,38 +637,34 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                 </div>
               ) : members.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.08)' }}>
-                    <i className="ri-group-line text-xl" style={{ color: '#10B981' }} />
-                  </div>
+                  <i className="ri-group-line text-2xl" style={{ color: '#94A3B8' }} />
                   <p className="text-sm" style={{ color: '#94A3B8' }}>Henüz üye bulunamadı</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-50">
                   {members.map(member => {
                     const isMe = member.user_id === user?.id;
-                    const isDeleting = actionLoadingId === member.user_id + '_delete';
-                    const isToggling = actionLoadingId === member.user_id;
+                    const roleConf = getRoleConf(member);
                     return (
-                      <div key={member.user_id} className="flex items-center gap-4 px-5 py-4 transition-all"
+                      <div key={member.user_id}
+                        className="flex items-center gap-4 px-5 py-4 transition-all"
                         style={{ opacity: member.is_active ? 1 : 0.65 }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-                        {/* Avatar */}
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                          style={{ background: member.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
+                          style={{ background: member.is_active ? `linear-gradient(135deg, ${roleConf.color}, ${roleConf.color}cc)` : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
                           {(member.display_name || member.email || '?').charAt(0).toUpperCase()}
                         </div>
-
-                        {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>
                               {member.display_name || '—'}
                               {isMe && <span className="ml-1 text-xs font-normal" style={{ color: '#10B981' }}>(siz)</span>}
                             </p>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                              style={{ background: roleBg(member.osgb_role), color: roleColor(member.osgb_role) }}>
-                              {roleLabel(member.osgb_role)}
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                              style={{ background: roleConf.bg, color: roleConf.color }}>
+                              <i className={`${roleConf.icon} text-[9px]`} />
+                              {roleConf.label}
                             </span>
                             {!member.is_active && (
                               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
@@ -598,44 +674,30 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                             )}
                           </div>
                           <p className="text-xs truncate mt-0.5" style={{ color: '#94A3B8' }}>{member.email}</p>
+                          {/* Atanmış firmalar */}
+                          {(member.osgb_role === 'gezici_uzman' || member.osgb_role === 'isyeri_hekimi') && member.active_firm_ids && member.active_firm_ids.length > 0 && (
+                            <p className="text-[10px] mt-0.5 flex items-center gap-1" style={{ color: roleConf.color }}>
+                              <i className="ri-building-3-line text-[9px]" />
+                              {member.active_firm_ids.length} firma atandı
+                            </p>
+                          )}
                         </div>
-
-                        {/* Actions */}
                         {!isMe && (
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {/* Aktif/Pasif toggle */}
-                            <button
-                              onClick={() => handleToggleActive(member)}
-                              disabled={isToggling}
-                              title={member.is_active ? 'Pasif yap' : 'Aktif yap'}
-                              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all disabled:opacity-50"
+                            <button onClick={() => handleToggleActive(member)} disabled={actionLoadingId === member.user_id}
+                              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
                               style={{
                                 background: member.is_active ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
                                 border: `1px solid ${member.is_active ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
                                 color: member.is_active ? '#EF4444' : '#10B981',
-                              }}
-                            >
-                              {isToggling ? (
-                                <i className="ri-loader-4-line animate-spin" />
-                              ) : (
-                                <i className={member.is_active ? 'ri-pause-circle-line' : 'ri-play-circle-line'} />
-                              )}
+                              }}>
+                              {actionLoadingId === member.user_id ? <i className="ri-loader-4-line animate-spin" /> : <i className={member.is_active ? 'ri-pause-circle-line' : 'ri-play-circle-line'} />}
                               {member.is_active ? 'Pasif' : 'Aktif'}
                             </button>
-
-                            {/* Sil butonu */}
-                            <button
-                              onClick={() => setDeleteConfirm(member)}
-                              disabled={isDeleting}
-                              title="Üyeyi kaldır"
-                              className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all disabled:opacity-50"
-                              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#EF4444' }}
-                            >
-                              {isDeleting ? (
-                                <i className="ri-loader-4-line animate-spin text-xs" />
-                              ) : (
-                                <i className="ri-delete-bin-line text-xs" />
-                              )}
+                            <button onClick={() => setDeleteConfirm(member)} disabled={actionLoadingId === member.user_id + '_delete'}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer disabled:opacity-50"
+                              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#EF4444' }}>
+                              <i className="ri-delete-bin-line text-xs" />
                             </button>
                           </div>
                         )}
@@ -646,13 +708,12 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               )}
             </div>
 
-            {/* Info note */}
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
-              style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
               <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
               <p className="text-xs leading-relaxed" style={{ color: '#64748B' }}>
-                <strong style={{ color: '#059669' }}>OSGB Admin:</strong> Tüm firma ve uzman yönetimi &bull;&nbsp;
-                <strong style={{ color: '#8B5CF6' }}>Gezici Uzman:</strong> Atanan firmalara erişim ve denetim yetkisi
+                <strong style={{ color: '#059669' }}>OSGB Admin:</strong> Tam yetki &bull;&nbsp;
+                <strong style={{ color: '#8B5CF6' }}>Gezici Uzman:</strong> Atanan firmalarda denetim &bull;&nbsp;
+                <strong style={{ color: '#0EA5E9' }}>İşyeri Hekimi:</strong> Atanan firmalarda sağlık takibi
               </p>
             </div>
           </div>
@@ -663,47 +724,12 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
           <div className="space-y-5">
             <div className="rounded-2xl p-7" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
               <SectionHeader icon="ri-information-line" iconBg="rgba(100,116,139,0.1)" iconColor="#64748B" title="Sistem Bilgisi" desc="Uygulama versiyonu ve OSGB teknik detayları" />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-7">
-                {[
-                  { label: 'Sistem Adı', value: 'ISG Denetim', icon: 'ri-shield-star-line', color: '#10B981' },
-                  { label: 'Versiyon', value: '2.0.0', icon: 'ri-code-s-slash-line', color: '#059669' },
-                  { label: 'Panel Tipi', value: 'OSGB Yönetim Paneli', icon: 'ri-building-4-line', color: '#06B6D4' },
-                  { label: 'Auth Sistemi', value: 'Supabase Auth', icon: 'ri-lock-2-line', color: '#34D399' },
-                  { label: 'Veritabanı', value: 'PostgreSQL (Supabase)', icon: 'ri-database-2-line', color: '#8B5CF6' },
-                  { label: 'Güvenlik', value: 'RLS + JWT', icon: 'ri-shield-check-line', color: '#4ADE80' },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'rgba(15,23,42,0.03)', border: '1px solid rgba(15,23,42,0.07)' }}>
-                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${item.color}15` }}>
-                      <i className={`${item.icon} text-sm`} style={{ color: item.color }} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#94A3B8' }}>{item.label}</p>
-                      <p className="text-sm font-bold mt-0.5" style={{ color: '#0F172A' }}>{item.value}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* OSGB bilgisi */}
-            <div className="rounded-2xl p-7" style={{ background: '#fff', border: '1px solid #f1f5f9' }}>
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                  <i className="ri-building-2-line text-lg" style={{ color: '#10B981' }} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold" style={{ color: '#0F172A' }}>OSGB Bilgileri</h3>
-                  <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Organizasyon ve kapsam detayları</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
                   { label: 'OSGB Adı', value: orgName, icon: 'ri-building-4-line', color: '#10B981' },
                   { label: 'Müşteri Firma', value: String(firmaCount), icon: 'ri-building-2-line', color: '#06B6D4' },
                   { label: 'Gezici Uzman', value: String(uzmanCount), icon: 'ri-user-star-line', color: '#8B5CF6' },
-                  { label: 'Admin', value: String(members.filter(m => m.osgb_role === 'osgb_admin').length || 1), icon: 'ri-shield-star-line', color: '#F59E0B' },
+                  { label: 'İşyeri Hekimi', value: String(members.filter(m => m.osgb_role === 'isyeri_hekimi').length), icon: 'ri-heart-pulse-line', color: '#0EA5E9' },
                 ].map(s => (
                   <div key={s.label} className="p-4 rounded-xl text-center" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ background: `${s.color}15` }}>
@@ -714,26 +740,159 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                   </div>
                 ))}
               </div>
-
-              <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
-                <span className="w-2 h-2 rounded-full mt-1 flex-shrink-0 animate-pulse" style={{ background: '#10B981' }} />
-                <div>
-                  <p className="text-xs font-semibold" style={{ color: '#059669' }}>OSGB sistemi aktif çalışıyor</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: '#64748B' }}>Tüm gezici uzmanlar ve müşteri firmalar senkronize.</p>
-                </div>
-              </div>
             </div>
           </div>
         )}
-
       </main>
 
       {/* ── Toast ── */}
       {toastMsg && createPortal(
         <div className="fixed bottom-6 right-6 z-[99999] flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white"
-          style={{ background: toastMsg.type === 'success' ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #EF4444, #DC2626)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+          style={{ background: toastMsg.type === 'success' ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #EF4444, #DC2626)' }}>
           <i className={toastMsg.type === 'success' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'} />
           {toastMsg.text}
+        </div>,
+        document.body
+      )}
+
+      {/* ── Kullanıcı Ekle Modal ── */}
+      {showAddModal && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowAddModal(false); }}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.15)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #f1f5f9' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                  <i className="ri-user-add-line text-base" style={{ color: '#10B981' }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: '#0F172A' }}>Yeni Kullanıcı Ekle</h3>
+                  <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Gezici uzman veya işyeri hekimi oluşturun</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(15,23,42,0.06)', color: '#64748B' }}>
+                <i className="ri-close-line" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              {/* Rol seçimi */}
+              <div>
+                <label style={labelStyle}>Rol *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: 'gezici_uzman', label: 'Gezici Uzman', icon: 'ri-user-star-line', color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.25)' },
+                    { value: 'isyeri_hekimi', label: 'İşyeri Hekimi', icon: 'ri-heart-pulse-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)', border: 'rgba(14,165,233,0.25)' },
+                  ] as const).map(opt => (
+                    <button key={opt.value} type="button"
+                      onClick={() => setAddForm(p => ({ ...p, osgb_role: opt.value, active_firm_ids: [] }))}
+                      className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all text-left"
+                      style={{
+                        background: addForm.osgb_role === opt.value ? opt.bg : 'rgba(15,23,42,0.03)',
+                        border: `2px solid ${addForm.osgb_role === opt.value ? opt.border : 'rgba(15,23,42,0.08)'}`,
+                      }}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: addForm.osgb_role === opt.value ? opt.bg : 'rgba(15,23,42,0.06)' }}>
+                        <i className={`${opt.icon} text-sm`} style={{ color: addForm.osgb_role === opt.value ? opt.color : '#94A3B8' }} />
+                      </div>
+                      <span className="text-xs font-semibold" style={{ color: addForm.osgb_role === opt.value ? opt.color : '#475569' }}>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Kişisel bilgiler */}
+              <div>
+                <label style={labelStyle}>Ad Soyad *</label>
+                <input value={addForm.display_name} onChange={e => setAddForm(p => ({ ...p, display_name: e.target.value }))} style={inputStyle} placeholder="Ad Soyad giriniz" onFocus={onFocus} onBlur={onBlur} />
+              </div>
+              <div>
+                <label style={labelStyle}>E-posta *</label>
+                <input type="email" value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} placeholder="kullanici@email.com" onFocus={onFocus} onBlur={onBlur} />
+              </div>
+              <div>
+                <label style={labelStyle}>Geçici Şifre *</label>
+                <div className="relative">
+                  <input type={showAddPassword ? 'text' : 'password'} value={addForm.password}
+                    onChange={e => setAddForm(p => ({ ...p, password: e.target.value }))}
+                    style={{ ...inputStyle, paddingRight: '40px' }} placeholder="En az 8 karakter" onFocus={onFocus} onBlur={onBlur} />
+                  <button type="button" onClick={() => setShowAddPassword(!showAddPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer" style={{ color: '#64748B' }}>
+                    <i className={`${showAddPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
+                  </button>
+                </div>
+                <p className="text-[10px] mt-1" style={{ color: '#94A3B8' }}>İlk girişte şifre değiştirmesi gerekecek.</p>
+              </div>
+
+              {/* Firma ataması */}
+              <div>
+                <label style={labelStyle}>
+                  Firma Ataması *
+                  <span className="ml-1 text-[10px] font-normal normal-case" style={{ color: '#94A3B8' }}>
+                    (en az 1 firma seç)
+                  </span>
+                </label>
+                {firmalarLoading ? (
+                  <div className="flex items-center justify-center py-4 gap-2" style={{ color: '#94A3B8' }}>
+                    <i className="ri-loader-4-line animate-spin text-sm" />
+                    <span className="text-xs">Firmalar yükleniyor...</span>
+                  </div>
+                ) : firmalar.length === 0 ? (
+                  <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                    <i className="ri-information-line text-sm flex-shrink-0" style={{ color: '#F59E0B' }} />
+                    <p className="text-xs" style={{ color: '#92400E' }}>
+                      Henüz atanmış müşteri firma bulunamadı. Önce Firmalar sekmesinden firma ekleyin.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto border rounded-xl p-2" style={{ borderColor: 'rgba(15,23,42,0.1)', background: 'rgba(15,23,42,0.02)' }}>
+                    {firmalar.map(f => {
+                      const selected = addForm.active_firm_ids.includes(f.id);
+                      return (
+                        <button key={f.id} type="button" onClick={() => toggleFirmaSelection(f.id)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer text-left transition-all"
+                          style={{ background: selected ? 'rgba(16,185,129,0.08)' : '#fff', border: `1.5px solid ${selected ? 'rgba(16,185,129,0.3)' : 'rgba(15,23,42,0.08)'}` }}>
+                          <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
+                            style={{ background: selected ? 'linear-gradient(135deg, #10B981, #059669)' : '#fff', border: selected ? 'none' : '1.5px solid rgba(15,23,42,0.2)' }}>
+                            {selected && <i className="ri-check-line text-white text-[9px]" />}
+                          </div>
+                          <i className="ri-building-3-line text-xs flex-shrink-0" style={{ color: selected ? '#10B981' : '#94A3B8' }} />
+                          <span className="text-xs font-medium flex-1 truncate" style={{ color: selected ? '#059669' : '#0F172A' }}>{f.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {addForm.active_firm_ids.length > 0 && (
+                  <p className="text-[10px] mt-1 font-semibold" style={{ color: '#10B981' }}>
+                    <i className="ri-check-double-line mr-0.5" />
+                    {addForm.active_firm_ids.length} firma seçildi
+                  </p>
+                )}
+              </div>
+
+              {addError && (
+                <div className="flex items-start gap-2 px-4 py-3 rounded-xl text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#F87171' }}>
+                  <i className="ri-error-warning-line flex-shrink-0 mt-0.5" />
+                  <span>{addError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Modal footer */}
+            <div className="flex gap-3 px-6 py-4" style={{ borderTop: '1px solid #f1f5f9' }}>
+              <button onClick={() => setShowAddModal(false)}
+                className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+                style={{ background: 'rgba(15,23,42,0.05)', border: '1px solid rgba(15,23,42,0.1)', color: '#64748B' }}>
+                İptal
+              </button>
+              <button onClick={handleAddUser} disabled={addLoading}
+                className="flex-1 whitespace-nowrap flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: addLoading ? 0.7 : 1 }}>
+                {addLoading ? <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</> : <><i className="ri-user-add-line" />Kullanıcı Ekle</>}
+              </button>
+            </div>
+          </div>
         </div>,
         document.body
       )}
@@ -743,11 +902,9 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
         <div className="fixed inset-0 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
           onClick={e => { if (e.target === e.currentTarget) setDeleteConfirm(null); }}>
-          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4"
-            style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.15)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4" style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.15)' }}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
                 <i className="ri-delete-bin-line text-base" style={{ color: '#EF4444' }} />
               </div>
               <div>
@@ -755,33 +912,18 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                 <p className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz</p>
               </div>
             </div>
-
-            <div className="px-3 py-3 rounded-xl"
-              style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
+            <div className="px-3 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)' }}>
               <p className="text-sm" style={{ color: '#0F172A' }}>
-                <strong>{deleteConfirm.display_name || deleteConfirm.email}</strong> adlı üyeyi OSGB organizasyonundan kaldırmak istediğinize emin misiniz?
-              </p>
-              <p className="text-xs mt-1.5" style={{ color: '#64748B' }}>
-                Kullanıcı organizasyondan çıkarılacak ve hesabı silinecektir.
+                <strong>{deleteConfirm.display_name || deleteConfirm.email}</strong> adlı üyeyi kaldırmak istediğinize emin misiniz?
               </p>
             </div>
-
-            <div className="flex gap-3 pt-1">
-              <button onClick={() => setDeleteConfirm(null)}
-                className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
-                style={{ background: 'rgba(15,23,42,0.05)', border: '1px solid rgba(15,23,42,0.1)', color: '#64748B' }}>
-                İptal
-              </button>
-              <button
-                onClick={handleDeleteMember}
-                disabled={actionLoadingId === deleteConfirm.user_id + '_delete'}
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 whitespace-nowrap py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+                style={{ background: 'rgba(15,23,42,0.05)', border: '1px solid rgba(15,23,42,0.1)', color: '#64748B' }}>İptal</button>
+              <button onClick={handleDeleteMember} disabled={actionLoadingId === deleteConfirm.user_id + '_delete'}
                 className="flex-1 whitespace-nowrap flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer disabled:opacity-70"
                 style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)' }}>
-                {actionLoadingId === deleteConfirm.user_id + '_delete' ? (
-                  <><i className="ri-loader-4-line animate-spin" />Kaldırılıyor...</>
-                ) : (
-                  <><i className="ri-delete-bin-line" />Evet, Kaldır</>
-                )}
+                {actionLoadingId === deleteConfirm.user_id + '_delete' ? <><i className="ri-loader-4-line animate-spin" />Kaldırılıyor...</> : <><i className="ri-delete-bin-line" />Evet, Kaldır</>}
               </button>
             </div>
           </div>
