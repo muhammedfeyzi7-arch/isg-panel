@@ -19,7 +19,7 @@ interface AtanmisOrg {
 
 export default function ZiyaretCheckIn() {
   const { user } = useAuth();
-  const { org, addToast } = useApp();
+  const { addToast } = useApp();
 
   const [aktifZiyaret, setAktifZiyaret] = useState<AktifZiyaret | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,6 +29,10 @@ export default function ZiyaretCheckIn() {
   const [atanmisFirmalar, setAtanmisFirmalar] = useState<AtanmisOrg[]>([]);
   const [gecmis, setGecmis] = useState<AktifZiyaret[]>([]);
   const [elapsed, setElapsed] = useState('');
+
+  // Kullanıcının osgb_org_id ve display_name'ini tutan state
+  const [osgbOrgId, setOsgbOrgId] = useState<string | null>(null);
+  const [uzmanAd, setUzmanAd] = useState<string>('');
 
   // Aktif ziyaret süresini say
   useEffect(() => {
@@ -45,33 +49,43 @@ export default function ZiyaretCheckIn() {
     return () => clearInterval(interval);
   }, [aktifZiyaret]);
 
-  // Kullanıcıya atanmış firmaları çek — active_firm_ids (array) üzerinden
+  // Kullanıcıya atanmış firmaları + osgb_org_id + display_name çek
   const fetchAtanmisFirmalar = useCallback(async () => {
     if (!user?.id) return;
 
-    // org context'ten activeFirmIds varsa direkt kullan (daha hızlı)
-    if (org?.activeFirmIds && org.activeFirmIds.length > 0) {
-      const { data: firmData } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .in('id', org.activeFirmIds);
-      setAtanmisFirmalar(firmData ?? []);
+    // user_organizations'dan tüm gerekli bilgileri çek
+    // osgb_role gezici_uzman veya isyeri_hekimi olabilir
+    const { data: uoData } = await supabase
+      .from('user_organizations')
+      .select('organization_id, active_firm_ids, active_firm_id, osgb_role, display_name')
+      .eq('user_id', user.id)
+      .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi'])
+      .maybeSingle();
+
+    if (!uoData) {
+      // Fallback: herhangi bir aktif üyelik
+      const { data: anyMembership } = await supabase
+        .from('user_organizations')
+        .select('organization_id, active_firm_ids, active_firm_id, display_name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (anyMembership) {
+        setOsgbOrgId(anyMembership.organization_id);
+        setUzmanAd(anyMembership.display_name ?? user.email ?? 'Uzman');
+      }
       return;
     }
 
-    // Fallback: DB'den çek (osgb_role = gezici_uzman kaydından)
-    const { data: uoData } = await supabase
-      .from('user_organizations')
-      .select('active_firm_ids')
-      .eq('user_id', user.id)
-      .eq('osgb_role', 'gezici_uzman')
-      .maybeSingle();
+    // OSGB org id = uzmanın bağlı olduğu ana org
+    setOsgbOrgId(uoData.organization_id);
+    setUzmanAd(uoData.display_name ?? user.email ?? 'Uzman');
 
-    if (!uoData) return;
-
+    // Atanmış firma id'leri
     const firmIds: string[] = (uoData.active_firm_ids && Array.isArray(uoData.active_firm_ids) && uoData.active_firm_ids.length > 0)
       ? (uoData.active_firm_ids as string[]).filter(Boolean)
-      : [];
+      : uoData.active_firm_id ? [uoData.active_firm_id as string] : [];
 
     if (firmIds.length === 0) return;
 
@@ -81,7 +95,7 @@ export default function ZiyaretCheckIn() {
       .in('id', firmIds);
 
     setAtanmisFirmalar(firmData ?? []);
-  }, [user?.id, org?.activeFirmIds]);
+  }, [user?.id, user?.email]);
 
   // Aktif ziyareti ve geçmişi çek
   const fetchZiyaret = useCallback(async () => {
@@ -96,7 +110,7 @@ export default function ZiyaretCheckIn() {
         .maybeSingle();
       setAktifZiyaret(data ?? null);
 
-      // Son 10 tamamlanmış ziyaret
+      // Son 5 tamamlanmış ziyaret
       const { data: gecmisData } = await supabase
         .from('osgb_ziyaretler')
         .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
@@ -117,7 +131,31 @@ export default function ZiyaretCheckIn() {
 
   // Check-in yap (firma ID ile)
   const handleCheckIn = useCallback(async (firmaId: string, qr = false) => {
-    if (!user?.id || !org?.id) return;
+    if (!user?.id) {
+      addToast('Oturum bulunamadı.', 'error');
+      return;
+    }
+
+    // osgbOrgId henüz gelmemişse DB'den tekrar çek
+    let resolvedOsgbOrgId = osgbOrgId;
+    let resolvedUzmanAd = uzmanAd;
+
+    if (!resolvedOsgbOrgId) {
+      const { data: uoData } = await supabase
+        .from('user_organizations')
+        .select('organization_id, display_name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (!uoData) {
+        addToast('Organizasyon bilgisi bulunamadı.', 'error');
+        return;
+      }
+      resolvedOsgbOrgId = uoData.organization_id;
+      resolvedUzmanAd = uoData.display_name ?? user.email ?? 'Uzman';
+    }
+
     setActionLoading(true);
     try {
       // Önce aktif ziyaret var mı kontrol et
@@ -151,11 +189,11 @@ export default function ZiyaretCheckIn() {
       const { data: yeniZiyaret, error } = await supabase
         .from('osgb_ziyaretler')
         .insert({
-          osgb_org_id: org.id,
+          osgb_org_id: resolvedOsgbOrgId,
           firma_org_id: firmaId,
           firma_ad: firmaData.name,
           uzman_user_id: user.id,
-          uzman_ad: user.user_metadata?.display_name ?? user.email ?? 'Uzman',
+          uzman_ad: resolvedUzmanAd || user.email || 'Uzman',
           uzman_email: user.email,
           giris_saati: now,
           durum: 'aktif',
@@ -166,15 +204,19 @@ export default function ZiyaretCheckIn() {
         .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[ZiyaretCheckIn] insert error:', error);
+        throw error;
+      }
       setAktifZiyaret(yeniZiyaret ?? null);
       addToast(`${firmaData.name} ziyareti başlatıldı!`, 'success');
     } catch (err) {
+      console.error('[ZiyaretCheckIn] handleCheckIn error:', err);
       addToast(`Check-in yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
     } finally {
       setActionLoading(false);
     }
-  }, [user, org, addToast]);
+  }, [user, osgbOrgId, uzmanAd, addToast]);
 
   // Check-out yap
   const handleCheckOut = useCallback(async () => {
@@ -253,7 +295,6 @@ export default function ZiyaretCheckIn() {
         addToast(`Farklı firmada aktif ziyaretiniz var (${aktifZiyaret.firma_ad}). Önce bitirin.`, 'error');
       }
     } else {
-      // QR ile check-in — firma atanmış olmasına gerek yok
       void handleCheckIn(firmaId, true);
     }
   }, [aktifZiyaret, handleCheckIn, handleCheckOut, addToast]);
@@ -311,7 +352,7 @@ export default function ZiyaretCheckIn() {
                 {aktifZiyaret.firma_ad ?? 'Bilinmeyen Firma'}
               </p>
               <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
-                Giriş: {formatTime(aktifZiyaret.giris_saati)}
+                Giriş: {formatTime(aktifZiyaret.giris_saati)} · {formatDate(aktifZiyaret.giris_saati)}
               </p>
             </div>
           </div>
@@ -330,7 +371,7 @@ export default function ZiyaretCheckIn() {
           <button
             onClick={handleCheckOut}
             disabled={actionLoading}
-            className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all"
+            className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all whitespace-nowrap"
             style={{ background: actionLoading ? '#64748B' : 'linear-gradient(135deg, #EF4444, #DC2626)', opacity: actionLoading ? 0.7 : 1 }}>
             {actionLoading
               ? <><i className="ri-loader-4-line animate-spin" />İşleniyor...</>
@@ -414,7 +455,7 @@ export default function ZiyaretCheckIn() {
               <button
                 onClick={() => { if (manuelFirmaId) void handleCheckIn(manuelFirmaId, false); }}
                 disabled={!manuelFirmaId || actionLoading}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition-all"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition-all whitespace-nowrap"
                 style={{
                   background: manuelFirmaId && !actionLoading ? 'linear-gradient(135deg, #0284C7, #0EA5E9)' : '#334155',
                   opacity: (!manuelFirmaId || actionLoading) ? 0.6 : 1,

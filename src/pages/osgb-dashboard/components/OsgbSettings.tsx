@@ -294,10 +294,6 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
     if (!addForm.display_name.trim()) { setAddError('Ad Soyad zorunludur.'); return; }
     if (!addForm.email.trim() || !addForm.email.includes('@')) { setAddError('Geçerli bir e-posta girin.'); return; }
     if (!addForm.password || addForm.password.length < 8) { setAddError('Şifre en az 8 karakter olmalıdır.'); return; }
-    if (addForm.active_firm_ids.length === 0) {
-      setAddError(`${addForm.osgb_role === 'isyeri_hekimi' ? 'İşyeri Hekimi' : 'Gezici Uzman'} için en az bir firma seçmelisiniz.`);
-      return;
-    }
 
     setAddLoading(true);
     try {
@@ -885,8 +881,8 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
 
               <div>
                 <label style={labelStyle}>
-                  Firma Ataması *
-                  <span className="ml-1 text-[10px] font-normal normal-case" style={{ color: 'var(--text-muted)' }}>(en az 1 firma seç)</span>
+                  Firma Ataması
+                  <span className="ml-1 text-[10px] font-normal normal-case" style={{ color: 'var(--text-muted)' }}>(isteğe bağlı, sonradan atanabilir)</span>
                 </label>
                 {firmalarLoading ? (
                   <div className="flex items-center justify-center py-4 gap-2" style={{ color: 'var(--text-muted)' }}>
@@ -894,9 +890,9 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                     <span className="text-xs">Firmalar yükleniyor...</span>
                   </div>
                 ) : firmalar.length === 0 ? (
-                  <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                    <i className="ri-information-line text-sm flex-shrink-0" style={{ color: '#F59E0B' }} />
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Henüz atanmış müşteri firma bulunamadı. Önce Firmalar sekmesinden firma ekleyin.</p>
+                  <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.15)' }}>
+                    <i className="ri-information-line text-sm flex-shrink-0" style={{ color: '#0EA5E9' }} />
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Henüz müşteri firma eklenmedi. Personel oluşturulduktan sonra Firmalar sekmesinden atama yapabilirsiniz.</p>
                   </div>
                 ) : (
                   <div className="space-y-1.5 max-h-40 overflow-y-auto border rounded-xl p-2" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-item)' }}>

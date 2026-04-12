@@ -86,13 +86,19 @@ export function useOrganizationAdmin() {
     orgId: string,
     fields: { subscription_end?: string; is_active?: boolean }
   ) => {
-    await saFetch(
-      `organizations?id=eq.${orgId}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ ...fields, updated_at: new Date().toISOString() }),
-      }
-    );
+    const saToken = sessionStorage.getItem('sa_access_token') ?? '';
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/super-admin-toggle-org`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${saToken}`,
+      },
+      body: JSON.stringify({ org_id: orgId, ...fields }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error((data as { error?: string }).error || `HTTP ${res.status}`);
+    }
     await fetchOrgs();
   }, [fetchOrgs]);
 

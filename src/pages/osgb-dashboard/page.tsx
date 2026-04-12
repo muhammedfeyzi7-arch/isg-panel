@@ -1204,6 +1204,12 @@ export default function OsgbDashboardPage() {
                   </div>
 
                   {/* Firma kartları — çoklu seçim */}
+                  {altFirmalar.length === 0 && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl mb-3" style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.15)' }}>
+                      <i className="ri-information-line text-sm flex-shrink-0" style={{ color: '#0EA5E9' }} />
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Henüz müşteri firma eklenmedi. Personeli şimdi oluşturup daha sonra Firmalar sekmesinden atama yapabilirsiniz.</p>
+                    </div>
+                  )}
                   {altFirmalar.length > 0 ? (
                     <div className="space-y-1.5 max-h-48 overflow-y-auto">
                       {altFirmalar.map(f => {
@@ -1242,9 +1248,7 @@ export default function OsgbDashboardPage() {
                         );
                       })}
                     </div>
-                  ) : (
-                    <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>Henüz firma eklenmedi.</p>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>
