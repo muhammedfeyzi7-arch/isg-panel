@@ -113,11 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.' };
       }
 
-      // Giriş başarılı — kullanıcının aktif org üyeliği var mı kontrol et
+      // Giriş başarılı — kullanıcının aktif org üyeliği var mı VE organizasyon aktif mi kontrol et
       if (signInData?.user) {
         const { data: membership } = await supabase
           .from('user_organizations')
-          .select('user_id, is_active')
+          .select('user_id, is_active, organization_id')
           .eq('user_id', signInData.user.id)
           .eq('is_active', true)
           .limit(1)
@@ -127,6 +127,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await supabase.auth.signOut({ scope: 'local' });
           clearAuthStorage();
           return { error: 'Hesabınız devre dışı bırakılmış veya organizasyondan çıkarılmış. Lütfen yöneticinizle iletişime geçin.' };
+        }
+
+        // Organizasyonun kendisi aktif mi kontrol et
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('id, is_active')
+          .eq('id', membership.organization_id)
+          .maybeSingle();
+
+        if (!orgData || orgData.is_active === false) {
+          await supabase.auth.signOut({ scope: 'local' });
+          clearAuthStorage();
+          return { error: 'Organizasyonunuz askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.' };
         }
       }
 

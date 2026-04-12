@@ -40,13 +40,11 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '').trim();
 
-    // Service role client — RLS bypass eder
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
       global: { headers: { Authorization: `Bearer ${serviceKey}` } },
     });
 
-    // Caller'ı doğrula (user token ile ayrı client)
     const userClient = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -57,7 +55,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Super admin kontrolü
     const { data: profile, error: profileErr } = await adminClient
       .from('profiles')
       .select('is_super_admin')
@@ -79,6 +76,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const {
       org_name,
+      org_type,
       subscription_start,
       subscription_end,
       admin_email,
@@ -86,6 +84,7 @@ Deno.serve(async (req) => {
       admin_display_name,
     } = body as {
       org_name: string;
+      org_type: 'osgb' | 'firma';
       subscription_start: string;
       subscription_end: string;
       admin_email: string;
@@ -110,6 +109,10 @@ Deno.serve(async (req) => {
     }
 
     const normalizedEmail = admin_email.toLowerCase().trim();
+    const resolvedOrgType = org_type === 'osgb' ? 'osgb' : 'firma';
+
+    // OSGB için osgb_role = 'osgb_admin', Firma için null
+    const resolvedOsgbRole = resolvedOrgType === 'osgb' ? 'osgb_admin' : null;
 
     // Benzersiz davet kodu üret
     let inviteCode = generateInviteCode();
@@ -123,13 +126,14 @@ Deno.serve(async (req) => {
       inviteCode = generateInviteCode();
     }
 
-    // 1. Organizasyonu oluştur (service role — RLS bypass)
+    // 1. Organizasyonu oluştur
     const { data: newOrg, error: orgErr } = await adminClient
       .from('organizations')
       .insert({
         name: org_name.trim(),
         invite_code: inviteCode,
         created_by: callerUser.id,
+        org_type: resolvedOrgType,
         subscription_start: subscription_start || new Date().toISOString().split('T')[0],
         subscription_end: subscription_end || null,
         is_active: true,
@@ -161,6 +165,7 @@ Deno.serve(async (req) => {
           admin_created: true,
           organization_id: newOrg.id,
           role: 'admin',
+          org_type: resolvedOrgType,
         },
       });
 
@@ -174,17 +179,24 @@ Deno.serve(async (req) => {
     }
 
     // 3. user_organizations kaydı oluştur
+    // OSGB admin için osgb_role = 'osgb_admin' set ediliyor!
+    const memberInsert: Record<string, unknown> = {
+      user_id: adminUserId,
+      organization_id: newOrg.id,
+      role: 'admin',
+      display_name: admin_display_name.trim(),
+      email: normalizedEmail,
+      is_active: true,
+      must_change_password: false,
+    };
+
+    if (resolvedOsgbRole) {
+      memberInsert.osgb_role = resolvedOsgbRole;
+    }
+
     const { error: memberErr } = await adminClient
       .from('user_organizations')
-      .insert({
-        user_id: adminUserId,
-        organization_id: newOrg.id,
-        role: 'admin',
-        display_name: admin_display_name.trim(),
-        email: normalizedEmail,
-        is_active: true,
-        must_change_password: false,
-      });
+      .insert(memberInsert);
 
     if (memberErr) {
       await adminClient.from('organizations').delete().eq('id', newOrg.id);
@@ -215,6 +227,7 @@ Deno.serve(async (req) => {
         id: newOrg.id,
         name: newOrg.name,
         invite_code: inviteCode,
+        org_type: resolvedOrgType,
         subscription_start: newOrg.subscription_start,
         subscription_end: newOrg.subscription_end,
       },
@@ -222,6 +235,7 @@ Deno.serve(async (req) => {
         id: adminUserId,
         email: normalizedEmail,
         display_name: admin_display_name,
+        osgb_role: resolvedOsgbRole,
       },
     }), {
       status: 200,

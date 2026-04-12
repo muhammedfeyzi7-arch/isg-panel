@@ -5,6 +5,7 @@ import OrgMembersTab from './OrgMembersTab';
 
 interface Props {
   org: OrgAdmin | null;
+  superAdminUserId: string | null;
   onClose: () => void;
   onUpdate: (orgId: string, fields: { subscription_end?: string; is_active?: boolean }) => Promise<void>;
   onDelete: (orgId: string) => Promise<void>;
@@ -24,7 +25,7 @@ function orgInitials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Props) {
+export default function OrgDetailSheet({ org, superAdminUserId, onClose, onUpdate, onDelete }: Props) {
   const [tab, setTab] = useState<'info' | 'members'>('info');
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
@@ -191,39 +192,55 @@ export default function OrgDetailSheet({ org, onClose, onUpdate, onDelete }: Pro
                 </button>
               </div>
 
-              {/* Tehlikeli alan */}
-              <div className="bg-white rounded-xl border border-red-200 p-4">
-                <p className="text-red-500 text-xs font-medium mb-1">Tehlikeli Alan</p>
-                <p className="text-slate-400 text-xs mb-3">Organizasyonu silmek tüm verilerini kalıcı olarak siler.</p>
-                {!confirmDelete ? (
-                  <button
-                    onClick={() => setConfirmDelete(true)}
-                    className="w-full py-2 rounded-lg text-sm font-medium bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    Organizasyonu Sil
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-red-500 text-xs text-center font-medium">Emin misiniz? Geri alınamaz.</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setConfirmDelete(false)}
-                        className="flex-1 py-2 rounded-lg text-sm font-medium bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
-                      >
-                        İptal
-                      </button>
-                      <button
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="flex-1 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        {deleting ? <i className="ri-loader-4-line animate-spin text-sm"></i> : null}
-                        Evet, Sil
-                      </button>
+              {/* Tehlikeli alan — sadece super admin'in oluşturduğu org'larda göster */}
+              {superAdminUserId && org.created_by === superAdminUserId ? (
+                <div className="bg-white rounded-xl border border-red-200 p-4">
+                  <p className="text-red-500 text-xs font-medium mb-1">Tehlikeli Alan</p>
+                  <p className="text-slate-400 text-xs mb-3">
+                    Organizasyonu silmek; tüm verileri, üyeleri ve kullanıcı hesaplarını kalıcı olarak siler.
+                  </p>
+                  {!confirmDelete ? (
+                    <button
+                      onClick={() => setConfirmDelete(true)}
+                      className="w-full py-2 rounded-lg text-sm font-medium bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      Organizasyonu Sil
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-red-500 text-xs text-center font-medium">Emin misiniz? Geri alınamaz.</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setConfirmDelete(false)}
+                          className="flex-1 py-2 rounded-lg text-sm font-medium bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          İptal
+                        </button>
+                        <button
+                          onClick={handleDelete}
+                          disabled={deleting}
+                          className="flex-1 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          {deleting ? <i className="ri-loader-4-line animate-spin text-sm"></i> : null}
+                          Evet, Sil
+                        </button>
+                      </div>
                     </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex items-start gap-3">
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-200 flex-shrink-0 mt-0.5">
+                    <i className="ri-lock-line text-slate-500 text-xs"></i>
                   </div>
-                )}
-              </div>
+                  <div>
+                    <p className="text-slate-600 text-xs font-semibold mb-0.5">Silme Korumalı</p>
+                    <p className="text-slate-400 text-xs leading-relaxed">
+                      Bu organizasyon super admin tarafından oluşturulmadığı için silinemez. Yalnızca abonelik ve durum yönetimi yapılabilir.
+                    </p>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

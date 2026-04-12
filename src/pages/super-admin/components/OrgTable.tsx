@@ -72,6 +72,23 @@ function DaysChip({ days }: { days: number | null }) {
   return <span className="text-slate-400 text-xs">{days}g kaldı</span>;
 }
 
+function OrgTypeBadge({ type }: { type: OrgAdmin['org_type'] }) {
+  if (type === 'osgb') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 text-xs font-medium whitespace-nowrap">
+        <i className="ri-hospital-line text-xs"></i>
+        OSGB
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-medium whitespace-nowrap">
+      <i className="ri-building-2-line text-xs"></i>
+      Firma
+    </span>
+  );
+}
+
 export default function OrgTable({ orgs, onSelect, search }: Props) {
   const filtered = orgs.filter(o =>
     o.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -95,6 +112,7 @@ export default function OrgTable({ orgs, onSelect, search }: Props) {
           <thead>
             <tr className="border-b border-slate-100">
               <th className="text-left text-slate-400 font-medium text-xs px-5 py-3">Organizasyon</th>
+              <th className="text-left text-slate-400 font-medium text-xs px-4 py-3">Tür</th>
               <th className="text-left text-slate-400 font-medium text-xs px-4 py-3">Durum</th>
               <th className="text-left text-slate-400 font-medium text-xs px-4 py-3">Üyeler</th>
               <th className="text-left text-slate-400 font-medium text-xs px-4 py-3">Oluşturulma</th>
@@ -125,6 +143,9 @@ export default function OrgTable({ orgs, onSelect, search }: Props) {
                         <p className="text-slate-400 text-xs font-mono">{org.invite_code}</p>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <OrgTypeBadge type={org.org_type} />
                   </td>
                   <td className="px-4 py-3.5">
                     <StatusBadge org={org} />
@@ -172,9 +193,12 @@ export default function OrgTable({ orgs, onSelect, search }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2 mb-0.5">
                   <p className="text-slate-800 font-medium text-sm truncate">{org.name}</p>
-                  <StatusBadge org={org} />
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <OrgTypeBadge type={org.org_type} />
+                    <StatusBadge org={org} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
                   <span className="font-mono">{org.invite_code}</span>
                   <span>·</span>
                   <span>{org.member_count || 0} üye</span>

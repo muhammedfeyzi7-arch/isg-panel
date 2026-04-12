@@ -38,6 +38,7 @@ export interface OrgAdmin {
   subscription_start: string | null;
   subscription_end: string | null;
   is_active: boolean;
+  org_type: 'osgb' | 'firma' | null;
   member_count?: number;
   founder_email?: string | null;
 }
@@ -96,10 +97,16 @@ export function useOrganizationAdmin() {
   }, [fetchOrgs]);
 
   const deleteOrg = useCallback(async (orgId: string) => {
-    await saFetch(
-      `organizations?id=eq.${orgId}`,
-      { method: 'DELETE' }
-    );
+    const saToken = sessionStorage.getItem('sa_access_token') ?? '';
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/super-admin-delete-org`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${saToken}` },
+      body: JSON.stringify({ org_id: orgId }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error((data as { error?: string }).error || `HTTP ${res.status}`);
+    }
     await fetchOrgs();
   }, [fetchOrgs]);
 
