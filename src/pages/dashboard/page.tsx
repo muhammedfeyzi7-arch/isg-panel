@@ -173,8 +173,8 @@ export default function DashboardPage() {
 
   const recentItems = useMemo(() => {
     const all = [
-      ...aktifFirmalar.map(f => ({ tip: 'Firma', ad: f.ad, tarih: f.olusturmaTarihi, icon: 'ri-building-2-line', color: '#3B82F6', badge: 'eklendi', badgeColor: '#10B981', badgeBg: 'rgba(16,185,129,0.12)' })),
-      ...aktifPersoneller.map(p => ({ tip: 'Personel', ad: p.adSoyad, tarih: p.olusturmaTarihi, icon: 'ri-user-line', color: '#10B981', badge: 'eklendi', badgeColor: '#10B981', badgeBg: 'rgba(16,185,129,0.12)' })),
+      ...aktifFirmalar.map(f => ({ tip: 'Firma', ad: f.ad, tarih: f.olusturmaTarihi, icon: 'ri-building-2-line', color: '#0EA5E9', badge: 'eklendi', badgeColor: '#0EA5E9', badgeBg: 'rgba(14,165,233,0.12)' })),
+      ...aktifPersoneller.map(p => ({ tip: 'Personel', ad: p.adSoyad, tarih: p.olusturmaTarihi, icon: 'ri-user-line', color: '#0EA5E9', badge: 'eklendi', badgeColor: '#0EA5E9', badgeBg: 'rgba(14,165,233,0.12)' })),
       ...aktifEgitimler.map(e => ({ tip: 'Eğitim', ad: e.ad, tarih: e.olusturmaTarihi, icon: 'ri-graduation-cap-line', color: '#F59E0B', badge: 'planlandı', badgeColor: '#F59E0B', badgeBg: 'rgba(245,158,11,0.12)' })),
     ];
     return all.sort((a, b) => new Date(b.tarih).getTime() - new Date(a.tarih).getTime()).slice(0, 8);
@@ -219,10 +219,10 @@ export default function DashboardPage() {
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
 
   const statCards = [
-    { label: 'Toplam Firma',          value: aktifFirmalar.length,    icon: 'ri-building-2-line',  sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`,       trend: stats.firmaTrend,    trendLabel: `Son 30g: +${stats.firmaLast30}`,    gradient: 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)',  border: 'rgba(16,185,129,0.15)',  iconBg: 'linear-gradient(135deg, #10B981, #059669)', valueColor: 'linear-gradient(135deg, #6EE7B7, #34D399)', accentColor: '#10B981' },
-    { label: 'Toplam Personel',       value: aktifPersoneller.length, icon: 'ri-team-line',        sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`, trend: stats.personelTrend, trendLabel: `Son 30g: +${stats.personelLast30}`, gradient: 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)',   border: 'rgba(16,185,129,0.15)', iconBg: 'linear-gradient(135deg, #10B981, #059669)', valueColor: 'linear-gradient(135deg, #6EE7B7, #34D399)', accentColor: '#10B981' },
-    { label: 'Eksik / Süresi Dolmuş', value: stats.eksik,             icon: 'ri-file-warning-line',sub: `${stats.yaklaşan} evrak 30 gün içinde`,                                     trend: null,                trendLabel: null,                                gradient: stats.eksik > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)', border: stats.eksik > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.15)', iconBg: stats.eksik > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', valueColor: stats.eksik > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #6EE7B7, #34D399)', accentColor: stats.eksik > 0 ? '#EF4444' : '#10B981' },
-    { label: 'Açık Uygunsuzluk',      value: stats.acikU,             icon: 'ri-alert-line',       sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, trend: null,                trendLabel: null,                                gradient: stats.acikU > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)', border: stats.acikU > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.15)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #10B981, #059669)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #6EE7B7, #34D399)', accentColor: stats.acikU > 0 ? '#EF4444' : '#10B981' },
+    { label: 'Toplam Firma',          value: aktifFirmalar.length,    icon: 'ri-building-2-line',  sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`,       trend: stats.firmaTrend,    trendLabel: `Son 30g: +${stats.firmaLast30}`,    gradient: 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)',  border: 'rgba(14,165,233,0.15)',  iconBg: 'linear-gradient(135deg, #0EA5E9, #0284C7)', valueColor: 'linear-gradient(135deg, #38BDF8, #7DD3FC)', accentColor: '#0EA5E9' },
+    { label: 'Toplam Personel',       value: aktifPersoneller.length, icon: 'ri-team-line',        sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`, trend: stats.personelTrend, trendLabel: `Son 30g: +${stats.personelLast30}`, gradient: 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)',   border: 'rgba(14,165,233,0.15)', iconBg: 'linear-gradient(135deg, #0EA5E9, #0284C7)', valueColor: 'linear-gradient(135deg, #38BDF8, #7DD3FC)', accentColor: '#0EA5E9' },
+    { label: 'Eksik / Süresi Dolmuş', value: stats.eksik,             icon: 'ri-file-warning-line',sub: `${stats.yaklaşan} evrak 30 gün içinde`,                                     trend: null,                trendLabel: null,                                gradient: stats.eksik > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)', border: stats.eksik > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(14,165,233,0.15)', iconBg: stats.eksik > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #0EA5E9, #0284C7)', valueColor: stats.eksik > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #38BDF8, #7DD3FC)', accentColor: stats.eksik > 0 ? '#EF4444' : '#0EA5E9' },
+    { label: 'Açık Uygunsuzluk',      value: stats.acikU,             icon: 'ri-alert-line',       sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, trend: null,                trendLabel: null,                                gradient: stats.acikU > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)', border: stats.acikU > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(14,165,233,0.15)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #0EA5E9, #0284C7)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #38BDF8, #7DD3FC)', accentColor: stats.acikU > 0 ? '#EF4444' : '#0EA5E9' },
   ];
 
   // İş İzni ek stat kartı
@@ -234,11 +234,11 @@ export default function DashboardPage() {
       sub: `${isIzniStats.aktif} aktif · ${isIzniStats.bekleyen} beklemede`,
       trend: null,
       trendLabel: null,
-      gradient: 'linear-gradient(145deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.04) 100%)',
-      border: 'rgba(16,185,129,0.15)',
-      iconBg: 'linear-gradient(135deg, #10B981, #059669)',
-      valueColor: 'linear-gradient(135deg, #6EE7B7, #34D399)',
-      accentColor: '#10B981',
+      gradient: 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)',
+      border: 'rgba(14,165,233,0.15)',
+      iconBg: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+      valueColor: 'linear-gradient(135deg, #38BDF8, #7DD3FC)',
+      accentColor: '#0EA5E9',
     },
   ];
 
@@ -247,11 +247,11 @@ export default function DashboardPage() {
 
       {/* ── Header ── */}
       <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)' }}>
-        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #0EA5E9, #38BDF8)' }} />
         <div className="px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
               <i className="ri-dashboard-3-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -272,8 +272,8 @@ export default function DashboardPage() {
               </div>
             )}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
-              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+              style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />
               Sistem Aktif
             </div>
           </div>
@@ -283,10 +283,10 @@ export default function DashboardPage() {
       {/* ── Welcome Banner — Onboarding ── */}
       {isEmpty && (
         <div className="rounded-xl overflow-hidden animate-fade-in"
-          style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
-          <div className="px-4 pt-4 pb-3 flex items-start gap-3" style={{ borderBottom: '1px solid rgba(16,185,129,0.12)' }}>
+          style={{ background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.2)' }}>
+          <div className="px-4 pt-4 pb-3 flex items-start gap-3" style={{ borderBottom: '1px solid rgba(14,165,233,0.12)' }}>
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
               <i className="ri-rocket-2-line text-white text-base" />
             </div>
             <div>
@@ -296,23 +296,23 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style={{ borderColor: 'rgba(16,185,129,0.1)' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style={{ borderColor: 'rgba(14,165,233,0.1)' }}>
             {[
-              { step: '1', icon: 'ri-building-2-line', color: '#10B981', bg: 'rgba(16,185,129,0.12)', title: 'Firma Ekle', desc: 'Sol menüden "Firmalar" modülüne giderek ilk firmanızı oluşturun.', module: 'firmalar' },
-              { step: '2', icon: 'ri-team-line', color: '#10B981', bg: 'rgba(16,185,129,0.12)', title: 'Personel Ekle', desc: 'Firmaya bağlı çalışanları "Personeller" modülünden kaydedin.', module: 'personeller' },
-              { step: '3', icon: 'ri-file-add-line', color: '#10B981', bg: 'rgba(16,185,129,0.12)', title: 'Evrak Yükle', desc: '"Evraklar" modülünden belgeleri yükleyin, sistem takibi otomatik yapar.', module: 'evraklar' },
+              { step: '1', icon: 'ri-building-2-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.12)', title: 'Firma Ekle', desc: 'Sol menüden "Firmalar" modülüne giderek ilk firmanızı oluşturun.', module: 'firmalar' },
+              { step: '2', icon: 'ri-team-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.12)', title: 'Personel Ekle', desc: 'Firmaya bağlı çalışanları "Personeller" modülünden kaydedin.', module: 'personeller' },
+              { step: '3', icon: 'ri-file-add-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.12)', title: 'Evrak Yükle', desc: '"Evraklar" modülünden belgeleri yükleyin, sistem takibi otomatik yapar.', module: 'evraklar' },
             ].map((item) => (
               <button
                 key={item.step}
                 onClick={() => setActiveModule(item.module as Parameters<typeof setActiveModule>[0])}
                 className="flex items-start gap-3 px-4 py-3 text-left cursor-pointer transition-all group"
                 style={{ background: 'transparent' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.06)'; }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.06)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
                 <div className="flex-shrink-0 mt-0.5">
                   <div className="w-7 h-7 flex items-center justify-center rounded-lg"
-                    style={{ background: item.bg, border: `1px solid rgba(16,185,129,0.3)` }}>
+                    style={{ background: item.bg, border: `1px solid rgba(14,165,233,0.3)` }}>
                     <i className={`${item.icon} text-xs`} style={{ color: item.color }} />
                   </div>
                 </div>
@@ -380,7 +380,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-2">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
               <i className="ri-bar-chart-2-line text-white text-xs" />
             </div>
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bu Ay Özeti</h2>
@@ -527,11 +527,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)' }}>
-          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #0EA5E9, #38BDF8)' }} />
           <div className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
                 <i className="ri-pie-chart-2-line text-white text-xs" />
               </div>
               <div>
@@ -587,9 +587,9 @@ export default function DashboardPage() {
       {/* ── Progress Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {[
-          { label: 'Aktif Firmalar',        value: aktifFirmalar.filter(f => f.durum === 'Aktif').length,         total: aktifFirmalar.length,    color: '#10B981', icon: 'ri-building-2-line',     accent: 'linear-gradient(135deg, #10B981, #059669)' },
-          { label: 'Aktif Personeller',     value: aktifPersoneller.filter(p => p.durum === 'Aktif').length,      total: aktifPersoneller.length, color: '#34D399', icon: 'ri-team-line',           accent: 'linear-gradient(135deg, #34D399, #10B981)' },
-          { label: 'Çalışabilir Muayene',   value: aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length, total: aktifMuayeneler.length,  color: '#059669', icon: 'ri-heart-pulse-line',    accent: 'linear-gradient(135deg, #059669, #10B981)' },
+          { label: 'Aktif Firmalar',        value: aktifFirmalar.filter(f => f.durum === 'Aktif').length,         total: aktifFirmalar.length,    color: '#0EA5E9', icon: 'ri-building-2-line',     accent: 'linear-gradient(135deg, #0EA5E9, #0284C7)' },
+          { label: 'Aktif Personeller',     value: aktifPersoneller.filter(p => p.durum === 'Aktif').length,      total: aktifPersoneller.length, color: '#38BDF8', icon: 'ri-team-line',           accent: 'linear-gradient(135deg, #38BDF8, #0EA5E9)' },
+          { label: 'Çalışabilir Muayene',   value: aktifMuayeneler.filter(m => m.sonuc === 'Çalışabilir').length, total: aktifMuayeneler.length,  color: '#0284C7', icon: 'ri-heart-pulse-line',    accent: 'linear-gradient(135deg, #0284C7, #0EA5E9)' },
         ].map(item => {
           const pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;
           return (
@@ -598,7 +598,7 @@ export default function DashboardPage() {
               <div className="p-3">
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <div className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0"
-                    style={{ background: `rgba(16,185,129,0.12)` }}>
+                    style={{ background: `rgba(14,165,233,0.12)` }}>
                     <i className={`${item.icon} text-[11px]`} style={{ color: item.color }} />
                   </div>
                   <span className="text-[10.5px] font-bold" style={{ color: item.color }}>{pct}%</span>

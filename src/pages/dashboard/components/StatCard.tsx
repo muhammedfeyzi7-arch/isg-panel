@@ -35,18 +35,18 @@ export default function StatCard({
         <div className="flex items-center justify-between mb-4">
           <div
             className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
-            style={{ background: `linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.08))` }}
+            style={{ background: `linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.08))` }}
           >
-            <i className={`${icon} text-sm`} style={{ color: '#10B981' }} />
+            <i className={`${icon} text-sm`} style={{ color: '#0EA5E9' }} />
           </div>
 
           {trend ? (
             <span
               className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
               style={{
-                background: trend.dir === 'up' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
-                color: trend.dir === 'up' ? '#34D399' : '#F87171',
-                border: `1px solid ${trend.dir === 'up' ? 'rgba(16,185,129,0.22)' : 'rgba(239,68,68,0.22)'}`,
+                background: trend.dir === 'up' ? 'rgba(14,165,233,0.12)' : 'rgba(239,68,68,0.12)',
+                color: trend.dir === 'up' ? '#38BDF8' : '#F87171',
+                border: `1px solid ${trend.dir === 'up' ? 'rgba(14,165,233,0.22)' : 'rgba(239,68,68,0.22)'}`,
               }}
             >
               <i className={`${trend.dir === 'up' ? 'ri-arrow-up-line' : 'ri-arrow-down-line'} text-[9px]`} />
@@ -55,7 +55,7 @@ export default function StatCard({
           ) : (
             <span
               className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(16,185,129,0.08)', color: '#10B981', border: '1px solid rgba(16,185,129,0.15)' }}
+              style={{ background: 'rgba(14,165,233,0.08)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.15)' }}
             >
               ✓
             </span>
@@ -89,7 +89,7 @@ export default function StatCard({
         <div className="flex items-center gap-1.5">
           <div
             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-            style={{ background: '#10B981', opacity: 0.7 }}
+            style={{ background: '#0EA5E9', opacity: 0.7 }}
           />
           <p
             className="text-[11px] leading-snug"

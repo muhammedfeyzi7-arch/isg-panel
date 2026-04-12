@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/store/AuthContext';
 import SupportModal from '@/components/feature/SupportModal';
-import { useApp } from '@/store/AppContext';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -42,8 +41,6 @@ export default function HekimSidebar({
   onMobileClose,
 }: HekimSidebarProps) {
   const { logout, user } = useAuth();
-  const { theme, toggleTheme } = useApp();
-  const isDark = theme === 'dark';
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
 
@@ -221,31 +218,6 @@ export default function HekimSidebar({
             );
           })}
         </nav>
-
-        {/* ── Theme Toggle ── */}
-        <div className={`px-2.5 pb-2 ${collapsed ? 'flex justify-center' : ''}`}>
-          <button
-            onClick={() => toggleTheme()}
-            title={isDark ? 'Açık Mod' : 'Karanlık Mod'}
-            className={`cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'w-10 h-10 flex items-center justify-center' : 'w-full flex items-center gap-2.5 px-3 py-2'}`}
-            style={{
-              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
-              border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)'}`,
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'; }}
-          >
-            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-              <i className={isDark ? 'ri-sun-line text-xs' : 'ri-moon-line text-xs'}
-                style={{ color: isDark ? '#F59E0B' : ACCENT }} />
-            </div>
-            {!collapsed && (
-              <span className="text-[11.5px] font-semibold flex-1 text-left" style={{ color: 'var(--text-muted)' }}>
-                {isDark ? 'Açık Mod' : 'Karanlık Mod'}
-              </span>
-            )}
-          </button>
-        </div>
 
         {/* ── Support ── */}
         <div className={`px-2.5 pb-2 ${collapsed ? 'flex justify-center' : ''}`}>

@@ -1,6 +1,32 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/store/AppContext';
 import { useAuth } from '@/store/AuthContext';
+
+/* ── Topbar: theme toggle icon button ── */
+function ThemeIconBtn({ isDark, borderColor }: { isDark: boolean; borderColor: string }) {
+  const { toggleTheme } = useApp();
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={toggleTheme}
+      title={isDark ? 'Açık Mod' : 'Karanlık Mod'}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="w-8 h-8 flex items-center justify-center rounded-xl cursor-pointer transition-all flex-shrink-0"
+      style={{
+        background: hovered
+          ? isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.08)'
+          : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
+        border: `1px solid ${hovered ? (isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.12)') : borderColor}`,
+      }}
+    >
+      <i
+        className={isDark ? 'ri-sun-line text-sm' : 'ri-moon-line text-sm'}
+        style={{ color: isDark ? '#F59E0B' : '#0EA5E9', transition: 'color 0.2s' }}
+      />
+    </button>
+  );
+}
 import { supabase } from '@/lib/supabase';
 import HekimSidebar, { type HekimTab } from './components/HekimSidebar';
 import HekimGenelBakisTab from './components/HekimGenelBakisTab';
@@ -9,7 +35,7 @@ import HekimPersonellerTab from './components/HekimPersonellerTab';
 import HekimSaglikTab from './components/HekimSaglikTab';
 import HekimCopTab from './components/HekimCopTab';
 import HekimIsKazasiTab from './components/HekimIsKazasiTab';
-import ZiyaretCheckIn from '@/pages/saha/components/ZiyaretCheckIn';
+import HekimMobilZiyaret from './components/HekimMobilZiyaret';
 
 const ACCENT = '#0EA5E9';
 const ACCENT_DARK = '#0284C7';
@@ -181,27 +207,8 @@ export default function HekimPage() {
         return <HekimCopTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
       case 'ziyaret':
         return (
-          <div className="max-w-[520px] mx-auto pb-24">
-            <div className="rounded-2xl overflow-hidden mb-5"
-              style={{ background: isDark ? 'rgba(17,24,39,0.8)' : '#fff', border: `1px solid rgba(14,165,233,0.2)` }}>
-              <div className="h-[3px]" style={{ background: `linear-gradient(90deg, ${ACCENT} 0%, #38BDF8 50%, ${ACCENT_DARK} 100%)` }} />
-              <div className="px-4 pt-3.5 pb-3.5 flex items-center gap-3">
-                <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-                  style={{ background: `rgba(14,165,233,0.12)`, border: `1px solid rgba(14,165,233,0.25)` }}>
-                  <i className="ri-map-pin-user-line text-lg" style={{ color: ACCENT }} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>Saha Ziyareti</h2>
-                  <p className="text-[11px] mt-0.5" style={{ color: '#64748b' }}>QR ile firma check-in / check-out</p>
-                </div>
-                <span className="ml-auto flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-full whitespace-nowrap"
-                  style={{ background: `rgba(14,165,233,0.1)`, color: ACCENT, border: `1px solid rgba(14,165,233,0.2)` }}>
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: ACCENT }} />
-                  Aktif
-                </span>
-              </div>
-            </div>
-            <ZiyaretCheckIn />
+          <div className="lg:hidden -mx-3 sm:-mx-5 md:-mx-6 -my-4">
+            <HekimMobilZiyaret isDark={isDark} />
           </div>
         );
       default:
@@ -274,96 +281,141 @@ export default function HekimPage() {
       <main className="min-h-screen overflow-y-auto transition-all duration-300 lg:block">
         {/* ── Topbar ── */}
         <div
-          className={`sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 h-[52px] lg:h-[56px] transition-all duration-300 ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'}`}
+          className={`sticky top-0 z-30 transition-all duration-300 ${collapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
           style={{
-            background: isDark ? 'rgba(17,24,39,0.95)' : 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(14px)',
+            background: isDark
+              ? 'rgba(10,15,26,0.92)'
+              : 'rgba(255,255,255,0.92)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
             borderBottom: `1px solid ${borderColor}`,
           }}
         >
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileOpen(v => !v)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer lg:hidden flex-shrink-0 transition-all"
-            style={{
-              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
-              border: `1px solid ${borderColor}`,
-              color: isDark ? '#94a3b8' : '#475569',
-            }}
-          >
-            <i className="ri-menu-line text-sm" />
-          </button>
+          {/* Top gradient accent line */}
+          <div
+            className="h-[2px] w-full"
+            style={{ background: `linear-gradient(90deg, ${ACCENT} 0%, #38BDF8 40%, transparent 100%)`, opacity: 0.7 }}
+          />
 
-          {/* Sekme başlığı */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-              <i className={`${current.icon} text-sm`} style={{ color: ACCENT }} />
-            </div>
-            <div>
-              <p className="text-sm font-bold leading-tight" style={{ color: textPrimary }}>{current.title}</p>
-              <p className="text-[10px] leading-none mt-0.5 hidden sm:block" style={{ color: '#94a3b8' }}>{current.subtitle}</p>
-            </div>
-          </div>
+          <div className="flex items-center gap-3 px-4 sm:px-5 h-[54px]">
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileOpen(v => !v)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer lg:hidden flex-shrink-0 transition-all"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)',
+                border: `1px solid ${borderColor}`,
+                color: isDark ? '#94a3b8' : '#64748b',
+              }}
+            >
+              <i className="ri-menu-line text-sm" />
+            </button>
 
-          <div className="ml-auto flex items-center gap-2">
+            {/* Sekme başlığı — icon pill + title */}
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{
+                  background: `linear-gradient(135deg, rgba(14,165,233,0.18), rgba(14,165,233,0.08))`,
+                  border: `1px solid rgba(14,165,233,0.22)`,
+                }}
+              >
+                <i className={`${current.icon} text-sm`} style={{ color: ACCENT }} />
+              </div>
+              <div className="min-w-0">
+                <p
+                  className="text-[13.5px] font-bold leading-tight truncate"
+                  style={{ color: textPrimary, letterSpacing: '-0.02em' }}
+                >
+                  {current.title}
+                </p>
+                <p className="text-[10px] leading-none mt-[2px] hidden sm:block truncate" style={{ color: isDark ? '#475569' : '#94a3b8' }}>
+                  {current.subtitle}
+                </p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="hidden sm:block h-5 w-px flex-shrink-0 mx-1" style={{ background: borderColor }} />
+
             {/* Firma Switcher */}
             {firmaOptions.length > 0 && (
-              <div className="relative" ref={switcherRef}>
+              <div className="relative hidden sm:block" ref={switcherRef}>
                 <button
                   onClick={() => setSwitcherOpen(v => !v)}
-                  className="whitespace-nowrap flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold cursor-pointer transition-all"
+                  className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold cursor-pointer transition-all"
                   style={{
-                    background: aktiveFirmaId ? `rgba(14,165,233,0.12)` : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'),
+                    background: aktiveFirmaId
+                      ? `rgba(14,165,233,0.12)`
+                      : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
                     border: `1px solid ${aktiveFirmaId ? 'rgba(14,165,233,0.3)' : borderColor}`,
-                    color: aktiveFirmaId ? ACCENT : (isDark ? '#94a3b8' : '#475569'),
+                    color: aktiveFirmaId ? ACCENT : isDark ? '#94a3b8' : '#64748b',
                   }}
                 >
                   <i className="ri-building-3-line text-xs" />
-                  <span className="max-w-[100px] sm:max-w-[140px] truncate">
-                    {aktifFirmaAd ?? `Tümü (${firmaOptions.length})`}
+                  <span className="max-w-[120px] truncate">
+                    {aktifFirmaAd ?? `Tüm Firmalar (${firmaOptions.length})`}
                   </span>
-                  <i className={`${switcherOpen ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} text-xs`} />
+                  <i className={`${switcherOpen ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'} text-xs opacity-70`} />
                 </button>
 
                 {switcherOpen && (
                   <div
-                    className="switcher-dropdown absolute right-0 top-full mt-2 rounded-xl overflow-hidden z-50"
+                    className="switcher-dropdown absolute left-0 top-full mt-2 rounded-2xl overflow-hidden z-50"
                     style={{
-                      minWidth: '180px',
-                      background: isDark ? '#1e293b' : '#ffffff',
+                      minWidth: '200px',
+                      background: isDark ? '#1a2235' : '#ffffff',
                       border: `1px solid ${borderColor}`,
-                      boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.4)' : '0 8px 24px rgba(15,23,42,0.1)',
+                      boxShadow: isDark
+                        ? '0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)'
+                        : '0 16px 48px rgba(15,23,42,0.12), 0 0 0 1px rgba(14,165,233,0.06)',
                     }}
                   >
+                    <div className="px-3 pt-3 pb-1.5">
+                      <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: isDark ? '#475569' : '#94a3b8' }}>
+                        Firma Seçin
+                      </p>
+                    </div>
                     {firmaOptions.length > 1 && (
                       <button
                         onClick={() => { setAktiveFirmaId(null); setSwitcherOpen(false); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-colors"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all mx-0"
                         style={{
                           background: !aktiveFirmaId ? `rgba(14,165,233,0.1)` : 'transparent',
-                          color: !aktiveFirmaId ? ACCENT : (isDark ? '#94a3b8' : '#475569'),
+                          color: !aktiveFirmaId ? ACCENT : isDark ? '#94a3b8' : '#64748b',
                         }}
+                        onMouseEnter={e => { if (aktiveFirmaId) (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'; }}
+                        onMouseLeave={e => { if (aktiveFirmaId) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       >
-                        <div className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0"
-                          style={{ background: !aktiveFirmaId ? `rgba(14,165,233,0.15)` : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)') }}>
-                          <i className="ri-apps-line text-xs" style={{ color: !aktiveFirmaId ? ACCENT : (isDark ? '#94a3b8' : '#64748b') }} />
+                        <div
+                          className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
+                          style={{
+                            background: !aktiveFirmaId
+                              ? `rgba(14,165,233,0.18)`
+                              : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
+                          }}
+                        >
+                          <i className="ri-apps-2-line text-xs" style={{ color: !aktiveFirmaId ? ACCENT : isDark ? '#94a3b8' : '#64748b' }} />
                         </div>
-                        <span className="text-[12px] font-semibold">Tüm Firmalar</span>
-                        {!aktiveFirmaId && <i className="ri-check-line text-xs ml-auto" style={{ color: ACCENT }} />}
+                        <span className="text-[12px] font-semibold flex-1">Tüm Firmalar</span>
+                        {!aktiveFirmaId && <i className="ri-check-line text-xs" style={{ color: ACCENT }} />}
                       </button>
                     )}
+                    <div className="mx-3 my-1 h-px" style={{ background: borderColor }} />
                     {firmaOptions.map(f => (
                       <button
                         key={f.id}
                         onClick={() => { setAktiveFirmaId(f.id); setSwitcherOpen(false); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-colors"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-all"
                         style={{
                           background: aktiveFirmaId === f.id ? `rgba(14,165,233,0.1)` : 'transparent',
-                          color: aktiveFirmaId === f.id ? ACCENT : (isDark ? '#e2e8f0' : '#0f172a'),
+                          color: aktiveFirmaId === f.id ? ACCENT : isDark ? '#e2e8f0' : '#0f172a',
                         }}
+                        onMouseEnter={e => { if (aktiveFirmaId !== f.id) (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'; }}
+                        onMouseLeave={e => { if (aktiveFirmaId !== f.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       >
                         <div
-                          className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
                           style={{ background: `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})` }}
                         >
                           {f.name.charAt(0).toUpperCase()}
@@ -374,18 +426,41 @@ export default function HekimPage() {
                         )}
                       </button>
                     ))}
+                    <div className="h-2" />
                   </div>
                 )}
               </div>
             )}
 
-            {/* İşyeri Hekimi badge */}
-            <div
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full flex-shrink-0"
-              style={{ background: `rgba(14,165,233,0.1)`, border: `1px solid rgba(14,165,233,0.2)` }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACCENT, boxShadow: `0 0 5px rgba(14,165,233,0.6)` }} />
-              <span className="text-[10px] font-bold" style={{ color: ACCENT }}>İŞYERİ HEKİMİ</span>
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Right actions */}
+            <div className="flex items-center gap-1.5">
+              {/* Theme toggle icon button */}
+              <ThemeIconBtn isDark={isDark} borderColor={borderColor} />
+
+              {/* Divider */}
+              <div className="hidden sm:block h-5 w-px mx-1" style={{ background: borderColor }} />
+
+              {/* İşyeri Hekimi badge */}
+              <div
+                className="hidden sm:flex items-center gap-1.5 pl-2 pr-3 py-1.5 rounded-full flex-shrink-0"
+                style={{
+                  background: isDark
+                    ? 'rgba(14,165,233,0.08)'
+                    : 'rgba(14,165,233,0.07)',
+                  border: `1px solid rgba(14,165,233,0.18)`,
+                }}
+              >
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})` }}
+                >
+                  {(user?.email ?? 'H').charAt(0).toUpperCase()}
+                </div>
+                <span className="text-[10px] font-bold" style={{ color: ACCENT }}>İŞYERİ HEKİMİ</span>
+              </div>
             </div>
           </div>
         </div>
@@ -424,14 +499,24 @@ export default function HekimPage() {
                 >
                   {isZiyaret ? (
                     <>
-                      <div className="w-8 h-8 flex items-center justify-center rounded-xl"
-                        style={{
-                          background: isActive ? `rgba(14,165,233,0.2)` : `rgba(14,165,233,0.08)`,
-                          border: `1px solid ${isActive ? 'rgba(14,165,233,0.4)' : 'rgba(14,165,233,0.2)'}`,
-                        }}>
-                        <i className={`${tab.icon} text-sm`} style={{ color: ACCENT }} />
+                      <div className="relative">
+                        <div
+                          className="w-10 h-10 flex items-center justify-center rounded-2xl relative z-10"
+                          style={{
+                            background: isActive
+                              ? `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})`
+                              : `rgba(14,165,233,0.1)`,
+                            border: `1.5px solid ${isActive ? ACCENT : 'rgba(14,165,233,0.3)'}`,
+                            boxShadow: isActive ? `0 0 12px rgba(14,165,233,0.4)` : 'none',
+                          }}>
+                          <i className={`${tab.icon} text-base`} style={{ color: isActive ? '#fff' : ACCENT }} />
+                        </div>
+                        {isActive && (
+                          <div className="absolute inset-0 rounded-2xl z-0 animate-ping"
+                            style={{ background: `rgba(14,165,233,0.2)` }} />
+                        )}
                       </div>
-                      <span className="text-[9px] font-bold" style={{ color: ACCENT }}>{tab.label}</span>
+                      <span className="text-[9px] font-extrabold" style={{ color: ACCENT }}>{tab.label}</span>
                     </>
                   ) : (
                     <>
