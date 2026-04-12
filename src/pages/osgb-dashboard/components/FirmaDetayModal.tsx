@@ -58,7 +58,6 @@ export default function FirmaDetayModal({
   const textFaint = 'var(--text-faint)';
   const modalBg = 'var(--modal-bg)';
   const modalBorder = 'var(--modal-border)';
-  const inputBg = 'var(--bg-input)';
   const inputBorder = 'var(--border-input)';
 
   const fetchAll = useCallback(async () => {
@@ -87,7 +86,6 @@ export default function FirmaDetayModal({
     setSonZiyaretTarih((ziyaretData ?? [])[0]?.giris_saati ?? null);
     setFirmaDurum((orgData as { is_active?: boolean } | null)?.is_active !== false ? 'aktif' : 'pasif');
 
-    // app_data'dan firma bilgilerini çek
     const data = (appData as { data?: Record<string, unknown> } | null)?.data;
     if (data && typeof data === 'object') {
       setFirmaInfo({
@@ -99,7 +97,6 @@ export default function FirmaDetayModal({
       });
     }
 
-    // Atanmış uzmanları bul
     const atananlar = uzmanlar.filter(u =>
       (u.active_firm_ids && u.active_firm_ids.includes(firmaId)) ||
       u.active_firm_id === firmaId
@@ -187,7 +184,6 @@ export default function FirmaDetayModal({
     } finally { setSilLoading(false); }
   };
 
-  // Ziyaret hesaplamaları
   const aktifZiyaret = ziyaretler.find(z => z.durum === 'aktif' || !z.cikis_saati);
   const totalZiyaret = ziyaretler.length;
   const son7Gun = ziyaretler.filter(z => {
@@ -226,17 +222,16 @@ export default function FirmaDetayModal({
       style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)', zIndex: 99999 }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
-        className="w-full max-w-2xl rounded-2xl flex flex-col"
-        style={{ background: modalBg, border: `1px solid ${modalBorder}`, maxHeight: '90vh' }}
-      >
+      <div className="w-full max-w-2xl rounded-2xl flex flex-col"
+        style={{ background: modalBg, border: `1px solid ${modalBorder}`, maxHeight: '90vh' }}>
+
         {/* ── HEADER ── */}
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1px solid ${cardBorder}` }}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative flex-shrink-0">
               <div className="w-11 h-11 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.1))', border: '1px solid rgba(16,185,129,0.2)' }}>
-                <i className="ri-building-2-line text-base" style={{ color: '#059669' }} />
+                style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.15), rgba(2,132,199,0.1))', border: '1px solid rgba(14,165,233,0.2)' }}>
+                <i className="ri-building-2-line text-base" style={{ color: '#0284C7' }} />
               </div>
               {aktifZiyaret && (
                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
@@ -250,9 +245,9 @@ export default function FirmaDetayModal({
                 <h3 className="text-sm font-bold truncate" style={{ color: textPrimary }}>{firmaAdi}</h3>
                 <span className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
                   style={{
-                    background: firmaDurum === 'aktif' ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.12)',
-                    color: firmaDurum === 'aktif' ? '#10B981' : '#64748B',
-                    border: `1px solid ${firmaDurum === 'aktif' ? 'rgba(16,185,129,0.25)' : 'rgba(100,116,139,0.25)'}`,
+                    background: firmaDurum === 'aktif' ? 'rgba(14,165,233,0.12)' : 'rgba(100,116,139,0.12)',
+                    color: firmaDurum === 'aktif' ? '#0EA5E9' : '#64748B',
+                    border: `1px solid ${firmaDurum === 'aktif' ? 'rgba(14,165,233,0.25)' : 'rgba(100,116,139,0.25)'}`,
                   }}>
                   {firmaDurum === 'aktif' ? '● Aktif' : '○ Pasif'}
                 </span>
@@ -271,17 +266,17 @@ export default function FirmaDetayModal({
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <button onClick={() => setShowQrModal(true)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
-              style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.15)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.08)'; }}>
+              style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.15)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.08)'; }}>
               <i className="ri-qr-code-line text-xs" />QR
             </button>
             <button onClick={handleDurumDegistir} disabled={durumLoading}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
               style={{
-                background: firmaDurum === 'aktif' ? 'rgba(239,68,68,0.07)' : 'rgba(16,185,129,0.08)',
-                border: `1px solid ${firmaDurum === 'aktif' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
-                color: firmaDurum === 'aktif' ? '#EF4444' : '#10B981',
+                background: firmaDurum === 'aktif' ? 'rgba(239,68,68,0.07)' : 'rgba(14,165,233,0.08)',
+                border: `1px solid ${firmaDurum === 'aktif' ? 'rgba(239,68,68,0.2)' : 'rgba(14,165,233,0.2)'}`,
+                color: firmaDurum === 'aktif' ? '#EF4444' : '#0EA5E9',
               }}>
               {durumLoading ? <i className="ri-loader-4-line animate-spin text-xs" /> : <i className={`${firmaDurum === 'aktif' ? 'ri-pause-circle-line' : 'ri-play-circle-line'} text-xs`} />}
               {firmaDurum === 'aktif' ? 'Pasif Yap' : 'Aktif Et'}
@@ -317,33 +312,28 @@ export default function FirmaDetayModal({
 
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-3">
-            <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#10B981' }} />
+            <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#0EA5E9' }} />
             <span className="text-sm" style={{ color: textFaint }}>Yükleniyor...</span>
           </div>
         ) : (
           <div className="flex-1 overflow-auto">
 
-            {/* ── UZMAN ATAMA (TEK KAYNAK) ── */}
+            {/* ── UZMAN ATAMA ── */}
             <div className="px-6 py-4" style={{ background: 'var(--bg-item)', borderBottom: `1px solid ${cardBorder}` }}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                    <i className="ri-user-star-line text-[10px]" style={{ color: '#10B981' }} />
+                  <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                    <i className="ri-user-star-line text-[10px]" style={{ color: '#0EA5E9' }} />
                   </div>
-                  <span className="text-xs font-semibold" style={{ color: textMuted }}>
-                    Bu firmaya atanan uzmanlar
-                  </span>
+                  <span className="text-xs font-semibold" style={{ color: textMuted }}>Bu firmaya atanan uzmanlar</span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{
-                      background: atananUzmanIds.length > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.08)',
-                      color: atananUzmanIds.length > 0 ? '#059669' : textFaint,
-                    }}>
+                    style={{ background: atananUzmanIds.length > 0 ? 'rgba(14,165,233,0.1)' : 'rgba(100,116,139,0.08)', color: atananUzmanIds.length > 0 ? '#0284C7' : textFaint }}>
                     {atananUzmanIds.length} uzman bağlı
                   </span>
                 </div>
                 <button onClick={handleUzmanAta} disabled={atanmaLoading}
                   className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: atanmaLoading ? 0.7 : 1 }}>
+                  style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', opacity: atanmaLoading ? 0.7 : 1 }}>
                   {atanmaLoading
                     ? <><i className="ri-loader-4-line animate-spin text-xs" />Kaydediliyor...</>
                     : <><i className="ri-save-line text-xs" />Kaydet</>}
@@ -359,32 +349,23 @@ export default function FirmaDetayModal({
                 <div className="space-y-1.5 max-h-44 overflow-y-auto pr-0.5">
                   {uzmanlar.map(u => {
                     const secili = atananUzmanIds.includes(u.user_id);
-                    const baskaBirFirmada = !secili &&
-                      ((u.active_firm_ids && u.active_firm_ids.length > 0) || u.active_firm_id);
+                    const baskaBirFirmada = !secili && ((u.active_firm_ids && u.active_firm_ids.length > 0) || u.active_firm_id);
                     return (
                       <button key={u.user_id} type="button" onClick={() => toggleUzman(u.user_id)}
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all text-left"
-                        style={{
-                          background: secili ? 'rgba(16,185,129,0.07)' : 'var(--bg-card-solid)',
-                          border: secili ? '1.5px solid rgba(16,185,129,0.28)' : `1.5px solid ${inputBorder}`,
-                          transform: 'translateX(0)',
-                        }}
+                        style={{ background: secili ? 'rgba(14,165,233,0.07)' : 'var(--bg-card-solid)', border: secili ? '1.5px solid rgba(14,165,233,0.28)' : `1.5px solid ${inputBorder}` }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(0)'; }}>
                         <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                          style={secili
-                            ? { background: 'linear-gradient(135deg, #10B981, #059669)' }
-                            : { background: 'var(--bg-card-solid)', border: `1.5px solid ${inputBorder}` }}>
+                          style={secili ? { background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' } : { background: 'var(--bg-card-solid)', border: `1.5px solid ${inputBorder}` }}>
                           {secili && <i className="ri-check-line text-white text-[10px]" />}
                         </div>
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                          style={{ background: secili ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                          style={{ background: secili ? 'linear-gradient(135deg, #0EA5E9, #0284C7)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
                           {(u.display_name ?? u.email ?? '?').charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate" style={{ color: secili ? '#059669' : textPrimary }}>
-                            {u.display_name}
-                          </p>
+                          <p className="text-xs font-semibold truncate" style={{ color: secili ? '#0284C7' : textPrimary }}>{u.display_name}</p>
                           <p className="text-[10px] truncate" style={{ color: textFaint }}>{u.email}</p>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -396,7 +377,7 @@ export default function FirmaDetayModal({
                           )}
                           {secili && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                              style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.22)' }}>
+                              style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.22)' }}>
                               ✓ Atandı
                             </span>
                           )}
@@ -408,55 +389,25 @@ export default function FirmaDetayModal({
               )}
               {uzmanlar.length > 0 && (
                 <p className="text-[10px] mt-2" style={{ color: textFaint }}>
-                  <i className="ri-information-line mr-0.5" />
-                  Bir uzman birden fazla firmaya atanabilir.
+                  <i className="ri-information-line mr-0.5" />Bir uzman birden fazla firmaya atanabilir.
                 </p>
               )}
             </div>
 
-            {/* ── KPI (Operasyon Odaklı) ── */}
+            {/* ── KPI ── */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4" style={{ borderBottom: `1px solid ${cardBorder}` }}>
               {[
-                {
-                  label: 'Toplam Personel',
-                  value: personelSayisi,
-                  icon: 'ri-group-line',
-                  color: '#10B981',
-                  bg: 'rgba(16,185,129,0.1)',
-                },
-                {
-                  label: 'Toplam Ziyaret',
-                  value: totalZiyaret,
-                  icon: 'ri-map-pin-2-line',
-                  color: '#10B981',
-                  bg: 'rgba(16,185,129,0.1)',
-                },
-                {
-                  label: 'Son Ziyaret',
-                  value: sonZiyaretTarih ? gunOnce(sonZiyaretTarih) : '—',
-                  icon: 'ri-time-line',
-                  color: '#F59E0B',
-                  bg: 'rgba(245,158,11,0.1)',
-                  isText: true,
-                },
-                {
-                  label: 'Ort. Ziyaret Süresi',
-                  value: avgSure !== null ? `${avgSure}dk` : '—',
-                  icon: 'ri-timer-line',
-                  color: '#F59E0B',
-                  bg: 'rgba(245,158,11,0.1)',
-                  isText: true,
-                },
+                { label: 'Toplam Personel', value: personelSayisi, icon: 'ri-group-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
+                { label: 'Toplam Ziyaret', value: totalZiyaret, icon: 'ri-map-pin-2-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
+                { label: 'Son Ziyaret', value: sonZiyaretTarih ? gunOnce(sonZiyaretTarih) : '—', icon: 'ri-time-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', isText: true },
+                { label: 'Ort. Ziyaret Süresi', value: avgSure !== null ? `${avgSure}dk` : '—', icon: 'ri-timer-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', isText: true },
               ].map(s => (
-                <div key={s.label} className="rounded-xl p-3 flex items-center gap-3 transition-all"
-                  style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                <div key={s.label} className="rounded-xl p-3 flex items-center gap-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: s.bg }}>
                     <i className={`${s.icon} text-sm`} style={{ color: s.color }} />
                   </div>
                   <div>
-                    <p className={`${s.isText ? 'text-sm' : 'text-base'} font-extrabold leading-none`} style={{ color: textPrimary }}>
-                      {s.value}
-                    </p>
+                    <p className={`${(s as { isText?: boolean }).isText ? 'text-sm' : 'text-base'} font-extrabold leading-none`} style={{ color: textPrimary }}>{s.value}</p>
                     <p className="text-[10px] mt-0.5" style={{ color: textFaint }}>{s.label}</p>
                   </div>
                 </div>
@@ -472,26 +423,18 @@ export default function FirmaDetayModal({
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
                   className="flex items-center gap-1.5 px-3 py-3 text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors"
-                  style={{
-                    color: activeTab === t.id ? '#059669' : textFaint,
-                    borderBottom: activeTab === t.id ? '2px solid #10B981' : '2px solid transparent',
-                  }}>
-                  <i className={`${t.icon} text-xs`} />
-                  {t.label}
+                  style={{ color: activeTab === t.id ? '#0284C7' : textFaint, borderBottom: activeTab === t.id ? '2px solid #0EA5E9' : '2px solid transparent' }}>
+                  <i className={`${t.icon} text-xs`} />{t.label}
                 </button>
               ))}
             </div>
 
             <div className="px-6 py-4">
-
-              {/* ── ÖZET TAB ── */}
               {activeTab === 'ozet' && (
                 <div className="space-y-4">
-
-                  {/* Firma Bilgileri */}
                   <div className="rounded-xl p-4" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
                     <div className="flex items-center gap-2 mb-3">
-                      <i className="ri-building-2-line text-xs" style={{ color: '#10B981' }} />
+                      <i className="ri-building-2-line text-xs" style={{ color: '#0EA5E9' }} />
                       <p className="text-xs font-semibold" style={{ color: textMuted }}>Firma Bilgileri</p>
                     </div>
                     {!firmaInfo || (!firmaInfo.yetkili && !firmaInfo.telefon && !firmaInfo.email && !firmaInfo.sgkSicil && !firmaInfo.adres) ? (
@@ -506,9 +449,8 @@ export default function FirmaDetayModal({
                           { label: 'Adres', value: firmaInfo.adres, icon: 'ri-map-pin-line' },
                         ].filter(row => row.value).map(row => (
                           <div key={row.label} className="flex items-start gap-2.5">
-                            <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0 mt-0.5"
-                              style={{ background: 'rgba(16,185,129,0.08)' }}>
-                              <i className={`${row.icon} text-[10px]`} style={{ color: '#10B981' }} />
+                            <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0 mt-0.5" style={{ background: 'rgba(14,165,233,0.08)' }}>
+                              <i className={`${row.icon} text-[10px]`} style={{ color: '#0EA5E9' }} />
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-[10px]" style={{ color: textFaint }}>{row.label}</p>
@@ -520,51 +462,25 @@ export default function FirmaDetayModal({
                     )}
                   </div>
 
-                  {/* Ziyaret Performansı */}
                   <div className="rounded-xl p-4" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
                     <div className="flex items-center gap-2 mb-3">
-                      <i className="ri-bar-chart-line text-xs" style={{ color: '#10B981' }} />
+                      <i className="ri-bar-chart-line text-xs" style={{ color: '#0EA5E9' }} />
                       <p className="text-xs font-semibold" style={{ color: textMuted }}>Ziyaret Performansı</p>
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10.5px]" style={{ color: textFaint }}>Son 7 günde ziyaret oranı</p>
-                          <span className="text-xs font-bold" style={{ color: son7Gun > 0 ? '#10B981' : textFaint }}>
-                            {son7Gun} ziyaret
-                          </span>
-                        </div>
-                        <div className="h-2.5 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0' }}>
-                          <div className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${Math.min(100, (son7Gun / 7) * 100)}%`,
-                              background: son7Gun >= 5 ? '#10B981' : son7Gun >= 2 ? '#F59E0B' : '#EF4444',
-                            }} />
-                        </div>
-                        <p className="text-[10px] mt-1" style={{ color: textFaint }}>Son 7 günde {son7Gun} ziyaret yapıldı</p>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[10.5px]" style={{ color: textFaint }}>Son 7 günde ziyaret oranı</p>
+                        <span className="text-xs font-bold" style={{ color: son7Gun > 0 ? '#0EA5E9' : textFaint }}>{son7Gun} ziyaret</span>
                       </div>
-                      {totalZiyaret > 0 && (
-                        <div className="pt-2" style={{ borderTop: `1px solid ${cardBorder}` }}>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              { label: 'Bu ay', value: ziyaretler.filter(z => new Date(z.giris_saati).getMonth() === new Date().getMonth()).length },
-                              { label: 'Tamamlanan', value: ziyaretler.filter(z => z.cikis_saati).length },
-                              { label: 'Aktif', value: ziyaretler.filter(z => !z.cikis_saati).length },
-                            ].map(s => (
-                              <div key={s.label} className="text-center">
-                                <p className="text-base font-extrabold" style={{ color: textPrimary }}>{s.value}</p>
-                                <p className="text-[9px] mt-0.5" style={{ color: textFaint }}>{s.label}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <div className="h-2.5 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0' }}>
+                        <div className="h-full rounded-full transition-all"
+                          style={{ width: `${Math.min(100, (son7Gun / 7) * 100)}%`, background: son7Gun >= 5 ? '#0EA5E9' : son7Gun >= 2 ? '#F59E0B' : '#EF4444' }} />
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* ── PERSONEL TAB ── */}
               {activeTab === 'personel' && (
                 <div className="space-y-2">
                   {personeller.length === 0 ? (
@@ -578,7 +494,7 @@ export default function FirmaDetayModal({
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(0)'; }}>
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                        style={{ background: 'linear-gradient(135deg, #06B6D4, #0891B2)' }}>
+                        style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
                         {p.ad_soyad.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -593,7 +509,6 @@ export default function FirmaDetayModal({
                 </div>
               )}
 
-              {/* ── ZİYARET TAB ── */}
               {activeTab === 'ziyaretler' && (
                 <div className="space-y-2">
                   {ziyaretler.length === 0 ? (
@@ -605,53 +520,30 @@ export default function FirmaDetayModal({
                     const aktif = z.durum === 'aktif' || !z.cikis_saati;
                     const sure = ziyaretSuresi(z.giris_saati, z.cikis_saati);
                     return (
-                      <div key={z.id}
-                        className="flex items-center gap-3 p-3 rounded-xl transition-all"
-                        style={{
-                          background: aktif ? 'rgba(34,197,94,0.06)' : cardBg,
-                          border: `1px solid ${aktif ? 'rgba(34,197,94,0.2)' : cardBorder}`,
-                        }}
+                      <div key={z.id} className="flex items-center gap-3 p-3 rounded-xl transition-all"
+                        style={{ background: aktif ? 'rgba(34,197,94,0.06)' : cardBg, border: `1px solid ${aktif ? 'rgba(34,197,94,0.2)' : cardBorder}` }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateX(0)'; }}>
-                        {/* Status dot */}
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                           style={{ background: aktif ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.1)' }}>
-                          {aktif
-                            ? <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
-                            : <i className="ri-checkbox-circle-line text-sm" style={{ color: '#94A3B8' }} />}
+                          {aktif ? <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} /> : <i className="ri-checkbox-circle-line text-sm" style={{ color: '#94A3B8' }} />}
                         </div>
-                        {/* Uzman avatar */}
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                          style={{ background: aktif ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                          style={{ background: aktif ? 'linear-gradient(135deg, #0EA5E9, #0284C7)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
                           {(z.uzman_ad ?? z.uzman_email ?? '?').charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>
-                            {z.uzman_ad ?? z.uzman_email ?? '—'}
-                          </p>
+                          <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{z.uzman_ad ?? z.uzman_email ?? '—'}</p>
                           <p className="text-[10px]" style={{ color: textFaint }}>
                             {new Date(z.giris_saati).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                             {z.cikis_saati && ` — ${new Date(z.cikis_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`}
                           </p>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {sure && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                              style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
-                              {sure}
-                            </span>
-                          )}
-                          {z.qr_ile_giris && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                              style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
-                              QR
-                            </span>
-                          )}
+                          {sure && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7' }}>{sure}</span>}
+                          {z.qr_ile_giris && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7' }}>QR</span>}
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{
-                              background: aktif ? 'rgba(34,197,94,0.1)' : 'rgba(148,163,184,0.1)',
-                              color: aktif ? '#16A34A' : '#94A3B8',
-                            }}>
+                            style={{ background: aktif ? 'rgba(34,197,94,0.1)' : 'rgba(148,163,184,0.1)', color: aktif ? '#16A34A' : '#94A3B8' }}>
                             {aktif ? '● Aktif' : 'Tamam'}
                           </span>
                         </div>
@@ -672,12 +564,7 @@ export default function FirmaDetayModal({
     <>
       {modal}
       {showQrModal && (
-        <FirmaQrModal
-          firmaId={firmaId}
-          firmaAdi={firmaAdi}
-          isDark={isDark}
-          onClose={() => setShowQrModal(false)}
-        />
+        <FirmaQrModal firmaId={firmaId} firmaAdi={firmaAdi} isDark={isDark} onClose={() => setShowQrModal(false)} />
       )}
     </>
   );

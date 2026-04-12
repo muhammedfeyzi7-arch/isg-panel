@@ -49,7 +49,7 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
   if (score === 2) return { score, label: 'Zayıf', color: '#F97316' };
   if (score === 3) return { score, label: 'Orta', color: '#F59E0B' };
   if (score === 4) return { score, label: 'Güçlü', color: '#22C55E' };
-  return { score, label: 'Çok Güçlü', color: '#10B981' };
+  return { score, label: 'Çok Güçlü', color: '#0EA5E9' };
 }
 
 const NAV_ITEMS: { id: SettingsTab; label: string; icon: string; desc: string }[] = [
@@ -60,9 +60,9 @@ const NAV_ITEMS: { id: SettingsTab; label: string; icon: string; desc: string }[
 ];
 
 const OSGB_ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  osgb_admin:    { label: 'OSGB Admin',     color: '#10B981', bg: 'rgba(16,185,129,0.1)',   icon: 'ri-shield-star-line' },
-  gezici_uzman:  { label: 'Gezici Uzman',   color: '#10B981', bg: 'rgba(16,185,129,0.1)',   icon: 'ri-user-star-line' },
-  isyeri_hekimi: { label: 'İşyeri Hekimi', color: '#10B981', bg: 'rgba(16,185,129,0.1)',   icon: 'ri-heart-pulse-line' },
+  osgb_admin:    { label: 'OSGB Admin',     color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)',   icon: 'ri-shield-star-line' },
+  gezici_uzman:  { label: 'Gezici Uzman',   color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)',   icon: 'ri-user-star-line' },
+  isyeri_hekimi: { label: 'İşyeri Hekimi', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)',   icon: 'ri-heart-pulse-line' },
 };
 
 interface OsgbSettingsProps {
@@ -385,8 +385,8 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
     color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em',
   };
   const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)';
-    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.08)';
+    e.currentTarget.style.borderColor = 'rgba(14,165,233,0.5)';
+    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.08)';
   };
   const onBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     e.currentTarget.style.borderColor = 'var(--border-input)';
@@ -395,10 +395,10 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
 
   const Notif = ({ n }: { n: NotifState }) => (
     <div className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm"
-      style={{ background: n.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${n.type === 'success' ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}` }}>
+      style={{ background: n.type === 'success' ? 'rgba(14,165,233,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${n.type === 'success' ? 'rgba(14,165,233,0.25)' : 'rgba(239,68,68,0.25)'}` }}>
       <i className={`${n.type === 'success' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'} text-base flex-shrink-0 mt-0.5`}
-        style={{ color: n.type === 'success' ? '#10B981' : '#EF4444' }} />
-      <span style={{ color: n.type === 'success' ? '#10B981' : '#F87171' }}>{n.message}</span>
+        style={{ color: n.type === 'success' ? '#0EA5E9' : '#EF4444' }} />
+      <span style={{ color: n.type === 'success' ? '#0EA5E9' : '#F87171' }}>{n.message}</span>
     </div>
   );
 
@@ -428,14 +428,14 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
           <div className="px-5 py-5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 4px 14px rgba(14,165,233,0.35)' }}>
                 {(displayName || user?.email || 'O').charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{displayName || user?.email?.split('@')[0]}</p>
                 <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{user?.email}</p>
                 <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1"
-                  style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
                   OSGB Admin
                 </span>
               </div>
@@ -447,26 +447,26 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               return (
                 <button key={item.id} onClick={() => setActiveTab(item.id)}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left cursor-pointer transition-all duration-150 mb-0.5"
-                  style={{ background: isActive ? 'rgba(16,185,129,0.08)' : 'transparent', border: isActive ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent' }}
+                  style={{ background: isActive ? 'rgba(14,165,233,0.08)' : 'transparent', border: isActive ? '1px solid rgba(14,165,233,0.2)' : '1px solid transparent' }}
                   onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
                   onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                   <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-                    style={{ background: isActive ? 'rgba(16,185,129,0.15)' : 'var(--bg-item)' }}>
-                    <i className={`${item.icon} text-sm`} style={{ color: isActive ? '#10B981' : 'var(--text-muted)' }} />
+                    style={{ background: isActive ? 'rgba(14,165,233,0.15)' : 'var(--bg-item)' }}>
+                    <i className={`${item.icon} text-sm`} style={{ color: isActive ? '#0EA5E9' : 'var(--text-muted)' }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-semibold truncate" style={{ color: isActive ? '#059669' : 'var(--text-primary)' }}>{item.label}</p>
+                    <p className="text-[12.5px] font-semibold truncate" style={{ color: isActive ? '#0284C7' : 'var(--text-primary)' }}>{item.label}</p>
                     <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{item.desc}</p>
                   </div>
-                  {isActive && <i className="ri-arrow-right-s-line text-sm flex-shrink-0" style={{ color: '#10B981' }} />}
+                  {isActive && <i className="ri-arrow-right-s-line text-sm flex-shrink-0" style={{ color: '#0EA5E9' }} />}
                 </button>
               );
             })}
           </nav>
-          <div className="px-4 py-3 mx-2 mb-2 rounded-xl" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
+          <div className="px-4 py-3 mx-2 mb-2 rounded-xl" style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.12)' }}>
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-              <span className="text-[10px] font-bold" style={{ color: '#10B981' }}>Sistem Aktif</span>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />
+              <span className="text-[10px] font-bold" style={{ color: '#0EA5E9' }}>Sistem Aktif</span>
             </div>
             <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{orgName}</p>
           </div>
@@ -479,7 +479,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
           {NAV_ITEMS.map(item => (
             <button key={item.id} onClick={() => setActiveTab(item.id)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap transition-all"
-              style={{ background: activeTab === item.id ? 'rgba(16,185,129,0.1)' : 'transparent', color: activeTab === item.id ? '#059669' : 'var(--text-muted)', border: activeTab === item.id ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent' }}>
+              style={{ background: activeTab === item.id ? 'rgba(14,165,233,0.1)' : 'transparent', color: activeTab === item.id ? '#0284C7' : 'var(--text-muted)', border: activeTab === item.id ? '1px solid rgba(14,165,233,0.2)' : '1px solid transparent' }}>
               <i className={`${item.icon} text-xs`} />
               {item.label}
             </button>
@@ -496,7 +496,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
             <SectionHeader icon="ri-user-settings-line" iconBg="rgba(16,185,129,0.1)" iconColor="#10B981" title="Profil Bilgileri" desc="Hesabınıza ait kişisel bilgileri güncelleyin" />
             <div className="flex items-center gap-5 p-5 rounded-2xl mb-7" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 6px 20px rgba(16,185,129,0.35)' }}>
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 6px 20px rgba(14,165,233,0.35)' }}>
                 {(displayName || user?.email || 'O').charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -529,7 +529,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
             <div className="mt-6">
               <button onClick={handleProfileSave} disabled={profileLoading}
                 className="whitespace-nowrap flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: profileLoading ? 0.7 : 1 }}>
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', opacity: profileLoading ? 0.7 : 1 }}>
                 {profileLoading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-save-line" />Kaydet</>}
               </button>
             </div>
@@ -595,10 +595,10 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: 'Toplam Üye', value: members.length, icon: 'ri-group-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-                { label: 'OSGB Admin', value: members.filter(m => m.osgb_role === 'osgb_admin').length, icon: 'ri-shield-star-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-                { label: 'Gezici Uzman', value: members.filter(m => m.osgb_role === 'gezici_uzman').length, icon: 'ri-user-star-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-                { label: 'İşyeri Hekimi', value: members.filter(m => m.osgb_role === 'isyeri_hekimi').length, icon: 'ri-heart-pulse-line', color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
+                { label: 'Toplam Üye', value: members.length, icon: 'ri-group-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)' },
+                { label: 'OSGB Admin', value: members.filter(m => m.osgb_role === 'osgb_admin').length, icon: 'ri-shield-star-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)' },
+                { label: 'Gezici Uzman', value: members.filter(m => m.osgb_role === 'gezici_uzman').length, icon: 'ri-user-star-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)' },
+                { label: 'İşyeri Hekimi', value: members.filter(m => m.osgb_role === 'isyeri_hekimi').length, icon: 'ri-heart-pulse-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.08)' },
               ].map(s => (
                 <div key={s.label} className="rounded-2xl p-4 isg-card">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ background: s.bg }}>
@@ -615,13 +615,13 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>OSGB Üyeleri</h3>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(14,165,233,0.08)', color: '#0284C7' }}>
                     {members.length} üye
                   </span>
                   <button
                     onClick={() => { setShowAddModal(true); setAddForm(emptyForm); setAddError(null); }}
                     className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                    style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
+                    style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}
                   >
                     <i className="ri-user-add-line text-xs" />
                     Kullanıcı Ekle
@@ -631,7 +631,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
 
               {teamLoading ? (
                 <div className="flex items-center justify-center py-10 gap-2" style={{ color: 'var(--text-muted)' }}>
-                  <i className="ri-loader-4-line animate-spin text-lg" style={{ color: '#10B981' }} />
+                  <i className="ri-loader-4-line animate-spin text-lg" style={{ color: '#0EA5E9' }} />
                   <span className="text-sm">Yükleniyor...</span>
                 </div>
               ) : members.length === 0 ? (
@@ -666,13 +666,13 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                           {/* Üye */}
                           <div className="flex items-center gap-2.5 min-w-0 w-full">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                              style={{ background: member.is_active ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
+                              style={{ background: member.is_active ? 'linear-gradient(135deg, #0EA5E9, #0284C7)' : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
                               {(member.display_name || member.email || '?').charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                                 {member.display_name || '—'}
-                                {isMe && <span className="ml-1 text-[10px] font-normal" style={{ color: '#10B981' }}>(siz)</span>}
+                                {isMe && <span className="ml-1 text-[10px] font-normal" style={{ color: '#0EA5E9' }}>(siz)</span>}
                               </p>
                               <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{member.email}</p>
                             </div>
@@ -683,7 +683,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                                   <button onClick={() => handleToggleActive(member)} disabled={actionLoadingId === member.user_id}
                                     title={member.is_active ? 'Pasif yap' : 'Aktif et'}
                                     className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer disabled:opacity-50"
-                                    style={{ background: member.is_active ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)', border: `1px solid ${member.is_active ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}`, color: member.is_active ? '#F59E0B' : '#10B981' }}>
+                                    style={{ background: member.is_active ? 'rgba(245,158,11,0.08)' : 'rgba(14,165,233,0.08)', border: `1px solid ${member.is_active ? 'rgba(245,158,11,0.2)' : 'rgba(14,165,233,0.2)'}`, color: member.is_active ? '#F59E0B' : '#0EA5E9' }}>
                                     {actionLoadingId === member.user_id ? <i className="ri-loader-4-line animate-spin text-[10px]" /> : <i className={`${member.is_active ? 'ri-pause-circle-line' : 'ri-play-circle-line'} text-[10px]`} />}
                                   </button>
                                   <button onClick={() => setDeleteConfirm(member)} title="Üyeyi kaldır"
@@ -699,16 +699,20 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                           {/* Rol */}
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                              style={{ background: roleConf.bg, color: roleConf.color, border: `1px solid ${roleConf.color}30` }}>
-                              <i className={`${roleConf.icon} text-[9px]`} />
-                              {roleConf.label}
+                              style={{
+                                background: member.is_active ? 'rgba(14,165,233,0.1)' : 'rgba(100,116,139,0.1)',
+                                color: member.is_active ? '#0EA5E9' : 'var(--text-muted)',
+                                border: `1px solid ${member.is_active ? 'rgba(14,165,233,0.2)' : 'rgba(100,116,139,0.2)'}`,
+                              }}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: member.is_active ? '#0EA5E9' : '#94A3B8' }} />
+                              {member.is_active ? 'Aktif' : 'Pasif'}
                             </span>
                           </div>
 
                           {/* Firma */}
                           <div>
                             {(member.osgb_role === 'gezici_uzman' || member.osgb_role === 'isyeri_hekimi') && member.active_firm_ids && member.active_firm_ids.length > 0 ? (
-                              <span className="text-[10px] font-semibold" style={{ color: '#10B981' }}>
+                              <span className="text-[10px] font-semibold" style={{ color: '#0EA5E9' }}>
                                 <i className="ri-building-3-line text-[9px] mr-0.5" />
                                 {member.active_firm_ids.length} firma
                               </span>
@@ -721,11 +725,11 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                           <div>
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                               style={{
-                                background: member.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
-                                color: member.is_active ? '#10B981' : 'var(--text-muted)',
-                                border: `1px solid ${member.is_active ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)'}`,
+                                background: member.is_active ? 'rgba(14,165,233,0.1)' : 'rgba(100,116,139,0.1)',
+                                color: member.is_active ? '#0EA5E9' : 'var(--text-muted)',
+                                border: `1px solid ${member.is_active ? 'rgba(14,165,233,0.2)' : 'rgba(100,116,139,0.2)'}`,
                               }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: member.is_active ? '#10B981' : '#94A3B8' }} />
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: member.is_active ? '#0EA5E9' : '#94A3B8' }} />
                               {member.is_active ? 'Aktif' : 'Pasif'}
                             </span>
                           </div>
@@ -737,7 +741,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                                 <button onClick={() => handleToggleActive(member)} disabled={actionLoadingId === member.user_id}
                                   title={member.is_active ? 'Pasif yap' : 'Aktif et'}
                                   className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer disabled:opacity-50 transition-all"
-                                  style={{ background: member.is_active ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)', border: `1px solid ${member.is_active ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}`, color: member.is_active ? '#F59E0B' : '#10B981' }}
+                                  style={{ background: member.is_active ? 'rgba(245,158,11,0.08)' : 'rgba(14,165,233,0.08)', border: `1px solid ${member.is_active ? 'rgba(245,158,11,0.2)' : 'rgba(14,165,233,0.2)'}`, color: member.is_active ? '#F59E0B' : '#0EA5E9' }}
                                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; }}
                                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}>
                                   {actionLoadingId === member.user_id ? <i className="ri-loader-4-line animate-spin text-[10px]" /> : <i className={`${member.is_active ? 'ri-pause-circle-line' : 'ri-play-circle-line'} text-[10px]`} />}
@@ -763,12 +767,12 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               )}
             </div>
 
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
-              <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(14,165,233,0.04)', border: '1px solid rgba(14,165,233,0.12)' }}>
+              <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#0EA5E9' }} />
               <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                <strong style={{ color: '#059669' }}>OSGB Admin:</strong> Tam yetki &bull;&nbsp;
-                <strong style={{ color: '#10B981' }}>Gezici Uzman:</strong> Atanan firmalarda denetim &bull;&nbsp;
-                <strong style={{ color: '#10B981' }}>İşyeri Hekimi:</strong> Atanan firmalarda sağlık takibi
+                <strong style={{ color: '#0284C7' }}>OSGB Admin:</strong> Tam yetki &bull;&nbsp;
+                <strong style={{ color: '#0EA5E9' }}>Gezici Uzman:</strong> Atanan firmalarda denetim &bull;&nbsp;
+                <strong style={{ color: '#0EA5E9' }}>İşyeri Hekimi:</strong> Atanan firmalarda sağlık takibi
               </p>
             </div>
           </div>
@@ -781,13 +785,13 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               <SectionHeader icon="ri-information-line" iconBg="rgba(100,116,139,0.1)" iconColor="#64748B" title="Sistem Bilgisi" desc="Uygulama versiyonu ve OSGB teknik detayları" />
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
-                  { label: 'OSGB Adı', value: orgName, icon: 'ri-building-4-line', color: '#10B981' },
-                  { label: 'Müşteri Firma', value: String(firmaCount), icon: 'ri-building-2-line', color: '#10B981' },
-                  { label: 'Gezici Uzman', value: String(uzmanCount), icon: 'ri-user-star-line', color: '#10B981' },
-                  { label: 'İşyeri Hekimi', value: String(members.filter(m => m.osgb_role === 'isyeri_hekimi').length), icon: 'ri-heart-pulse-line', color: '#10B981' },
+                  { label: 'OSGB Adı', value: orgName, icon: 'ri-building-4-line', color: '#0EA5E9' },
+                  { label: 'Müşteri Firma', value: String(firmaCount), icon: 'ri-building-2-line', color: '#0EA5E9' },
+                  { label: 'Gezici Uzman', value: String(uzmanCount), icon: 'ri-user-star-line', color: '#0EA5E9' },
+                  { label: 'İşyeri Hekimi', value: String(members.filter(m => m.osgb_role === 'isyeri_hekimi').length), icon: 'ri-heart-pulse-line', color: '#0EA5E9' },
                 ].map(s => (
-                  <div key={s.label} className="p-4 rounded-xl text-center" style={{ background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ background: 'rgba(16,185,129,0.15)' }}>
+                  <div key={s.label} className="p-4 rounded-xl text-center" style={{ background: 'rgba(14,165,233,0.04)', border: '1px solid rgba(14,165,233,0.12)' }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ background: 'rgba(14,165,233,0.15)' }}>
                       <i className={`${s.icon} text-base`} style={{ color: s.color }} />
                     </div>
                     <p className="text-lg font-extrabold" style={{ color: 'var(--text-primary)' }}>{s.value}</p>
@@ -803,7 +807,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
       {/* ── Toast ── */}
       {toastMsg && createPortal(
         <div className="fixed bottom-6 right-6 z-[99999] flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white"
-          style={{ background: toastMsg.type === 'success' ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #EF4444, #DC2626)' }}>
+          style={{ background: toastMsg.type === 'success' ? 'linear-gradient(135deg, #0EA5E9, #0284C7)' : 'linear-gradient(135deg, #EF4444, #DC2626)', border: `1px solid ${toastMsg.type === 'success' ? 'rgba(14,165,233,0.25)' : 'rgba(239,68,68,0.25)'}` }}>
           <i className={toastMsg.type === 'success' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'} />
           {toastMsg.text}
         </div>,
@@ -819,8 +823,8 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
             style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                  <i className="ri-user-add-line text-base" style={{ color: '#10B981' }} />
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                  <i className="ri-user-add-line text-base" style={{ color: '#0EA5E9' }} />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Yeni Kullanıcı Ekle</h3>
@@ -845,14 +849,14 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                       onClick={() => setAddForm(p => ({ ...p, osgb_role: opt.value, active_firm_ids: [] }))}
                       className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all text-left"
                       style={{
-                        background: addForm.osgb_role === opt.value ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
-                        border: `2px solid ${addForm.osgb_role === opt.value ? 'rgba(16,185,129,0.3)' : 'var(--border-subtle)'}`,
+                        background: addForm.osgb_role === opt.value ? 'rgba(14,165,233,0.1)' : 'var(--bg-item)',
+                        border: `2px solid ${addForm.osgb_role === opt.value ? 'rgba(14,165,233,0.3)' : 'var(--border-subtle)'}`,
                       }}>
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: addForm.osgb_role === opt.value ? 'rgba(16,185,129,0.15)' : 'var(--bg-item)' }}>
-                        <i className={`${opt.icon} text-sm`} style={{ color: addForm.osgb_role === opt.value ? '#10B981' : 'var(--text-muted)' }} />
+                        style={{ background: addForm.osgb_role === opt.value ? 'rgba(14,165,233,0.15)' : 'var(--bg-item)' }}>
+                        <i className={`${opt.icon} text-sm`} style={{ color: addForm.osgb_role === opt.value ? '#0EA5E9' : 'var(--text-muted)' }} />
                       </div>
-                      <span className="text-xs font-semibold" style={{ color: addForm.osgb_role === opt.value ? '#10B981' : 'var(--text-secondary)' }}>{opt.label}</span>
+                      <span className="text-xs font-semibold" style={{ color: addForm.osgb_role === opt.value ? '#0EA5E9' : 'var(--text-secondary)' }}>{opt.label}</span>
                     </button>
                   ))}
                 </div>
@@ -901,20 +905,20 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
                       return (
                         <button key={f.id} type="button" onClick={() => toggleFirmaSelection(f.id)}
                           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer text-left transition-all"
-                          style={{ background: selected ? 'rgba(16,185,129,0.08)' : 'var(--bg-card-solid)', border: `1.5px solid ${selected ? 'rgba(16,185,129,0.3)' : 'var(--border-subtle)'}` }}>
+                          style={{ background: selected ? 'rgba(14,165,233,0.08)' : 'var(--bg-card-solid)', border: `1.5px solid ${selected ? 'rgba(14,165,233,0.3)' : 'var(--border-subtle)'}` }}>
                           <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
-                            style={{ background: selected ? 'linear-gradient(135deg, #10B981, #059669)' : 'var(--bg-input)', border: selected ? 'none' : '1.5px solid var(--border-main)' }}>
+                            style={{ background: selected ? 'linear-gradient(135deg, #0EA5E9, #0284C7)' : 'var(--bg-input)', border: selected ? 'none' : '1.5px solid var(--border-main)' }}>
                             {selected && <i className="ri-check-line text-white text-[9px]" />}
                           </div>
-                          <i className="ri-building-3-line text-xs flex-shrink-0" style={{ color: selected ? '#10B981' : 'var(--text-muted)' }} />
-                          <span className="text-xs font-medium flex-1 truncate" style={{ color: selected ? '#059669' : 'var(--text-primary)' }}>{f.name}</span>
+                          <i className="ri-building-3-line text-xs flex-shrink-0" style={{ color: selected ? '#0EA5E9' : 'var(--text-muted)' }} />
+                          <span className="text-xs font-medium flex-1 truncate" style={{ color: selected ? '#0284C7' : 'var(--text-primary)' }}>{f.name}</span>
                         </button>
                       );
                     })}
                   </div>
                 )}
                 {addForm.active_firm_ids.length > 0 && (
-                  <p className="text-[10px] mt-1 font-semibold" style={{ color: '#10B981' }}>
+                  <p className="text-[10px] mt-1 font-semibold" style={{ color: '#0EA5E9' }}>
                     <i className="ri-check-double-line mr-0.5" />
                     {addForm.active_firm_ids.length} firma seçildi
                   </p>
@@ -937,7 +941,7 @@ export default function OsgbSettings({ orgId, orgName, firmaCount, uzmanCount }:
               </button>
               <button onClick={handleAddUser} disabled={addLoading}
                 className="flex-1 whitespace-nowrap flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: addLoading ? 0.7 : 1 }}>
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', opacity: addLoading ? 0.7 : 1 }}>
                 {addLoading ? <><i className="ri-loader-4-line animate-spin" />Ekleniyor...</> : <><i className="ri-user-add-line" />Kullanıcı Ekle</>}
               </button>
             </div>

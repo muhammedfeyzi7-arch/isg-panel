@@ -531,7 +531,7 @@ export default function OsgbDashboardPage() {
                         placeholder="Ad, e-posta veya firma ara..."
                         className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl outline-none transition-all"
                         style={{ background: 'var(--bg-input)', border: '1.5px solid var(--border-input)', color: textPrimary }}
-                        onFocus={e => { e.currentTarget.style.borderColor = '#10B981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.1)'; }}
+                        onFocus={e => { e.currentTarget.style.borderColor = '#0EA5E9'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.1)'; }}
                         onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-input)'; e.currentTarget.style.boxShadow = 'none'; }}
                       />
                     </div>

@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase';
 import { useApp } from '@/store/AppContext';
 import ZiyaretDetayPanel from './ZiyaretDetayPanel';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface Ziyaret {
   id: string;
   osgb_org_id: string;
@@ -23,19 +22,16 @@ interface Ziyaret {
   sure_dakika: number | null;
 }
 
-// ─── Excel Export — Firma Bazlı Multi-Sheet ────────────────────────────────────
 async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   const { default: ExcelJS } = await import('exceljs');
   const wb = new ExcelJS.Workbook();
   wb.creator = 'ISG Yönetim Sistemi';
   wb.created = new Date();
 
-  // Tarihe göre DESC sırala
   const sorted = [...ziyaretler].sort(
     (a, b) => new Date(b.giris_saati).getTime() - new Date(a.giris_saati).getTime()
   );
 
-  // Firma bazında grupla — firma_org_id'ye göre, sonra firma_ad'a fallback
   const firmaMap = new Map<string, { ad: string; ziyaretler: Ziyaret[] }>();
   for (const z of sorted) {
     const key = z.firma_org_id ?? z.firma_ad ?? 'Bilinmiyor';
@@ -55,7 +51,6 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
     return h > 0 ? `${h}s ${m}dk` : `${m} dk`;
   };
 
-  // Kolon tanımları (her sheet aynı)
   const columns = [
     { header: 'Tarih', key: 'tarih', width: 14 },
     { header: 'Uzman Adı', key: 'uzman', width: 26 },
@@ -71,17 +66,13 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
     ws.getRow(1).height = 28;
     ws.getRow(1).eachCell(cell => {
       cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF064E3B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0C4A6E' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = {
-        bottom: { style: 'medium', color: { argb: 'FF10B981' } },
-      };
+      cell.border = { bottom: { style: 'medium', color: { argb: 'FF0EA5E9' } } };
     });
   };
 
-  // Her firma için ayrı sheet
   for (const [, { ad, ziyaretler: fZiyaretler }] of firmaMap) {
-    // Sheet adı max 31 karakter (Excel limiti), özel karakterleri temizle
     const sheetName = ad.replace(/[\\/?*[\]:]/g, '').slice(0, 31);
     const ws = wb.addWorksheet(sheetName);
     ws.columns = columns;
@@ -106,44 +97,32 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
       row.height = 22;
 
       row.eachCell({ includeEmpty: true }, (cell, colNum) => {
-        // Zebra
-        const zebraColor = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDF4';
+        const zebraColor = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F9FF';
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: zebraColor } };
         cell.alignment = { vertical: 'middle', horizontal: colNum === 2 ? 'left' : 'center' };
         cell.font = { size: 11, name: 'Calibri', color: { argb: 'FF1E293B' } };
-        cell.border = {
-          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-        };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
       });
 
-      // Tip rengi
       const tipCell = row.getCell('tip');
       tipCell.font = {
-        bold: true,
-        size: 11,
-        name: 'Calibri',
+        bold: true, size: 11, name: 'Calibri',
         color: { argb: z.qr_ile_giris ? 'FF7C3AED' : 'FF475569' },
       };
 
-      // Süre dakika rengi (sayısal)
       const sureDkCell = row.getCell('sure_dk');
       if (typeof sureDk === 'number') {
         sureDkCell.font = {
-          bold: true,
-          size: 11,
-          name: 'Calibri',
-          color: { argb: sureDk > 120 ? 'FF059669' : sureDk > 60 ? 'FF0891B2' : 'FF94A3B8' },
+          bold: true, size: 11, name: 'Calibri',
+          color: { argb: sureDk > 120 ? 'FF0284C7' : sureDk > 60 ? 'FF0891B2' : 'FF94A3B8' },
         };
       }
     });
 
-    // Toplam satırı
     ws.addRow({});
     const sumRow = ws.addRow({
       tarih: `Toplam: ${fZiyaretler.length} ziyaret`,
-      uzman: '',
-      giris: '',
-      cikis: '',
+      uzman: '', giris: '', cikis: '',
       sure_dk: fZiyaretler.reduce((s, z) => {
         const dk = z.sure_dakika ?? (z.cikis_saati
           ? Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000)
@@ -160,15 +139,13 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
     });
     sumRow.height = 24;
     sumRow.eachCell({ includeEmpty: true }, cell => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
-      cell.font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF064E3B' } };
-      cell.border = { top: { style: 'medium', color: { argb: 'FF10B981' } } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+      cell.font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF0C4A6E' } };
+      cell.border = { top: { style: 'medium', color: { argb: 'FF0EA5E9' } } };
     });
-
     ws.views = [{ state: 'frozen', ySplit: 1 }];
   }
 
-  // Dosya adı: Ziyaret-Raporu-YYYY-MM.xlsx
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -182,49 +159,41 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   a.download = fileName;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  void donem; // suppress unused warning
 }
 
 interface ZiyaretlerTabProps {
   isDark: boolean;
 }
 
-// ─── Helper Fonksiyonlar ──────────────────────────────────────────────────────
-
-/** Firma bazlı en son ziyareti döndürür */
 function getLastVisitByFirma(ziyaretler: Ziyaret[]): Record<string, Ziyaret> {
   const map: Record<string, Ziyaret> = {};
   for (const z of ziyaretler) {
     const key = z.firma_org_id;
-    if (!map[key] || new Date(z.giris_saati) > new Date(map[key].giris_saati)) {
-      map[key] = z;
-    }
+    if (!map[key] || new Date(z.giris_saati) > new Date(map[key].giris_saati)) map[key] = z;
   }
   return map;
 }
 
-/** Uzman bazlı en son ziyareti döndürür */
 function getLastVisitByUzman(ziyaretler: Ziyaret[]): Record<string, Ziyaret> {
   const map: Record<string, Ziyaret> = {};
   for (const z of ziyaretler) {
     const key = z.uzman_user_id;
-    if (!map[key] || new Date(z.giris_saati) > new Date(map[key].giris_saati)) {
-      map[key] = z;
-    }
+    if (!map[key] || new Date(z.giris_saati) > new Date(map[key].giris_saati)) map[key] = z;
   }
   return map;
 }
 
-/** 7+ gündür ziyaret edilmemiş firma id'lerini döndürür */
 function getInactiveFirmalar(lastVisitMap: Record<string, Ziyaret>, allFirmaIds: string[]): string[] {
   const threshold = Date.now() - 7 * 24 * 3600 * 1000;
   return allFirmaIds.filter(id => {
     const last = lastVisitMap[id];
-    if (!last) return true; // hiç ziyaret yok
+    if (!last) return true;
     return new Date(last.giris_saati).getTime() < threshold;
   });
 }
 
-/** 3+ gündür ziyaret yapmayan uzman user_id'lerini döndürür */
 function getInactiveUzmanlar(lastVisitMap: Record<string, Ziyaret>, allUzmanIds: string[]): { id: string; gunSayisi: number }[] {
   return allUzmanIds
     .map(id => {
@@ -236,7 +205,6 @@ function getInactiveUzmanlar(lastVisitMap: Record<string, Ziyaret>, allUzmanIds:
     .filter(x => x.gunSayisi >= 3);
 }
 
-/** Son ziyaret badge rengi */
 function getSonZiyaretBadge(lastVisit: Ziyaret | undefined): {
   label: string; color: string; bg: string; border: string;
 } {
@@ -248,7 +216,6 @@ function getSonZiyaretBadge(lastVisit: Ziyaret | undefined): {
   return { label: `${gunSayisi} gün önce`, color: '#EF4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.25)' };
 }
 
-// ─── Yardımcı formatlar ───────────────────────────────────────────────────────
 function formatSure(dakika: number | null): string {
   if (!dakika || dakika < 0) return '—';
   const h = Math.floor(dakika / 60);
@@ -271,7 +238,6 @@ function formatTarih(iso: string): string {
   return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-// ─── Gerçek zamanlı süre sayacı ──────────────────────────────────────────────
 function ElapsedTimer({ since }: { since: string }) {
   const [elapsed, setElapsed] = useState('');
   useEffect(() => {
@@ -291,16 +257,14 @@ function ElapsedTimer({ since }: { since: string }) {
 
 type FilterTarih = 'bugun' | 'bu_hafta' | 'bu_ay' | 'ozel';
 
-// ─── Ana Bileşen ──────────────────────────────────────────────────────────────
 export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
   const { org, addToast, firmalar: appFirmalar } = useApp();
   const [ziyaretler, setZiyaretler] = useState<Ziyaret[]>([]);
-  const [tumZiyaretler, setTumZiyaretler] = useState<Ziyaret[]>([]); // Son 30 gün — badge hesaplamaları için
+  const [tumZiyaretler, setTumZiyaretler] = useState<Ziyaret[]>([]);
   const [loading, setLoading] = useState(true);
   const [secilenZiyaret, setSecilenZiyaret] = useState<Ziyaret | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  // Filtreler
   const [filterTarih, setFilterTarih] = useState<FilterTarih>('bugun');
   const [filterOzelBaslangic, setFilterOzelBaslangic] = useState('');
   const [filterOzelBitis, setFilterOzelBitis] = useState('');
@@ -324,8 +288,6 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     }
   }, [ziyaretler, filterTarih, filterOzelBaslangic]);
 
-
-
   const cardStyle: React.CSSProperties = {
     background: 'var(--bg-card-solid)',
     border: '1px solid var(--border-subtle)',
@@ -336,15 +298,12 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
-        setFilterOpen(false);
-      }
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
     };
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
-  // ── Son 30 günlük tüm ziyaretleri çek (badge hesapları için) ──
   const fetchTumZiyaretler = useCallback(async () => {
     if (!org?.id) return;
     const since = new Date();
@@ -425,9 +384,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     try {
       const cikis = new Date().toISOString();
       const ziyaret = ziyaretler.find(z => z.id === ziyaretId);
-      const sure = ziyaret
-        ? Math.round((Date.now() - new Date(ziyaret.giris_saati).getTime()) / 60000)
-        : null;
+      const sure = ziyaret ? Math.round((Date.now() - new Date(ziyaret.giris_saati).getTime()) / 60000) : null;
       const { error } = await supabase
         .from('osgb_ziyaretler')
         .update({ durum: 'tamamlandi', cikis_saati: cikis, sure_dakika: sure, updated_at: cikis })
@@ -442,16 +399,8 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     }
   };
 
-  // ── Analytics hesapları ──────────────────────────────────────────────────────
   const aktifZiyaretler = useMemo(() => ziyaretler.filter(z => z.durum === 'aktif'), [ziyaretler]);
   const aktifSahaUzman = useMemo(() => [...new Set(aktifZiyaretler.map(z => z.uzman_user_id))].length, [aktifZiyaretler]);
-
-  // Bu haftaki ziyaretler
-  const buHaftaZiyaret = useMemo(() => {
-    const dayOfWeek = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
-    const haftaBaslangic = new Date(); haftaBaslangic.setDate(new Date().getDate() - dayOfWeek); haftaBaslangic.setHours(0, 0, 0, 0);
-    return tumZiyaretler.filter(z => new Date(z.giris_saati) >= haftaBaslangic).length;
-  }, [tumZiyaretler]);
 
   const tamamlananlar = useMemo(() => tumZiyaretler.filter(z => z.sure_dakika && z.sure_dakika > 0), [tumZiyaretler]);
   const ortalamaSure = useMemo(() =>
@@ -463,26 +412,17 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     [tumZiyaretler]
   );
 
-  // ── Firma & uzman bazlı son ziyaret haritaları ───────────────────────────────
   const lastByFirma = useMemo(() => getLastVisitByFirma(tumZiyaretler), [tumZiyaretler]);
   const lastByUzman = useMemo(() => getLastVisitByUzman(tumZiyaretler), [tumZiyaretler]);
 
-  // App'teki firmalar
   const tumFirmaIds = useMemo(() => appFirmalar.filter(f => !f.silinmis).map(f => f.id), [appFirmalar]);
-
-  // Geciken firmalar (7+ gün ziyaret edilmemiş)
   const gecikmisFilmalar = useMemo(() => getInactiveFirmalar(lastByFirma, tumFirmaIds), [lastByFirma, tumFirmaIds]);
 
-  // Pasif uzmanlar (3+ gün ziyaret yapmamış)
-  const tumUzmanIds = useMemo(() =>
-    [...new Set(tumZiyaretler.map(z => z.uzman_user_id))],
-    [tumZiyaretler]
-  );
+  const tumUzmanIds = useMemo(() => [...new Set(tumZiyaretler.map(z => z.uzman_user_id))], [tumZiyaretler]);
   const pasifUzmanlar = useMemo(() => getInactiveUzmanlar(lastByUzman, tumUzmanIds), [lastByUzman, tumUzmanIds]);
 
   const aktifFilterSayisi = [filterUzman, filterFirma, filterDurum].filter(Boolean).length;
 
-  // Geciken firmalar için ilk 5 firma adı
   const gecikmisFilmalarDetay = useMemo(() =>
     gecikmisFilmalar.slice(0, 5).map(id => {
       const firma = appFirmalar.find(f => f.id === id);
@@ -515,9 +455,9 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               <button key={opt.id} onClick={() => setFilterTarih(opt.id)}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
                 style={{
-                  background: filterTarih === opt.id ? 'rgba(16,185,129,0.12)' : 'transparent',
-                  color: filterTarih === opt.id ? '#10B981' : textMuted,
-                  border: filterTarih === opt.id ? '1px solid rgba(16,185,129,0.25)' : '1px solid transparent',
+                  background: filterTarih === opt.id ? 'rgba(14,165,233,0.12)' : 'transparent',
+                  color: filterTarih === opt.id ? '#0EA5E9' : textMuted,
+                  border: filterTarih === opt.id ? '1px solid rgba(14,165,233,0.25)' : '1px solid transparent',
                 }}>
                 {opt.label}
               </button>
@@ -542,14 +482,14 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
             <button onClick={() => setFilterOpen(v => !v)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap"
               style={{
-                background: aktifFilterSayisi > 0 ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
-                border: `1px solid ${aktifFilterSayisi > 0 ? 'rgba(16,185,129,0.25)' : 'var(--border-subtle)'}`,
-                color: aktifFilterSayisi > 0 ? '#10B981' : textMuted,
+                background: aktifFilterSayisi > 0 ? 'rgba(14,165,233,0.1)' : 'var(--bg-item)',
+                border: `1px solid ${aktifFilterSayisi > 0 ? 'rgba(14,165,233,0.25)' : 'var(--border-subtle)'}`,
+                color: aktifFilterSayisi > 0 ? '#0EA5E9' : textMuted,
               }}>
               <i className="ri-filter-3-line text-xs" />
               Filtrele
               {aktifFilterSayisi > 0 && (
-                <span className="w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: '#10B981' }}>
+                <span className="w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: '#0EA5E9' }}>
                   {aktifFilterSayisi}
                 </span>
               )}
@@ -565,8 +505,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                     <div className="relative">
                       <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: textMuted }} />
                       <input value={filterUzman} onChange={e => setFilterUzman(e.target.value)}
-                        placeholder="Uzman adı..."
-                        className="w-full text-xs pl-8 pr-3 py-2 rounded-xl outline-none"
+                        placeholder="Uzman adı..." className="w-full text-xs pl-8 pr-3 py-2 rounded-xl outline-none"
                         style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary }} />
                     </div>
                   </div>
@@ -575,8 +514,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                     <div className="relative">
                       <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: textMuted }} />
                       <input value={filterFirma} onChange={e => setFilterFirma(e.target.value)}
-                        placeholder="Firma adı..."
-                        className="w-full text-xs pl-8 pr-3 py-2 rounded-xl outline-none"
+                        placeholder="Firma adı..." className="w-full text-xs pl-8 pr-3 py-2 rounded-xl outline-none"
                         style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary }} />
                     </div>
                   </div>
@@ -592,13 +530,13 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                           className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer whitespace-nowrap"
                           style={{
                             background: filterDurum === opt.val
-                              ? opt.val === 'aktif' ? 'rgba(34,197,94,0.12)' : opt.val === 'tamamlandi' ? 'rgba(148,163,184,0.12)' : 'rgba(16,185,129,0.12)'
+                              ? opt.val === 'aktif' ? 'rgba(34,197,94,0.12)' : opt.val === 'tamamlandi' ? 'rgba(148,163,184,0.12)' : 'rgba(14,165,233,0.12)'
                               : 'var(--bg-item)',
                             border: filterDurum === opt.val
-                              ? opt.val === 'aktif' ? '1px solid rgba(34,197,94,0.25)' : opt.val === 'tamamlandi' ? '1px solid rgba(148,163,184,0.25)' : '1px solid rgba(16,185,129,0.25)'
+                              ? opt.val === 'aktif' ? '1px solid rgba(34,197,94,0.25)' : opt.val === 'tamamlandi' ? '1px solid rgba(148,163,184,0.25)' : '1px solid rgba(14,165,233,0.25)'
                               : '1px solid var(--border-subtle)',
                             color: filterDurum === opt.val
-                              ? opt.val === 'aktif' ? '#22C55E' : opt.val === 'tamamlandi' ? '#94A3B8' : '#10B981'
+                              ? opt.val === 'aktif' ? '#22C55E' : opt.val === 'tamamlandi' ? '#94A3B8' : '#0EA5E9'
                               : textMuted,
                           }}>
                           {opt.label}
@@ -624,9 +562,9 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
             disabled={exporting || ziyaretler.length === 0}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap transition-all"
             style={{
-              background: ziyaretler.length > 0 ? 'rgba(16,185,129,0.1)' : 'var(--bg-item)',
-              border: `1px solid ${ziyaretler.length > 0 ? 'rgba(16,185,129,0.25)' : 'var(--border-subtle)'}`,
-              color: ziyaretler.length > 0 ? '#10B981' : textMuted,
+              background: ziyaretler.length > 0 ? 'rgba(14,165,233,0.1)' : 'var(--bg-item)',
+              border: `1px solid ${ziyaretler.length > 0 ? 'rgba(14,165,233,0.25)' : 'var(--border-subtle)'}`,
+              color: ziyaretler.length > 0 ? '#0EA5E9' : textMuted,
               opacity: exporting ? 0.7 : 1,
             }}
             title="Her firma için ayrı sekme içeren Excel raporu indir"
@@ -639,7 +577,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
           <button onClick={() => { void fetchZiyaretler(); void fetchTumZiyaretler(); }}
             className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all"
             style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; (e.currentTarget as HTMLElement).style.color = '#10B981'; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; }}>
             <i className="ri-refresh-line text-sm" />
           </button>
@@ -654,23 +592,18 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               <i className="ri-alarm-warning-line text-sm" style={{ color: '#EF4444' }} />
             </div>
             <div className="flex-1">
-              <span className="text-xs font-bold" style={{ color: '#EF4444' }}>
-                7+ gündür ziyaret edilmeyen firmalar
-              </span>
-              <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
+              <span className="text-xs font-bold" style={{ color: '#EF4444' }}>7+ gündür ziyaret edilmeyen firmalar</span>
+              <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
                 {gecikmisFilmalar.length} firma
               </span>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {gecikmisFilmalarDetay.map(f => (
-              <div key={f.id}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+              <div key={f.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
                 style={{ background: isDark ? 'rgba(239,68,68,0.08)' : '#fff', border: '1px solid rgba(239,68,68,0.2)' }}>
-                <div className="w-5 h-5 flex items-center justify-center rounded-lg flex-shrink-0"
-                  style={{ background: 'rgba(16,185,129,0.1)' }}>
-                  <i className="ri-building-2-line text-[9px]" style={{ color: '#059669' }} />
+                <div className="w-5 h-5 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                  <i className="ri-building-2-line text-[9px]" style={{ color: '#0284C7' }} />
                 </div>
                 <span className="text-xs font-semibold" style={{ color: textPrimary }}>{f.ad}</span>
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
@@ -680,8 +613,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               </div>
             ))}
             {gecikmisFilmalar.length > 5 && (
-              <div className="flex items-center px-3 py-1.5 rounded-xl"
-                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+              <div className="flex items-center px-3 py-1.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
                 <span className="text-xs font-semibold" style={{ color: '#EF4444' }}>+{gecikmisFilmalar.length - 5} daha</span>
               </div>
             )}
@@ -697,8 +629,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               <i className="ri-user-unfollow-line text-sm" style={{ color: '#F59E0B' }} />
             </div>
             <span className="text-xs font-bold" style={{ color: '#F59E0B' }}>Saha Aktivitesi Azalan Uzmanlar</span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full ml-1"
-              style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B' }}>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full ml-1" style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B' }}>
               {pasifUzmanlar.length} uzman
             </span>
           </div>
@@ -707,22 +638,15 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               const lastZ = lastByUzman[u.id];
               const isKritik = u.gunSayisi >= 5;
               return (
-                <div key={u.id}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
-                  style={{
-                    background: isDark ? (isKritik ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)') : '#fff',
-                    border: `1px solid ${isKritik ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}`,
-                  }}>
+                <div key={u.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+                  style={{ background: isDark ? (isKritik ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)') : '#fff', border: `1px solid ${isKritik ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
                   <div className="w-5 h-5 flex items-center justify-center rounded-full text-[9px] font-bold text-white flex-shrink-0"
                     style={{ background: isKritik ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #F59E0B, #D97706)' }}>
                     {(lastZ?.uzman_ad ?? '?').charAt(0).toUpperCase()}
                   </div>
                   <span className="text-xs font-semibold" style={{ color: textPrimary }}>{lastZ?.uzman_ad ?? 'Bilinmiyor'}</span>
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                    style={{
-                      background: isKritik ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
-                      color: isKritik ? '#EF4444' : '#F59E0B',
-                    }}>
+                    style={{ background: isKritik ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', color: isKritik ? '#EF4444' : '#F59E0B' }}>
                     {u.gunSayisi === 999 ? 'Hiç yok' : `${u.gunSayisi}g önce`}
                   </span>
                 </div>
@@ -765,18 +689,15 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
         </div>
       )}
 
-      {/* ── KPI KARTLAR — Premium Gradient ── */}
+      {/* ── KPI KARTLAR ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           {
-            label: 'Aktif Ziyaret',
-            value: aktifSahaUzman,
+            label: 'Aktif Ziyaret', value: aktifSahaUzman,
             subLabel: aktifSahaUzman > 0 ? `${aktifSahaUzman} uzman sahada` : 'Şu an kimse yok',
-            icon: 'ri-map-pin-user-line',
-            color: '#22C55E',
+            icon: 'ri-map-pin-user-line', color: '#22C55E',
             gradient: 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(16,185,129,0.05) 100%)',
-            border: 'rgba(34,197,94,0.2)',
-            pulse: aktifSahaUzman > 0,
+            border: 'rgba(34,197,94,0.2)', pulse: aktifSahaUzman > 0,
           },
           {
             label: 'Bugünkü Ziyaret',
@@ -784,54 +705,30 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
               const today = new Date();
               return ziyaretler.filter(z => new Date(z.giris_saati).toDateString() === today.toDateString()).length;
             })(),
-            subLabel: 'Bugün toplam',
-            icon: 'ri-calendar-check-line',
-            color: '#10B981',
-            gradient: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.04) 100%)',
-            border: 'rgba(16,185,129,0.2)',
-            pulse: false,
+            subLabel: 'Bugün toplam', icon: 'ri-calendar-check-line', color: '#0EA5E9',
+            gradient: 'linear-gradient(135deg, rgba(14,165,233,0.12) 0%, rgba(2,132,199,0.04) 100%)',
+            border: 'rgba(14,165,233,0.2)', pulse: false,
           },
           {
-            label: 'Ortalama Süre',
-            value: formatSure(ortalamaSure),
-            subLabel: 'Son 30 günde',
-            icon: 'ri-time-line',
-            color: '#F59E0B',
+            label: 'Ortalama Süre', value: formatSure(ortalamaSure),
+            subLabel: 'Son 30 günde', icon: 'ri-time-line', color: '#F59E0B',
             gradient: 'linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(217,119,6,0.04) 100%)',
-            border: 'rgba(245,158,11,0.2)',
-            pulse: false,
+            border: 'rgba(245,158,11,0.2)', pulse: false,
           },
           {
-            label: 'QR Oranı',
-            value: `%${qrOrani}`,
-            subLabel: 'QR ile giriş',
-            icon: 'ri-qr-code-line',
-            color: '#10B981',
-            gradient: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.04) 100%)',
-            border: 'rgba(16,185,129,0.2)',
-            pulse: false,
+            label: 'QR Oranı', value: `%${qrOrani}`,
+            subLabel: 'QR ile giriş', icon: 'ri-qr-code-line', color: '#0EA5E9',
+            gradient: 'linear-gradient(135deg, rgba(14,165,233,0.12) 0%, rgba(2,132,199,0.04) 100%)',
+            border: 'rgba(14,165,233,0.2)', pulse: false,
           },
         ].map(kpi => (
-          <div
-            key={kpi.label}
-            className="rounded-2xl p-4 transition-all"
-            style={{
-              background: kpi.gradient,
-              border: `1px solid ${kpi.border}`,
-              boxShadow: 'none',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
-              (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${kpi.border}`;
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
-              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-            }}
+          <div key={kpi.label} className="rounded-2xl p-4 transition-all"
+            style={{ background: kpi.gradient, border: `1px solid ${kpi.border}`, boxShadow: 'none' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${kpi.border}`; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
           >
             <div className="flex items-center justify-between mb-3">
-              <div className="w-9 h-9 flex items-center justify-center rounded-xl"
-                style={{ background: `${kpi.color}18`, border: `1px solid ${kpi.border}` }}>
+              <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: `${kpi.color}18`, border: `1px solid ${kpi.border}` }}>
                 <i className={`${kpi.icon} text-base`} style={{ color: kpi.color }} />
               </div>
               {kpi.pulse && (
@@ -850,25 +747,20 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
       {/* ── TABLO / EMPTY STATE ── */}
       {loading ? (
         <div className="rounded-2xl p-12 flex flex-col items-center gap-3" style={cardStyle}>
-          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#10B981' }} />
+          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#0EA5E9' }} />
           <p className="text-sm" style={{ color: textMuted }}>Ziyaretler yükleniyor...</p>
         </div>
       ) : ziyaretler.length === 0 ? (
         <div className="rounded-2xl p-14 flex flex-col items-center gap-5" style={cardStyle}>
-          <div className="w-20 h-20 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(16,185,129,0.08)', border: '1.5px solid rgba(16,185,129,0.15)' }}>
-            <i className="ri-map-pin-2-line text-3xl" style={{ color: '#10B981' }} />
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.08)', border: '1.5px solid rgba(14,165,233,0.15)' }}>
+            <i className="ri-map-pin-2-line text-3xl" style={{ color: '#0EA5E9' }} />
           </div>
           <div className="text-center">
             <p className="text-sm font-bold" style={{ color: textPrimary }}>
               {filterTarih === 'bugun' ? 'Henüz ziyaret yok' : 'Ziyaret bulunamadı'}
             </p>
             <p className="text-xs mt-1.5 max-w-xs" style={{ color: textMuted }}>
-              {aktifFilterSayisi > 0
-                ? 'Seçili filtre koşullarında kayıt yok.'
-                : filterTarih === 'bugun'
-                  ? 'Uzmanlar QR ile ziyaret başlatabilir.'
-                  : 'Seçili dönemde ziyaret kaydı bulunamadı.'}
+              {aktifFilterSayisi > 0 ? 'Seçili filtre koşullarında kayıt yok.' : filterTarih === 'bugun' ? 'Uzmanlar QR ile ziyaret başlatabilir.' : 'Seçili dönemde ziyaret kaydı bulunamadı.'}
             </p>
           </div>
           {aktifFilterSayisi > 0 && (
@@ -887,40 +779,27 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
             </p>
             {aktifFilterSayisi > 0 && (
               <button onClick={() => { setFilterUzman(''); setFilterFirma(''); setFilterDurum(''); }}
-                className="text-[10px] font-semibold cursor-pointer flex items-center gap-1"
-                style={{ color: '#EF4444' }}>
+                className="text-[10px] font-semibold cursor-pointer flex items-center gap-1" style={{ color: '#EF4444' }}>
                 <i className="ri-close-circle-line" />Filtreleri temizle
               </button>
             )}
           </div>
 
-          {/* ── Card + Hybrid List ── */}
           <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
             {ziyaretler.map((z, i) => {
               const isAktif = z.durum === 'aktif';
               return (
-                <div
-                  key={z.id}
-                  onClick={() => setSecilenZiyaret(z)}
+                <div key={z.id} onClick={() => setSecilenZiyaret(z)}
                   className="flex items-center gap-4 px-5 py-3.5 cursor-pointer transition-all"
-                  style={{
-                    background: isAktif ? (isDark ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.025)') : 'transparent',
-                    animationDelay: `${i * 30}ms`,
-                  }}
+                  style={{ background: isAktif ? (isDark ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.025)') : 'transparent', animationDelay: `${i * 30}ms` }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.background = isAktif
-                      ? 'rgba(34,197,94,0.08)'
-                      : 'var(--bg-row-hover)';
+                    (e.currentTarget as HTMLElement).style.background = isAktif ? 'rgba(34,197,94,0.08)' : 'var(--bg-row-hover)';
                     (e.currentTarget as HTMLElement).style.paddingLeft = '22px';
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = isAktif
-                      ? (isDark ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.025)')
-                      : 'transparent';
+                    (e.currentTarget as HTMLElement).style.background = isAktif ? (isDark ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.025)') : 'transparent';
                     (e.currentTarget as HTMLElement).style.paddingLeft = '20px';
-                  }}
-                >
-                  {/* Avatar */}
+                  }}>
                   <div className="relative flex-shrink-0">
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold text-white"
                       style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
@@ -932,40 +811,30 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                     )}
                   </div>
 
-                  {/* Orta: uzman + firma */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>
-                      {z.uzman_ad ?? '—'}
-                    </p>
+                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{z.uzman_ad ?? '—'}</p>
                     <div className="flex items-center gap-1 mt-0.5">
-                      <i className="ri-building-2-line text-[9px] flex-shrink-0" style={{ color: '#10B981' }} />
+                      <i className="ri-building-2-line text-[9px] flex-shrink-0" style={{ color: '#0EA5E9' }} />
                       <p className="text-[11px] truncate" style={{ color: textMuted }}>{z.firma_ad ?? '—'}</p>
                     </div>
                   </div>
 
-                  {/* Giriş saati */}
                   <div className="flex-shrink-0 text-right hidden sm:block">
                     <p className="text-xs font-semibold" style={{ color: textPrimary }}>{formatSaat(z.giris_saati)}</p>
                     <p className="text-[10px]" style={{ color: textMuted }}>{formatTarih(z.giris_saati)}</p>
                   </div>
 
-                  {/* Süre */}
                   <div className="flex-shrink-0">
                     {isAktif ? (
                       <ElapsedTimer since={z.giris_saati} />
                     ) : (
                       <span className="text-[10px] font-bold px-2 py-1 rounded-lg"
-                        style={{
-                          background: z.sure_dakika ? 'rgba(6,182,212,0.08)' : 'transparent',
-                          color: z.sure_dakika ? '#06B6D4' : textMuted,
-                          border: z.sure_dakika ? '1px solid rgba(6,182,212,0.15)' : 'none',
-                        }}>
+                        style={{ background: z.sure_dakika ? 'rgba(6,182,212,0.08)' : 'transparent', color: z.sure_dakika ? '#06B6D4' : textMuted, border: z.sure_dakika ? '1px solid rgba(6,182,212,0.15)' : 'none' }}>
                         {formatSure(z.sure_dakika)}
                       </span>
                     )}
                   </div>
 
-                  {/* Durum + QR badge grubu */}
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     {isAktif ? (
                       <div className="flex items-center gap-1">
@@ -986,13 +855,12 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                     )}
                     {z.qr_ile_giris && (
                       <span className="text-[9px] font-bold px-1.5 py-1 rounded-lg whitespace-nowrap"
-                        style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.2)' }}>
                         <i className="ri-qr-code-line mr-0.5 text-[9px]" />QR
                       </span>
                     )}
                   </div>
 
-                  {/* Arrow */}
                   <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0"
                     style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
                     <i className="ri-arrow-right-s-line text-sm" style={{ color: textMuted }} />
@@ -1004,7 +872,6 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
         </div>
       )}
 
-      {/* Detay Panel */}
       {secilenZiyaret && (
         <ZiyaretDetayPanel
           ziyaret={secilenZiyaret}

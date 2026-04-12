@@ -70,9 +70,9 @@ export default function OsgbLoadingScreen({ onDone }: OsgbLoadingScreenProps) {
         <div
           className="w-16 h-16 flex items-center justify-center rounded-2xl"
           style={{
-            background: 'linear-gradient(135deg, rgba(16,185,129,0.18), rgba(16,185,129,0.06))',
-            border: '1px solid rgba(16,185,129,0.3)',
-            boxShadow: '0 0 40px rgba(16,185,129,0.15)',
+            background: 'linear-gradient(135deg, rgba(14,165,233,0.18), rgba(14,165,233,0.06))',
+            border: '1px solid rgba(14,165,233,0.3)',
+            boxShadow: '0 0 40px rgba(14,165,233,0.15)',
           }}
         >
           <img
@@ -80,18 +80,15 @@ export default function OsgbLoadingScreen({ onDone }: OsgbLoadingScreenProps) {
             alt="ISG Logo"
             style={{
               height: '32px', width: 'auto', objectFit: 'contain',
-              filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(16,185,129,0.5))',
+              filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(14,165,233,0.5))',
             }}
           />
         </div>
         <div className="text-center">
-          <h1
-            className="text-2xl font-black"
-            style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}
-          >
+          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>
             ISG Denetim
           </h1>
-          <p className="text-sm mt-1 font-semibold" style={{ color: '#10B981' }}>
+          <p className="text-sm mt-1 font-semibold" style={{ color: '#0EA5E9' }}>
             OSGB Yönetim Paneli
           </p>
         </div>
@@ -104,18 +101,14 @@ export default function OsgbLoadingScreen({ onDone }: OsgbLoadingScreenProps) {
             className="h-full rounded-full transition-all duration-200"
             style={{
               width: `${progress}%`,
-              background: 'linear-gradient(90deg, #10B981, #34D399)',
-              boxShadow: '0 0 8px rgba(16,185,129,0.5)',
+              background: 'linear-gradient(90deg, #0EA5E9, #38BDF8)',
+              boxShadow: '0 0 8px rgba(14,165,233,0.5)',
             }}
           />
         </div>
         <div className="flex justify-between mt-1.5">
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            {Math.round(progress)}%
-          </span>
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            {stepIndex + 1}/{STEPS.length}
-          </span>
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{Math.round(progress)}%</span>
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{stepIndex + 1}/{STEPS.length}</span>
         </div>
       </div>
 
@@ -123,20 +116,12 @@ export default function OsgbLoadingScreen({ onDone }: OsgbLoadingScreenProps) {
       <div
         className="flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300"
         style={{
-          background: isDone ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.07)',
-          border: `1px solid ${isDone ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.15)'}`,
+          background: isDone ? 'rgba(14,165,233,0.12)' : 'rgba(14,165,233,0.07)',
+          border: `1px solid ${isDone ? 'rgba(14,165,233,0.3)' : 'rgba(14,165,233,0.15)'}`,
         }}
       >
-        <i
-          className={`${step.icon} text-sm`}
-          style={{
-            color: '#10B981',
-            animation: isDone ? 'none' : 'osgbSpin 1.5s linear infinite',
-          }}
-        />
-        <span className="text-xs font-semibold" style={{ color: '#10B981' }}>
-          {step.label}
-        </span>
+        <i className={`${step.icon} text-sm`} style={{ color: '#0EA5E9', animation: isDone ? 'none' : 'osgbSpin 1.5s linear infinite' }} />
+        <span className="text-xs font-semibold" style={{ color: '#0EA5E9' }}>{step.label}</span>
       </div>
 
       {/* Step dots */}
@@ -148,11 +133,7 @@ export default function OsgbLoadingScreen({ onDone }: OsgbLoadingScreenProps) {
             style={{
               width: i === stepIndex ? '20px' : '6px',
               height: '6px',
-              background: i < stepIndex
-                ? '#10B981'
-                : i === stepIndex
-                  ? '#34D399'
-                  : 'rgba(16,185,129,0.15)',
+              background: i < stepIndex ? '#0EA5E9' : i === stepIndex ? '#38BDF8' : 'rgba(14,165,233,0.15)',
             }}
           />
         ))}

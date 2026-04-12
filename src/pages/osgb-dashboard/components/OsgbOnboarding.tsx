@@ -60,9 +60,9 @@ export default function OsgbOnboarding({
       title: 'Firma Ekle',
       description: 'Hizmet verdiğiniz müşteri firmayı sisteme tanıtın.',
       detail: 'Firma adı, iletişim bilgileri ve sözleşme tarihlerini ekleyin.',
-      color: '#10B981',
-      colorBg: 'rgba(16,185,129,0.1)',
-      colorBorder: 'rgba(16,185,129,0.2)',
+      color: '#0EA5E9',
+      colorBg: 'rgba(14,165,233,0.1)',
+      colorBorder: 'rgba(14,165,233,0.2)',
       done: firmaVar,
       active: !firmaVar,
       actionLabel: firmaVar ? `${firmalar.length} Firma Eklendi` : 'Firma Ekle',
@@ -74,9 +74,9 @@ export default function OsgbOnboarding({
       title: 'Uzman Ekle',
       description: 'Sahada çalışacak gezici uzmanı sisteme ekleyin.',
       detail: 'İsim, e-posta ve şifre bilgileriyle uzman hesabı oluşturun.',
-      color: '#10B981',
-      colorBg: 'rgba(16,185,129,0.1)',
-      colorBorder: 'rgba(16,185,129,0.2)',
+      color: '#0EA5E9',
+      colorBg: 'rgba(14,165,233,0.1)',
+      colorBorder: 'rgba(14,165,233,0.2)',
       done: uzmanVar,
       active: firmaVar && !uzmanVar,
       locked: !firmaVar,
@@ -102,12 +102,12 @@ export default function OsgbOnboarding({
 
   const progressColor =
     progress === 100
-      ? 'linear-gradient(90deg, #10B981, #34D399)'
+      ? 'linear-gradient(90deg, #0EA5E9, #38BDF8)'
       : progress >= 66
-      ? 'linear-gradient(90deg, #10B981, #F59E0B)'
+      ? 'linear-gradient(90deg, #0EA5E9, #F59E0B)'
       : progress >= 33
-      ? 'linear-gradient(90deg, #10B981, #34D399)'
-      : 'linear-gradient(90deg, #10B981, #10B981)';
+      ? 'linear-gradient(90deg, #0EA5E9, #38BDF8)'
+      : 'linear-gradient(90deg, #0EA5E9, #0EA5E9)';
 
   const progressLabel =
     progress === 100
@@ -125,17 +125,17 @@ export default function OsgbOnboarding({
         className="rounded-2xl p-6 relative overflow-hidden"
         style={{
           background: isDark
-            ? 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(139,92,246,0.06) 50%, rgba(245,158,11,0.05) 100%)'
-            : 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(139,92,246,0.04) 50%, rgba(245,158,11,0.03) 100%)',
-          border: '1px solid rgba(16,185,129,0.15)',
+            ? 'linear-gradient(135deg, rgba(14,165,233,0.08) 0%, rgba(139,92,246,0.06) 50%, rgba(245,158,11,0.05) 100%)'
+            : 'linear-gradient(135deg, rgba(14,165,233,0.06) 0%, rgba(139,92,246,0.04) 50%, rgba(245,158,11,0.03) 100%)',
+          border: '1px solid rgba(14,165,233,0.15)',
         }}
       >
         {/* Dekoratif arka plan ikonları */}
         <div className="absolute top-4 right-8 opacity-5">
-          <i className="ri-settings-3-line text-6xl" style={{ color: '#10B981' }} />
+          <i className="ri-settings-3-line text-6xl" style={{ color: '#0EA5E9' }} />
         </div>
         <div className="absolute bottom-2 right-32 opacity-5">
-          <i className="ri-building-2-line text-5xl" style={{ color: '#10B981' }} />
+          <i className="ri-building-2-line text-5xl" style={{ color: '#0EA5E9' }} />
         </div>
 
         <div className="relative z-10">
@@ -144,17 +144,13 @@ export default function OsgbOnboarding({
               <div className="flex items-center gap-2 mb-1.5">
                 <div
                   className="w-7 h-7 flex items-center justify-center rounded-lg"
-                  style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.25)' }}
+                  style={{ background: 'rgba(14,165,233,0.15)', border: '1px solid rgba(14,165,233,0.25)' }}
                 >
-                  <i className="ri-rocket-2-line text-xs" style={{ color: '#10B981' }} />
+                  <i className="ri-rocket-2-line text-xs" style={{ color: '#0EA5E9' }} />
                 </div>
                 <span
                   className="text-[10px] font-bold uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
-                  style={{
-                    background: 'rgba(16,185,129,0.1)',
-                    border: '1px solid rgba(16,185,129,0.2)',
-                    color: '#10B981',
-                  }}
+                  style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}
                 >
                   Kurulum Rehberi
                 </span>
@@ -169,35 +165,17 @@ export default function OsgbOnboarding({
 
             {/* Progress çember */}
             <div className="flex flex-col items-center gap-1">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center relative"
-                style={{
-                  background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
-                  border: '3px solid rgba(16,185,129,0.15)',
-                }}
-              >
-                {/* Dairesel progress göstergesi */}
+              <div className="relative w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)', border: '3px solid rgba(14,165,233,0.15)' }}>
                 <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 64 64">
-                  <circle
-                    cx="32" cy="32" r="28"
-                    fill="none"
-                    stroke="rgba(16,185,129,0.2)"
-                    strokeWidth="4"
-                  />
-                  <circle
-                    cx="32" cy="32" r="28"
-                    fill="none"
-                    stroke="#10B981"
-                    strokeWidth="4"
-                    strokeLinecap="round"
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(14,165,233,0.2)" strokeWidth="4" />
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="#0EA5E9" strokeWidth="4" strokeLinecap="round"
                     strokeDasharray={`${2 * Math.PI * 28}`}
                     strokeDashoffset={`${2 * Math.PI * 28 * (1 - progress / 100)}`}
                     style={{ transition: 'stroke-dashoffset 0.6s ease' }}
                   />
                 </svg>
-                <span className="text-base font-extrabold relative z-10" style={{ color: '#10B981' }}>
-                  {progress}%
-                </span>
+                <span className="text-base font-extrabold relative z-10" style={{ color: '#0EA5E9' }}>{progress}%</span>
               </div>
               <p className="text-[10px] font-semibold text-center" style={{ color: textMuted }}>
                 {progressLabel}
@@ -208,39 +186,19 @@ export default function OsgbOnboarding({
           {/* Linear progress bar */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold" style={{ color: textMuted }}>
-                {completedSteps}/3 adım tamamlandı
-              </span>
-              <span className="text-[10px] font-bold" style={{ color: '#10B981' }}>
-                %{progress}
-              </span>
+              <span className="text-[10px] font-semibold" style={{ color: textMuted }}>{completedSteps}/3 adım tamamlandı</span>
+              <span className="text-[10px] font-bold" style={{ color: '#0EA5E9' }}>%{progress}</span>
             </div>
-            <div
-              className="h-2 rounded-full overflow-hidden"
-              style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)' }}
-            >
-              <div
-                className="h-full rounded-full transition-all duration-700 ease-out"
-                style={{ width: `${progress}%`, background: progressColor }}
-              />
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)' }}>
+              <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${progress}%`, background: progressColor }} />
             </div>
             {/* Step dots */}
             <div className="flex items-center justify-between pt-0.5">
               {steps.map(s => (
                 <div key={s.index} className="flex items-center gap-1">
-                  <div
-                    className="w-2 h-2 rounded-full transition-all"
-                    style={{
-                      background: s.done ? '#10B981' : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
-                      boxShadow: s.done ? '0 0 5px rgba(16,185,129,0.5)' : 'none',
-                    }}
-                  />
-                  <span
-                    className="text-[9px] font-medium"
-                    style={{ color: s.done ? '#10B981' : textMuted }}
-                  >
-                    {s.title}
-                  </span>
+                  <div className="w-2 h-2 rounded-full transition-all"
+                    style={{ background: s.done ? '#0EA5E9' : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)', boxShadow: s.done ? '0 0 5px rgba(14,165,233,0.5)' : 'none' }} />
+                  <span className="text-[9px] font-medium" style={{ color: s.done ? '#0EA5E9' : textMuted }}>{s.title}</span>
                 </div>
               ))}
             </div>
@@ -432,38 +390,21 @@ export default function OsgbOnboarding({
 
       {/* ── Alt bilgi / Tamamlandı mesajı ── */}
       {progress === 100 ? (
-        <div
-          className="rounded-2xl p-5 flex items-center gap-4"
-          style={{
-            background: 'rgba(16,185,129,0.06)',
-            border: '1.5px solid rgba(16,185,129,0.2)',
-          }}
-        >
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'rgba(16,185,129,0.12)' }}
-          >
-            <i className="ri-checkbox-circle-line text-xl" style={{ color: '#10B981' }} />
+        <div className="rounded-2xl p-5 flex items-center gap-4"
+          style={{ background: 'rgba(14,165,233,0.06)', border: '1.5px solid rgba(14,165,233,0.2)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(14,165,233,0.12)' }}>
+            <i className="ri-checkbox-circle-line text-xl" style={{ color: '#0EA5E9' }} />
           </div>
           <div>
-            <p className="text-sm font-bold" style={{ color: '#10B981' }}>
-              Kurulum Tamamlandı!
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: textMuted }}>
-              Harika! Artık tüm firma ve uzman yönetimini bu panel üzerinden yapabilirsiniz.
-            </p>
+            <p className="text-sm font-bold" style={{ color: '#0EA5E9' }}>Kurulum Tamamlandı!</p>
+            <p className="text-xs mt-0.5" style={{ color: textMuted }}>Harika! Artık tüm firma ve uzman yönetimini bu panel üzerinden yapabilirsiniz.</p>
           </div>
         </div>
       ) : (
-        <div
-          className="rounded-2xl p-4 flex items-start gap-3"
-          style={{
-            background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-            border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.05)',
-          }}
-        >
-          <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.08)' }}>
-            <i className="ri-lightbulb-line text-xs" style={{ color: '#10B981' }} />
+        <div className="rounded-2xl p-4 flex items-start gap-3"
+          style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.05)' }}>
+          <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(14,165,233,0.08)' }}>
+            <i className="ri-lightbulb-line text-xs" style={{ color: '#0EA5E9' }} />
           </div>
           <div>
             <p className="text-xs font-semibold" style={{ color: textPrimary }}>

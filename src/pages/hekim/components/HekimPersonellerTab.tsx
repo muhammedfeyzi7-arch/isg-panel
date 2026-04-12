@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import HekimMuayeneModal from './HekimMuayeneModal';
 
 interface PersonelRow {
   id: string;
@@ -23,7 +24,10 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState<string>('');
   const [firmaAdMap, setFirmaAdMap] = useState<Record<string, string>>({});
+  const [muayeneModalOpen, setMuayeneModalOpen] = useState(false);
+  const [selectedPersonelId, setSelectedPersonelId] = useState<string | null>(null);
 
+  const ACCENT = '#0EA5E9';
   const textPrimary = 'var(--text-primary)';
   const textMuted = 'var(--text-muted)';
   const textSecondary = isDark ? '#94A3B8' : '#64748B';
@@ -140,8 +144,8 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
     );
     if (sonuc === 'Çalışabilir') return (
       <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-        style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }} />
+        style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT, border: `1px solid rgba(14,165,233,0.2)` }}>
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACCENT }} />
         {sonuc}
       </span>
     );
@@ -177,7 +181,7 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
               border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)'}`,
               color: textPrimary,
             }}
-            onFocus={e => { e.currentTarget.style.borderColor = '#10B981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.1)'; }}
+            onFocus={e => { e.currentTarget.style.borderColor = ACCENT; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.1)'; }}
             onBlur={e => { e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
@@ -188,9 +192,9 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
             onChange={e => setFirmaFilter(e.target.value)}
             className="py-2.5 px-3 rounded-xl text-sm outline-none cursor-pointer"
             style={{
-              background: firmaFilter ? 'rgba(16,185,129,0.08)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'),
-              border: `1.5px solid ${firmaFilter ? 'rgba(16,185,129,0.25)' : (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)')}`,
-              color: firmaFilter ? '#10B981' : textPrimary,
+              background: firmaFilter ? 'rgba(14,165,233,0.08)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'),
+              border: `1.5px solid ${firmaFilter ? 'rgba(14,165,233,0.25)' : (isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)')}`,
+              color: firmaFilter ? ACCENT : textPrimary,
             }}
           >
             <option value="">Tüm Firmalar</option>
@@ -209,7 +213,7 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
       {/* ── Loading ── */}
       {loading && (
         <div className="rounded-2xl p-12 flex flex-col items-center gap-3" style={card}>
-          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#10B981' }} />
+          <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: ACCENT }} />
           <p className="text-sm" style={{ color: textMuted }}>Yükleniyor...</p>
         </div>
       )}
@@ -218,8 +222,8 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
       {!loading && filtered.length === 0 && (
         <div className="rounded-2xl p-14 flex flex-col items-center gap-5" style={card}>
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(16,185,129,0.08)', border: '1.5px solid rgba(16,185,129,0.15)' }}>
-            <i className="ri-group-line text-2xl" style={{ color: '#10B981' }} />
+            style={{ background: 'rgba(14,165,233,0.08)', border: '1.5px solid rgba(14,165,233,0.15)' }}>
+            <i className="ri-group-line text-2xl" style={{ color: ACCENT }} />
           </div>
           <div className="text-center">
             <p className="text-base font-bold mb-2" style={{ color: textPrimary }}>
@@ -237,7 +241,6 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
         <div className="rounded-2xl overflow-hidden" style={card}>
           <div className="overflow-x-auto">
             <div className="min-w-[700px]">
-              {/* Sütun başlıkları */}
               <div className="grid px-4 py-2.5"
                 style={{
                   gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr',
@@ -251,7 +254,6 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
                 <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>SONUÇ</span>
               </div>
 
-              {/* Satırlar — premium kart stili */}
               <div className="space-y-1.5 p-2">
                 {filtered.map((p) => (
                   <div
@@ -264,8 +266,8 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
                     }}
                     onMouseEnter={e => {
                       const el = e.currentTarget as HTMLElement;
-                      el.style.background = isDark ? 'rgba(16,185,129,0.07)' : 'rgba(16,185,129,0.05)';
-                      el.style.borderColor = 'rgba(16,185,129,0.3)';
+                      el.style.background = isDark ? 'rgba(14,165,233,0.07)' : 'rgba(14,165,233,0.05)';
+                      el.style.borderColor = 'rgba(14,165,233,0.3)';
                       el.style.transform = 'translateX(2px)';
                     }}
                     onMouseLeave={e => {
@@ -279,7 +281,7 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
                     <div className="flex items-center gap-3 min-w-0">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
-                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                        style={{ background: `linear-gradient(135deg, ${ACCENT}, #0284C7)` }}>
                         {p.adSoyad.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -301,7 +303,7 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
                     {/* Firma */}
                     <div className="flex items-center min-w-0">
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap truncate"
-                        style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT, border: '1px solid rgba(14,165,233,0.2)' }}>
                         <i className="ri-building-2-line text-[9px] flex-shrink-0" />
                         <span className="truncate">{p.firmaAd}</span>
                       </span>
@@ -322,8 +324,18 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
                     </div>
 
                     {/* Sonuç */}
-                    <div className="flex items-center justify-end">
+                    <div className="flex items-center justify-end gap-2">
                       {getSonucBadge(p.sonMuayeneSonuc)}
+                      <button
+                        onClick={() => { setSelectedPersonelId(p.id); setMuayeneModalOpen(true); }}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+                        style={{ background: isDark ? 'rgba(14,165,233,0.1)' : 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.25)', color: ACCENT }}
+                        title="Muayene Ekle"
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.2)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.1)' : 'rgba(14,165,233,0.08)'; }}
+                      >
+                        <i className="ri-stethoscope-line text-xs" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -332,7 +344,16 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
           </div>
         </div>
       )}
+
+      <HekimMuayeneModal
+        open={muayeneModalOpen}
+        onClose={() => { setMuayeneModalOpen(false); setSelectedPersonelId(null); }}
+        onSaved={() => setMuayeneModalOpen(false)}
+        atanmisFirmaIds={atanmisFirmaIds}
+        isDark={isDark}
+        editData={null}
+        preselectedPersonelId={selectedPersonelId}
+      />
     </div>
   );
 }
-

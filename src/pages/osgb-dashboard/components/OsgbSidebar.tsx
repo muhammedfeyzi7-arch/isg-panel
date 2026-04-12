@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/store/AuthContext';
 import SupportModal from '@/components/feature/SupportModal';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
+
+const ACCENT = '#0EA5E9';
+const ACCENT_DARK = '#0284C7';
+const ACCENT_LIGHT = '#38BDF8';
 
 type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'ayarlar';
 
@@ -84,88 +88,55 @@ export default function OsgbSidebar({
           className={`flex items-center flex-shrink-0 ${collapsed ? 'justify-center px-0 h-[56px]' : 'px-4 h-[56px] gap-3'}`}
           style={{ borderBottom: '1px solid var(--border-subtle)' }}
         >
-          {/* Logo */}
           <div
             className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
-            style={{
-              background: 'rgba(16,185,129,0.12)',
-              border: '1px solid rgba(16,185,129,0.22)',
-            }}
+            style={{ background: `rgba(14,165,233,0.12)`, border: `1px solid rgba(14,165,233,0.22)` }}
           >
-            <img
-              src={LOGO_URL}
-              alt="ISG"
-              style={{ height: '16px', width: 'auto', objectFit: 'contain' }}
-            />
+            <img src={LOGO_URL} alt="ISG" style={{ height: '16px', width: 'auto', objectFit: 'contain' }} />
           </div>
 
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p
-                className="text-[12.5px] font-bold truncate leading-tight"
-                style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}
-              >
+              <p className="text-[12.5px] font-bold truncate leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
                 ISG Denetim
               </p>
-              <p
-                className="text-[9.5px] font-semibold mt-0.5 truncate"
-                style={{ color: '#10B981', letterSpacing: '0.04em' }}
-              >
+              <p className="text-[9.5px] font-semibold mt-0.5 truncate" style={{ color: ACCENT, letterSpacing: '0.04em' }}>
                 OSGB PANELİ
               </p>
             </div>
           )}
 
-          {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? 'Genişlet' : 'Daralt'}
             className="hidden lg:flex items-center justify-center w-6 h-6 rounded-md cursor-pointer flex-shrink-0 transition-all duration-150"
             style={{ color: 'var(--text-faint)', background: 'transparent' }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)';
-              (e.currentTarget as HTMLElement).style.color = '#10B981';
+              (e.currentTarget as HTMLElement).style.background = `rgba(14,165,233,0.1)`;
+              (e.currentTarget as HTMLElement).style.color = ACCENT;
             }}
             onMouseLeave={e => {
               (e.currentTarget as HTMLElement).style.background = 'transparent';
               (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
             }}
           >
-            <i
-              className="ri-side-bar-line text-[11px]"
-              style={{ transform: collapsed ? 'scaleX(-1)' : 'none' }}
-            />
+            <i className="ri-side-bar-line text-[11px]" style={{ transform: collapsed ? 'scaleX(-1)' : 'none' }} />
           </button>
         </div>
 
         {/* ── Org Badge ── */}
         {!collapsed && (
           <div className="mx-3 mt-3">
-            <div
-              className="px-3 py-2.5 rounded-xl"
-              style={{
-                background: 'rgba(16,185,129,0.06)',
-                border: '1px solid rgba(16,185,129,0.12)',
-              }}
-            >
+            <div className="px-3 py-2.5 rounded-xl"
+              style={{ background: `rgba(14,165,233,0.06)`, border: `1px solid rgba(14,165,233,0.12)` }}>
               <div className="flex items-center gap-2">
-                <div
-                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ background: '#10B981', boxShadow: '0 0 5px rgba(16,185,129,0.6)' }}
-                />
-                <p
-                  className="text-[9px] font-bold uppercase tracking-[0.12em]"
-                  style={{ color: 'rgba(16,185,129,0.65)' }}
-                >
+                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ background: ACCENT, boxShadow: `0 0 5px rgba(14,165,233,0.6)` }} />
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em]" style={{ color: `rgba(14,165,233,0.65)` }}>
                   Organizasyon
                 </p>
               </div>
-              <p
-                className="text-[12px] font-bold mt-1 truncate"
-                style={{ color: '#10B981' }}
-              >
-                {orgName}
-              </p>
+              <p className="text-[12px] font-bold mt-1 truncate" style={{ color: ACCENT }}>{orgName}</p>
             </div>
           </div>
         )}
@@ -175,10 +146,7 @@ export default function OsgbSidebar({
           {navGroups.map((group, gi) => (
             <div key={group.label} className={gi > 0 ? 'mt-4' : ''}>
               {!collapsed ? (
-                <p
-                  className="text-[9px] font-bold uppercase px-2 mb-1.5 select-none tracking-[0.14em]"
-                  style={{ color: 'var(--text-faint)' }}
-                >
+                <p className="text-[9px] font-bold uppercase px-2 mb-1.5 select-none tracking-[0.14em]" style={{ color: 'var(--text-faint)' }}>
                   {group.label}
                 </p>
               ) : (
@@ -203,64 +171,44 @@ export default function OsgbSidebar({
                           borderRadius: '10px',
                           justifyContent: collapsed ? 'center' : undefined,
                           gap: collapsed ? undefined : '10px',
-                          background: isActive
-                            ? 'rgba(16,185,129,0.1)'
-                            : isHovered
-                            ? 'var(--bg-hover)'
-                            : 'transparent',
-                          border: isActive
-                            ? '1px solid rgba(16,185,129,0.2)'
-                            : '1px solid transparent',
+                          background: isActive ? `rgba(14,165,233,0.1)` : isHovered ? 'var(--bg-hover)' : 'transparent',
+                          border: isActive ? `1px solid rgba(14,165,233,0.2)` : '1px solid transparent',
                           transition: 'all 0.18s ease',
                         }}
                       >
-                        {/* Active accent bar */}
                         {isActive && !collapsed && (
                           <span
                             className="absolute left-0 top-1/2 -translate-y-1/2 rounded-r-full"
                             style={{
-                              width: '3px',
-                              height: '55%',
-                              background: 'linear-gradient(180deg, #34D399, #059669)',
-                              boxShadow: '0 0 6px rgba(16,185,129,0.4)',
+                              width: '3px', height: '55%',
+                              background: `linear-gradient(180deg, ${ACCENT_LIGHT}, ${ACCENT_DARK})`,
+                              boxShadow: `0 0 6px rgba(14,165,233,0.4)`,
                             }}
                           />
                         )}
 
-                        {/* Icon */}
                         <span
                           className="flex items-center justify-center flex-shrink-0"
                           style={{
-                            width: '17px',
-                            height: '17px',
+                            width: '17px', height: '17px',
                             marginLeft: isActive && !collapsed ? '6px' : undefined,
                             transition: 'transform 0.18s ease',
                             transform: isHovered && !isActive ? 'translateX(1px)' : 'none',
                           }}
                         >
-                          <i
-                            className={`${item.icon} text-[14px]`}
+                          <i className={`${item.icon} text-[14px]`}
                             style={{
-                              color: isActive
-                                ? '#10B981'
-                                : isHovered
-                                ? 'var(--text-secondary)'
-                                : 'var(--text-faint)',
+                              color: isActive ? ACCENT : isHovered ? 'var(--text-secondary)' : 'var(--text-faint)',
                               transition: 'color 0.18s ease',
                             }}
                           />
                         </span>
 
-                        {/* Label */}
                         {!collapsed && (
                           <span
                             className="flex-1 leading-none text-[12px] truncate"
                             style={{
-                              color: isActive
-                                ? '#10B981'
-                                : isHovered
-                                ? 'var(--text-primary)'
-                                : 'var(--text-muted)',
+                              color: isActive ? ACCENT : isHovered ? 'var(--text-primary)' : 'var(--text-muted)',
                               fontWeight: isActive ? 600 : 500,
                               transition: 'color 0.18s ease',
                             }}
@@ -269,15 +217,9 @@ export default function OsgbSidebar({
                           </span>
                         )}
 
-                        {/* Active dot */}
                         {!collapsed && isActive && (
-                          <span
-                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                            style={{
-                              background: '#10B981',
-                              boxShadow: '0 0 5px rgba(16,185,129,0.6)',
-                            }}
-                          />
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ background: ACCENT, boxShadow: `0 0 5px rgba(14,165,233,0.6)` }} />
                         )}
                       </button>
                     </li>
@@ -291,52 +233,24 @@ export default function OsgbSidebar({
         {/* ── Stats Box ── */}
         {!collapsed && (
           <div className="px-3 pb-2">
-            <div
-              className="rounded-xl p-3"
-              style={{
-                background: 'var(--bg-item)',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
-              <p
-                className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2.5"
-                style={{ color: 'var(--text-faint)' }}
-              >
+            <div className="rounded-xl p-3" style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] mb-2.5" style={{ color: 'var(--text-faint)' }}>
                 İstatistikler
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { value: firmaCount, label: 'Toplam Firma', color: '#10B981', icon: 'ri-building-3-line' },
-                  { value: uzmanCount, label: 'Toplam Uzman', color: '#10B981', icon: 'ri-shield-user-line' },
+                  { value: firmaCount, label: 'Toplam Firma', icon: 'ri-building-3-line' },
+                  { value: uzmanCount, label: 'Toplam Uzman', icon: 'ri-shield-user-line' },
                 ].map(stat => (
-                  <div
-                    key={stat.label}
-                    className="rounded-lg p-2.5"
-                    style={{
-                      background: 'rgba(16,185,129,0.05)',
-                      border: '1px solid rgba(16,185,129,0.1)',
-                    }}
-                  >
+                  <div key={stat.label} className="rounded-lg p-2.5"
+                    style={{ background: `rgba(14,165,233,0.05)`, border: `1px solid rgba(14,165,233,0.1)` }}>
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                        <i
-                          className={`${stat.icon} text-[10px]`}
-                          style={{ color: 'rgba(16,185,129,0.55)' }}
-                        />
+                        <i className={`${stat.icon} text-[10px]`} style={{ color: `rgba(14,165,233,0.55)` }} />
                       </div>
                     </div>
-                    <p
-                      className="text-[17px] font-extrabold leading-none"
-                      style={{ color: stat.color }}
-                    >
-                      {stat.value}
-                    </p>
-                    <p
-                      className="text-[9px] font-medium mt-0.5"
-                      style={{ color: 'var(--text-faint)' }}
-                    >
-                      {stat.label}
-                    </p>
+                    <p className="text-[17px] font-extrabold leading-none" style={{ color: ACCENT }}>{stat.value}</p>
+                    <p className="text-[9px] font-medium mt-0.5" style={{ color: 'var(--text-faint)' }}>{stat.label}</p>
                   </div>
                 ))}
               </div>
@@ -350,28 +264,23 @@ export default function OsgbSidebar({
             onClick={() => setSupportOpen(true)}
             title={collapsed ? 'Destek' : undefined}
             className={`cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'w-10 h-10 flex items-center justify-center' : 'w-full flex items-center gap-2.5 px-3 py-2'}`}
-            style={{
-              background: 'rgba(16,185,129,0.06)',
-              border: '1px solid rgba(16,185,129,0.14)',
-            }}
+            style={{ background: `rgba(14,165,233,0.06)`, border: `1px solid rgba(14,165,233,0.14)` }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.12)';
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.28)';
+              (e.currentTarget as HTMLElement).style.background = `rgba(14,165,233,0.12)`;
+              (e.currentTarget as HTMLElement).style.borderColor = `rgba(14,165,233,0.28)`;
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.06)';
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.14)';
+              (e.currentTarget as HTMLElement).style.background = `rgba(14,165,233,0.06)`;
+              (e.currentTarget as HTMLElement).style.borderColor = `rgba(14,165,233,0.14)`;
             }}
           >
             <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-              <i className="ri-customer-service-2-line text-xs" style={{ color: '#10B981' }} />
+              <i className="ri-customer-service-2-line text-xs" style={{ color: ACCENT }} />
             </div>
             {!collapsed && (
               <>
-                <span className="text-[11.5px] font-semibold flex-1 text-left" style={{ color: '#10B981' }}>
-                  Destek
-                </span>
-                <i className="ri-arrow-right-s-line text-xs" style={{ color: 'rgba(16,185,129,0.4)' }} />
+                <span className="text-[11.5px] font-semibold flex-1 text-left" style={{ color: ACCENT }}>Destek</span>
+                <i className="ri-arrow-right-s-line text-xs" style={{ color: `rgba(14,165,233,0.4)` }} />
               </>
             )}
           </button>
@@ -380,37 +289,22 @@ export default function OsgbSidebar({
         {/* ── Profile ── */}
         <div
           className={`mx-2.5 mb-3 rounded-xl flex items-center ${collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2.5'}`}
-          style={{
-            background: 'var(--bg-item)',
-            border: '1px solid var(--border-subtle)',
-          }}
+          style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}
         >
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
-            style={{
-              background: 'linear-gradient(135deg, #10B981, #059669)',
-            }}
-          >
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
+            style={{ background: `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})` }}>
             {userInitial}
           </div>
 
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <p
-                  className="text-[11.5px] font-semibold truncate leading-tight"
-                  style={{ color: 'var(--text-primary)' }}
-                >
+                <p className="text-[11.5px] font-semibold truncate leading-tight" style={{ color: 'var(--text-primary)' }}>
                   {userName}
                 </p>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: '#10B981', boxShadow: '0 0 4px rgba(16,185,129,0.6)' }}
-                  />
-                  <p className="text-[9.5px] font-semibold" style={{ color: '#10B981' }}>
-                    OSGB Admin
-                  </p>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACCENT, boxShadow: `0 0 4px rgba(14,165,233,0.6)` }} />
+                  <p className="text-[9.5px] font-semibold" style={{ color: ACCENT }}>OSGB Admin</p>
                 </div>
               </div>
               <button

@@ -42,36 +42,31 @@ function VisitBadge({ days }: { days: number | null }) {
   if (days === null) return (
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
       style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: '1px solid rgba(100,116,139,0.15)' }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#94A3B8' }} />
-      Hiç yok
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#94A3B8' }} />Hiç yok
     </span>
   );
   if (days === 0) return (
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
-      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-      Bugün
+      style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
+      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />Bugün
     </span>
   );
   if (days <= 2) return (
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.18)' }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }} />
-      {days}g önce
+      style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.18)' }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#0EA5E9' }} />{days}g önce
     </span>
   );
   if (days <= 7) return (
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
       style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.18)' }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#F59E0B' }} />
-      {days}g önce
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#F59E0B' }} />{days}g önce
     </span>
   );
   return (
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
       style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.18)' }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#EF4444' }} />
-      {days}g önce
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#EF4444' }} />{days}g önce
     </span>
   );
 }
@@ -89,7 +84,7 @@ export default function FirmalarTab({
   const tableBg = isDark ? 'rgba(20,30,50,0.98)' : '#ffffff';
   const tableHeadBg = isDark ? 'rgba(15,23,42,0.8)' : '#f8fafc';
   const borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
-  const rowHoverBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(16,185,129,0.025)';
+  const rowHoverBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(14,165,233,0.025)';
 
   useEffect(() => {
     if (!orgId || altFirmalar.length === 0) return;
@@ -142,7 +137,7 @@ export default function FirmalarTab({
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Firma ara..."
             className="w-full pl-9 pr-4 py-2 text-sm rounded-xl outline-none transition-all"
             style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1.5px solid ${borderColor}`, color: textPrimary }}
-            onFocus={e => { e.currentTarget.style.borderColor = '#10B981'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.1)'; }}
+            onFocus={e => { e.currentTarget.style.borderColor = '#0EA5E9'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.1)'; }}
             onBlur={e => { e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.boxShadow = 'none'; }} />
           {search && (
             <button onClick={() => setSearch('')}
@@ -160,7 +155,7 @@ export default function FirmalarTab({
 
         <button onClick={onFirmaEkle}
           className="whitespace-nowrap ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all"
-          style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
+          style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}>
           <i className="ri-add-line text-sm" />
@@ -173,8 +168,8 @@ export default function FirmalarTab({
         <div className="rounded-xl p-12 flex flex-col items-center gap-4 text-center"
           style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
           <div className="w-14 h-14 rounded-xl flex items-center justify-center"
-            style={{ background: 'rgba(16,185,129,0.08)', border: '1.5px solid rgba(16,185,129,0.15)' }}>
-            <i className="ri-building-2-line text-2xl" style={{ color: '#10B981' }} />
+            style={{ background: 'rgba(14,165,233,0.08)', border: '1.5px solid rgba(14,165,233,0.15)' }}>
+            <i className="ri-building-2-line text-2xl" style={{ color: '#0EA5E9' }} />
           </div>
           <div>
             <p className="text-sm font-bold mb-1" style={{ color: textPrimary }}>
@@ -187,7 +182,7 @@ export default function FirmalarTab({
           {!search && (
             <button onClick={onFirmaEkle}
               className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
               <i className="ri-add-line" />İlk Firmayı Ekle
             </button>
           )}
@@ -223,8 +218,8 @@ export default function FirmalarTab({
                     border: `1px solid ${borderColor}`,
                   }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)';
-                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.2)';
+                    (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)';
                   }}
                   onMouseLeave={e => {
                     (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff';
@@ -236,7 +231,7 @@ export default function FirmalarTab({
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
                     <div className="relative flex-shrink-0">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold text-white"
-                        style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : 'linear-gradient(135deg, #10B981, #059669)' }}>
+                        style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
                         {f.name.charAt(0).toUpperCase()}
                       </div>
                       {isAktif && (
@@ -262,9 +257,9 @@ export default function FirmalarTab({
                         {firmaUzmanlar.slice(0, 2).map(u => (
                           <span key={u.user_id}
                             className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                            style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                            style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.2)' }}>
                             <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0"
-                              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
                               {u.display_name.charAt(0).toUpperCase()}
                             </span>
                             {u.display_name.split(' ')[0]}
@@ -272,7 +267,7 @@ export default function FirmalarTab({
                         ))}
                         {firmaUzmanlar.length > 2 && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{ background: 'rgba(16,185,129,0.08)', color: '#059669' }}>
+                            style={{ background: 'rgba(14,165,233,0.08)', color: '#0284C7' }}>
                             +{firmaUzmanlar.length - 2}
                           </span>
                         )}
@@ -318,7 +313,7 @@ export default function FirmalarTab({
                       title="Detay"
                       className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
                       style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1px solid ${borderColor}`, color: textSecondary }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.25)'; (e.currentTarget as HTMLElement).style.color = '#10B981'; }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.25)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; (e.currentTarget as HTMLElement).style.color = textSecondary; }}>
                       <i className="ri-eye-line text-[10px]" />
                     </button>

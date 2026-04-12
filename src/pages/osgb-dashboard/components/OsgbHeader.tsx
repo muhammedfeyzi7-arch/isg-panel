@@ -47,13 +47,11 @@ export default function OsgbHeader({
   const hour = new Date().getHours();
   const greeting = hour >= 6 && hour < 12 ? 'Günaydın' : hour >= 12 && hour < 17 ? 'İyi Günler' : 'İyi Akşamlar';
 
-  // user_metadata.full_name varsa onu kullan, yoksa email prefix
   const [displayName, setDisplayName] = useState<string>(
     user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'Admin'
   );
   const firstName = displayName;
 
-  // Supabase auth değişikliklerini dinle (Ayarlar'da isim güncellenince)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
@@ -64,13 +62,11 @@ export default function OsgbHeader({
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Notifications ──
   const [supportNotifs, setSupportNotifs] = useState<SupportNotification[]>([]);
   const [supportNotifOpen, setSupportNotifOpen] = useState(false);
   const supportNotifRef = useRef<HTMLDivElement>(null);
   const unreadCount = supportNotifs.filter(n => !n.is_read).length;
 
-  // ── Support Modal ──
   const [supportOpen, setSupportOpen] = useState(false);
   const [supportViewTicketId, setSupportViewTicketId] = useState<string | null>(null);
 
@@ -99,22 +95,17 @@ export default function OsgbHeader({
     if (ids.length > 0) await supabase.from('notifications').update({ is_read: true }).in('id', ids);
   };
 
-  // ── Search ──
   const [search, setSearch] = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // ── Profile dropdown ──
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // ── Quick Add dropdown ──
   const [quickOpen, setQuickOpen] = useState(false);
   const quickRef = useRef<HTMLDivElement>(null);
   const quickBtnRef = useRef<HTMLButtonElement>(null);
-  const [quickRect, setQuickRect] = useState<DOMRect | null>(null);
 
-  // ── Refresh ──
   const [refreshing, setRefreshing] = useState(false);
   const [refreshDone, setRefreshDone] = useState(false);
 
@@ -128,7 +119,6 @@ export default function OsgbHeader({
     setTimeout(() => setRefreshDone(false), 2000);
   };
 
-  // ── ESC tuşu ile quick modal kapat ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setQuickOpen(false);
@@ -137,15 +127,12 @@ export default function OsgbHeader({
     return () => document.removeEventListener('keydown', handler);
   }, [quickOpen]);
 
-  // ── Click outside ──
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchFocus(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
       if (supportNotifRef.current && !supportNotifRef.current.contains(e.target as Node)) setSupportNotifOpen(false);
-      // Quick dropdown is rendered via portal — close if click is outside the button
       if (quickRef.current && !quickRef.current.contains(e.target as Node)) {
-        // Check if click is inside the portal dropdown (data-quick-dropdown attr)
         const target = e.target as HTMLElement;
         if (!target.closest('[data-quick-dropdown]')) {
           setQuickOpen(false);
@@ -156,7 +143,6 @@ export default function OsgbHeader({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Theme tokens ──
   const headerBg     = isDark ? 'var(--bg-header, rgba(15,23,42,0.95))' : 'rgba(255,255,255,0.97)';
   const headerBorder = isDark ? 'var(--border-subtle, rgba(255,255,255,0.07))' : 'rgba(15,23,42,0.075)';
   const textMuted    = '#64748B';
@@ -168,6 +154,10 @@ export default function OsgbHeader({
   const dropdownBg   = isDark ? 'var(--bg-card-solid, #1e293b)' : 'rgba(255,255,255,0.99)';
   const dropdownBorder= isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.09)';
   const dropdownHover= isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.038)';
+
+  // ACCENT = #0EA5E9, ACCENT_DARK = #0284C7
+  const ACCENT = '#0EA5E9';
+  const ACCENT_DARK = '#0284C7';
 
   const navToTab = (tab: Tab) => {
     setActiveTab?.(tab);
@@ -203,11 +193,9 @@ export default function OsgbHeader({
 
         {/* Sayfa başlığı */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <div
-            className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
-            style={{ background: 'rgba(16,185,129,0.12)' }}
-          >
-            <i className={`${meta.icon} text-[11px]`} style={{ color: '#10B981' }} />
+          <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
+            style={{ background: 'rgba(14,165,233,0.12)' }}>
+            <i className={`${meta.icon} text-[11px]`} style={{ color: ACCENT }} />
           </div>
           <span className="text-[12px] sm:text-[13px] font-bold truncate" style={{ color: nameColor, maxWidth: '140px' }}>
             {meta.label}
@@ -226,9 +214,9 @@ export default function OsgbHeader({
         {/* OSGB badge */}
         <div
           className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold flex-shrink-0"
-          style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669' }}
+          style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', color: ACCENT_DARK }}
         >
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: ACCENT }} />
           OSGB Admin · {orgName}
         </div>
 
@@ -244,9 +232,9 @@ export default function OsgbHeader({
             style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: isDark ? '#e5e7eb' : '#334155' }}
             onFocus={e => {
               setSearchFocus(true);
-              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(16,185,129,0.04)';
-              e.currentTarget.style.borderColor = '#10B981';
-              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(16,185,129,0.2)';
+              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.09)' : `rgba(14,165,233,0.04)`;
+              e.currentTarget.style.borderColor = ACCENT;
+              e.currentTarget.style.boxShadow = `0 0 0 2px rgba(14,165,233,0.2)`;
               e.currentTarget.style.width = '180px';
             }}
             onBlur={e => {
@@ -262,7 +250,7 @@ export default function OsgbHeader({
               style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
             >
               <div className="px-4 py-2 text-center">
-                <i className="ri-search-line text-xl" style={{ color: '#10B981' }} />
+                <i className="ri-search-line text-xl" style={{ color: ACCENT }} />
                 <p className="text-[12px] mt-1.5 font-medium" style={{ color: textMuted }}>
                   &quot;{search}&quot; için arama yapılıyor...
                 </p>
@@ -277,13 +265,13 @@ export default function OsgbHeader({
           disabled={refreshing}
           title="Verileri Yenile"
           className="w-8 h-8 hidden md:flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0 disabled:opacity-50"
-          style={{ background: refreshDone ? 'rgba(52,211,153,0.12)' : iconBtnBg, border: `1px solid ${refreshDone ? 'rgba(52,211,153,0.3)' : iconBtnBorder}` }}
+          style={{ background: refreshDone ? 'rgba(14,165,233,0.12)' : iconBtnBg, border: `1px solid ${refreshDone ? 'rgba(14,165,233,0.3)' : iconBtnBorder}` }}
           onMouseEnter={e => { if (!refreshing) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = refreshDone ? 'rgba(52,211,153,0.12)' : iconBtnBg; }}
+          onMouseLeave={e => { e.currentTarget.style.background = refreshDone ? 'rgba(14,165,233,0.12)' : iconBtnBg; }}
         >
           <i
             className={`${refreshing ? 'ri-loader-4-line animate-spin' : refreshDone ? 'ri-check-line' : 'ri-refresh-line'} text-sm`}
-            style={{ color: refreshDone ? '#34D399' : refreshing ? '#10B981' : textMuted }}
+            style={{ color: refreshDone ? ACCENT : refreshing ? ACCENT : textMuted }}
           />
         </button>
 
@@ -306,21 +294,19 @@ export default function OsgbHeader({
           <button
             ref={quickBtnRef}
             onClick={() => {
-              const rect = quickBtnRef.current?.getBoundingClientRect() ?? null;
-              setQuickRect(rect);
               setQuickOpen(v => !v);
               setProfileOpen(false);
               setSupportNotifOpen(false);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white cursor-pointer whitespace-nowrap flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontSize: '11px', borderRadius: '8px' }}
+            style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_DARK})`, fontSize: '11px', borderRadius: '8px' }}
           >
             <i className="ri-add-line text-sm" />
             <span className="hidden sm:inline">Hızlı Ekle</span>
           </button>
         </div>
 
-        {/* Hızlı Ekle — Tam Ekran Modal (Portal) */}
+        {/* Hızlı Ekle Modal (Portal) */}
         {quickOpen && createPortal(
           <div
             data-quick-dropdown="true"
@@ -328,7 +314,6 @@ export default function OsgbHeader({
             style={{ zIndex: 999999, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)' }}
             onMouseDown={e => { if (e.target === e.currentTarget) setQuickOpen(false); }}
           >
-            {/* ESC tuşu ile kapat */}
             <div
               className="relative w-full max-w-lg rounded-2xl overflow-hidden"
               style={{
@@ -338,13 +323,13 @@ export default function OsgbHeader({
               }}
             >
               {/* Renkli üst bant */}
-              <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #10B981, #059669, #34D399, #06B6D4, #F59E0B)' }} />
+              <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${ACCENT}, ${ACCENT_DARK}, #38BDF8, #F59E0B)` }} />
 
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))', border: '1px solid rgba(16,185,129,0.2)' }}>
-                    <i className="ri-add-circle-line text-lg" style={{ color: '#10B981' }} />
+                  <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: `rgba(14,165,233,0.15)`, border: `1px solid rgba(14,165,233,0.2)` }}>
+                    <i className="ri-add-circle-line text-lg" style={{ color: ACCENT }} />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold" style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}>Hızlı Ekle</h3>
@@ -363,56 +348,52 @@ export default function OsgbHeader({
               </div>
 
               <div className="px-6 py-5 space-y-5">
-                {/* Temel İşlemler */}
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#94A3B8' }}>— Temel İşlemler</p>
                   <div className="grid grid-cols-2 gap-3">
-                    {/* Firma Ekle */}
                     <button
                       onClick={() => { onFirmaEkle?.(); setQuickOpen(false); }}
                       className="flex flex-col items-start gap-3 p-4 rounded-xl cursor-pointer transition-all text-left group"
-                      style={{ background: isDark ? 'rgba(16,185,129,0.06)' : '#f0fdf4', border: `1.5px solid rgba(16,185,129,0.2)` }}
-                      onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(16,185,129,0.12)' : '#dcfce7'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(16,185,129,0.06)' : '#f0fdf4'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.2)'; }}
+                      style={{ background: isDark ? `rgba(14,165,233,0.06)` : '#f0f9ff', border: `1.5px solid rgba(14,165,233,0.2)` }}
+                      onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(14,165,233,0.12)' : '#e0f2fe'; e.currentTarget.style.borderColor = 'rgba(14,165,233,0.4)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(14,165,233,0.06)' : '#f0f9ff'; e.currentTarget.style.borderColor = 'rgba(14,165,233,0.2)'; }}
                     >
-                      <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                        <i className="ri-building-2-line text-lg" style={{ color: '#10B981' }} />
+                      <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                        <i className="ri-building-2-line text-lg" style={{ color: ACCENT }} />
                       </div>
                       <div>
                         <p className="text-sm font-bold" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>Firma Ekle</p>
                         <p className="text-[10.5px] mt-0.5" style={{ color: '#64748B' }}>Yeni firma kaydı oluştur</p>
-                        <p className="text-[10px] font-semibold mt-2" style={{ color: '#10B981' }}>Modüle git →</p>
+                        <p className="text-[10px] font-semibold mt-2" style={{ color: ACCENT }}>Modüle git →</p>
                       </div>
                     </button>
 
-                    {/* Uzman Ekle */}
                     <button
                       onClick={() => { onUzmanEkle?.(); setQuickOpen(false); }}
                       className="flex flex-col items-start gap-3 p-4 rounded-xl cursor-pointer transition-all text-left group"
-                      style={{ background: isDark ? 'rgba(16,185,129,0.06)' : '#f0fdf4', border: `1.5px solid rgba(16,185,129,0.2)` }}
-                      onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(16,185,129,0.12)' : '#dcfce7'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(16,185,129,0.06)' : '#f0fdf4'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.2)'; }}
+                      style={{ background: isDark ? 'rgba(14,165,233,0.06)' : '#f0f9ff', border: `1.5px solid rgba(14,165,233,0.2)` }}
+                      onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(14,165,233,0.12)' : '#e0f2fe'; e.currentTarget.style.borderColor = 'rgba(14,165,233,0.4)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(14,165,233,0.06)' : '#f0f9ff'; e.currentTarget.style.borderColor = 'rgba(14,165,233,0.2)'; }}
                     >
-                      <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                        <i className="ri-user-add-line text-lg" style={{ color: '#10B981' }} />
+                      <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                        <i className="ri-user-add-line text-lg" style={{ color: ACCENT }} />
                       </div>
                       <div>
                         <p className="text-sm font-bold" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>Uzman Ekle</p>
                         <p className="text-[10.5px] mt-0.5" style={{ color: '#64748B' }}>Çalışan kaydı ekle</p>
-                        <p className="text-[10px] font-semibold mt-2" style={{ color: '#10B981' }}>Modüle git →</p>
+                        <p className="text-[10px] font-semibold mt-2" style={{ color: ACCENT }}>Modüle git →</p>
                       </div>
                     </button>
                   </div>
                 </div>
 
-                {/* Diğer İşlemler */}
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#94A3B8' }}>— Diğer İşlemler</p>
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { icon: 'ri-file-list-3-line', label: 'Ziyaret Ekle', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', tab: 'ziyaretler' as Tab },
-                      { icon: 'ri-bar-chart-grouped-line', label: 'Raporlar', color: '#10B981', bg: 'rgba(16,185,129,0.1)', tab: 'raporlar' as Tab },
-                      { icon: 'ri-map-pin-2-line', label: 'Ziyaretler', color: '#10B981', bg: 'rgba(16,185,129,0.1)', tab: 'ziyaretler' as Tab },
+                      { icon: 'ri-bar-chart-grouped-line', label: 'Raporlar', color: ACCENT, bg: 'rgba(14,165,233,0.1)', tab: 'raporlar' as Tab },
+                      { icon: 'ri-map-pin-2-line', label: 'Ziyaretler', color: ACCENT, bg: 'rgba(14,165,233,0.1)', tab: 'ziyaretler' as Tab },
                       { icon: 'ri-settings-3-line', label: 'Ayarlar', color: '#64748B', bg: 'rgba(100,116,139,0.1)', tab: 'ayarlar' as Tab },
                     ].map(item => (
                       <button
@@ -433,14 +414,13 @@ export default function OsgbHeader({
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="px-6 py-3 flex items-center justify-between" style={{ borderTop: `1px solid ${dropdownBorder}` }}>
                 <div className="flex items-center gap-2">
                   <kbd className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.07)', color: '#64748B', border: `1px solid ${dropdownBorder}` }}>ESC</kbd>
                   <span className="text-[10px]" style={{ color: '#64748B' }}>ile kapat</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <i className="ri-flashlight-line text-xs" style={{ color: '#10B981' }} />
+                  <i className="ri-flashlight-line text-xs" style={{ color: ACCENT }} />
                   <span className="text-[10px] font-semibold" style={{ color: '#64748B' }}>6 modül mevcut</span>
                 </div>
               </div>
@@ -464,7 +444,7 @@ export default function OsgbHeader({
             {unreadCount > 0 && (
               <span
                 className="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full px-1"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 0 6px rgba(16,185,129,0.5)' }}
+                style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_DARK})`, boxShadow: `0 0 6px rgba(14,165,233,0.5)` }}
               >
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
@@ -478,18 +458,18 @@ export default function OsgbHeader({
             >
               <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                    <i className="ri-notification-3-line text-xs" style={{ color: '#10B981' }} />
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                    <i className="ri-notification-3-line text-xs" style={{ color: ACCENT }} />
                   </div>
                   <p className="text-[13px] font-bold" style={{ color: nameColor }}>Bildirimler</p>
                   {unreadCount > 0 && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.12)', color: ACCENT, border: '1px solid rgba(14,165,233,0.2)' }}>
                       {unreadCount} yeni
                     </span>
                   )}
                 </div>
                 {unreadCount > 0 && (
-                  <button onClick={markAllRead} className="text-[11px] cursor-pointer font-semibold px-2 py-1 rounded-lg" style={{ color: '#10B981', background: 'rgba(16,185,129,0.08)' }}>
+                  <button onClick={markAllRead} className="text-[11px] cursor-pointer font-semibold px-2 py-1 rounded-lg" style={{ color: ACCENT, background: 'rgba(14,165,233,0.08)' }}>
                     Tümünü oku
                   </button>
                 )}
@@ -497,8 +477,8 @@ export default function OsgbHeader({
 
               {supportNotifs.length === 0 ? (
                 <div className="py-10 px-4 text-center">
-                  <div className="w-10 h-10 flex items-center justify-center rounded-2xl mx-auto mb-3" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                    <i className="ri-check-double-line text-lg" style={{ color: '#10B981' }} />
+                  <div className="w-10 h-10 flex items-center justify-center rounded-2xl mx-auto mb-3" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                    <i className="ri-check-double-line text-lg" style={{ color: ACCENT }} />
                   </div>
                   <p className="text-[12px] font-semibold" style={{ color: isDark ? '#E2E8F0' : '#334155' }}>Yeni bildirim yok</p>
                   <p className="text-[11px] mt-1" style={{ color: '#64748B' }}>Sistem bildirimleri burada görünür</p>
@@ -520,19 +500,19 @@ export default function OsgbHeader({
                       style={{
                         borderBottom: idx < supportNotifs.length - 1 ? `1px solid ${dropdownBorder}` : 'none',
                         opacity: n.is_read ? 0.5 : 1,
-                        background: !n.is_read ? (isDark ? 'rgba(16,185,129,0.04)' : 'rgba(16,185,129,0.03)') : 'transparent',
+                        background: !n.is_read ? (isDark ? 'rgba(14,165,233,0.04)' : 'rgba(14,165,233,0.03)') : 'transparent',
                       }}
                       onMouseEnter={e => { e.currentTarget.style.background = dropdownHover; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = !n.is_read ? (isDark ? 'rgba(16,185,129,0.04)' : 'rgba(16,185,129,0.03)') : 'transparent'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = !n.is_read ? (isDark ? 'rgba(14,165,233,0.04)' : 'rgba(14,165,233,0.03)') : 'transparent'; }}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0 mt-0.5" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                          <i className="ri-reply-line text-xs" style={{ color: '#10B981' }} />
+                        <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0 mt-0.5" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                          <i className="ri-reply-line text-xs" style={{ color: ACCENT }} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <p className="text-[12px] font-semibold truncate flex-1" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{n.title}</p>
-                            {!n.is_read && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#10B981' }} />}
+                            {!n.is_read && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: ACCENT }} />}
                           </div>
                           <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: '#64748B' }}>{n.message}</p>
                           <p className="text-[10px] mt-1" style={{ color: '#94A3B8' }}>{new Date(n.created_at).toLocaleString('tr-TR')}</p>
@@ -560,7 +540,7 @@ export default function OsgbHeader({
           >
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 2px 8px rgba(16,185,129,0.35)' }}
+              style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_DARK})`, boxShadow: `0 2px 8px rgba(14,165,233,0.35)` }}
             >
               {(user?.email ?? 'O').charAt(0).toUpperCase()}
             </div>
@@ -575,12 +555,11 @@ export default function OsgbHeader({
               className="absolute right-0 top-12 z-50 w-[220px] overflow-hidden"
               style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}`, borderRadius: '16px', boxShadow: isDark ? '0 25px 60px rgba(0,0,0,0.55)' : '0 20px 50px rgba(15,23,42,0.15)', backdropFilter: 'blur(20px)' }}
             >
-              {/* Header */}
               <div className="px-4 py-3.5" style={{ borderBottom: `1px solid ${dropdownBorder}` }}>
                 <div className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
+                    style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_DARK})`, boxShadow: '0 4px 12px rgba(14,165,233,0.3)' }}
                   >
                     {(user?.email ?? 'O').charAt(0).toUpperCase()}
                   </div>
@@ -588,16 +567,14 @@ export default function OsgbHeader({
                     <p className="text-[13px] font-bold truncate" style={{ color: isDark ? '#E2E8F0' : '#0F172A' }}>{firstName}</p>
                     <p className="text-[10.5px] truncate mt-0.5" style={{ color: '#64748B' }}>{user?.email}</p>
                     <div className="flex items-center gap-1 mt-1">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }} />
-                      <span className="text-[9.5px] font-semibold" style={{ color: '#10B981' }}>OSGB Admin</span>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACCENT }} />
+                      <span className="text-[9.5px] font-semibold" style={{ color: ACCENT }}>OSGB Admin</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Menu items */}
               <div className="py-1.5">
-                {/* Ayarlar */}
                 <button
                   onClick={() => navToTab('ayarlar')}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
@@ -611,29 +588,27 @@ export default function OsgbHeader({
                   <i className="ri-arrow-right-s-line text-xs" style={{ color: '#475569' }} />
                 </button>
 
-                {/* Raporlar */}
                 <button
                   onClick={() => navToTab('raporlar')}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
                   onMouseEnter={e => { e.currentTarget.style.background = dropdownHover; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                    <i className="ri-bar-chart-2-line text-xs" style={{ color: '#10B981' }} />
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                    <i className="ri-bar-chart-2-line text-xs" style={{ color: ACCENT }} />
                   </div>
                   <span className="text-[12.5px] font-medium flex-1" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>Raporlar</span>
                   <i className="ri-arrow-right-s-line text-xs" style={{ color: '#475569' }} />
                 </button>
 
-                {/* Destek */}
                 <button
                   onClick={() => { setSupportOpen(true); setProfileOpen(false); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
                   onMouseEnter={e => { e.currentTarget.style.background = dropdownHover; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.1)' }}>
-                    <i className="ri-customer-service-2-line text-xs" style={{ color: '#10B981' }} />
+                  <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                    <i className="ri-customer-service-2-line text-xs" style={{ color: ACCENT }} />
                   </div>
                   <span className="text-[12.5px] font-medium flex-1" style={{ color: isDark ? '#CBD5E1' : '#334155' }}>Destek / Sorun Bildir</span>
                   <i className="ri-arrow-right-s-line text-xs" style={{ color: '#475569' }} />
@@ -641,7 +616,6 @@ export default function OsgbHeader({
 
                 <div className="mx-3 my-1.5" style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)' }} />
 
-                {/* Çıkış */}
                 <button
                   onClick={() => { setProfileOpen(false); logout(); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-all duration-150"
@@ -659,7 +633,6 @@ export default function OsgbHeader({
         </div>
       </header>
 
-      {/* Support Modal */}
       <SupportModal
         open={supportOpen}
         onClose={() => { setSupportOpen(false); setSupportViewTicketId(null); }}
