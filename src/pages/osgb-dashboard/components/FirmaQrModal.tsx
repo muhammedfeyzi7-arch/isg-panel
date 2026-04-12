@@ -86,8 +86,8 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
 
-    // Yeşil üst şerit
-    ctx.fillStyle = '#10B981';
+    // Üst şerit (tema rengi)
+    ctx.fillStyle = '#0EA5E9';
     ctx.fillRect(0, 0, outputCanvas.width, headerH);
 
     // Başlık metni
@@ -125,7 +125,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
           <title>Ziyaret QR - ${firmaAdi}</title>
           <style>
             body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fff; }
-            .header { background: #10B981; color: #fff; width: 320px; padding: 20px; text-align: center; border-radius: 12px 12px 0 0; }
+            .header { background: linear-gradient(135deg, #0369A1, #0EA5E9); color: #fff; width: 320px; padding: 20px; text-align: center; border-radius: 12px 12px 0 0; }
             .header h2 { margin: 0 0 4px; font-size: 16px; letter-spacing: 1px; }
             .header p { margin: 0; font-size: 13px; opacity: 0.9; }
             .qr-box { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px; padding: 24px; text-align: center; }
@@ -171,7 +171,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
         {/* Başlık */}
         <div
           className="flex items-center justify-between px-5 py-4"
-          style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: '#fff' }}
+          style={{ background: 'linear-gradient(135deg, #0369A1, #0EA5E9)', color: '#fff' }}
         >
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
@@ -196,7 +196,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
           {/* QR Görsel */}
           <div
             className="rounded-2xl p-4 flex items-center justify-center"
-            style={{ background: '#ffffff', border: '2px solid rgba(16,185,129,0.2)' }}
+            style={{ background: '#ffffff', border: '2px solid rgba(14,165,233,0.25)' }}
           >
             <div ref={qrRef} style={{ lineHeight: 0 }} />
             {!qrReady && (
@@ -209,7 +209,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
           {/* Açıklama */}
           <div className="text-center px-2">
             <p className="text-xs font-semibold" style={{ color: textPrimary }}>
-              <i className="ri-information-line mr-1" style={{ color: '#10B981' }} />
+              <i className="ri-information-line mr-1" style={{ color: '#0EA5E9' }} />
               Uzmanlar bu kodu okutarak ziyaret başlatır
             </p>
             <p className="text-[10px] mt-1" style={{ color: textMuted }}>
@@ -242,9 +242,9 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
               disabled={!qrReady}
               className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-all"
               style={{
-                background: qrReady ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)',
-                border: `1px solid ${qrReady ? 'rgba(16,185,129,0.25)' : 'rgba(148,163,184,0.2)'}`,
-                color: qrReady ? '#10B981' : '#94A3B8',
+                background: qrReady ? 'rgba(14,165,233,0.1)' : 'rgba(148,163,184,0.1)',
+                border: `1px solid ${qrReady ? 'rgba(14,165,233,0.25)' : 'rgba(148,163,184,0.2)'}`,
+                color: qrReady ? '#0EA5E9' : '#94A3B8',
               }}
             >
               <i className="ri-download-2-line text-base" />
@@ -255,7 +255,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
               disabled={!qrReady}
               className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-all text-white"
               style={{
-                background: qrReady ? 'linear-gradient(135deg, #10B981, #059669)' : 'rgba(148,163,184,0.2)',
+                background: qrReady ? 'linear-gradient(135deg, #0369A1, #0EA5E9)' : 'rgba(148,163,184,0.2)',
                 opacity: qrReady ? 1 : 0.6,
               }}
             >
