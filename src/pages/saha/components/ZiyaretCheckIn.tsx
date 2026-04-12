@@ -284,14 +284,20 @@ export default function ZiyaretCheckIn() {
     setActionLoading(true);
     setGpsError(null);
     setGpsStatus('loading');
-    const coords = await getGpsCoords();
-    setGpsStatus(coords ? 'ok' : 'denied');
+
+    let coords: GpsCoords | null = null;
+    try {
+      coords = await getGpsCoords();
+    } catch {
+      coords = null;
+    }
+    setGpsStatus(coords ? 'ok' : 'idle');
 
     try {
       const now = new Date().toISOString();
       const sureDakika = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
 
-      const { error, data: updatedData } = await supabase
+      const { error } = await supabase
         .from('osgb_ziyaretler')
         .update({
           cikis_saati: now,
@@ -302,17 +308,18 @@ export default function ZiyaretCheckIn() {
           check_out_lng: coords?.lng ?? null,
         })
         .eq('id', aktifZiyaret.id)
-        .select('id')
-        .maybeSingle();
+        .eq('uzman_user_id', user.id);
 
       if (error) throw new Error(error.message || 'Güncelleme başarısız');
-      if (!updatedData) throw new Error('Ziyaret kaydı güncellenemedi.');
 
       addToast(`Ziyaret tamamlandı! Süre: ${sureDakika} dakika`, 'success');
       setAktifZiyaret(null);
+      setShowQr(false);
       void fetchZiyaret();
     } catch (err) {
       console.error('[CheckOut] err:', err);
+      addToast(`Check-out yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      // Hata olsa bile listeyi yenile
       void fetchZiyaret();
     } finally {
       setActionLoading(false);

@@ -30,6 +30,7 @@ interface FirmalarTabProps {
   onFirmaClick: (firma: { id: string; name: string }) => void;
   onFirmaEkle: () => void;
   onAtamaYap: (firmaId: string) => void;
+  onFirmaDeleted?: (firmaId: string) => void;
 }
 
 function getDaysDiff(dateStr: string | null | undefined): number | null {
@@ -86,7 +87,7 @@ function GpsBadge({ active }: { active: boolean }) {
 }
 
 export default function FirmalarTab({
-  altFirmalar, uzmanlar, orgId, isDark, onFirmaClick, onFirmaEkle, onAtamaYap,
+  altFirmalar, uzmanlar, orgId, isDark, onFirmaClick, onFirmaEkle, onAtamaYap, onFirmaDeleted,
 }: FirmalarTabProps) {
   const [search, setSearch] = useState('');
   const [firmaLastVisit, setFirmaLastVisit] = useState<Record<string, string>>({});
@@ -151,12 +152,16 @@ export default function FirmalarTab({
   const handleSil = async (firmaId: string, firmaAdi: string) => {
     setSilLoading(true);
     try {
-      await supabase.from('organizations')
+      const { error } = await supabase
+        .from('organizations')
         .update({ is_active: false, name: `[SİLİNDİ] ${firmaAdi}` })
         .eq('id', firmaId);
+      if (error) throw error;
       setSilOnayId(null);
-      // parent'ı yenile
-      window.location.reload();
+      // Callback ile parent state'i güncelle (reload yok)
+      if (onFirmaDeleted) {
+        onFirmaDeleted(firmaId);
+      }
     } catch (err) {
       console.error('[Sil] err:', err);
     } finally {

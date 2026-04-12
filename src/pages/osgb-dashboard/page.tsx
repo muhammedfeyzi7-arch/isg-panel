@@ -584,6 +584,7 @@ export default function OsgbDashboardPage() {
                   onFirmaClick={(f) => setSecilenFirma(f)}
                   onFirmaEkle={() => { setShowFirmaModal(true); setFirmaError(null); }}
                   onAtamaYap={(firmaId) => { setShowAtamaModal(true); setAtamaError(null); setAtamaUzmanId(''); setAtamaFirmaIds([firmaId]); }}
+                  onFirmaDeleted={(firmaId) => setAltFirmalar(prev => prev.filter(f => f.id !== firmaId))}
                 />
               )}
 

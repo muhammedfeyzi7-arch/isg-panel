@@ -15,14 +15,45 @@ interface AktifZiyaret {
   qr_ile_giris: boolean;
 }
 
-interface AtanmisOrg {
-  id: string;
+interface GpsCoords { lat: number; lng: number; }
+
+interface FirmaGpsInfo {
   name: string;
+  gps_required: boolean;
+  gps_radius: number;
+  gps_strict: boolean;
+  firma_lat: number | null;
+  firma_lng: number | null;
 }
 
 interface Props {
   isDark: boolean;
 }
+
+function getGpsCoords(): Promise<GpsCoords | null> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { timeout: 10000, maximumAge: 30000, enableHighAccuracy: true }
+    );
+  });
+}
+
+function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+type GpsStatusType = 'idle' | 'loading' | 'checking' | 'ok' | 'denied' | 'blocked';
 
 export default function HekimMobilZiyaret({ isDark }: Props) {
   const { user } = useAuth();
@@ -32,10 +63,13 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  const [manuelFirmaId, setManuelFirmaId] = useState('');
-  const [atanmisFirmalar, setAtanmisFirmalar] = useState<AtanmisOrg[]>([]);
   const [gecmis, setGecmis] = useState<AktifZiyaret[]>([]);
   const [elapsed, setElapsed] = useState('');
+  const [gpsStatus, setGpsStatus] = useState<GpsStatusType>('idle');
+  const [gpsError, setGpsError] = useState<string | null>(null);
+
+  const [osgbOrgId, setOsgbOrgId] = useState<string | null>(null);
+  const [hekimAd, setHekimAd] = useState<string>('');
 
   const bg = isDark ? '#0a0f1a' : '#f0f9ff';
   const cardBg = isDark ? 'rgba(17,24,39,0.85)' : '#ffffff';
@@ -58,35 +92,45 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
     return () => clearInterval(interval);
   }, [aktifZiyaret]);
 
-  const fetchAtanmisFirmalar = useCallback(async () => {
+  const fetchOrgInfo = useCallback(async () => {
     if (!user?.id) return;
-    if (org?.activeFirmIds && org.activeFirmIds.length > 0) {
-      const { data } = await supabase.from('organizations').select('id, name').in('id', org.activeFirmIds);
-      setAtanmisFirmalar(data ?? []);
+    // org zaten context'ten gelebilir
+    if (org?.id) {
+      setOsgbOrgId(org.id);
+      setHekimAd(user.user_metadata?.display_name ?? user.email ?? 'Hekim');
       return;
     }
     const { data: uoData } = await supabase
-      .from('user_organizations').select('active_firm_ids')
-      .eq('user_id', user.id).eq('osgb_role', 'gezici_uzman').maybeSingle();
-    if (!uoData) return;
-    const firmIds: string[] = Array.isArray(uoData.active_firm_ids) ? (uoData.active_firm_ids as string[]).filter(Boolean) : [];
-    if (firmIds.length === 0) return;
-    const { data } = await supabase.from('organizations').select('id, name').in('id', firmIds);
-    setAtanmisFirmalar(data ?? []);
-  }, [user?.id, org?.activeFirmIds]);
+      .from('user_organizations')
+      .select('organization_id, display_name')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (uoData) {
+      setOsgbOrgId(uoData.organization_id);
+      setHekimAd(uoData.display_name ?? user.email ?? 'Hekim');
+    }
+  }, [user?.id, user?.email, user?.user_metadata, org?.id]);
 
   const fetchZiyaret = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const { data } = await supabase.from('osgb_ziyaretler')
+      const { data } = await supabase
+        .from('osgb_ziyaretler')
         .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
-        .eq('uzman_user_id', user.id).eq('durum', 'aktif').maybeSingle();
+        .eq('uzman_user_id', user.id)
+        .eq('durum', 'aktif')
+        .maybeSingle();
       setAktifZiyaret(data ?? null);
-      const { data: gecmisData } = await supabase.from('osgb_ziyaretler')
+
+      const { data: gecmisData } = await supabase
+        .from('osgb_ziyaretler')
         .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
-        .eq('uzman_user_id', user.id).eq('durum', 'tamamlandi')
-        .order('created_at', { ascending: false }).limit(5);
+        .eq('uzman_user_id', user.id)
+        .eq('durum', 'tamamlandi')
+        .order('created_at', { ascending: false })
+        .limit(5);
       setGecmis((gecmisData ?? []) as AktifZiyaret[]);
     } finally {
       setLoading(false);
@@ -95,29 +139,140 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
 
   useEffect(() => {
     void fetchZiyaret();
-    void fetchAtanmisFirmalar();
-  }, [fetchZiyaret, fetchAtanmisFirmalar]);
+    void fetchOrgInfo();
+  }, [fetchZiyaret, fetchOrgInfo]);
 
+  // ── CHECK-IN (GPS kontrollü) ──
   const handleCheckIn = useCallback(async (firmaId: string, qr = false) => {
-    if (!user?.id || !org?.id) return;
+    if (!user?.id) { addToast('Oturum bulunamadı.', 'error'); return; }
+
+    let resolvedOsgbOrgId = osgbOrgId;
+    let resolvedHekimAd = hekimAd;
+
+    if (!resolvedOsgbOrgId) {
+      const { data: uoData } = await supabase
+        .from('user_organizations')
+        .select('organization_id, display_name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (!uoData) { addToast('Organizasyon bilgisi bulunamadı.', 'error'); return; }
+      resolvedOsgbOrgId = uoData.organization_id;
+      resolvedHekimAd = uoData.display_name ?? user.email ?? 'Hekim';
+    }
+
     setActionLoading(true);
-    try {
-      const { data: existing } = await supabase.from('osgb_ziyaretler')
-        .select('id, firma_ad').eq('uzman_user_id', user.id).eq('durum', 'aktif').maybeSingle();
-      if (existing) {
-        addToast(`Aktif ziyaret var: ${existing.firma_ad ?? 'Firma'}. Önce bitirin.`, 'error');
-        return;
+    setGpsError(null);
+
+    // Firma GPS bilgisini çek
+    const { data: firmaData } = await supabase
+      .from('organizations')
+      .select('name, gps_required, gps_radius, gps_strict, firma_lat, firma_lng')
+      .eq('id', firmaId)
+      .maybeSingle() as { data: FirmaGpsInfo | null };
+
+    if (!firmaData) {
+      addToast('Firma bulunamadı. QR geçersiz olabilir.', 'error');
+      setActionLoading(false);
+      return;
+    }
+
+    // Aktif ziyaret çakışma kontrolü
+    const { data: existing } = await supabase
+      .from('osgb_ziyaretler')
+      .select('id, firma_ad')
+      .eq('uzman_user_id', user.id)
+      .eq('durum', 'aktif')
+      .maybeSingle();
+
+    if (existing) {
+      addToast(`Zaten aktif bir ziyaretiniz var: ${existing.firma_ad ?? 'Firma'}. Önce mevcut ziyareti bitirin.`, 'error');
+      setActionLoading(false);
+      return;
+    }
+
+    // GPS kontrolü
+    let coords: GpsCoords | null = null;
+    let checkInGpsStatus: 'ok' | 'too_far' | 'no_permission' = 'ok';
+    let checkInDistanceM: number | null = null;
+
+    if (firmaData.gps_required) {
+      setGpsStatus('loading');
+      coords = await getGpsCoords();
+
+      if (!coords) {
+        checkInGpsStatus = 'no_permission';
+        const strict = firmaData.gps_strict !== false;
+        if (strict) {
+          setGpsStatus('denied');
+          setGpsError('Konum izni gerekli. Tarayıcı ayarlarından konum iznini etkinleştirin ve tekrar deneyin.');
+          setActionLoading(false);
+          return;
+        }
+        setGpsStatus('denied');
       }
-      const { data: firmaData } = await supabase.from('organizations').select('name').eq('id', firmaId).maybeSingle();
-      if (!firmaData) { addToast('Firma bulunamadı. QR geçersiz olabilir.', 'error'); return; }
+
+      if (coords && firmaData.firma_lat !== null && firmaData.firma_lng !== null) {
+        setGpsStatus('checking');
+        const distance = haversineMetres(coords.lat, coords.lng, firmaData.firma_lat, firmaData.firma_lng);
+        const radius = firmaData.gps_radius ?? 1000;
+
+        if (distance > radius) {
+          checkInGpsStatus = 'too_far';
+          checkInDistanceM = Math.round(distance);
+          const distStr = distance >= 1000
+            ? `${(distance / 1000).toFixed(1)} km`
+            : `${Math.round(distance)} m`;
+          setGpsStatus('blocked');
+          setGpsError(`Firma konumunda değilsiniz. Mesafeniz: ${distStr} — İzin verilen: ${radius} m`);
+          setActionLoading(false);
+          return;
+        }
+        checkInDistanceM = Math.round(distance);
+        checkInGpsStatus = 'ok';
+        setGpsStatus('ok');
+      } else if (!coords) {
+        checkInGpsStatus = 'no_permission';
+      } else {
+        checkInGpsStatus = 'ok';
+        setGpsStatus('ok');
+      }
+    } else {
+      setGpsStatus('loading');
+      coords = await getGpsCoords();
+      if (coords) {
+        checkInGpsStatus = 'ok';
+        setGpsStatus('ok');
+      } else {
+        checkInGpsStatus = 'no_permission';
+        setGpsStatus('idle');
+      }
+    }
+
+    try {
       const now = new Date().toISOString();
-      const { data: yeniZiyaret, error } = await supabase.from('osgb_ziyaretler').insert({
-        osgb_org_id: org.id, firma_org_id: firmaId, firma_ad: firmaData.name,
-        uzman_user_id: user.id,
-        uzman_ad: user.user_metadata?.display_name ?? user.email ?? 'Uzman',
-        uzman_email: user.email, giris_saati: now, durum: 'aktif',
-        qr_ile_giris: qr, created_at: now, updated_at: now,
-      }).select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris').maybeSingle();
+      const { data: yeniZiyaret, error } = await supabase
+        .from('osgb_ziyaretler')
+        .insert({
+          osgb_org_id: resolvedOsgbOrgId,
+          firma_org_id: firmaId,
+          firma_ad: firmaData.name,
+          uzman_user_id: user.id,
+          uzman_ad: resolvedHekimAd || user.email || 'Hekim',
+          uzman_email: user.email,
+          giris_saati: now,
+          durum: 'aktif',
+          qr_ile_giris: qr,
+          created_at: now,
+          updated_at: now,
+          check_in_lat: coords?.lat ?? null,
+          check_in_lng: coords?.lng ?? null,
+          gps_status: checkInGpsStatus,
+          check_in_distance_m: checkInDistanceM,
+        })
+        .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
+        .maybeSingle();
+
       if (error) throw error;
       setAktifZiyaret(yeniZiyaret ?? null);
       addToast(`${firmaData.name} ziyareti başlatıldı!`, 'success');
@@ -125,39 +280,69 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
       addToast(`Check-in yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
     } finally {
       setActionLoading(false);
+      if (gpsStatus !== 'blocked' && gpsStatus !== 'denied') {
+        setTimeout(() => { setGpsStatus('idle'); setGpsError(null); }, 3000);
+      }
     }
-  }, [user, org, addToast]);
+  }, [user, osgbOrgId, hekimAd, addToast, gpsStatus]);
 
+  // ── CHECK-OUT ──
   const handleCheckOut = useCallback(async () => {
     if (!aktifZiyaret || !user?.id) return;
     setActionLoading(true);
+    setGpsError(null);
+    setGpsStatus('loading');
+
+    let coords: GpsCoords | null = null;
+    try { coords = await getGpsCoords(); } catch { coords = null; }
+    setGpsStatus(coords ? 'ok' : 'idle');
+
     try {
       const now = new Date().toISOString();
       const sureDakika = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
-      const { error } = await supabase.from('osgb_ziyaretler').update({
-        cikis_saati: now, durum: 'tamamlandi', sure_dakika: sureDakika, updated_at: now,
-      }).eq('id', aktifZiyaret.id).eq('uzman_user_id', user.id);
-      if (error) throw error;
+
+      const { error } = await supabase
+        .from('osgb_ziyaretler')
+        .update({
+          cikis_saati: now,
+          durum: 'tamamlandi',
+          sure_dakika: sureDakika,
+          updated_at: now,
+          check_out_lat: coords?.lat ?? null,
+          check_out_lng: coords?.lng ?? null,
+        })
+        .eq('id', aktifZiyaret.id)
+        .eq('uzman_user_id', user.id);
+
+      if (error) throw new Error(error.message || 'Güncelleme başarısız');
+
       addToast(`Ziyaret tamamlandı! Süre: ${sureDakika} dakika`, 'success');
       setAktifZiyaret(null);
+      setShowQr(false);
       void fetchZiyaret();
     } catch (err) {
       addToast(`Check-out yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      void fetchZiyaret();
     } finally {
       setActionLoading(false);
+      setTimeout(() => { setGpsStatus('idle'); setGpsError(null); }, 3000);
     }
   }, [aktifZiyaret, user?.id, addToast, fetchZiyaret]);
 
+  // QR sonucu
   const handleQrResult = useCallback((text: string) => {
     setShowQr(false);
+    setGpsError(null);
+    setGpsStatus('idle');
     let firmaId: string | null = null;
+
     try {
       const parsed = JSON.parse(text) as { type?: string; id?: string };
       if (parsed.type === 'firm' && parsed.id) firmaId = parsed.id;
     } catch { /* not JSON */ }
+
     if (!firmaId) {
-      const uuidMatch = text.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-      if (uuidMatch) firmaId = text.trim();
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text.trim())) firmaId = text.trim();
     }
     if (!firmaId) firmaId = text.match(/firma[_-]?id=([0-9a-f-]{36})/i)?.[1] ?? null;
     if (!firmaId) {
@@ -165,7 +350,9 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
       const last = segs[segs.length - 1] ?? '';
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(last)) firmaId = last;
     }
+
     if (!firmaId) { addToast('Geçersiz QR kodu.', 'error'); return; }
+
     if (aktifZiyaret) {
       if (aktifZiyaret.firma_org_id === firmaId) void handleCheckOut();
       else addToast(`Başka firmada aktif ziyaret var (${aktifZiyaret.firma_ad}). Önce bitirin.`, 'error');
@@ -184,16 +371,30 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
     return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
   };
 
+  // GPS durum bandı
+  type BandConfig = { bg: string; border: string; color: string; icon: string; text: string } | null;
+  const gpsBandConfig: Record<GpsStatusType, BandConfig> = {
+    idle: null,
+    loading: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', color: '#D97706', icon: 'ri-loader-4-line animate-spin', text: 'Konum alınıyor...' },
+    checking: { bg: 'rgba(14,165,233,0.08)', border: 'rgba(14,165,233,0.2)', color: '#0284C7', icon: 'ri-map-pin-2-line', text: 'Konum kontrol ediliyor...' },
+    ok: { bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', color: '#16A34A', icon: 'ri-map-pin-2-fill', text: 'Konum doğrulandı' },
+    denied: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', color: '#D97706', icon: 'ri-map-pin-line', text: gpsError ? 'Konum izni gerekli — check-in engellendi' : 'Konum alınamadı' },
+    blocked: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', color: '#DC2626', icon: 'ri-map-pin-line', text: 'Firma konumunda değilsiniz' },
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4" style={{ background: bg, minHeight: '100vh' }}>
-        <div className="w-12 h-12 flex items-center justify-center rounded-2xl" style={{ background: `rgba(14,165,233,0.1)`, border: `1px solid rgba(14,165,233,0.2)` }}>
+        <div className="w-12 h-12 flex items-center justify-center rounded-2xl"
+          style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)' }}>
           <i className="ri-loader-4-line text-xl animate-spin" style={{ color: ACCENT }} />
         </div>
         <p className="text-sm font-semibold" style={{ color: textMuted }}>Yükleniyor...</p>
       </div>
     );
   }
+
+  const band = gpsBandConfig[gpsStatus];
 
   return (
     <div className="min-h-screen pb-24" style={{ background: bg }}>
@@ -207,7 +408,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
           0%, 100% { text-shadow: 0 0 12px rgba(14,165,233,0.3); }
           50% { text-shadow: 0 0 24px rgba(14,165,233,0.7); }
         }
-        .timer-glow { animation: timerGlow 2s ease-in-out infinite; }
+        .hekim-timer-glow { animation: timerGlow 2s ease-in-out infinite; }
       `}</style>
 
       {/* ── HERO HEADER ── */}
@@ -220,13 +421,8 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
           borderBottom: `1px solid ${border}`,
         }}
       >
-        {/* Background decoration */}
         <div className="absolute top-0 right-0 w-48 h-48 rounded-full pointer-events-none"
-          style={{ background: `radial-gradient(circle, rgba(14,165,233,0.08) 0%, transparent 70%)`, transform: 'translate(30%, -30%)' }} />
-        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full pointer-events-none"
-          style={{ background: `radial-gradient(circle, rgba(14,165,233,0.05) 0%, transparent 70%)`, transform: 'translate(-30%, 30%)' }} />
-
-        {/* Accent top line */}
+          style={{ background: 'radial-gradient(circle, rgba(14,165,233,0.08) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
         <div className="absolute top-0 left-0 right-0 h-[3px]"
           style={{ background: `linear-gradient(90deg, ${ACCENT_DARK}, #38BDF8, ${ACCENT})` }} />
 
@@ -234,14 +430,14 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
           <div className="relative flex-shrink-0">
             <div className="w-14 h-14 flex items-center justify-center rounded-2xl"
               style={{
-                background: `linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.08))`,
-                border: `1.5px solid rgba(14,165,233,0.3)`,
+                background: 'linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.08))',
+                border: '1.5px solid rgba(14,165,233,0.3)',
               }}>
-              <i className="ri-map-pin-user-line text-2xl" style={{ color: ACCENT }} />
+              <i className="ri-heart-pulse-line text-2xl" style={{ color: ACCENT }} />
             </div>
             {aktifZiyaret && (
               <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full"
-                style={{ background: ACCENT, boxShadow: `0 0 8px rgba(14,165,233,0.6)` }}>
+                style={{ background: ACCENT, boxShadow: '0 0 8px rgba(14,165,233,0.6)' }}>
                 <i className="ri-check-line text-white text-[9px] font-bold" />
               </span>
             )}
@@ -253,7 +449,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
               </h1>
               {aktifZiyaret ? (
                 <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap"
-                  style={{ background: `rgba(14,165,233,0.15)`, color: ACCENT, border: `1px solid rgba(14,165,233,0.3)` }}>
+                  style={{ background: 'rgba(14,165,233,0.15)', color: ACCENT, border: '1px solid rgba(14,165,233,0.3)' }}>
                   <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: ACCENT }} />
                   AKTİF
                 </span>
@@ -274,15 +470,44 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
       {/* ── CONTENT ── */}
       <div className="px-4 pt-5 space-y-4">
 
+        {/* GPS Durum Bandı */}
+        {band && (
+          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${band.border}` }}>
+            <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: band.bg }}>
+              <i className={`${band.icon} text-sm flex-shrink-0`} style={{ color: band.color }} />
+              <span className="text-xs font-semibold flex-1" style={{ color: band.color }}>{band.text}</span>
+              {(gpsStatus === 'blocked' || gpsStatus === 'denied') && (
+                <button onClick={() => { setGpsStatus('idle'); setGpsError(null); }}
+                  className="w-5 h-5 flex items-center justify-center rounded cursor-pointer flex-shrink-0"
+                  style={{ color: band.color, opacity: 0.7 }}>
+                  <i className="ri-close-line text-xs" />
+                </button>
+              )}
+            </div>
+            {gpsError && gpsStatus === 'blocked' && (
+              <div className="px-3 pb-3 pt-1" style={{ background: band.bg }}>
+                <p className="text-[11px] leading-relaxed" style={{ color: '#64748B' }}>{gpsError}</p>
+                <div className="flex items-center gap-1.5 mt-2 text-[10px] font-semibold" style={{ color: '#DC2626' }}>
+                  <i className="ri-error-warning-line" />
+                  Check-in engellendi — fiziksel olarak firmada olmanız gerekiyor
+                </div>
+              </div>
+            )}
+            {gpsError && gpsStatus === 'denied' && (
+              <div className="px-3 pb-3 pt-1" style={{ background: band.bg }}>
+                <p className="text-[11px] leading-relaxed" style={{ color: '#64748B' }}>{gpsError}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── AKTİF ZİYARET ── */}
         {aktifZiyaret ? (
           <div
             className="rounded-2xl overflow-hidden"
-            style={{ background: cardBg, border: `1.5px solid rgba(14,165,233,0.3)`, boxShadow: isDark ? '0 8px 32px rgba(14,165,233,0.08)' : '0 8px 32px rgba(14,165,233,0.1)' }}
+            style={{ background: cardBg, border: '1.5px solid rgba(14,165,233,0.3)' }}
           >
-            {/* Card top accent */}
             <div className="h-[3px]" style={{ background: `linear-gradient(90deg, ${ACCENT_DARK}, #38BDF8, ${ACCENT})` }} />
-
             <div className="p-5">
               {/* Status badge */}
               <div className="flex items-center gap-2 mb-5">
@@ -295,7 +520,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
                 </span>
                 {aktifZiyaret.qr_ile_giris && (
                   <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ background: `rgba(14,165,233,0.1)`, color: ACCENT, border: `1px solid rgba(14,165,233,0.2)` }}>
+                    style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT, border: '1px solid rgba(14,165,233,0.2)' }}>
                     <i className="ri-qr-code-line mr-0.5" />QR Girişi
                   </span>
                 )}
@@ -304,7 +529,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
               {/* Firma info */}
               <div className="flex items-center gap-4 mb-5">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: `linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.06))`, border: `1px solid rgba(14,165,233,0.25)` }}>
+                  style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.06))', border: '1px solid rgba(14,165,233,0.25)' }}>
                   <i className="ri-building-2-line text-2xl" style={{ color: ACCENT }} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -313,53 +538,81 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
                   </p>
                   <div className="flex items-center gap-1.5 mt-1.5">
                     <i className="ri-time-line text-xs" style={{ color: textMuted }} />
-                    <p className="text-xs" style={{ color: textMuted }}>
-                      Giriş: {formatTime(aktifZiyaret.giris_saati)}
-                    </p>
+                    <p className="text-xs" style={{ color: textMuted }}>Giriş: {formatTime(aktifZiyaret.giris_saati)}</p>
                   </div>
                 </div>
               </div>
 
               {/* Timer */}
               <div className="flex items-center justify-center py-5 rounded-2xl mb-5"
-                style={{
-                  background: isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.05)',
-                  border: `1px solid rgba(14,165,233,0.15)`,
-                }}>
+                style={{ background: isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.15)' }}>
                 <div className="text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: `rgba(14,165,233,0.6)` }}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: 'rgba(14,165,233,0.6)' }}>
                     Geçen Süre
                   </p>
-                  <p className="text-4xl font-black font-mono timer-glow" style={{ color: ACCENT, letterSpacing: '0.04em' }}>
+                  <p className="text-4xl font-black font-mono hekim-timer-glow" style={{ color: ACCENT, letterSpacing: '0.04em' }}>
                     {elapsed || '00d 00s'}
                   </p>
                 </div>
               </div>
 
-              {/* Checkout */}
-              <button
-                onClick={handleCheckOut}
-                disabled={actionLoading}
-                className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl text-sm font-bold text-white cursor-pointer transition-all"
-                style={{
-                  background: actionLoading
-                    ? '#334155'
-                    : 'linear-gradient(135deg, #EF4444, #DC2626)',
-                  opacity: actionLoading ? 0.7 : 1,
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                {actionLoading
-                  ? <><i className="ri-loader-4-line animate-spin" />İşleniyor...</>
-                  : <><i className="ri-logout-box-r-line text-base" />Ziyareti Bitir (Check-out)</>}
-              </button>
+              {/* QR ile bitir */}
+              {showQr ? (
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(14,165,233,0.2)' }}>
+                  <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                    <p className="text-sm font-semibold" style={{ color: textPrimary }}>Aynı Firma QR&apos;ını Okut</p>
+                    <button onClick={() => setShowQr(false)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
+                      style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+                      <i className="ri-close-line text-sm" />
+                    </button>
+                  </div>
+                  <QrScanner onResult={handleQrResult} onClose={() => setShowQr(false)} />
+                  <p className="text-center text-xs py-2" style={{ color: textMuted }}>
+                    Aynı firmayı okutunca ziyaret otomatik biter
+                  </p>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowQr(true)}
+                  disabled={actionLoading}
+                  className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl cursor-pointer transition-all mb-3"
+                  style={{ background: 'rgba(14,165,233,0.08)', border: '2px dashed rgba(14,165,233,0.35)', color: ACCENT }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.14)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.08)'; }}>
+                  <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(14,165,233,0.15)' }}>
+                    {actionLoading
+                      ? <i className="ri-loader-4-line animate-spin text-base" style={{ color: ACCENT }} />
+                      : <i className="ri-qr-scan-2-line text-base" style={{ color: ACCENT }} />}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold" style={{ color: ACCENT }}>QR ile Ziyareti Bitir</p>
+                    <p className="text-xs" style={{ color: textMuted }}>Aynı firma QR kodunu okutun</p>
+                  </div>
+                </button>
+              )}
+
+              {/* Manuel bitir butonu */}
+              {!showQr && (
+                <button
+                  onClick={handleCheckOut}
+                  disabled={actionLoading}
+                  className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl text-sm font-bold text-white cursor-pointer transition-all"
+                  style={{
+                    background: actionLoading ? '#334155' : 'linear-gradient(135deg, #EF4444, #DC2626)',
+                    opacity: actionLoading ? 0.7 : 1,
+                  }}
+                >
+                  {actionLoading
+                    ? <><i className="ri-loader-4-line animate-spin" />İşleniyor...</>
+                    : <><i className="ri-logout-box-r-line text-base" />Ziyareti Bitir (Check-out)</>}
+                </button>
+              )}
             </div>
           </div>
         ) : (
           /* ── CHECK-IN ALANI ── */
           <div className="space-y-3">
-
-            {/* QR Scanner Card */}
             <div
               className="rounded-2xl overflow-hidden"
               style={{ background: cardBg, border: `1px solid ${border}` }}
@@ -370,14 +623,14 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: `rgba(14,165,233,0.1)` }}>
+                      <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,0.1)' }}>
                         <i className="ri-qr-scan-2-line text-xs" style={{ color: ACCENT }} />
                       </div>
                       <p className="text-sm font-bold" style={{ color: textPrimary }}>Firma QR&apos;ı Okut</p>
                     </div>
                     <button
                       onClick={() => setShowQr(false)}
-                      className="w-7 h-7 flex items-center justify-center rounded-xl cursor-pointer transition-all"
+                      className="w-7 h-7 flex items-center justify-center rounded-xl cursor-pointer"
                       style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>
                       <i className="ri-close-line text-sm" />
                     </button>
@@ -390,128 +643,59 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
               ) : (
                 <button
                   onClick={() => setShowQr(true)}
+                  disabled={actionLoading}
                   className="w-full flex flex-col items-center justify-center gap-4 py-10 cursor-pointer transition-all"
-                  style={{ background: 'transparent' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `rgba(14,165,233,0.03)`; }}
+                  style={{ background: 'transparent', opacity: actionLoading ? 0.6 : 1 }}
+                  onMouseEnter={e => { if (!actionLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.03)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 >
-                  {/* QR Icon with rings */}
                   <div className="relative flex items-center justify-center">
                     <div className="absolute w-28 h-28 rounded-full opacity-20"
-                      style={{ background: `radial-gradient(circle, rgba(14,165,233,0.3) 0%, transparent 70%)` }} />
+                      style={{ background: 'radial-gradient(circle, rgba(14,165,233,0.3) 0%, transparent 70%)' }} />
                     <div className="w-20 h-20 flex items-center justify-center rounded-2xl relative z-10"
                       style={{
-                        background: `linear-gradient(135deg, rgba(14,165,233,0.16), rgba(14,165,233,0.05))`,
-                        border: `2px dashed rgba(14,165,233,0.35)`,
+                        background: 'linear-gradient(135deg, rgba(14,165,233,0.16), rgba(14,165,233,0.05))',
+                        border: '2px dashed rgba(14,165,233,0.35)',
                       }}>
-                      <i className="ri-qr-scan-2-line text-4xl" style={{ color: ACCENT }} />
+                      {actionLoading
+                        ? <i className="ri-loader-4-line text-4xl animate-spin" style={{ color: ACCENT }} />
+                        : <i className="ri-qr-scan-2-line text-4xl" style={{ color: ACCENT }} />}
                     </div>
                   </div>
                   <div className="text-center px-4">
                     <p className="text-base font-extrabold" style={{ color: ACCENT, letterSpacing: '-0.02em' }}>
-                      QR ile Ziyaret Başlat
+                      {actionLoading ? 'İşleniyor...' : 'QR ile Ziyaret Başlat'}
                     </p>
                     <p className="text-xs mt-1.5 leading-relaxed" style={{ color: textMuted }}>
-                      Firma QR kodunu okutun — anında check-in yapılır
+                      {actionLoading ? 'Konum ve firma bilgileri kontrol ediliyor' : 'Firma QR kodunu okutun — anında check-in yapılır'}
                     </p>
                   </div>
-                  <div
-                    className="flex items-center gap-2 px-4 py-2 rounded-full"
-                    style={{ background: `rgba(14,165,233,0.1)`, border: `1px solid rgba(14,165,233,0.2)` }}
-                  >
-                    <i className="ri-camera-line text-xs" style={{ color: ACCENT }} />
-                    <span className="text-xs font-bold" style={{ color: ACCENT }}>Kamerayı Aç</span>
-                  </div>
+                  {!actionLoading && (
+                    <div
+                      className="flex items-center gap-2 px-4 py-2 rounded-full"
+                      style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)' }}
+                    >
+                      <i className="ri-camera-line text-xs" style={{ color: ACCENT }} />
+                      <span className="text-xs font-bold" style={{ color: ACCENT }}>Kamerayı Aç</span>
+                    </div>
+                  )}
                 </button>
               )}
             </div>
 
-            {/* Manuel seçim */}
-            {atanmisFirmalar.length > 0 && (
-              <div
-                className="rounded-2xl overflow-hidden"
-                style={{ background: cardBg, border: `1px solid ${border}` }}
-              >
-                <div className="px-4 pt-4 pb-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
-                      style={{ background: `rgba(14,165,233,0.1)` }}>
-                      <i className="ri-building-2-line text-xs" style={{ color: ACCENT }} />
-                    </div>
-                    <p className="text-xs font-bold" style={{ color: textMuted }}>Manuel Firma Seç</p>
-                  </div>
-                </div>
-                <div className="px-4 pb-2 space-y-1.5 mt-2">
-                  {atanmisFirmalar.map(f => (
-                    <button
-                      key={f.id}
-                      onClick={() => setManuelFirmaId(f.id)}
-                      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all text-left"
-                      style={{
-                        background: manuelFirmaId === f.id
-                          ? `rgba(14,165,233,0.1)`
-                          : isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)',
-                        border: manuelFirmaId === f.id
-                          ? `1.5px solid rgba(14,165,233,0.35)`
-                          : `1.5px solid ${border}`,
-                      }}
-                    >
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={manuelFirmaId === f.id
-                          ? { background: ACCENT }
-                          : { background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)', border: `1.5px solid ${border}` }}>
-                        {manuelFirmaId === f.id && <i className="ri-check-line text-white text-[10px]" />}
-                      </div>
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: manuelFirmaId === f.id ? `rgba(14,165,233,0.15)` : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)' }}>
-                        <i className="ri-building-2-line text-xs" style={{ color: manuelFirmaId === f.id ? ACCENT : textMuted }} />
-                      </div>
-                      <p className="text-sm font-semibold flex-1 truncate"
-                        style={{ color: manuelFirmaId === f.id ? ACCENT : textPrimary }}>
-                        {f.name}
-                      </p>
-                      {manuelFirmaId === f.id && (
-                        <i className="ri-checkbox-circle-fill text-base flex-shrink-0" style={{ color: ACCENT }} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <div className="px-4 pb-4 mt-2">
-                  <button
-                    onClick={() => { if (manuelFirmaId) void handleCheckIn(manuelFirmaId, false); }}
-                    disabled={!manuelFirmaId || actionLoading}
-                    className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all"
-                    style={{
-                      background: manuelFirmaId && !actionLoading
-                        ? `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})`
-                        : isDark ? '#1e293b' : '#e2e8f0',
-                      color: manuelFirmaId && !actionLoading ? '#fff' : textMuted,
-                      opacity: (!manuelFirmaId || actionLoading) ? 0.6 : 1,
-                    }}
-                  >
-                    {actionLoading
-                      ? <><i className="ri-loader-4-line animate-spin" />Başlatılıyor...</>
-                      : <><i className="ri-login-box-line text-base" />Ziyareti Başlat</>}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Sadece QR gerekiyorsa info */}
-            {atanmisFirmalar.length === 0 && !showQr && (
+            {!showQr && !actionLoading && (
               <div
                 className="rounded-2xl p-4"
-                style={{ background: isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.04)', border: `1px dashed rgba(14,165,233,0.25)` }}
+                style={{ background: isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.04)', border: '1px dashed rgba(14,165,233,0.25)' }}
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                    style={{ background: `rgba(14,165,233,0.1)` }}>
-                    <i className="ri-information-line text-base" style={{ color: ACCENT }} />
+                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                    <i className="ri-qr-scan-2-line text-base" style={{ color: ACCENT }} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: textPrimary }}>QR ile ziyaret başlatabilirsiniz</p>
+                    <p className="text-sm font-semibold" style={{ color: textPrimary }}>QR kod okutarak ziyaret başlatın</p>
                     <p className="text-xs mt-1 leading-relaxed" style={{ color: textMuted }}>
-                      Firmanın QR kodunu okutun — sistem otomatik check-in yapar. Manuel seçim için adminizden firma ataması talep edin.
+                      Firmanın QR kodunu tarat — sistem otomatik check-in ve check-out yapar. Aynı QR&apos;ı ikinci kez okutunca ziyaret biter.
                     </p>
                   </div>
                 </div>
@@ -527,7 +711,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
             style={{ background: cardBg, border: `1px solid ${border}` }}
           >
             <div className="px-4 pt-4 pb-2 flex items-center gap-2">
-              <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: `rgba(14,165,233,0.1)` }}>
+              <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,0.1)' }}>
                 <i className="ri-history-line text-xs" style={{ color: ACCENT }} />
               </div>
               <p className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: textMuted }}>
@@ -554,7 +738,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     {z.qr_ile_giris && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                        style={{ background: `rgba(14,165,233,0.1)`, color: ACCENT, border: `1px solid rgba(14,165,233,0.2)` }}>QR</span>
+                        style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT, border: '1px solid rgba(14,165,233,0.2)' }}>QR</span>
                     )}
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                       style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)', color: textMuted }}>
