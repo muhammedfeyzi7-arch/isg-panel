@@ -12,11 +12,6 @@ interface AktifZiyaret {
   qr_ile_giris: boolean;
 }
 
-interface AtanmisOrg {
-  id: string;
-  name: string;
-}
-
 export default function ZiyaretCheckIn() {
   const { user } = useAuth();
   const { addToast } = useApp();
@@ -25,8 +20,6 @@ export default function ZiyaretCheckIn() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  const [manuelFirmaId, setManuelFirmaId] = useState('');
-  const [atanmisFirmalar, setAtanmisFirmalar] = useState<AtanmisOrg[]>([]);
   const [gecmis, setGecmis] = useState<AktifZiyaret[]>([]);
   const [elapsed, setElapsed] = useState('');
 
@@ -49,52 +42,21 @@ export default function ZiyaretCheckIn() {
     return () => clearInterval(interval);
   }, [aktifZiyaret]);
 
-  // Kullanıcıya atanmış firmaları + osgb_org_id + display_name çek
+  // Kullanıcının osgb_org_id + display_name çek
   const fetchAtanmisFirmalar = useCallback(async () => {
     if (!user?.id) return;
 
-    // user_organizations'dan tüm gerekli bilgileri çek
-    // osgb_role gezici_uzman veya isyeri_hekimi olabilir
     const { data: uoData } = await supabase
       .from('user_organizations')
-      .select('organization_id, active_firm_ids, active_firm_id, osgb_role, display_name')
+      .select('organization_id, display_name')
       .eq('user_id', user.id)
-      .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi'])
+      .eq('is_active', true)
       .maybeSingle();
 
-    if (!uoData) {
-      // Fallback: herhangi bir aktif üyelik
-      const { data: anyMembership } = await supabase
-        .from('user_organizations')
-        .select('organization_id, active_firm_ids, active_firm_id, display_name')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      if (anyMembership) {
-        setOsgbOrgId(anyMembership.organization_id);
-        setUzmanAd(anyMembership.display_name ?? user.email ?? 'Uzman');
-      }
-      return;
+    if (uoData) {
+      setOsgbOrgId(uoData.organization_id);
+      setUzmanAd(uoData.display_name ?? user.email ?? 'Uzman');
     }
-
-    // OSGB org id = uzmanın bağlı olduğu ana org
-    setOsgbOrgId(uoData.organization_id);
-    setUzmanAd(uoData.display_name ?? user.email ?? 'Uzman');
-
-    // Atanmış firma id'leri
-    const firmIds: string[] = (uoData.active_firm_ids && Array.isArray(uoData.active_firm_ids) && uoData.active_firm_ids.length > 0)
-      ? (uoData.active_firm_ids as string[]).filter(Boolean)
-      : uoData.active_firm_id ? [uoData.active_firm_id as string] : [];
-
-    if (firmIds.length === 0) return;
-
-    const { data: firmData } = await supabase
-      .from('organizations')
-      .select('id, name')
-      .in('id', firmIds);
-
-    setAtanmisFirmalar(firmData ?? []);
   }, [user?.id, user?.email]);
 
   // Aktif ziyareti ve geçmişi çek
@@ -227,7 +189,8 @@ export default function ZiyaretCheckIn() {
       const giris = new Date(aktifZiyaret.giris_saati);
       const sureDakika = Math.round((Date.now() - giris.getTime()) / 60000);
 
-      const { error } = await supabase
+      // Sadece ID ile update et — RLS zaten uzman_user_id = auth.uid() kontrol ediyor
+      const { error, data: updatedData } = await supabase
         .from('osgb_ziyaretler')
         .update({
           cikis_saati: now,
@@ -236,9 +199,17 @@ export default function ZiyaretCheckIn() {
           updated_at: now,
         })
         .eq('id', aktifZiyaret.id)
-        .eq('uzman_user_id', user.id);
+        .select('id')
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[ZiyaretCheckIn] checkout error:', JSON.stringify(error));
+        throw new Error(error.message || error.code || 'Güncelleme başarısız');
+      }
+      if (!updatedData) {
+        // RLS engeli — ziyaret kaydı bulunamadı veya yetki yok
+        throw new Error('Ziyaret kaydı güncellenemedi. Yetki hatası olabilir.');
+      }
       addToast(`Ziyaret tamamlandı! Süre: ${sureDakika} dakika`, 'success');
       setAktifZiyaret(null);
       void fetchZiyaret();
@@ -419,55 +390,7 @@ export default function ZiyaretCheckIn() {
             )}
           </div>
 
-          {/* Manuel firma seçimi */}
-          {atanmisFirmalar.length > 0 && (
-            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <p className="text-xs font-semibold mb-3" style={{ color: '#64748B' }}>
-                <i className="ri-building-2-line mr-1" />Manuel Firma Seç
-              </p>
-              <div className="space-y-1.5 mb-3">
-                {atanmisFirmalar.map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => setManuelFirmaId(f.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all text-left"
-                    style={{
-                      background: manuelFirmaId === f.id ? 'rgba(14,165,233,0.1)' : 'rgba(255,255,255,0.03)',
-                      border: manuelFirmaId === f.id ? '1.5px solid rgba(14,165,233,0.35)' : '1.5px solid rgba(255,255,255,0.07)',
-                    }}>
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={manuelFirmaId === f.id
-                        ? { background: '#0EA5E9' }
-                        : { background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.12)' }}>
-                      {manuelFirmaId === f.id && <i className="ri-check-line text-white text-[10px]" />}
-                    </div>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(14,165,233,0.1)' }}>
-                      <i className="ri-building-2-line text-xs" style={{ color: '#0EA5E9' }} />
-                    </div>
-                    <p className="text-xs font-semibold flex-1 truncate"
-                      style={{ color: manuelFirmaId === f.id ? '#0EA5E9' : 'var(--text-primary)' }}>
-                      {f.name}
-                    </p>
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => { if (manuelFirmaId) void handleCheckIn(manuelFirmaId, false); }}
-                disabled={!manuelFirmaId || actionLoading}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition-all whitespace-nowrap"
-                style={{
-                  background: manuelFirmaId && !actionLoading ? 'linear-gradient(135deg, #0284C7, #0EA5E9)' : '#334155',
-                  opacity: (!manuelFirmaId || actionLoading) ? 0.6 : 1,
-                }}>
-                {actionLoading
-                  ? <><i className="ri-loader-4-line animate-spin" />Başlatılıyor...</>
-                  : <><i className="ri-login-box-line" />Ziyareti Başlat</>}
-              </button>
-            </div>
-          )}
-
-          {atanmisFirmalar.length === 0 && !showQr && (
+          {!showQr && (
             <div className="rounded-2xl p-5" style={{ background: 'rgba(14,165,233,0.05)', border: '1px dashed rgba(14,165,233,0.3)' }}>
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
@@ -476,11 +399,10 @@ export default function ZiyaretCheckIn() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    QR kod okutarak ziyaret başlatabilirsiniz
+                    QR kod okutarak ziyaret başlatın
                   </p>
                   <p className="text-xs mt-1 leading-relaxed" style={{ color: '#64748B' }}>
-                    Firmanın QR kodunu tarat — sistem otomatik check-in yapar.
-                    Manuel seçim için OSGB admininizden firma ataması talep edin.
+                    Firmanın QR kodunu tarat — sistem otomatik check-in ve check-out yapar. Aynı QR&apos;ı ikinci kez okutunca ziyaret biter.
                   </p>
                 </div>
               </div>

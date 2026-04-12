@@ -1,5 +1,4 @@
 import { createPortal } from 'react-dom';
-import { useState } from 'react';
 
 interface Ziyaret {
   id: string;
@@ -21,7 +20,7 @@ interface ZiyaretDetayPanelProps {
   ziyaret: Ziyaret;
   isDark: boolean;
   onClose: () => void;
-  onBitir: (id: string) => Promise<void>;
+  onBitir?: (id: string) => Promise<void>;
 }
 
 function formatSure(dakika: number | null): string {
@@ -47,23 +46,13 @@ function calcElapsed(giris: string): string {
   return `${m} dakika`;
 }
 
-export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir }: ZiyaretDetayPanelProps) {
-  const [confirmBitir, setConfirmBitir] = useState(false);
-  const [loading, setLoading] = useState(false);
-
+export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir: _onBitir }: ZiyaretDetayPanelProps) {
   const isAktif = ziyaret.durum === 'aktif';
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--bg-item)',
     border: '1px solid var(--border-subtle)',
     borderRadius: '14px',
-  };
-
-  const handleBitir = async () => {
-    setLoading(true);
-    await onBitir(ziyaret.id);
-    setLoading(false);
-    setConfirmBitir(false);
   };
 
   const mapUrl = ziyaret.konum_lat && ziyaret.konum_lng
@@ -248,38 +237,16 @@ export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir }:
           )}
         </div>
 
-        {/* Footer — Bitir butonu */}
+        {/* Footer — Aktif ziyaret bilgi notu (admin sonlandıramaz) */}
         {isAktif && (
           <div className="px-5 py-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-            {!confirmBitir ? (
-              <button
-                onClick={() => setConfirmBitir(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold cursor-pointer transition-all whitespace-nowrap"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, #059669, #047857)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, #10B981, #059669)'; }}>
-                <i className="ri-checkbox-circle-line" />
-                Ziyareti Bitir
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-center text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-                  Ziyareti bitirmek istediğinize emin misiniz?
-                </p>
-                <div className="flex gap-2">
-                  <button onClick={() => setConfirmBitir(false)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
-                    style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-                    İptal
-                  </button>
-                  <button onClick={handleBitir} disabled={loading}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap text-white"
-                    style={{ background: 'linear-gradient(135deg, #10B981, #059669)', opacity: loading ? 0.7 : 1 }}>
-                    {loading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-check-line" />Evet, Bitir</>}
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="flex items-center gap-2 p-3 rounded-xl"
+              style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+              <i className="ri-information-line text-sm flex-shrink-0" style={{ color: '#F59E0B' }} />
+              <p className="text-xs leading-relaxed" style={{ color: '#92400E' }}>
+                Ziyaret devam ediyor. Uzman QR kodu tekrar okutarak ziyareti bitirebilir.
+              </p>
+            </div>
           </div>
         )}
       </div>

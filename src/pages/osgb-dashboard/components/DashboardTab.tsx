@@ -23,11 +23,11 @@ interface Uzman {
 
 interface Ziyaret {
   id: string;
-  uzman_id: string;
-  firma_id: string;
+  uzman_user_id: string;
+  firma_org_id: string;
   giris_saati: string;
   cikis_saati: string | null;
-  ziyaret_tipi?: string;
+  qr_ile_giris?: boolean;
 }
 
 interface DashboardTabProps {
@@ -144,8 +144,8 @@ export default function DashboardTab({
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const { data } = await supabase
           .from('osgb_ziyaretler')
-          .select('id, uzman_id, firma_id, giris_saati, cikis_saati, ziyaret_tipi')
-          .eq('organization_id', orgId)
+          .select('id, uzman_user_id, firma_org_id, giris_saati, cikis_saati, qr_ile_giris')
+          .eq('osgb_org_id', orgId)
           .gte('giris_saati', thirtyDaysAgo.toISOString())
           .order('giris_saati', { ascending: false });
         setZiyaretler(data ?? []);
@@ -169,19 +169,19 @@ export default function DashboardTab({
 
   const firmaLastVisit: Record<string, string> = {};
   ziyaretler.forEach(z => {
-    if (!firmaLastVisit[z.firma_id] || z.giris_saati > firmaLastVisit[z.firma_id]) {
-      firmaLastVisit[z.firma_id] = z.giris_saati;
+    if (!firmaLastVisit[z.firma_org_id] || z.giris_saati > firmaLastVisit[z.firma_org_id]) {
+      firmaLastVisit[z.firma_org_id] = z.giris_saati;
     }
   });
 
   const uzmanLastVisit: Record<string, string> = {};
   ziyaretler.forEach(z => {
-    if (!uzmanLastVisit[z.uzman_id] || z.giris_saati > uzmanLastVisit[z.uzman_id]) {
-      uzmanLastVisit[z.uzman_id] = z.giris_saati;
+    if (!uzmanLastVisit[z.uzman_user_id] || z.giris_saati > uzmanLastVisit[z.uzman_user_id]) {
+      uzmanLastVisit[z.uzman_user_id] = z.giris_saati;
     }
   });
 
-  const aktifUzmanIds = new Set(aktifZiyaretler.map(z => z.uzman_id));
+  const aktifUzmanIds = new Set(aktifZiyaretler.map(z => z.uzman_user_id));
   const son5 = ziyaretler.slice(0, 5);
 
   const getUzmanAd = (uid: string) => {
@@ -193,6 +193,8 @@ export default function DashboardTab({
     const f = altFirmalar.find(x => x.id === fid);
     return f?.name ?? 'Bilinmeyen Firma';
   };
+
+  void bugunZiyaretler;
 
   void textMuted;
 
@@ -337,7 +339,7 @@ export default function DashboardTab({
                 {altFirmalar.slice(0, 5).map((f, idx) => {
                   const lastVisitDate = firmaLastVisit[f.id];
                   const days = getDaysDiff(lastVisitDate);
-                  const isAktif = aktifZiyaretler.some(z => z.firma_id === f.id);
+                  const isAktif = aktifZiyaretler.some(z => z.firma_org_id === f.id);
                   const rowBg = 'transparent';
                   const rowHover = isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)';
                   return (
@@ -421,7 +423,7 @@ export default function DashboardTab({
               <div>
                 {uzmanlar.slice(0, 5).map((u, idx) => {
                   const isSahada = aktifUzmanIds.has(u.user_id);
-                  const lastVisitDate = uzmanLastVisit[u.user_id];
+                  const lastVisitDate = uzmanLastVisit[u.user_id] ?? null;
                   const days = getDaysDiff(lastVisitDate);
                   const rowBg = 'transparent';
                   const rowHover = isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)';
@@ -497,8 +499,8 @@ export default function DashboardTab({
               <div className="space-y-3">
                 {son5.map((z, idx) => {
                   const isAktif = !z.cikis_saati;
-                  const uzmanAd = getUzmanAd(z.uzman_id);
-                  const firmaAd = getFirmaAd(z.firma_id);
+                  const uzmanAd = getUzmanAd(z.uzman_user_id);
+                  const firmaAd = getFirmaAd(z.firma_org_id);
                   const girisSaat = new Date(z.giris_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
                   const sure = formatDuration(z.giris_saati, z.cikis_saati);
                   const initial = uzmanAd.charAt(0).toUpperCase();
@@ -551,7 +553,7 @@ export default function DashboardTab({
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {z.ziyaret_tipi === 'qr' && (
+                            {z.qr_ile_giris && (
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
                                 style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>QR</span>
                             )}

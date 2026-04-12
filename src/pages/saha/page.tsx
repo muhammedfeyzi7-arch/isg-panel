@@ -9,6 +9,7 @@ import IsIzniSahaBolumu from './components/IsIzniSahaBolumu';
 import { OfflineBand, PendingModal } from './components/OfflineBand';
 import QrScanner, { loadJsQR } from './components/QrScanner';
 import ZiyaretCheckIn from './components/ZiyaretCheckIn';
+import GeziciUzmanSaglikTab from './components/GeziciUzmanSaglikTab';
 import {
   STATUS_CFG,
   EkipmanDetayPanel,
@@ -19,10 +20,11 @@ import {
 import { uploadFileToStorage } from '@/utils/fileUpload';
 
 // ─── Sekme Tanımları ──────────────────────────────────────────────────────────
-type SahaTab = 'ziyaret' | 'qr' | 'ekipman' | 'izin' | 'uygunsuzluk';
+type SahaTab = 'ziyaret' | 'qr' | 'ekipman' | 'izin' | 'uygunsuzluk' | 'saglik';
 
 const TABS: { id: SahaTab; label: string; icon: string; color: string; activeBg: string }[] = [
   { id: 'ziyaret',      label: 'Ziyaret',     icon: 'ri-map-pin-user-line',     color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
+  { id: 'saglik',       label: 'Sağlık',      icon: 'ri-heart-pulse-line',      color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
   { id: 'qr',           label: 'QR Tara',     icon: 'ri-qr-code-line',          color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
   { id: 'ekipman',      label: 'Ekipmanlar',  icon: 'ri-tools-line',            color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
   { id: 'izin',         label: 'İş İzinleri', icon: 'ri-shield-keyhole-line',   color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
@@ -512,10 +514,12 @@ function QrEkipmanKart({ ekipman, onClose, onKontrolYapildi, onDurumDegistir, is
 export default function SahaPage() {
   const { ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, addToast, ekipmanKontrolBildirimi, currentUser, dataLoading, uygunsuzluklar, isIzinleri, org } = useApp();
 
-  // Ziyaret sekmesi sadece gezici uzmanlar için görünür
+  // Ziyaret ve sağlık sekmeleri sadece gezici uzmanlar için görünür
   const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
 
-  const visibleTabs = isGeziciUzman ? TABS : TABS.filter(t => t.id !== 'ziyaret');
+  const visibleTabs = isGeziciUzman
+    ? TABS
+    : TABS.filter(t => t.id !== 'ziyaret' && t.id !== 'saglik');
 
   const [activeTab, setActiveTab] = useState<SahaTab>(() => isGeziciUzman ? 'ziyaret' : 'qr');
   const [showPendingModal, setShowPendingModal] = useState(false);
@@ -760,6 +764,9 @@ export default function SahaPage() {
       <div className="flex-1">
         {activeTab === 'ziyaret' && (
           <ZiyaretCheckIn />
+        )}
+        {activeTab === 'saglik' && (
+          <GeziciUzmanSaglikTab atanmisFirmaIds={org?.activeFirmIds ?? (org?.id ? [org.id] : [])} />
         )}
         {activeTab === 'qr' && (
           <QrTab isOnline={isOnline} onKontrolYapildi={handleKontrolYapildi} onDurumDegistir={handleDurumDegistir} />

@@ -96,7 +96,6 @@ export default function SupportTicketsPanel() {
           admin_reply: reply.trim(),
           status: 'replied',
           replied_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         }),
       });
       if (selected.user_id) {
@@ -109,6 +108,7 @@ export default function SupportTicketsPanel() {
             title: 'Destek talebiniz yanıtlandı',
             message: `"${selected.subject}" konulu talebiniz yanıtlandı.`,
             is_read: false,
+            created_at: new Date().toISOString(),
           }),
         });
       }

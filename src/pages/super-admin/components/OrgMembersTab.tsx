@@ -34,13 +34,22 @@ export default function OrgMembersTab({ orgId }: { orgId: string }) {
       setLoading(true);
       setError('');
       try {
+        // Super admin GET - Prefer: count=exact ile toplam üye sayısını da al
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/user_organizations?organization_id=eq.${orgId}&select=user_id,display_name,email,role,is_active,joined_at&order=joined_at.asc`,
-          { headers: saHeaders() }
+          `${SUPABASE_URL}/rest/v1/user_organizations?organization_id=eq.${encodeURIComponent(orgId)}&select=user_id,display_name,email,role,is_active,joined_at&order=joined_at.asc`,
+          {
+            headers: {
+              ...saHeaders(),
+              'Prefer': 'count=exact',
+            },
+          }
         );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText}`);
+        }
         const data = await res.json();
-        setMembers(data || []);
+        setMembers(Array.isArray(data) ? data : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Hata oluştu');
       } finally {
