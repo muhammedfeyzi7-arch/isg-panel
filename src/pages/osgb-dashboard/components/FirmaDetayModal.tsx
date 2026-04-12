@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import FirmaQrModal from './FirmaQrModal';
+import FirmaKonumSecici from './FirmaKonumSecici';
 
 interface Uzman {
   user_id: string;
@@ -34,7 +35,7 @@ interface ZiyaretRow {
 export default function FirmaDetayModal({
   firmaId, firmaAdi, orgId, uzmanlar, onClose, onRefresh, addToast, isDark = false,
 }: FirmaDetayModalProps) {
-  const [activeTab, setActiveTab] = useState<'ozet' | 'personel' | 'ziyaretler'>('ozet');
+  const [activeTab, setActiveTab] = useState<'ozet' | 'personel' | 'ziyaretler' | 'duzenle'>('ozet');
   const [personeller, setPersoneller] = useState<PersonelRow[]>([]);
   const [ziyaretler, setZiyaretler] = useState<ZiyaretRow[]>([]);
   const [personelSayisi, setPersonelSayisi] = useState(0);
@@ -50,6 +51,18 @@ export default function FirmaDetayModal({
   const [firmaInfo, setFirmaInfo] = useState<{
     yetkili?: string; telefon?: string; email?: string; sgkSicil?: string; adres?: string;
   } | null>(null);
+
+  // Düzenleme formu
+  const [editForm, setEditForm] = useState({
+    ad: firmaAdi,
+    yetkili: '', telefon: '', email: '', sgkSicil: '', adres: '',
+    gpsRequired: false, gpsRadius: 1000, gpsStrict: true,
+    firmaLat: null as number | null, firmaLng: null as number | null,
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
   const cardBg = 'var(--bg-item)';
   const cardBorder = 'var(--border-subtle)';
@@ -71,7 +84,7 @@ export default function FirmaDetayModal({
     ] = await Promise.all([
       supabase.from('personeller').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId),
       supabase.from('personeller').select('id, ad_soyad, gorevi, created_at').eq('organization_id', firmaId).order('created_at', { ascending: false }).limit(10),
-      supabase.from('organizations').select('is_active').eq('id', firmaId).maybeSingle(),
+      supabase.from('organizations').select('id, name, is_active, gps_required, gps_radius, gps_strict, firma_lat, firma_lng').eq('id', firmaId).maybeSingle(),
       supabase.from('osgb_ziyaretler')
         .select('id, uzman_ad, uzman_email, giris_saati, cikis_saati, durum, qr_ile_giris')
         .eq('firma_org_id', firmaId)
@@ -84,18 +97,34 @@ export default function FirmaDetayModal({
     setPersoneller(personelData ?? []);
     setZiyaretler((ziyaretData ?? []) as ZiyaretRow[]);
     setSonZiyaretTarih((ziyaretData ?? [])[0]?.giris_saati ?? null);
-    setFirmaDurum((orgData as { is_active?: boolean } | null)?.is_active !== false ? 'aktif' : 'pasif');
+
+    const org = orgData as { is_active?: boolean; name?: string; gps_required?: boolean; gps_radius?: number; gps_strict?: boolean; firma_lat?: number | null; firma_lng?: number | null } | null;
+    setFirmaDurum(org?.is_active !== false ? 'aktif' : 'pasif');
 
     const data = (appData as { data?: Record<string, unknown> } | null)?.data;
-    if (data && typeof data === 'object') {
-      setFirmaInfo({
-        yetkili: data.yetkili as string | undefined,
-        telefon: data.telefon as string | undefined,
-        email: data.email as string | undefined,
-        sgkSicil: data.sgkSicil as string | undefined,
-        adres: data.adres as string | undefined,
-      });
-    }
+    const infoObj = data && typeof data === 'object' ? {
+      yetkili: data.yetkili as string | undefined,
+      telefon: data.telefon as string | undefined,
+      email: data.email as string | undefined,
+      sgkSicil: data.sgkSicil as string | undefined,
+      adres: data.adres as string | undefined,
+    } : null;
+    if (infoObj) setFirmaInfo(infoObj);
+
+    // Düzenleme formunu doldur
+    setEditForm({
+      ad: org?.name ?? firmaAdi,
+      yetkili: (data?.yetkili as string) ?? '',
+      telefon: (data?.telefon as string) ?? '',
+      email: (data?.email as string) ?? '',
+      sgkSicil: (data?.sgkSicil as string) ?? '',
+      adres: (data?.adres as string) ?? '',
+      gpsRequired: org?.gps_required ?? false,
+      gpsRadius: org?.gps_radius ?? 1000,
+      gpsStrict: org?.gps_strict ?? true,
+      firmaLat: org?.firma_lat ?? null,
+      firmaLng: org?.firma_lng ?? null,
+    });
 
     const atananlar = uzmanlar.filter(u =>
       (u.active_firm_ids && u.active_firm_ids.includes(firmaId)) ||
@@ -153,6 +182,49 @@ export default function FirmaDetayModal({
     } catch (err) {
       addToast(`Uzman ataması yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
     } finally { setAtanmaLoading(false); }
+  };
+
+  /** Nominatim geocoding */
+  const handleGeocode = async () => {
+    const q = editForm.adres.trim();
+    if (!q) return;
+    setGeocodeLoading(true);
+    setGeocodeError(null);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`, { headers: { 'Accept-Language': 'tr' } });
+      const result = await res.json() as Array<{ lat: string; lon: string }>;
+      if (!result || result.length === 0) { setGeocodeError('Adres bulunamadı.'); return; }
+      setEditForm(p => ({ ...p, firmaLat: parseFloat(result[0].lat), firmaLng: parseFloat(result[0].lon) }));
+    } catch { setGeocodeError('Arama hatası.'); }
+    finally { setGeocodeLoading(false); }
+  };
+
+  const handleEdit = async () => {
+    if (!editForm.ad.trim()) { setEditError('Firma adı zorunludur.'); return; }
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      const { error: orgErr } = await supabase.from('organizations').update({
+        name: editForm.ad.trim(),
+        gps_required: editForm.gpsRequired,
+        gps_radius: editForm.gpsRadius,
+        gps_strict: editForm.gpsStrict,
+        firma_lat: editForm.gpsRequired ? editForm.firmaLat : null,
+        firma_lng: editForm.gpsRequired ? editForm.firmaLng : null,
+        firma_adres: editForm.adres.trim() || null,
+      }).eq('id', firmaId);
+      if (orgErr) throw orgErr;
+      await supabase.from('app_data').upsert({
+        organization_id: firmaId,
+        data: { yetkili: editForm.yetkili, telefon: editForm.telefon, email: editForm.email, sgkSicil: editForm.sgkSicil, adres: editForm.adres },
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'organization_id' });
+      setFirmaInfo({ yetkili: editForm.yetkili, telefon: editForm.telefon, email: editForm.email, sgkSicil: editForm.sgkSicil, adres: editForm.adres });
+      addToast('Firma bilgileri güncellendi!', 'success');
+      setActiveTab('ozet');
+      onRefresh();
+    } catch (err) { setEditError(err instanceof Error ? err.message : String(err)); }
+    finally { setEditLoading(false); }
   };
 
   const handleDurumDegistir = async () => {
@@ -420,6 +492,7 @@ export default function FirmaDetayModal({
                 { id: 'ozet' as const, label: 'Özet', icon: 'ri-pie-chart-line' },
                 { id: 'personel' as const, label: `Personel (${personeller.length})`, icon: 'ri-group-line' },
                 { id: 'ziyaretler' as const, label: `Ziyaret (${ziyaretler.length})`, icon: 'ri-map-pin-2-line' },
+                { id: 'duzenle' as const, label: 'Düzenle', icon: 'ri-edit-line' },
               ].map(t => (
                 <button key={t.id} onClick={() => setActiveTab(t.id)}
                   className="flex items-center gap-1.5 px-3 py-3 text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors"
@@ -506,6 +579,140 @@ export default function FirmaDetayModal({
                       </span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {activeTab === 'duzenle' && (
+                <div className="space-y-4">
+                  {editError && (
+                    <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <i className="ri-error-warning-line text-sm flex-shrink-0" style={{ color: '#EF4444' }} />
+                      <p className="text-xs" style={{ color: '#EF4444' }}>{editError}</p>
+                    </div>
+                  )}
+                  {/* Temel Bilgiler */}
+                  <div className="rounded-xl p-4 space-y-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: textMuted }}>Temel Bilgiler</p>
+                    {[
+                      { label: 'Firma Adı *', key: 'ad', placeholder: 'Firma adı' },
+                      { label: 'Yetkili Kişi', key: 'yetkili', placeholder: 'Yetkili adı soyadı' },
+                      { label: 'Telefon', key: 'telefon', placeholder: '+90 5xx xxx xx xx' },
+                      { label: 'E-posta', key: 'email', placeholder: 'firma@example.com' },
+                      { label: 'SGK Sicil No', key: 'sgkSicil', placeholder: 'SGK sicil numarası' },
+                    ].map(f => (
+                      <div key={f.key}>
+                        <label className="block text-[10px] font-semibold mb-1" style={{ color: textMuted }}>{f.label}</label>
+                        <input
+                          value={(editForm as Record<string, unknown>)[f.key] as string}
+                          onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+                          placeholder={f.placeholder}
+                          className="w-full text-xs px-3 py-2 rounded-xl outline-none"
+                          style={{ background: 'var(--bg-input)', border: `1px solid ${cardBorder}`, color: textPrimary }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* GPS Ayarları */}
+                  <div className="rounded-xl p-4 space-y-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: textMuted }}>GPS & Konum Ayarları</p>
+                    <div className="flex gap-2">
+                      {[
+                        { val: false, label: 'Sadece QR', icon: 'ri-qr-code-line' },
+                        { val: true, label: 'QR + Konum', icon: 'ri-map-pin-2-line' },
+                      ].map(opt => (
+                        <button key={String(opt.val)} type="button"
+                          onClick={() => setEditForm(p => ({ ...p, gpsRequired: opt.val }))}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all"
+                          style={{
+                            background: editForm.gpsRequired === opt.val ? (opt.val ? 'rgba(239,68,68,0.1)' : 'rgba(14,165,233,0.1)') : 'var(--bg-item)',
+                            border: `1.5px solid ${editForm.gpsRequired === opt.val ? (opt.val ? 'rgba(239,68,68,0.3)' : 'rgba(14,165,233,0.3)') : cardBorder}`,
+                            color: editForm.gpsRequired === opt.val ? (opt.val ? '#EF4444' : '#0EA5E9') : textMuted,
+                          }}>
+                          <i className={`${opt.icon} text-xs`} />{opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {editForm.gpsRequired && (
+                      <div className="space-y-3">
+                        {/* Adres + Geocode */}
+                        <div>
+                          <label className="block text-[10px] font-semibold mb-1" style={{ color: textMuted }}>Firma Adresi</label>
+                          <div className="flex gap-2">
+                            <input
+                              value={editForm.adres}
+                              onChange={e => { setEditForm(p => ({ ...p, adres: e.target.value })); setGeocodeError(null); }}
+                              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleGeocode(); } }}
+                              placeholder="Tam adres — Enter veya 'Ara'"
+                              className="flex-1 text-xs px-3 py-2 rounded-xl outline-none"
+                              style={{ background: 'var(--bg-input)', border: `1px solid ${cardBorder}`, color: textPrimary }}
+                            />
+                            <button type="button" onClick={() => void handleGeocode()} disabled={geocodeLoading || !editForm.adres.trim()}
+                              className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer whitespace-nowrap"
+                              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', opacity: geocodeLoading ? 0.7 : 1 }}>
+                              {geocodeLoading ? <i className="ri-loader-4-line animate-spin" /> : <i className="ri-search-line" />}Ara
+                            </button>
+                          </div>
+                          {geocodeError && <p className="text-[10px] mt-1" style={{ color: '#EF4444' }}>{geocodeError}</p>}
+                          {editForm.firmaLat !== null && !geocodeError && (
+                            <p className="text-[10px] mt-1" style={{ color: '#16A34A' }}>
+                              <i className="ri-map-pin-2-fill mr-0.5" />Konum: {editForm.firmaLat.toFixed(5)}, {editForm.firmaLng?.toFixed(5)} — haritaya tıklayarak ayarlayın
+                            </p>
+                          )}
+                        </div>
+                        {/* Harita */}
+                        <FirmaKonumSecici
+                          lat={editForm.firmaLat}
+                          lng={editForm.firmaLng}
+                          radius={editForm.gpsRadius}
+                          onSelect={(lat, lng) => setEditForm(p => ({ ...p, firmaLat: lat, firmaLng: lng }))}
+                        />
+                        {/* Radius slider */}
+                        <div>
+                          <label className="block text-[10px] font-semibold mb-1" style={{ color: textMuted }}>
+                            İzin Verilen Mesafe: <span style={{ color: '#EF4444' }}>{editForm.gpsRadius} m</span>
+                          </label>
+                          <input type="range" min={50} max={5000} step={50} value={editForm.gpsRadius}
+                            onChange={e => setEditForm(p => ({ ...p, gpsRadius: Number(e.target.value) }))}
+                            className="w-full" />
+                        </div>
+                        {/* GPS Strict */}
+                        <div className="flex gap-2">
+                          {[
+                            { val: true, label: 'GPS yoksa engelle' },
+                            { val: false, label: 'GPS yoksa izin ver' },
+                          ].map(opt => (
+                            <button key={String(opt.val)} type="button"
+                              onClick={() => setEditForm(p => ({ ...p, gpsStrict: opt.val }))}
+                              className="flex-1 py-2 rounded-xl text-[10px] font-semibold cursor-pointer transition-all"
+                              style={{
+                                background: editForm.gpsStrict === opt.val ? 'rgba(14,165,233,0.1)' : 'var(--bg-item)',
+                                border: `1px solid ${editForm.gpsStrict === opt.val ? 'rgba(14,165,233,0.3)' : cardBorder}`,
+                                color: editForm.gpsStrict === opt.val ? '#0EA5E9' : textMuted,
+                              }}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {!editForm.gpsRequired && (
+                      <div>
+                        <label className="block text-[10px] font-semibold mb-1" style={{ color: textMuted }}>Adres (isteğe bağlı)</label>
+                        <input value={editForm.adres} onChange={e => setEditForm(p => ({ ...p, adres: e.target.value }))}
+                          placeholder="Firma adresi" className="w-full text-xs px-3 py-2 rounded-xl outline-none"
+                          style={{ background: 'var(--bg-input)', border: `1px solid ${cardBorder}`, color: textPrimary }} />
+                      </div>
+                    )}
+                  </div>
+
+                  <button onClick={() => void handleEdit()} disabled={editLoading}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white cursor-pointer"
+                    style={{ background: editLoading ? 'rgba(14,165,233,0.5)' : 'linear-gradient(135deg, #0EA5E9, #0284C7)', opacity: editLoading ? 0.8 : 1 }}>
+                    {editLoading ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</> : <><i className="ri-save-line" />Değişiklikleri Kaydet</>}
+                  </button>
                 </div>
               )}
 

@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../store/AuthContext';
 import { useApp } from '../../store/AppContext';
+
+const FirmaKonumSecici = lazy(() => import('./components/FirmaKonumSecici'));
 import { supabase } from '../../lib/supabase';
 import { downloadOsgbReportPdf } from './utils/osgbReportPdf';
 import { downloadOsgbReportExcel } from './utils/osgbReportExcel';
@@ -15,6 +17,8 @@ import OsgbSettings from './components/OsgbSettings';
 import ZiyaretlerTab from './components/ZiyaretlerTab';
 import OsgbLoadingScreen from './components/OsgbLoadingScreen';
 import OsgbOnboarding from './components/OsgbOnboarding';
+import OnboardingTour from '../../components/feature/OnboardingTour';
+import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -54,7 +58,7 @@ interface FirmaDetay {
 
 export default function OsgbDashboardPage() {
   const { user } = useAuth();
-  const { org, addToast } = useApp();
+  const { org, addToast, mustChangePassword } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -237,18 +241,57 @@ export default function OsgbDashboardPage() {
     ad: '', yetkili: '', telefon: '', eposta: '', sgkSicil: '', adres: '',
     tehlikeSinifi: 'Tehlikeli', durum: 'Aktif',
     sozlesmeBas: '', sozlesmeBit: '', logoFile: null as File | null,
+    // GPS alanları
+    ziyaretDogrulama: 'sadece_qr' as 'sadece_qr' | 'qr_konum',
+    izinVerilenMesafe: 1000,
+    firmaLat: null as number | null,
+    firmaLng: null as number | null,
+    gpsStrict: true, // true = engelle, false = uyar ama izin ver
   });
-  const [firmaFormTab, setFirmaFormTab] = useState<0 | 1>(0);
+  const [firmaFormTab, setFirmaFormTab] = useState<0 | 1 | 2>(0);
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  /** Nominatim geocoding — adres → koordinat */
+  const handleGeocode = useCallback(async () => {
+    const q = firmaForm.adres.trim();
+    if (!q) return;
+    setGeocodeLoading(true);
+    setGeocodeError(null);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&addressdetails=1`;
+      const res = await fetch(url, { headers: { 'Accept-Language': 'tr' } });
+      const data = await res.json() as Array<{ lat: string; lon: string; display_name: string }>;
+      if (!data || data.length === 0) {
+        setGeocodeError('Adres bulunamadı. Daha ayrıntılı bir adres deneyin.');
+        return;
+      }
+      const { lat, lon } = data[0];
+      setFirmaForm(p => ({ ...p, firmaLat: parseFloat(lat), firmaLng: parseFloat(lon) }));
+    } catch {
+      setGeocodeError('Adres arama sırasında bir hata oluştu.');
+    } finally {
+      setGeocodeLoading(false);
+    }
+  }, [firmaForm.adres]);
 
   const handleFirmaEkle = async () => {
     if (!firmaForm.ad.trim()) { setFirmaError('Firma adı zorunludur.'); return; }
+    if (firmaForm.ziyaretDogrulama === 'qr_konum' && !firmaForm.adres.trim()) {
+      setFirmaError('QR + Konum doğrulama seçildiğinde adres zorunludur.');
+      setFirmaFormTab(2);
+      return;
+    }
     if (!org?.id) return;
     setFirmaLoading(true);
     setFirmaError(null);
     try {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+
+      const gpsRequired = firmaForm.ziyaretDogrulama === 'qr_konum';
+
       const { data: newFirma, error } = await supabase
         .from('organizations')
         .insert({
@@ -257,6 +300,12 @@ export default function OsgbDashboardPage() {
           created_by: user?.id,
           org_type: 'firma',
           parent_org_id: org.id,
+          gps_required: gpsRequired,
+          gps_radius: gpsRequired ? firmaForm.izinVerilenMesafe : 1000,
+          gps_strict: gpsRequired ? firmaForm.gpsStrict : true,
+          firma_adres: firmaForm.adres.trim() || null,
+          firma_lat: gpsRequired ? firmaForm.firmaLat : null,
+          firma_lng: gpsRequired ? firmaForm.firmaLng : null,
         })
         .select()
         .maybeSingle();
@@ -267,14 +316,25 @@ export default function OsgbDashboardPage() {
       }
 
       await supabase.from('app_data').upsert(
-        { organization_id: newFirma.id, data: {}, updated_at: new Date().toISOString() },
+        {
+          organization_id: newFirma.id,
+          data: {
+            yetkili: firmaForm.yetkili,
+            telefon: firmaForm.telefon,
+            email: firmaForm.eposta,
+            sgkSicil: firmaForm.sgkSicil,
+            adres: firmaForm.adres,
+          },
+          updated_at: new Date().toISOString(),
+        },
         { onConflict: 'organization_id' }
       );
 
       addToast(`${firmaForm.ad.trim()} başarıyla eklendi!`, 'success');
       setShowFirmaModal(false);
-      setFirmaForm({ ad: '', yetkili: '', telefon: '', eposta: '', sgkSicil: '', adres: '', tehlikeSinifi: 'Tehlikeli', durum: 'Aktif', sozlesmeBas: '', sozlesmeBit: '', logoFile: null });
+      setFirmaForm({ ad: '', yetkili: '', telefon: '', eposta: '', sgkSicil: '', adres: '', tehlikeSinifi: 'Tehlikeli', durum: 'Aktif', sozlesmeBas: '', sozlesmeBit: '', logoFile: null, ziyaretDogrulama: 'sadece_qr', izinVerilenMesafe: 1000, firmaLat: null, firmaLng: null, gpsStrict: true });
       setFirmaFormTab(0);
+      setGeocodeError(null);
       await fetchData();
     } catch (err) {
       setFirmaError(String(err));
@@ -430,8 +490,15 @@ export default function OsgbDashboardPage() {
     return <OsgbLoadingScreen onDone={() => setShowIntro(false)} />;
   }
 
+  if (mustChangePassword) {
+    return <ForcePasswordChange />;
+  }
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-app)' }}>
+
+      {/* Onboarding Tour */}
+      <OnboardingTour />
 
       {/* Mobile overlay */}
       <div
@@ -540,10 +607,10 @@ export default function OsgbDashboardPage() {
                       ≡ {filteredUzmanlar.length} sonuç
                     </span>
                     <button onClick={() => { setShowUzmanModal(true); setUzmanError(null); setUzmanFormTab(0); setUzmanForm({ ad: '', soyad: '', email: '', telefon: '', rol: 'gezici_uzman' as 'gezici_uzman' | 'isyeri_hekimi', password: '', passwordConfirm: '', atananFirmaIds: [] }); }}
-                      className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all ml-auto"
-                      style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', border: '1px solid rgba(14,165,233,0.3)' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.02)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}>
+                        className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all ml-auto"
+                        style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', border: '1px solid rgba(14,165,233,0.3)' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.02)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}>
                       <i className="ri-user-add-line" />+ Personel Ekle
                     </button>
                   </div>
@@ -1046,7 +1113,7 @@ export default function OsgbDashboardPage() {
                             border: `1.5px solid ${uzmanForm.rol === opt.val ? opt.border : 'var(--border-subtle)'}`,
                             color: uzmanForm.rol === opt.val ? opt.color : 'var(--text-muted)',
                           }}>
-                          <i className={`${opt.icon} text-sm`} />
+                          <i className={`${opt.icon} text-xs`} />
                           {opt.label}
                         </button>
                       ))}
@@ -1475,23 +1542,31 @@ export default function OsgbDashboardPage() {
               </button>
             </div>
 
-            {/* Section Tabs — 2 sekme */}
+            {/* Section Tabs — 3 sekme */}
             <div className="flex gap-1.5 px-6 pt-4 flex-shrink-0">
               {[
                 { idx: 0, icon: 'ri-id-card-line', label: 'Kimlik & İletişim' },
                 { idx: 1, icon: 'ri-file-list-3-line', label: 'Sözleşme & Durum' },
+                { idx: 2, icon: 'ri-map-pin-line', label: 'Konum & Ziyaret' },
               ].map(tab => (
                 <button
                   key={tab.idx}
-                  onClick={() => setFirmaFormTab(tab.idx as 0 | 1)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                  onClick={() => setFirmaFormTab(tab.idx as 0 | 1 | 2)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
                   style={{
-                    background: firmaFormTab === tab.idx ? 'rgba(14,165,233,0.1)' : 'var(--bg-item)',
-                    border: firmaFormTab === tab.idx ? '1.5px solid rgba(14,165,233,0.3)' : '1px solid var(--border-subtle)',
-                    color: firmaFormTab === tab.idx ? '#0EA5E9' : 'var(--text-muted)',
+                    background: firmaFormTab === tab.idx
+                      ? tab.idx === 2 ? 'rgba(239,68,68,0.08)' : 'rgba(14,165,233,0.1)'
+                      : 'var(--bg-item)',
+                    border: firmaFormTab === tab.idx
+                      ? tab.idx === 2 ? '1.5px solid rgba(239,68,68,0.25)' : '1.5px solid rgba(14,165,233,0.3)'
+                      : '1px solid var(--border-subtle)',
+                    color: firmaFormTab === tab.idx
+                      ? tab.idx === 2 ? '#EF4444' : '#0EA5E9'
+                      : 'var(--text-muted)',
                   }}>
                   <i className={`${tab.icon} text-xs`} />
-                  {tab.label}
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.idx + 1}</span>
                 </button>
               ))}
             </div>
@@ -1741,6 +1816,240 @@ export default function OsgbDashboardPage() {
                   )}
                 </div>
               )}
+
+              {/* Tab 2: Konum & Ziyaret Doğrulama */}
+              {firmaFormTab === 2 && (
+                <div className="space-y-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                      <i className="ri-map-pin-line text-xs" style={{ color: '#EF4444' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Konum & Ziyaret Doğrulama</p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Uzmanın firmayı ziyaret ederken doğrulama yöntemi</p>
+                    </div>
+                  </div>
+
+                  {/* Ziyaret doğrulama seçeneği */}
+                  <div>
+                    <label style={labelStyle}>Ziyaret Doğrulama Yöntemi</label>
+                    <div className="flex gap-2">
+                      {([
+                        { val: 'sadece_qr', icon: 'ri-qr-code-line', label: 'Sadece QR', desc: 'QR kodu tarayarak giriş', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)', border: 'rgba(14,165,233,0.3)' },
+                        { val: 'qr_konum', icon: 'ri-map-pin-2-line', label: 'QR + Konum', desc: 'QR + GPS konum doğrulama', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.3)' },
+                      ] as const).map(opt => (
+                        <button key={opt.val} type="button"
+                          onClick={() => setFirmaForm(p => ({ ...p, ziyaretDogrulama: opt.val }))}
+                          className="flex-1 flex flex-col items-center gap-1.5 py-3 px-3 rounded-xl cursor-pointer transition-all"
+                          style={{
+                            background: firmaForm.ziyaretDogrulama === opt.val ? opt.bg : 'var(--bg-item)',
+                            border: `1.5px solid ${firmaForm.ziyaretDogrulama === opt.val ? opt.border : 'var(--border-subtle)'}`,
+                            color: firmaForm.ziyaretDogrulama === opt.val ? opt.color : 'var(--text-muted)',
+                          }}>
+                          <i className={`${opt.icon} text-base`} />
+                          <span className="text-xs font-bold">{opt.label}</span>
+                          <span className="text-[9px] text-center leading-tight" style={{ color: 'var(--text-faint)' }}>{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* QR + Konum seçiliyse ek alanlar */}
+                  {firmaForm.ziyaretDogrulama === 'qr_konum' && (
+                    <>
+                      {/* Adres — zorunlu + geocoding */}
+                      <div>
+                        <label style={labelStyle}>
+                          Firma Adresi <span style={{ color: '#EF4444' }}>*</span>
+                          <span className="ml-1 text-[10px] font-normal" style={{ color: 'var(--text-faint)' }}>(Konum doğrulama için zorunlu)</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <textarea
+                            value={firmaForm.adres}
+                            onChange={e => {
+                              setFirmaForm(p => ({ ...p, adres: e.target.value }));
+                              setGeocodeError(null);
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleGeocode(); } }}
+                            placeholder="Tam adres girin, sonra 'Ara' butonuna tıklayın"
+                            rows={2}
+                            className="flex-1"
+                            style={{ ...inputStyle, resize: 'none', height: 'auto', borderColor: !firmaForm.adres.trim() ? 'rgba(239,68,68,0.4)' : 'var(--border-input)' }}
+                            onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.6)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 0 0 3px rgba(239,68,68,0.08)'; }}
+                            onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = !firmaForm.adres.trim() ? 'rgba(239,68,68,0.4)' : 'var(--border-input)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleGeocode()}
+                            disabled={geocodeLoading || !firmaForm.adres.trim()}
+                            className="flex-shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all whitespace-nowrap self-stretch"
+                            style={{
+                              background: firmaForm.adres.trim() ? 'rgba(239,68,68,0.1)' : 'var(--bg-item)',
+                              border: `1.5px solid ${firmaForm.adres.trim() ? 'rgba(239,68,68,0.3)' : 'var(--border-subtle)'}`,
+                              color: firmaForm.adres.trim() ? '#EF4444' : 'var(--text-faint)',
+                              opacity: geocodeLoading ? 0.7 : 1,
+                            }}
+                          >
+                            {geocodeLoading
+                              ? <i className="ri-loader-4-line animate-spin text-sm" />
+                              : <i className="ri-search-line text-sm" />}
+                            Ara
+                          </button>
+                        </div>
+                        {/* Geocode sonuç / hata */}
+                        {geocodeError && (
+                          <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1.5 rounded-lg"
+                            style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                            <i className="ri-error-warning-line text-xs flex-shrink-0" style={{ color: '#EF4444' }} />
+                            <p className="text-[10px]" style={{ color: '#EF4444' }}>{geocodeError}</p>
+                          </div>
+                        )}
+                        {firmaForm.firmaLat !== null && !geocodeError && (
+                          <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1.5 rounded-lg"
+                            style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                            <i className="ri-map-pin-2-fill text-xs flex-shrink-0" style={{ color: '#22C55E' }} />
+                            <p className="text-[10px]" style={{ color: '#16A34A' }}>
+                              Konum bulundu: {firmaForm.firmaLat.toFixed(5)}, {firmaForm.firmaLng?.toFixed(5)} — haritayı kontrol edin veya tıklayarak ayarlayın
+                            </p>
+                          </div>
+                        )}
+                        <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>
+                          <i className="ri-information-line mr-0.5" />
+                          Adresi girin ve "Ara"ya tıklayın — harita otomatik konuma gider. Ardından haritaya tıklayarak pinı ince ayarlayabilirsiniz.
+                        </p>
+                      </div>
+
+                      {/* İzin verilen mesafe */}
+                      <div>
+                        <label style={labelStyle}>
+                          İzin Verilen Mesafe
+                          <span className="ml-2 font-bold" style={{ color: '#EF4444' }}>{firmaForm.izinVerilenMesafe} metre</span>
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="range"
+                            min={50}
+                            max={5000}
+                            step={50}
+                            value={firmaForm.izinVerilenMesafe}
+                            onChange={e => setFirmaForm(p => ({ ...p, izinVerilenMesafe: Number(e.target.value) }))}
+                            className="flex-1 cursor-pointer"
+                            style={{ accentColor: '#EF4444' }}
+                          />
+                          <input
+                            type="number"
+                            min={50}
+                            max={5000}
+                            step={50}
+                            value={firmaForm.izinVerilenMesafe}
+                            onChange={e => setFirmaForm(p => ({ ...p, izinVerilenMesafe: Math.max(50, Math.min(5000, Number(e.target.value))) }))}
+                            className="text-sm text-center rounded-lg outline-none"
+                            style={{ width: '80px', padding: '6px 8px', background: 'var(--bg-input)', border: '1.5px solid var(--border-input)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+                        <div className="flex justify-between mt-1">
+                          {[50, 250, 500, 1000, 2000, 5000].map(v => (
+                            <button key={v} type="button"
+                              onClick={() => setFirmaForm(p => ({ ...p, izinVerilenMesafe: v }))}
+                              className="text-[9px] font-semibold px-1.5 py-0.5 rounded cursor-pointer transition-all"
+                              style={{
+                                background: firmaForm.izinVerilenMesafe === v ? 'rgba(239,68,68,0.1)' : 'var(--bg-item)',
+                                color: firmaForm.izinVerilenMesafe === v ? '#EF4444' : 'var(--text-faint)',
+                                border: `1px solid ${firmaForm.izinVerilenMesafe === v ? 'rgba(239,68,68,0.25)' : 'transparent'}`,
+                              }}>
+                              {v}m
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* GPS alınamazsa davranış */}
+                      <div>
+                        <label style={labelStyle}>GPS Alınamazsa</label>
+                        <div className="flex gap-2">
+                          {([
+                            { val: true, icon: 'ri-shield-keyhole-line', label: 'Engelle', desc: 'Check-in yapılamaz', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.3)' },
+                            { val: false, icon: 'ri-error-warning-line', label: 'Uyar, İzin Ver', desc: 'Uyarı göster, devam et', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.3)' },
+                          ] as const).map(opt => (
+                            <button key={String(opt.val)} type="button"
+                              onClick={() => setFirmaForm(p => ({ ...p, gpsStrict: opt.val }))}
+                              className="flex-1 flex flex-col items-center gap-1.5 py-3 px-3 rounded-xl cursor-pointer transition-all"
+                              style={{
+                                background: firmaForm.gpsStrict === opt.val ? opt.bg : 'var(--bg-item)',
+                                border: `1.5px solid ${firmaForm.gpsStrict === opt.val ? opt.border : 'var(--border-subtle)'}`,
+                                color: firmaForm.gpsStrict === opt.val ? opt.color : 'var(--text-muted)',
+                              }}>
+                              <i className={`${opt.icon} text-base`} />
+                              <span className="text-xs font-bold">{opt.label}</span>
+                              <span className="text-[9px] text-center leading-tight" style={{ color: 'var(--text-faint)' }}>{opt.desc}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[10px] mt-2" style={{ color: 'var(--text-faint)' }}>
+                          <i className="ri-information-line mr-0.5" />
+                          {firmaForm.gpsStrict
+                            ? 'Konum izni verilmezse uzman check-in yapamaz.'
+                            : 'Konum alınamazsa uyarı gösterilir, check-in yine de yapılır.'}
+                        </p>
+                      </div>
+
+                      {/* Harita */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label style={{ ...labelStyle, marginBottom: 0 }}>Haritadan Konum Seç</label>
+                          {firmaForm.firmaLat !== null && firmaForm.firmaLng !== null && (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                              style={{ background: 'rgba(34,197,94,0.1)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.2)' }}>
+                              <i className="ri-map-pin-fill mr-1" />
+                              {firmaForm.firmaLat.toFixed(5)}, {firmaForm.firmaLng.toFixed(5)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] mb-2" style={{ color: 'var(--text-faint)' }}>
+                          <i className="ri-cursor-line mr-1" />Haritaya tıklayarak veya marker&apos;ı sürükleyerek konum belirleyin. Kırmızı alan izin verilen mesafeyi gösterir.
+                        </p>
+                        <Suspense fallback={
+                          <div className="w-full h-[260px] rounded-xl flex items-center justify-center"
+                            style={{ background: 'var(--bg-item)', border: '1.5px solid rgba(239,68,68,0.2)' }}>
+                            <div className="flex flex-col items-center gap-2">
+                              <i className="ri-loader-4-line text-2xl animate-spin" style={{ color: '#EF4444' }} />
+                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Harita yükleniyor...</span>
+                            </div>
+                          </div>
+                        }>
+                          <FirmaKonumSecici
+                            lat={firmaForm.firmaLat}
+                            lng={firmaForm.firmaLng}
+                            radius={firmaForm.izinVerilenMesafe}
+                            onSelect={(lat, lng) => setFirmaForm(p => ({ ...p, firmaLat: lat, firmaLng: lng }))}
+                          />
+                        </Suspense>
+                        {firmaForm.firmaLat === null && (
+                          <div className="flex items-center gap-2 mt-2 p-2.5 rounded-lg"
+                            style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                            <i className="ri-information-line text-xs flex-shrink-0" style={{ color: '#F59E0B' }} />
+                            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Konum seçilmedi — haritaya tıklayarak seçin (isteğe bağlı)</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Sadece QR seçiliyse bilgi */}
+                  {firmaForm.ziyaretDogrulama === 'sadece_qr' && (
+                    <div className="flex items-start gap-3 p-4 rounded-xl"
+                      style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.15)' }}>
+                      <i className="ri-information-line text-sm flex-shrink-0" style={{ color: '#0EA5E9' }} />
+                      <div>
+                        <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Sadece QR Doğrulama</p>
+                        <p className="text-[10.5px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                          Gezici uzman, firmadaki QR kodu tarayarak giriş yapacak. GPS konum doğrulaması uygulanmaz.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Error */}
@@ -1757,15 +2066,15 @@ export default function OsgbDashboardPage() {
               style={{ borderTop: '1px solid var(--border-subtle)' }}>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setFirmaFormTab(t => Math.max(0, t - 1) as 0 | 1)}
+                  onClick={() => setFirmaFormTab(t => Math.max(0, t - 1) as 0 | 1 | 2)}
                   disabled={firmaFormTab === 0}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
                   style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', opacity: firmaFormTab === 0 ? 0.35 : 1 }}>
                   <i className="ri-arrow-left-line" /> Geri
                 </button>
-                {firmaFormTab < 1 && (
+                {firmaFormTab < 2 && (
                   <button
-                    onClick={() => setFirmaFormTab(t => Math.min(1, t + 1) as 0 | 1)}
+                    onClick={() => setFirmaFormTab(t => Math.min(2, t + 1) as 0 | 1 | 2)}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
                     style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}>
                     İleri <i className="ri-arrow-right-line" />

@@ -204,14 +204,14 @@ export default function SuperAdminPage() {
   if (!isSuperAdmin) return null;
 
   const statItems = [
-    { label: 'Toplam',       value: stats.total,         icon: 'ri-grid-line',            iconCls: 'text-slate-500',   bgCls: 'bg-slate-100' },
-    { label: 'Aktif',        value: stats.active,        icon: 'ri-checkbox-circle-line', iconCls: 'text-emerald-600', bgCls: 'bg-emerald-50' },
-    { label: 'Pasif',        value: stats.passive,       icon: 'ri-close-circle-line',    iconCls: 'text-red-500',     bgCls: 'bg-red-50' },
-    { label: 'Doldu',        value: stats.expired,       icon: 'ri-time-line',            iconCls: 'text-orange-500',  bgCls: 'bg-orange-50' },
-    { label: '14g Dolacak',  value: stats.expiringSoon,  icon: 'ri-alarm-warning-line',   iconCls: 'text-amber-600',   bgCls: 'bg-amber-50' },
-    { label: 'OSGB',         value: stats.osgb,          icon: 'ri-hospital-line',        iconCls: 'text-teal-600',    bgCls: 'bg-teal-50' },
-    { label: 'Firma',        value: stats.firma,         icon: 'ri-building-2-line',      iconCls: 'text-indigo-600',  bgCls: 'bg-indigo-50' },
-    { label: 'Toplam Üye',   value: stats.totalMembers,  icon: 'ri-team-line',            iconCls: 'text-slate-500',   bgCls: 'bg-slate-100' },
+    { label: 'Toplam',      value: stats.total,        icon: 'ri-grid-line',            accent: '#0EA5E9', gradFrom: 'rgba(14,165,233,0.2)',  gradTo: 'rgba(14,165,233,0.06)',  barGrad: 'linear-gradient(90deg, #0EA5E9, #38BDF8)',  sub: 'Kayıtlı organizasyon' },
+    { label: 'Aktif',       value: stats.active,       icon: 'ri-checkbox-circle-line', accent: '#10B981', gradFrom: 'rgba(16,185,129,0.2)',  gradTo: 'rgba(16,185,129,0.06)',  barGrad: 'linear-gradient(90deg, #10B981, #34D399)',  sub: 'Aktif abonelik' },
+    { label: 'Pasif',       value: stats.passive,      icon: 'ri-close-circle-line',    accent: '#EF4444', gradFrom: 'rgba(239,68,68,0.2)',   gradTo: 'rgba(239,68,68,0.06)',   barGrad: 'linear-gradient(90deg, #EF4444, #F87171)',  sub: 'Devre dışı hesap' },
+    { label: 'Doldu',       value: stats.expired,      icon: 'ri-time-line',            accent: '#F97316', gradFrom: 'rgba(249,115,22,0.2)',  gradTo: 'rgba(249,115,22,0.06)',  barGrad: 'linear-gradient(90deg, #F97316, #FB923C)',  sub: 'Abonelik bitti' },
+    { label: '14g Dolacak', value: stats.expiringSoon, icon: 'ri-alarm-warning-line',   accent: '#F59E0B', gradFrom: 'rgba(245,158,11,0.2)',  gradTo: 'rgba(245,158,11,0.06)',  barGrad: 'linear-gradient(90deg, #F59E0B, #FCD34D)',  sub: 'Yakında bitiyor' },
+    { label: 'OSGB',        value: stats.osgb,         icon: 'ri-hospital-line',        accent: '#0EA5E9', gradFrom: 'rgba(14,165,233,0.2)',  gradTo: 'rgba(14,165,233,0.06)',  barGrad: 'linear-gradient(90deg, #0EA5E9, #38BDF8)',  sub: 'OSGB hesabı' },
+    { label: 'Firma',       value: stats.firma,        icon: 'ri-building-2-line',      accent: '#0EA5E9', gradFrom: 'rgba(14,165,233,0.2)',  gradTo: 'rgba(14,165,233,0.06)',  barGrad: 'linear-gradient(90deg, #0EA5E9, #38BDF8)',  sub: 'Firma hesabı' },
+    { label: 'Toplam Üye',  value: stats.totalMembers, icon: 'ri-team-line',            accent: '#0EA5E9', gradFrom: 'rgba(14,165,233,0.2)',  gradTo: 'rgba(14,165,233,0.06)',  barGrad: 'linear-gradient(90deg, #0EA5E9, #38BDF8)',  sub: 'Platform kullanıcısı' },
   ];
 
   return (
@@ -278,12 +278,39 @@ export default function SuperAdminPage() {
             {/* Stat kartları */}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
               {statItems.map((s, i) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-xl p-4">
-                  <div className={`w-7 h-7 flex items-center justify-center rounded-lg ${s.bgCls} mb-3`}>
-                    <i className={`${s.icon} text-sm ${s.iconCls}`}></i>
+                <div
+                  key={i}
+                  className="relative rounded-2xl overflow-hidden cursor-default transition-all duration-300 group"
+                  style={{ background: '#ffffff', border: '1px solid rgba(15,23,42,0.08)' }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)';
+                    (e.currentTarget as HTMLElement).style.boxShadow = `0 16px 40px ${s.accent}22, 0 4px 16px rgba(0,0,0,0.05)`;
+                    (e.currentTarget as HTMLElement).style.borderColor = `${s.accent}40`;
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                    (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(15,23,42,0.08)';
+                  }}
+                >
+                  {/* Accent top bar */}
+                  <div className="h-[3px]" style={{ background: s.barGrad }} />
+                  {/* Shimmer blob */}
+                  <div
+                    className="absolute top-0 right-0 w-20 h-20 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                    style={{ background: `radial-gradient(circle, ${s.accent}18 0%, transparent 70%)`, transform: 'translate(30%, -30%)' }}
+                  />
+                  <div className="p-4 relative">
+                    <div
+                      className="w-8 h-8 flex items-center justify-center rounded-xl mb-3 transition-transform duration-300 group-hover:scale-110"
+                      style={{ background: `linear-gradient(135deg, ${s.gradFrom}, ${s.gradTo})`, border: `1px solid ${s.accent}35` }}
+                    >
+                      <i className={`${s.icon} text-sm`} style={{ color: s.accent }} />
+                    </div>
+                    <p className="text-slate-800 font-black text-xl leading-none mb-1 tabular-nums" style={{ letterSpacing: '-0.05em' }}>{s.value}</p>
+                    <p className="text-slate-800 text-xs font-bold mb-1 leading-tight">{s.label}</p>
+                    <p className="text-slate-400 text-[10px] leading-snug">{s.sub}</p>
                   </div>
-                  <p className="text-slate-800 font-black text-xl leading-none mb-1">{s.value}</p>
-                  <p className="text-slate-400 text-xs">{s.label}</p>
                 </div>
               ))}
             </div>

@@ -287,8 +287,8 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark }: HekimIsKaz
       {/* Liste */}
       {!loading && filtered.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ background: isDark ? '#1e293b' : '#fff', border: `1px solid ${borderColor}` }}>
-          {/* Kolon başlıkları */}
-          <div className="grid px-4 py-2.5 min-w-[700px]"
+          {/* Kolon başlıkları — sadece desktop */}
+          <div className="hidden md:grid px-4 py-2.5"
             style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 90px',
               background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)',
               borderBottom: `1px solid ${borderColor}` }}>
@@ -297,8 +297,75 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark }: HekimIsKaz
             ))}
           </div>
 
-          {/* Satırlar */}
-          <div className="space-y-1.5 p-2 overflow-x-auto">
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden divide-y" style={{ borderColor }}>
+            {filtered.map(kaza => {
+              const siddetCfg = SIDDET_CONFIG[kaza.yaralanmaSiddeti] ?? SIDDET_CONFIG['Hafif'];
+              const durumCfg = DURUM_CONFIG[kaza.durum] ?? DURUM_CONFIG['Açık'];
+
+              return (
+                <div key={kaza.id} className="p-4">
+                  <div className="flex items-start gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+                      style={{ background: `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})` }}>
+                      {kaza.personelAd.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: textPrimary }}>{kaza.personelAd}</p>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT_DARK }}>
+                        <i className="ri-building-2-line text-[9px]" />{kaza.firmaAd}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+                      style={{ background: siddetCfg.bg, color: siddetCfg.color, border: `1px solid ${siddetCfg.border}` }}>
+                      {kaza.yaralanmaSiddeti || '—'}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+                      style={{ background: durumCfg.bg, color: durumCfg.color }}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: durumCfg.color }} />
+                      {kaza.durum}
+                    </span>
+                    <span className="text-xs" style={{ color: textSecondary }}>{kaza.kazaTuru || '—'}</span>
+                  </div>
+                  <div className="text-xs mb-3" style={{ color: textSecondary }}>
+                    <span>{kaza.kazaTarihi ? new Date(kaza.kazaTarihi).toLocaleDateString('tr-TR') : '—'}</span>
+                    {kaza.kazaYeri && <span> · {kaza.kazaYeri}</span>}
+                  </div>
+                  <div className="flex items-center gap-1.5 justify-end flex-wrap pt-2" style={{ borderTop: `1px solid ${borderColor}` }}>
+                    <button onClick={() => { setEditData(kaza); setShowModal(true); }}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${borderColor}` }}>
+                      <i className="ri-edit-line text-xs" style={{ color: textSecondary }} />
+                    </button>
+                    <button onClick={() => setDeleteId(kaza.id)}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${borderColor}` }}>
+                      <i className="ri-delete-bin-line text-xs" style={{ color: textSecondary }} />
+                    </button>
+                    <button onClick={() => printIsKazasiTutanagi({
+                        id: kaza.id, personelAd: kaza.personelAd, personelGorev: undefined,
+                        firmaAd: kaza.firmaAd, kazaTarihi: kaza.kazaTarihi, kazaSaati: kaza.kazaSaati,
+                        kazaYeri: kaza.kazaYeri, kazaTuru: kaza.kazaTuru, kazaAciklamasi: kaza.kazaAciklamasi,
+                        yaraliVucutBolgeleri: kaza.yaraliVucutBolgeleri, yaralanmaTuru: kaza.yaralanmaTuru,
+                        yaralanmaSiddeti: kaza.yaralanmaSiddeti, isGunuKaybi: kaza.isGunuKaybi,
+                        hastaneyeKaldirildi: kaza.hastaneyeKaldirildi, hastaneAdi: kaza.hastaneAdi,
+                        tanikBilgileri: kaza.tanikBilgileri, onlemler: kaza.onlemler, durum: kaza.durum,
+                      })}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
+                      style={{ background: isDark ? 'rgba(14,165,233,0.08)' : 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.2)', color: ACCENT }}>
+                      <i className="ri-printer-line text-xs" />Yazdır
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Satırlar — desktop */}
+          <div className="hidden md:block space-y-1.5 p-2 overflow-x-auto">
             {filtered.map(kaza => {
               const isExpanded = expandedId === kaza.id;
               const siddetCfg = SIDDET_CONFIG[kaza.yaralanmaSiddeti] ?? SIDDET_CONFIG['Hafif'];
@@ -385,12 +452,12 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark }: HekimIsKaz
                         </button>
                         {raporMenuId === kaza.id && (
                           <div
-                            className="absolute right-0 top-8 z-50 rounded-xl overflow-hidden"
+                            className="absolute right-0 bottom-full mb-1 z-[999] rounded-xl overflow-hidden"
                             style={{
                               background: isDark ? '#1e293b' : '#ffffff',
                               border: `1px solid ${borderColor}`,
                               minWidth: 160,
-                              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                              boxShadow: '0 -8px 24px rgba(0,0,0,0.15)',
                             }}
                           >
                             <button

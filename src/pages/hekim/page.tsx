@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/store/AppContext';
 import { useAuth } from '@/store/AuthContext';
+import OnboardingTour from '@/components/feature/OnboardingTour';
+import ForcePasswordChange from '@/components/feature/ForcePasswordChange';
 
 /* ── Topbar: theme toggle icon button ── */
 function ThemeIconBtn({ isDark, borderColor }: { isDark: boolean; borderColor: string }) {
@@ -200,7 +202,7 @@ function HekimLoadingScreen({ isDark }: { isDark: boolean }) {
 }
 
 export default function HekimPage() {
-  const { org, theme } = useApp();
+  const { org, theme, mustChangePassword } = useApp();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<HekimTab>('genel_bakis');
   const [collapsed, setCollapsed] = useState(false);
@@ -278,6 +280,10 @@ export default function HekimPage() {
 
   if (loading) {
     return <HekimLoadingScreen isDark={isDark} />;
+  }
+
+  if (mustChangePassword) {
+    return <ForcePasswordChange />;
   }
 
   if (!loading && atanmisFirmaIds.length === 0) {
@@ -387,6 +393,9 @@ export default function HekimPage() {
           --text-faint: ${isDark ? '#334155' : '#cbd5e1'};
         }
       `}</style>
+
+      {/* Onboarding Tour */}
+      <OnboardingTour />
 
       {/* Mobile overlay */}
       <div

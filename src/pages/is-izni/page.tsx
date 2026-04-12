@@ -1240,7 +1240,7 @@ export default function IsIzniPage() {
       ) : (
         <div className="space-y-1.5">
           {/* Sütun başlıkları */}
-          <div className="grid items-center px-4 py-2"
+          <div className="hidden md:grid items-center px-4 py-2"
             style={{
               gridTemplateColumns: '1.4fr 1.1fr 1.3fr 1.4fr 1.5fr 120px',
               borderBottom: '1px solid var(--border-subtle)',
@@ -1250,8 +1250,77 @@ export default function IsIzniPage() {
             ))}
           </div>
 
-          {/* Kart satırlar */}
-          <div className="space-y-1.5 pt-1">
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden space-y-2 pt-1">
+            {filtered.map(iz => {
+              const firma = firmalar.find(f => f.id === iz.firmaId);
+              const tip = TIP_CONFIG[iz.tip] || { color: '#64748B', bg: 'rgba(100,116,139,0.12)', icon: 'ri-question-line' };
+              const dur = DURUM_CONFIG[iz.durum] || DURUM_CONFIG['Onay Bekliyor'];
+              const expired = isExpired(iz.bitisTarihi);
+              const daysLeft2 = getDaysLeft(iz.bitisTarihi);
+              const expiringSoon = !expired && daysLeft2 !== null && daysLeft2 >= 0 && daysLeft2 <= 2;
+
+              return (
+                <div key={iz.id} className="rounded-xl p-4 isg-card" style={{ border: '1px solid var(--border-subtle)' }}>
+                  <div className="flex items-start gap-2.5 mb-3">
+                    <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)' }}>
+                      <i className="ri-shield-keyhole-line text-sm" style={{ color: '#10B981' }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-xs font-mono font-bold" style={{ color: '#10B981' }}>{iz.izinNo}</span>
+                        {expired && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>Geçmiş</span>}
+                        {expiringSoon && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>{daysLeft2 === 0 ? 'Bugün' : `${daysLeft2}g`}</span>}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold whitespace-nowrap" style={{ background: tip.bg, color: tip.color }}>
+                          <i className={`${tip.icon} text-[9px]`} />{iz.tip}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap" style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}` }}>
+                          <i className={`${dur.icon} text-[9px]`} />{dur.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {firma && (
+                    <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                      <i className="ri-building-2-line mr-1" />{firma.ad}
+                    </p>
+                  )}
+                  {(iz.baslamaTarihi || iz.bitisTarihi) && (
+                    <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
+                      <i className="ri-calendar-line mr-1" />
+                      {iz.baslamaTarihi ? new Date(iz.baslamaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}
+                      {iz.bitisTarihi && ` → ${new Date(iz.bitisTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' })}`}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-1.5 justify-end flex-wrap pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    {isDenetci && iz.durum === 'Onay Bekliyor' && (
+                      <button onClick={() => setDenetciRecordId(iz.id)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
+                        style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.25)' }}>
+                        <i className="ri-shield-check-line text-xs" />Değerlendir
+                      </button>
+                    )}
+                    {isDenetci && iz.durum !== 'Onay Bekliyor' && (
+                      <IsIzniBtn icon="ri-eye-line" onClick={() => setDenetciRecordId(iz.id)} title="Detay" />
+                    )}
+                    {!isDenetci && (
+                      <>
+                        <IsIzniBtn icon="ri-eye-line" onClick={() => setViewRecordId(iz.id)} title="Detay" />
+                        <IsIzniBtn icon="ri-file-pdf-line" onClick={() => { const f = firmalar.find(x => x.id === iz.firmaId); generateIsIzniPdf(iz, f, personeller.filter(p => iz.calisanlar?.includes(p.adSoyad))); }} title="PDF" />
+                        {canEdit && <IsIzniBtn icon="ri-edit-line" onClick={() => openEdit(iz)} title="Düzenle" />}
+                        {canDelete && <IsIzniBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(iz.id)} title="Sil" />}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Kart satırlar — desktop */}
+          <div className="hidden md:block space-y-1.5 pt-1">
             {filtered.map(iz => {
               const firma = firmalar.find(f => f.id === iz.firmaId);
               const tip = TIP_CONFIG[iz.tip] || { color: '#64748B', bg: 'rgba(100,116,139,0.12)', icon: 'ri-question-line' };
@@ -1579,7 +1648,6 @@ export default function IsIzniPage() {
           onPdf={() => { const f = firmalar.find(x => x.id === viewRecord.firmaId); generateIsIzniPdf(viewRecord, f, personeller.filter(p => viewRecord.calisanlar?.includes(p.adSoyad))); }}
         />
       )}
-
 
       {/* ── Denetçi Değerlendirme Modal — store'dan canlı okunuyor ── */}
       {denetciRecord && (

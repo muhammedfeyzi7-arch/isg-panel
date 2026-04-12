@@ -55,9 +55,9 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
   {
     id: 'muayene',
-    label: 'Muayene',
+    label: 'Sağlık Durumu',
     icon: 'ri-heart-pulse-line',
-    description: 'Muayene ekle',
+    description: 'Sağlık durumu ekle',
     accentColor: '#EC4899',
     gradientFrom: '#EC4899',
     gradientTo: '#DB2777',

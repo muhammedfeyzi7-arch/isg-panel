@@ -632,7 +632,8 @@ export default function MuayenelerPage() {
         </div>
       ) : (
         <div className="space-y-1">
-          <div className="grid items-center px-4 py-2"
+          {/* Sütun başlıkları — sadece desktop */}
+          <div className="hidden md:grid items-center px-4 py-2"
             style={{
               gridTemplateColumns: '32px 2fr 1.5fr 1.2fr 1.2fr 1.3fr 1fr 100px',
               borderBottom: '1px solid var(--border-subtle)',
@@ -645,8 +646,68 @@ export default function MuayenelerPage() {
             ))}
           </div>
 
-          {/* Satırlar — her biri ayrı kart */}
-          <div className="space-y-1.5 pt-1">
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden space-y-2 pt-1">
+            {filtered.map(m => {
+              const p = personeller.find(x => x.id === m.personelId);
+              const f = firmalar.find(x => x.id === m.firmaId);
+              const days = getDaysUntil(m.sonrakiTarih);
+              const dur = getDurumConfig(days);
+              const saglikDurumu = (m as unknown as { saglikDurumu?: string }).saglikDurumu;
+              const isSelected = selectedIds.has(m.id);
+              return (
+                <div
+                  key={m.id}
+                  className="rounded-xl p-4 isg-card"
+                  style={{
+                    background: isSelected ? 'rgba(239,68,68,0.04)' : 'var(--bg-card-solid)',
+                    border: isSelected ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(m.id)} className="w-4 h-4 cursor-pointer mt-0.5 flex-shrink-0" />
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                      {(p?.adSoyad || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{p?.adSoyad || '—'}</p>
+                        {m.sonrakiTarih && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap" style={{ background: dur.bg, color: dur.color, border: `1px solid ${dur.border}` }}>
+                            <i className={`${dur.icon} text-[9px]`} />{dur.label}
+                          </span>
+                        )}
+                      </div>
+                      {p?.gorev && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.gorev}</p>}
+                      <div className="mt-2 space-y-1">
+                        {f?.ad && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                              style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
+                              <i className="ri-building-2-line text-[9px]" />{f.ad}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 flex-wrap text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {m.muayeneTarihi && <span>Muayene: {fmtDate(m.muayeneTarihi)}</span>}
+                          {m.sonrakiTarih && <span>Sonraki: {fmtDate(m.sonrakiTarih)}</span>}
+                        </div>
+                        {saglikDurumu && <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{saglikDurumu}</p>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 justify-end mt-3 pt-3 flex-wrap" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    <HealthActionBtn icon="ri-edit-line" onClick={() => openEdit(m)} title="Düzenle" />
+                    <HealthActionBtn icon="ri-delete-bin-line" onClick={() => setDeleteId(m.id)} title="Sil" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop kart satırlar */}
+          <div className="hidden md:block space-y-1.5 pt-1">
             {filtered.map(m => {
               const p = personeller.find(x => x.id === m.personelId);
               const f = firmalar.find(x => x.id === m.firmaId);
@@ -795,7 +856,11 @@ export default function MuayenelerPage() {
         footer={
           <>
             <button onClick={() => setShowBulkDeleteModal(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
+            <button
+              onClick={handleBulkDelete}
+              className="btn-danger whitespace-nowrap"
+              disabled={selectedIds.size === 0}
+            >
               <i className="ri-delete-bin-line mr-1" />Evet, {selectedIds.size} Kaydı Sil
             </button>
           </>

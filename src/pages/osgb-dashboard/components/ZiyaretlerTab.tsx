@@ -20,6 +20,10 @@ interface Ziyaret {
   qr_ile_giris: boolean;
   notlar: string | null;
   sure_dakika: number | null;
+  gps_status: 'ok' | 'too_far' | 'no_permission' | null;
+  check_in_lat: number | null;
+  check_in_lng: number | null;
+  check_in_distance_m: number | null;
 }
 
 async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
@@ -216,6 +220,59 @@ function getSonZiyaretBadge(lastVisit: Ziyaret | undefined): {
   return { label: `${gunSayisi} gün önce`, color: '#EF4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.25)' };
 }
 
+// ── GPS DURUM BADGE ──────────────────────────────────────────────
+interface GpsBadgeConfig {
+  dot: string;
+  text: string;
+  color: string;
+  bg: string;
+  border: string;
+  tooltip: string;
+}
+
+function getGpsBadgeConfig(status: 'ok' | 'too_far' | 'no_permission' | null, distanceM?: number | null): GpsBadgeConfig | null {
+  if (!status) return null;
+  const base = 'Ziyaret sırasında kullanıcının konumu firma konumuna göre kontrol edilmiştir.';
+  const distStr = distanceM != null
+    ? distanceM >= 1000 ? ` (${(distanceM / 1000).toFixed(1)}km)` : ` (${distanceM}m)`
+    : '';
+  switch (status) {
+    case 'ok':
+      return { dot: '#22C55E', text: 'Konum doğrulandı', color: '#16A34A', bg: 'rgba(34,197,94,0.09)', border: 'rgba(34,197,94,0.22)', tooltip: base };
+    case 'too_far':
+      return { dot: '#EF4444', text: `Konum dışında${distStr}`, color: '#DC2626', bg: 'rgba(239,68,68,0.09)', border: 'rgba(239,68,68,0.22)', tooltip: base };
+    case 'no_permission':
+      return { dot: '#F59E0B', text: 'Konum alınamadı', color: '#D97706', bg: 'rgba(245,158,11,0.09)', border: 'rgba(245,158,11,0.22)', tooltip: base };
+    default:
+      return null;
+  }
+}
+
+function GpsBadge({ status, distanceM }: { status: 'ok' | 'too_far' | 'no_permission' | null; distanceM?: number | null }) {
+  const cfg = getGpsBadgeConfig(status, distanceM);
+  if (!cfg) return null;
+  return (
+    <div className="relative group flex-shrink-0">
+      <span
+        className="flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-xl whitespace-nowrap cursor-default"
+        style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
+        {cfg.text}
+      </span>
+      {/* Tooltip */}
+      <div
+        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-xl text-[10px] leading-snug font-medium pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 w-56 text-center"
+        style={{ background: 'rgba(15,23,42,0.92)', color: '#E2E8F0', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        {cfg.tooltip}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+          style={{ borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid rgba(15,23,42,0.92)' }} />
+      </div>
+    </div>
+  );
+}
+
 function formatSure(dakika: number | null): string {
   if (!dakika || dakika < 0) return '—';
   const h = Math.floor(dakika / 60);
@@ -310,7 +367,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     since.setDate(since.getDate() - 30);
     const { data } = await supabase
       .from('osgb_ziyaretler')
-      .select('id, osgb_org_id, firma_org_id, firma_ad, uzman_user_id, uzman_ad, uzman_email, giris_saati, cikis_saati, durum, qr_ile_giris, sure_dakika, notlar, konum_lat, konum_lng, konum_adres')
+      .select('id, osgb_org_id, firma_org_id, firma_ad, uzman_user_id, uzman_ad, uzman_email, giris_saati, cikis_saati, durum, qr_ile_giris, sure_dakika, notlar, konum_lat, konum_lng, konum_adres, gps_status, check_in_distance_m')
       .eq('osgb_org_id', org.id)
       .gte('giris_saati', since.toISOString())
       .order('giris_saati', { ascending: false })
@@ -411,6 +468,17 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     tumZiyaretler.length > 0 ? Math.round((tumZiyaretler.filter(z => z.qr_ile_giris).length / tumZiyaretler.length) * 100) : 0,
     [tumZiyaretler]
   );
+
+  // GPS istatistikleri
+  const gpsIstatistik = useMemo(() => {
+    const gpsli = tumZiyaretler.filter(z => z.gps_status !== null);
+    const tooFar = gpsli.filter(z => z.gps_status === 'too_far').length;
+    const noPermission = gpsli.filter(z => z.gps_status === 'no_permission').length;
+    const ok = gpsli.filter(z => z.gps_status === 'ok').length;
+    const total = gpsli.length;
+    const ihlalOrani = total > 0 ? Math.round(((tooFar + noPermission) / total) * 100) : 0;
+    return { tooFar, noPermission, ok, total, ihlalOrani };
+  }, [tumZiyaretler]);
 
   const lastByFirma = useMemo(() => getLastVisitByFirma(tumZiyaretler), [tumZiyaretler]);
   const lastByUzman = useMemo(() => getLastVisitByUzman(tumZiyaretler), [tumZiyaretler]);
@@ -744,6 +812,67 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
         ))}
       </div>
 
+      {/* ── GPS İHLAL İSTATİSTİKLERİ ── */}
+      {gpsIstatistik.total > 0 && (
+        <div className="rounded-2xl p-4" style={{ background: isDark ? 'rgba(15,23,42,0.6)' : '#fff', border: '1px solid var(--border-subtle)' }}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(239,68,68,0.1)' }}>
+              <i className="ri-map-pin-2-line text-sm" style={{ color: '#EF4444' }} />
+            </div>
+            <span className="text-xs font-bold" style={{ color: textPrimary }}>GPS Konum İstatistikleri</span>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full ml-1"
+              style={{ background: 'rgba(14,165,233,0.08)', color: '#0284C7' }}>
+              Son 30 gün · {gpsIstatistik.total} kayıt
+            </span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: 'Konum Doğrulandı', value: gpsIstatistik.ok, icon: 'ri-map-pin-2-fill', color: '#16A34A', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)' },
+              { label: 'Kapsam Dışında', value: gpsIstatistik.tooFar, icon: 'ri-map-pin-line', color: '#DC2626', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' },
+              { label: 'Konum Alınamadı', value: gpsIstatistik.noPermission, icon: 'ri-map-pin-line', color: '#D97706', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
+              { label: 'İhlal Oranı', value: `%${gpsIstatistik.ihlalOrani}`, icon: 'ri-pie-chart-line', color: gpsIstatistik.ihlalOrani > 20 ? '#DC2626' : gpsIstatistik.ihlalOrani > 5 ? '#D97706' : '#16A34A', bg: gpsIstatistik.ihlalOrani > 20 ? 'rgba(239,68,68,0.08)' : gpsIstatistik.ihlalOrani > 5 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: gpsIstatistik.ihlalOrani > 20 ? 'rgba(239,68,68,0.2)' : gpsIstatistik.ihlalOrani > 5 ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)' },
+            ].map(stat => (
+              <div key={stat.label} className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ background: stat.bg, border: `1px solid ${stat.border}` }}>
+                <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                  style={{ background: stat.bg, border: `1px solid ${stat.border}` }}>
+                  <i className={`${stat.icon} text-sm`} style={{ color: stat.color }} />
+                </div>
+                <div>
+                  <p className="text-lg font-extrabold leading-none" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="text-[10px] mt-0.5 font-medium" style={{ color: textMuted }}>{stat.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Progress bar */}
+          {gpsIstatistik.total > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px]" style={{ color: textMuted }}>Konum uyum dağılımı</span>
+                <span className="text-[10px] font-semibold" style={{ color: '#16A34A' }}>%{Math.round((gpsIstatistik.ok / gpsIstatistik.total) * 100)} başarılı</span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden flex" style={{ background: 'var(--bg-item)' }}>
+                <div className="h-full transition-all" style={{ width: `${(gpsIstatistik.ok / gpsIstatistik.total) * 100}%`, background: '#22C55E' }} />
+                <div className="h-full transition-all" style={{ width: `${(gpsIstatistik.tooFar / gpsIstatistik.total) * 100}%`, background: '#EF4444' }} />
+                <div className="h-full transition-all" style={{ width: `${(gpsIstatistik.noPermission / gpsIstatistik.total) * 100}%`, background: '#F59E0B' }} />
+              </div>
+              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                {[
+                  { dot: '#22C55E', label: 'Doğrulandı' },
+                  { dot: '#EF4444', label: 'Kapsam dışı' },
+                  { dot: '#F59E0B', label: 'İzin yok' },
+                ].map(l => (
+                  <span key={l.label} className="flex items-center gap-1 text-[9px]" style={{ color: textMuted }}>
+                    <span className="w-2 h-2 rounded-full" style={{ background: l.dot }} />{l.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── TABLO / EMPTY STATE ── */}
       {loading ? (
         <div className="rounded-2xl p-12 flex flex-col items-center gap-3" style={cardStyle}>
@@ -859,6 +988,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                         <i className="ri-qr-code-line mr-0.5 text-[9px]" />QR
                       </span>
                     )}
+                    <GpsBadge status={z.gps_status} distanceM={z.check_in_distance_m} />
                   </div>
 
                   <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0"

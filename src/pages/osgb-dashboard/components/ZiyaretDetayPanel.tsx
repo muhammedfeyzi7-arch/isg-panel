@@ -14,6 +14,51 @@ interface Ziyaret {
   qr_ile_giris: boolean;
   notlar: string | null;
   sure_dakika: number | null;
+  gps_status: 'ok' | 'too_far' | 'no_permission' | null;
+}
+
+interface GpsStatusConfig {
+  icon: string;
+  label: string;
+  sub: string;
+  color: string;
+  bg: string;
+  border: string;
+}
+
+function getGpsStatusConfig(status: 'ok' | 'too_far' | 'no_permission' | null): GpsStatusConfig | null {
+  if (!status) return null;
+  switch (status) {
+    case 'ok':
+      return {
+        icon: 'ri-map-pin-2-fill',
+        label: 'Konum Doğrulandı',
+        sub: 'Uzman check-in anında firma konumundaydı',
+        color: '#16A34A',
+        bg: 'rgba(34,197,94,0.08)',
+        border: 'rgba(34,197,94,0.22)',
+      };
+    case 'too_far':
+      return {
+        icon: 'ri-map-pin-line',
+        label: 'Konum Dışında',
+        sub: 'Uzman check-in anında firma konumunun dışındaydı',
+        color: '#DC2626',
+        bg: 'rgba(239,68,68,0.08)',
+        border: 'rgba(239,68,68,0.22)',
+      };
+    case 'no_permission':
+      return {
+        icon: 'ri-map-pin-line',
+        label: 'Konum Alınamadı',
+        sub: 'GPS izni verilmedi veya konum alınamadı',
+        color: '#D97706',
+        bg: 'rgba(245,158,11,0.08)',
+        border: 'rgba(245,158,11,0.22)',
+      };
+    default:
+      return null;
+  }
 }
 
 interface ZiyaretDetayPanelProps {
@@ -201,6 +246,32 @@ export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir: _
               </div>
             </div>
           </div>
+
+          {/* GPS Konum Durumu */}
+          {(() => {
+            const cfg = getGpsStatusConfig(ziyaret.gps_status);
+            if (!cfg) return null;
+            return (
+              <div className="p-4 rounded-2xl" style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}>
+                <p className="text-[9.5px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--text-faint)' }}>Konum Durumu</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                    style={{ background: cfg.bg, border: `1.5px solid ${cfg.border}` }}>
+                    <i className={`${cfg.icon} text-base`} style={{ color: cfg.color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold" style={{ color: cfg.color }}>{cfg.label}</p>
+                    <p className="text-[10px] mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>{cfg.sub}</p>
+                  </div>
+                  <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-xl flex-shrink-0 whitespace-nowrap"
+                    style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.color }} />
+                    {ziyaret.gps_status === 'ok' ? 'ok' : ziyaret.gps_status === 'too_far' ? 'too_far' : 'no_permission'}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Notlar */}
           {ziyaret.notlar && (

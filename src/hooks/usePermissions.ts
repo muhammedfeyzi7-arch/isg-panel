@@ -58,8 +58,8 @@ export function usePermissions(): Permissions {
   // Gezici uzman → firma yönetimi (ekle/düzenle/sil) dışında tam yetkili
   return {
     canCreate: isAdmin || isMember || isFirmaUser || isGeziciUzman,
-    canEdit:   isAdmin || isMember || isFirmaUser || isGeziciUzman,
-    canDelete: isAdmin || isMember || isGeziciUzman,
+    canEdit:   isAdmin || isMember || isFirmaUser,
+    canDelete: isAdmin || isMember,
     isReadOnly: isDenetci,
     isDenetci,
     isGeziciUzman,
@@ -67,8 +67,7 @@ export function usePermissions(): Permissions {
     canAccessSettings: isAdmin,
     canAccessModule,
     canViewSensitiveData: !isDenetci,
-    // Firma ekle/düzenle/sil: sadece admin, member, firma_user
-    // Gezici uzman ve işyeri hekimi firmalar üzerinde yönetim yapamaz
+    // Gezici uzman firma ekleyemez/düzenleyemez/silemez
     canManageFirma: isAdmin || isMember || isFirmaUser,
   };
 }

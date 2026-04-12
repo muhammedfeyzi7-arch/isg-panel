@@ -114,10 +114,7 @@ export default function FirmalarPage() {
     addFirma, updateFirma, deleteFirma, addToast, quickCreate, setQuickCreate,
     setFirmaLogo, org,
   } = useApp();
-  const { canEdit: _canEdit, canDelete: _canDelete, isReadOnly, isGeziciUzman, canManageFirma } = usePermissions();
-  // Firma yönetimi (düzenle/sil) sadece canManageFirma yetkisinde çalışır
-  const canEdit = canManageFirma && _canEdit;
-  const canDelete = canManageFirma && _canDelete;
+  const { canCreate, canEdit, canDelete, isReadOnly, isGeziciUzman, canManageFirma } = usePermissions();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [tehlikeFilter, setTehlikeFilter] = useState('');
@@ -428,12 +425,12 @@ export default function FirmalarPage() {
                     </button>
                     <Badge label={firma.durum} color={getFirmaStatusColor(firma.durum)} />
                   </div>
-                  <div className="flex items-center justify-between mt-3 pt-3 gap-2 flex-wrap" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge label={firma.tehlikeSinifi} color={getTehlikeColor(firma.tehlikeSinifi)} />
-                      {firma.telefon && <span className="text-xs truncate max-w-[120px]" style={{ color: 'var(--text-muted)' }}>{firma.telefon}</span>}
+                      {firma.telefon && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{firma.telefon}</span>}
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1">
                       <ActionBtn icon="ri-eye-line" color="#2563EB" onClick={() => setDetailId(firma.id)} title="Detay" />
                       {canManageFirma && <ActionBtn icon="ri-edit-line" color="#2563EB" onClick={() => openEdit(firma)} title="Düzenle" />}
                       {canManageFirma && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}

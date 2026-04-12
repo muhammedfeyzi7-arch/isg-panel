@@ -1,54 +1,137 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
-const ACCENT = '#0EA5E9';
+// ── Renk Paleti ──────────────────────────────────────────────────────────────
+const RED        = '#EF4444';
+const RED_LIGHT  = '#FCA5A5';
+const RED_BG     = 'rgba(239,68,68,0.15)';
+const RED_BORDER = 'rgba(239,68,68,0.35)';
 
+// ── Vücut bölgesi tanımı ─────────────────────────────────────────────────────
 interface BodyRegion {
-  id: string;
+  id:    string;
   label: string;
-  frontDot: { cx: number; cy: number; r?: number } | null;
-  backDot:  { cx: number; cy: number; r?: number } | null;
+  /** SVG viewBox = 400×460 içindeki koordinat */
+  cx:    number;
+  cy:    number;
+  rx:    number;   // yatay yarı-çap
+  ry:    number;   // dikey yarı-çap
+  /** Klinik not */
+  note:  string;
+  risk:  'Kritik' | 'Yüksek' | 'Orta' | 'Düşük';
 }
 
+const RISK_COLOR: Record<string, string> = {
+  Kritik: '#EF4444',
+  Yüksek: '#F59E0B',
+  Orta:   '#F97316',
+  Düşük:  '#10B981',
+};
+
+// SVG koordinatları: insan vücudunu temsil eden 400×460 viewBox
 const REGIONS: BodyRegion[] = [
-  { id: 'bas',       label: 'Baş',        frontDot: { cx: 200, cy:  52 }, backDot:  { cx: 200, cy:  52 } },
-  { id: 'boyun',     label: 'Boyun',      frontDot: { cx: 200, cy:  95 }, backDot:  { cx: 200, cy:  95 } },
-  { id: 'sol_omuz',  label: 'Sol Omuz',   frontDot: { cx: 148, cy: 118 }, backDot:  { cx: 148, cy: 118 } },
-  { id: 'sag_omuz',  label: 'Sağ Omuz',  frontDot: { cx: 252, cy: 118 }, backDot:  { cx: 252, cy: 118 } },
-  { id: 'gogus',     label: 'Göğüs',      frontDot: { cx: 200, cy: 148 }, backDot:  null },
-  { id: 'sirt',      label: 'Sırt',       frontDot: null,                 backDot:  { cx: 200, cy: 155 } },
-  { id: 'sol_kol',   label: 'Sol Kol',    frontDot: { cx: 122, cy: 178 }, backDot:  { cx: 122, cy: 178 } },
-  { id: 'sag_kol',   label: 'Sağ Kol',   frontDot: { cx: 278, cy: 178 }, backDot:  { cx: 278, cy: 178 } },
-  { id: 'karin',     label: 'Karın/Bel',  frontDot: { cx: 200, cy: 208 }, backDot:  null },
-  { id: 'sol_el',    label: 'Sol El',     frontDot: { cx: 106, cy: 258 }, backDot:  { cx: 106, cy: 258 } },
-  { id: 'sag_el',    label: 'Sağ El',     frontDot: { cx: 294, cy: 258 }, backDot:  { cx: 294, cy: 258 } },
-  { id: 'sol_kalca', label: 'Sol Kalça',  frontDot: { cx: 177, cy: 272 }, backDot:  { cx: 177, cy: 272 } },
-  { id: 'sag_kalca', label: 'Sağ Kalça', frontDot: { cx: 223, cy: 272 }, backDot:  { cx: 223, cy: 272 } },
-  { id: 'sol_bacak', label: 'Sol Bacak',  frontDot: { cx: 174, cy: 340 }, backDot:  { cx: 174, cy: 340 } },
-  { id: 'sag_bacak', label: 'Sağ Bacak', frontDot: { cx: 226, cy: 340 }, backDot:  { cx: 226, cy: 340 } },
-  { id: 'sol_ayak',  label: 'Sol Ayak',  frontDot: { cx: 172, cy: 430 }, backDot:  { cx: 172, cy: 430 } },
-  { id: 'sag_ayak',  label: 'Sağ Ayak', frontDot: { cx: 228, cy: 430 }, backDot:  { cx: 228, cy: 430 } },
+  { id: 'bas',       label: 'Baş',        cx: 200, cy:  52, rx: 28, ry: 30, note: 'Kafa travması, beyin sarsıntısı riski yüksek',          risk: 'Kritik' },
+  { id: 'boyun',     label: 'Boyun',      cx: 200, cy:  95, rx: 14, ry: 12, note: 'Omurga hasarı — immobilizasyon gerekebilir',              risk: 'Kritik' },
+  { id: 'sol_omuz',  label: 'Sol Omuz',   cx: 148, cy: 118, rx: 20, ry: 16, note: 'Rotator cuff, klavikula kırığı değerlendir',              risk: 'Orta'   },
+  { id: 'sag_omuz',  label: 'Sağ Omuz',  cx: 252, cy: 118, rx: 20, ry: 16, note: 'Rotator cuff, klavikula kırığı değerlendir',              risk: 'Orta'   },
+  { id: 'gogus',     label: 'Göğüs',      cx: 200, cy: 148, rx: 28, ry: 22, note: 'Pnömotoraks, kot kırığı olasılığını göz önünde bulundur', risk: 'Yüksek' },
+  { id: 'sirt',      label: 'Sırt',       cx: 200, cy: 155, rx: 28, ry: 22, note: 'Vertebra hasarı olasılığını değerlendir',                 risk: 'Yüksek' },
+  { id: 'sol_kol',   label: 'Sol Kol',    cx: 122, cy: 178, rx: 14, ry: 22, note: 'Biseps/humerus kırığı, sinir hasarı',                     risk: 'Düşük'  },
+  { id: 'sag_kol',   label: 'Sağ Kol',   cx: 278, cy: 178, rx: 14, ry: 22, note: 'Biseps/humerus kırığı, sinir hasarı',                     risk: 'Düşük'  },
+  { id: 'sol_el',    label: 'Sol El',     cx: 106, cy: 258, rx: 14, ry: 18, note: 'Parmak kırıkları, tendon hasarı',                         risk: 'Düşük'  },
+  { id: 'sag_el',    label: 'Sağ El',    cx: 294, cy: 258, rx: 14, ry: 18, note: 'Parmak kırıkları, tendon hasarı',                         risk: 'Düşük'  },
+  { id: 'karin',     label: 'Karın/Bel', cx: 200, cy: 208, rx: 26, ry: 28, note: 'İç organ hasarı, lomber vertebra değerlendir',             risk: 'Yüksek' },
+  { id: 'sol_kalca', label: 'Sol Kalça',  cx: 177, cy: 272, rx: 18, ry: 16, note: 'Kalça eklemi, femur boynu kırığı',                        risk: 'Düşük'  },
+  { id: 'sag_kalca', label: 'Sağ Kalça', cx: 223, cy: 272, rx: 18, ry: 16, note: 'Kalça eklemi, femur boynu kırığı',                        risk: 'Düşük'  },
+  { id: 'sol_bacak', label: 'Sol Bacak',  cx: 174, cy: 340, rx: 16, ry: 30, note: 'Tibia/fibula kırığı, menisküs hasarı',                    risk: 'Düşük'  },
+  { id: 'sag_bacak', label: 'Sağ Bacak', cx: 226, cy: 340, rx: 16, ry: 30, note: 'Tibia/fibula kırığı, menisküs hasarı',                    risk: 'Düşük'  },
+  { id: 'sol_ayak',  label: 'Sol Ayak',  cx: 172, cy: 430, rx: 16, ry: 14, note: 'Metatars kırığı, ayak bileği burkulmasi',                  risk: 'Düşük'  },
+  { id: 'sag_ayak',  label: 'Sağ Ayak', cx: 228, cy: 430, rx: 16, ry: 14, note: 'Metatars kırığı, ayak bileği burkulmasi',                  risk: 'Düşük'  },
 ];
 
-const BODY_PARTS = [
-  { id: 'bas',       label: 'Baş' },
-  { id: 'boyun',     label: 'Boyun' },
-  { id: 'sol_omuz',  label: 'Sol Omuz' },
-  { id: 'sag_omuz',  label: 'Sağ Omuz' },
-  { id: 'gogus',     label: 'Göğüs' },
-  { id: 'sirt',      label: 'Sırt' },
-  { id: 'sol_kol',   label: 'Sol Kol' },
-  { id: 'sag_kol',   label: 'Sağ Kol' },
-  { id: 'karin',     label: 'Karın/Bel' },
-  { id: 'sol_el',    label: 'Sol El' },
-  { id: 'sag_el',    label: 'Sağ El' },
-  { id: 'sol_kalca', label: 'Sol Kalça' },
-  { id: 'sag_kalca', label: 'Sağ Kalça' },
-  { id: 'sol_bacak', label: 'Sol Bacak' },
-  { id: 'sag_bacak', label: 'Sağ Bacak' },
-  { id: 'sol_ayak',  label: 'Sol Ayak' },
-  { id: 'sag_ayak',  label: 'Sağ Ayak' },
-];
+// ── Tooltip bileşeni ─────────────────────────────────────────────────────────
+interface TooltipProps {
+  region: BodyRegion;
+  containerRect: DOMRect;
+  svgRect: DOMRect;
+  isDark: boolean;
+  onClose: () => void;
+}
 
+function RegionTooltip({ region, svgRect, isDark, onClose }: TooltipProps) {
+  // Tooltip'i bölgenin sağına veya soluna konumlandır
+  const riskColor = RISK_COLOR[region.risk];
+  const bg = isDark ? 'rgba(15,23,42,0.97)' : 'rgba(255,255,255,0.97)';
+  const border = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.12)';
+  const textP = isDark ? '#f1f5f9' : '#0f172a';
+  const textS = isDark ? '#94a3b8' : '#64748b';
+
+  // cx/cy → pixel (SVG viewBox 400×460, svgRect ile orantıla)
+  const scaleX = svgRect.width  / 400;
+  const scaleY = svgRect.height / 460;
+  const pxX = svgRect.left + region.cx * scaleX;
+  const pxY = svgRect.top  + region.cy * scaleY;
+
+  const TOOLTIP_W = 180;
+  const TOOLTIP_H = 64;
+  const GAP = 12;
+
+  // Sağa veya sola?
+  const placeRight = pxX + TOOLTIP_W + GAP < window.innerWidth - 20;
+  const left = placeRight ? pxX + GAP : pxX - TOOLTIP_W - GAP;
+  const top  = Math.min(
+    Math.max(pxY - TOOLTIP_H / 2, 8),
+    window.innerHeight - TOOLTIP_H - 8,
+  );
+
+  return (
+    <div
+      className="fixed pointer-events-none z-[99999] rounded-2xl overflow-hidden"
+      style={{
+        left,
+        top,
+        width: TOOLTIP_W,
+        background: bg,
+        border: `1px solid ${border}`,
+        boxShadow: isDark
+          ? `0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px ${RED_BORDER}`
+          : `0 20px 60px rgba(15,23,42,0.2), 0 0 0 1px ${RED_BORDER}`,
+        animation: 'tooltipFadeIn 0.15s ease',
+      }}
+    >
+      {/* Üst kırmızı şerit */}
+      <div className="h-[2px]" style={{ background: `linear-gradient(90deg, ${RED}, transparent)` }} />
+
+      {/* Başlık */}
+      <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+        <div
+          className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}
+        >
+          <i className="ri-body-scan-line text-xs" style={{ color: RED }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold truncate" style={{ color: textP }}>{region.label}</p>
+          <span
+            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+            style={{ background: `${riskColor}18`, color: riskColor, border: `1px solid ${riskColor}30` }}
+          >
+            {region.risk} Risk
+          </span>
+        </div>
+        <button
+          className="pointer-events-auto w-5 h-5 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+          style={{ color: textS, background: 'transparent' }}
+          onClick={onClose}
+        >
+          <i className="ri-close-line text-xs" />
+        </button>
+      </div>
+
+    </div>
+  );
+}
+
+// ── Ana bileşen ───────────────────────────────────────────────────────────────
 interface Human3DModelProps {
   selected: string[];
   onToggle: (id: string) => void;
@@ -57,19 +140,67 @@ interface Human3DModelProps {
 
 export default function Human3DModel({ selected, onToggle, isDark }: Human3DModelProps) {
   const [loaded, setLoaded] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [tooltipRegion, setTooltipRegion] = useState<BodyRegion | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [svgRect, setSvgRect] = useState<DOMRect | null>(null);
+  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
 
-  const bg     = isDark ? '#0c1628' : '#eef4fb';
+  const bg = isDark ? '#0c1628' : '#eef4fb';
+  const textS = isDark ? '#64748b' : '#94a3b8';
   const border = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
-  const textS  = isDark ? '#64748b' : '#94a3b8';
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)';
+
+  const updateRects = useCallback(() => {
+    if (svgRef.current)       setSvgRect(svgRef.current.getBoundingClientRect());
+    if (containerRef.current) setContainerRect(containerRef.current.getBoundingClientRect());
+  }, []);
+
+  useEffect(() => {
+    updateRects();
+    window.addEventListener('resize', updateRects);
+    return () => window.removeEventListener('resize', updateRects);
+  }, [updateRects, loaded]);
+
+  const handleEllipseClick = useCallback((region: BodyRegion, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggle(region.id);
+    updateRects();
+    setTooltipRegion(prev => (prev?.id === region.id ? null : region));
+  }, [onToggle, updateRects]);
+
+  const handleEllipseHover = useCallback((id: string | null) => {
+    setHoveredId(id);
+  }, []);
+
+  const dismissTooltip = useCallback(() => setTooltipRegion(null), []);
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: bg }}>
-      {/* 3D Model */}
+    <div
+      ref={containerRef}
+      className="w-full h-full flex flex-col overflow-hidden relative"
+      style={{ background: bg }}
+      onClick={dismissTooltip}
+    >
+      <style>{`
+        @keyframes tooltipFadeIn {
+          from { opacity: 0; transform: scale(0.95) translateY(4px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0);   }
+        }
+        @keyframes hotspotPulse {
+          0%, 100% { r: 8; opacity: 0.55; }
+          50%       { r: 13; opacity: 0; }
+        }
+      `}</style>
+
+      {/* ── 3D Model iframe ── */}
       <div className="flex-1 relative" style={{ minHeight: 0 }}>
         {!loaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: bg, zIndex: 10 }}>
-            <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+            style={{ background: bg, zIndex: 10 }}
+          >
+            <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
             <span className="text-xs" style={{ color: textS }}>3D model yükleniyor...</span>
           </div>
         )}
@@ -77,44 +208,190 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
           title="Human Anatomy 3D"
           src="https://sketchfab.com/models/14191ef860b44925be0e94462c84ffe6/embed?autostart=1&ui_controls=1&ui_infos=0&ui_inspector=0&ui_stop=0&ui_watermark=0&ui_watermark_link=0"
           allow="autoplay; fullscreen; xr-spatial-tracking"
+          onLoad={() => { setLoaded(true); setTimeout(updateRects, 100); }}
           style={{
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            display: 'block',
-            opacity: loaded ? 1 : 0,
-            transition: 'opacity 0.3s',
+            width: '100%', height: '100%', border: 'none', display: 'block',
+            opacity: loaded ? 1 : 0, transition: 'opacity 0.3s',
           }}
-          onLoad={() => setLoaded(true)}
         />
+
+        {/* ── SVG Hotspot Overlay ── */}
+        {loaded && (
+          <svg
+            ref={svgRef}
+            viewBox="0 0 400 460"
+            preserveAspectRatio="xMidYMid meet"
+            className="absolute inset-0 w-full h-full"
+            style={{ pointerEvents: 'none', zIndex: 5 }}
+          >
+            {REGIONS.map(region => {
+              const isSel     = selected.includes(region.id);
+              const isHovered = hoveredId === region.id;
+
+              // Seçilmişse kırmızı dolgu, hover ise yarı saydam
+              const fillOpacity = isSel ? 0.45 : isHovered ? 0.25 : 0.0;
+              const strokeOpacity = isSel || isHovered ? 1 : 0.6;
+              const strokeWidth = isSel ? 2.5 : isHovered ? 2 : 1.5;
+              const dotR = isSel ? 6 : isHovered ? 7 : 5;
+
+              return (
+                <g key={region.id}>
+                  {/* Seçiliyse pulse ring */}
+                  {isSel && (
+                    <ellipse
+                      cx={region.cx} cy={region.cy}
+                      rx={region.rx + 8} ry={region.ry + 8}
+                      fill="none"
+                      stroke={RED}
+                      strokeWidth="1"
+                      opacity="0"
+                      style={{
+                        animation: 'hotspotPulse 1.8s ease-in-out infinite',
+                        transformOrigin: `${region.cx}px ${region.cy}px`,
+                      }}
+                    />
+                  )}
+
+                  {/* Tıklanabilir ellipse alanı */}
+                  <ellipse
+                    cx={region.cx} cy={region.cy}
+                    rx={region.rx} ry={region.ry}
+                    fill={isSel || isHovered ? RED : 'transparent'}
+                    fillOpacity={fillOpacity}
+                    stroke={isSel || isHovered ? RED : 'rgba(239,68,68,0.7)'}
+                    strokeOpacity={strokeOpacity}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={isSel ? 'none' : isHovered ? 'none' : '4 3'}
+                    rx={region.rx} ry={region.ry}
+                    style={{
+                      cursor: 'pointer',
+                      pointerEvents: 'all',
+                      transition: 'fill-opacity 0.2s, stroke-opacity 0.2s',
+                      filter: isSel ? `drop-shadow(0 0 6px ${RED})` : 'none',
+                    }}
+                    onClick={e => handleEllipseClick(region, e as unknown as React.MouseEvent)}
+                    onMouseEnter={() => handleEllipseHover(region.id)}
+                    onMouseLeave={() => handleEllipseHover(null)}
+                  />
+
+                  {/* Merkez nokta */}
+                  <circle
+                    cx={region.cx} cy={region.cy}
+                    r={dotR}
+                    fill={isSel ? RED : isHovered ? RED : 'rgba(239,68,68,0.7)'}
+                    opacity={isSel || isHovered ? 1 : 0.75}
+                    style={{
+                      cursor: 'pointer',
+                      pointerEvents: 'all',
+                      transition: 'r 0.15s, opacity 0.15s',
+                      filter: isSel ? `drop-shadow(0 0 4px ${RED})` : 'none',
+                    }}
+                    onClick={e => handleEllipseClick(region, e as unknown as React.MouseEvent)}
+                    onMouseEnter={() => handleEllipseHover(region.id)}
+                    onMouseLeave={() => handleEllipseHover(null)}
+                  />
+
+                  {/* Seçili ise label tag */}
+                  {isSel && (
+                    <foreignObject
+                      x={region.cx + region.rx + 4}
+                      y={region.cy - 10}
+                      width="72"
+                      height="20"
+                      style={{ pointerEvents: 'none', overflow: 'visible' }}
+                    >
+                      <div
+                        style={{
+                          background: RED,
+                          borderRadius: '6px',
+                          padding: '2px 6px',
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          color: '#fff',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-block',
+                          boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        {region.label}
+                      </div>
+                    </foreignObject>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        )}
       </div>
 
-      {/* Bölge seçim butonları */}
-      <div className="flex-shrink-0 px-2 py-2" style={{ borderTop: `1px solid ${border}` }}>
-        <p className="text-[9px] font-semibold mb-1.5 text-center" style={{ color: textS }}>
-          <i className="ri-body-scan-line mr-1" />Etkilenen bölgeyi seç
-        </p>
-        <div className="flex flex-wrap gap-1 justify-center">
-          {BODY_PARTS.map(part => {
-            const isSel = selected.includes(part.id);
-            return (
-              <button
-                key={part.id}
-                onClick={() => onToggle(part.id)}
-                className="px-2 py-0.5 rounded-full text-[9px] font-medium cursor-pointer transition-all whitespace-nowrap"
-                style={{
-                  background: isSel ? ACCENT : cardBg,
-                  color: isSel ? '#fff' : textS,
-                  border: `1px solid ${isSel ? ACCENT : border}`,
-                }}
-              >
-                {isSel && <i className="ri-check-line mr-0.5" />}
-                {part.label}
-              </button>
-            );
-          })}
+      {/* ── Seçili Bölge Özet Şeridi ── */}
+      {selected.length > 0 && (
+        <div
+          className="flex-shrink-0 flex items-center gap-2 px-3 py-2 flex-wrap"
+          style={{ borderTop: `1px solid ${border}`, background: isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.04)' }}
+        >
+          <span className="text-[9px] font-bold uppercase tracking-wider flex-shrink-0" style={{ color: RED }}>
+            <i className="ri-map-pin-2-fill mr-1" />Seçili ({selected.length})
+          </span>
+          <div className="flex flex-wrap gap-1">
+            {selected.map(id => {
+              const reg = REGIONS.find(r => r.id === id);
+              return (
+                <button
+                  key={id}
+                  onClick={() => onToggle(id)}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold cursor-pointer whitespace-nowrap transition-all"
+                  style={{ background: 'rgba(239,68,68,0.12)', color: RED, border: '1px solid rgba(239,68,68,0.25)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.22)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)'; }}
+                >
+                  {reg?.label ?? id}
+                  <i className="ri-close-line text-[8px] ml-0.5" />
+                </button>
+              );
+            })}
+          </div>
         </div>
+      )}
+
+      {/* ── Renk Kılavuzu ── */}
+      <div
+        className="flex-shrink-0 flex items-center justify-between px-3 py-1.5"
+        style={{ borderTop: `1px solid ${border}` }}
+      >
+        <div className="flex items-center gap-3">
+          {[
+            { color: 'rgba(239,68,68,0.6)', label: 'Bölge', dash: true },
+            { color: RED,                   label: 'Seçili', dash: false },
+          ].map(item => (
+            <div key={item.label} className="flex items-center gap-1">
+              <div
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{
+                  background: item.color,
+                  border: item.dash ? `1.5px dashed ${RED}` : 'none',
+                }}
+              />
+              <span className="text-[9px]" style={{ color: textS }}>{item.label}</span>
+            </div>
+          ))}
+        </div>
+        <span className="text-[9px] flex items-center gap-1" style={{ color: textS }}>
+          <i className="ri-cursor-line text-[9px]" />Bölgeye tıkla: seç
+        </span>
       </div>
+
+      {/* ── Tooltip ── */}
+      {tooltipRegion && svgRect && containerRect && (
+        <RegionTooltip
+          region={tooltipRegion}
+          containerRect={containerRect}
+          svgRect={svgRect}
+          isDark={isDark}
+          onClose={dismissTooltip}
+        />
+      )}
     </div>
   );
 }

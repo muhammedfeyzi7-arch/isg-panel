@@ -219,10 +219,42 @@ export default function DashboardPage() {
   const PIE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#6366F1'];
 
   const statCards = [
-    { label: 'Toplam Firma',          value: aktifFirmalar.length,    icon: 'ri-building-2-line',  sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`,       trend: stats.firmaTrend,    trendLabel: `Son 30g: +${stats.firmaLast30}`,    gradient: 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)',  border: 'rgba(14,165,233,0.15)',  iconBg: 'linear-gradient(135deg, #0EA5E9, #0284C7)', valueColor: 'linear-gradient(135deg, #38BDF8, #7DD3FC)', accentColor: '#0EA5E9' },
-    { label: 'Toplam Personel',       value: aktifPersoneller.length, icon: 'ri-team-line',        sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`, trend: stats.personelTrend, trendLabel: `Son 30g: +${stats.personelLast30}`, gradient: 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)',   border: 'rgba(14,165,233,0.15)', iconBg: 'linear-gradient(135deg, #0EA5E9, #0284C7)', valueColor: 'linear-gradient(135deg, #38BDF8, #7DD3FC)', accentColor: '#0EA5E9' },
-    { label: 'Eksik / Süresi Dolmuş', value: stats.eksik,             icon: 'ri-file-warning-line',sub: `${stats.yaklaşan} evrak 30 gün içinde`,                                     trend: null,                trendLabel: null,                                gradient: stats.eksik > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)', border: stats.eksik > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(14,165,233,0.15)', iconBg: stats.eksik > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #0EA5E9, #0284C7)', valueColor: stats.eksik > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #38BDF8, #7DD3FC)', accentColor: stats.eksik > 0 ? '#EF4444' : '#0EA5E9' },
-    { label: 'Açık Uygunsuzluk',      value: stats.acikU,             icon: 'ri-alert-line',       sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`, trend: null,                trendLabel: null,                                gradient: stats.acikU > 0 ? 'linear-gradient(145deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)' : 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)', border: stats.acikU > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(14,165,233,0.15)', iconBg: stats.acikU > 0 ? 'linear-gradient(135deg, #EF4444, #DC2626)' : 'linear-gradient(135deg, #0EA5E9, #0284C7)', valueColor: stats.acikU > 0 ? 'linear-gradient(135deg, #FCA5A5, #F87171)' : 'linear-gradient(135deg, #38BDF8, #7DD3FC)', accentColor: stats.acikU > 0 ? '#EF4444' : '#0EA5E9' },
+    {
+      label: 'Toplam Firma',
+      value: aktifFirmalar.length,
+      icon: 'ri-building-2-line',
+      sub: `${aktifFirmalar.filter(f => f.durum === 'Aktif').length} aktif firma`,
+      trend: stats.firmaTrend,
+      trendLabel: `Son 30g: +${stats.firmaLast30}`,
+      variant: 'default' as const,
+    },
+    {
+      label: 'Toplam Personel',
+      value: aktifPersoneller.length,
+      icon: 'ri-team-line',
+      sub: `${aktifPersoneller.filter(p => p.durum === 'Aktif').length} aktif personel`,
+      trend: stats.personelTrend,
+      trendLabel: `Son 30g: +${stats.personelLast30}`,
+      variant: 'default' as const,
+    },
+    {
+      label: 'Eksik / Süresi Dolmuş',
+      value: stats.eksik,
+      icon: 'ri-file-warning-line',
+      sub: `${stats.yaklaşan} evrak 30 gün içinde`,
+      trend: null,
+      trendLabel: null,
+      variant: stats.eksik > 0 ? 'danger' as const : 'success' as const,
+    },
+    {
+      label: 'Açık Uygunsuzluk',
+      value: stats.acikU,
+      icon: 'ri-alert-line',
+      sub: `${aktifUygunsuzluklar.filter(u => u.durum === 'Kapandı').length} kapatılmış`,
+      trend: null,
+      trendLabel: null,
+      variant: stats.acikU > 0 ? 'danger' as const : 'success' as const,
+    },
   ];
 
   // İş İzni ek stat kartı
@@ -234,11 +266,7 @@ export default function DashboardPage() {
       sub: `${isIzniStats.aktif} aktif · ${isIzniStats.bekleyen} beklemede`,
       trend: null,
       trendLabel: null,
-      gradient: 'linear-gradient(145deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)',
-      border: 'rgba(14,165,233,0.15)',
-      iconBg: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
-      valueColor: 'linear-gradient(135deg, #38BDF8, #7DD3FC)',
-      accentColor: '#0EA5E9',
+      variant: 'default' as const,
     },
   ];
 
@@ -343,18 +371,14 @@ export default function DashboardPage() {
             sub={card.sub}
             trend={card.trend}
             trendLabel={card.trendLabel}
-            gradient={card.gradient}
-            border={card.border}
-            iconBg={card.iconBg}
-            valueColor={card.valueColor}
-            accentColor={card.accentColor}
-            delay={idx * 120}
+            variant={card.variant}
+            delay={idx * 100}
           />
         ))}
       </div>
 
-      {/* ── Görev + İş İzni Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
+      {/* ── İş İzni Stat Card ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {extraStatCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -364,12 +388,8 @@ export default function DashboardPage() {
             sub={card.sub}
             trend={card.trend}
             trendLabel={card.trendLabel}
-            gradient={card.gradient}
-            border={card.border}
-            iconBg={card.iconBg}
-            valueColor={card.valueColor}
-            accentColor={card.accentColor}
-            delay={idx * 120 + 480}
+            variant={card.variant}
+            delay={idx * 100 + 400}
           />
         ))}
       </div>

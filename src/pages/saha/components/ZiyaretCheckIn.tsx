@@ -12,6 +12,44 @@ interface AktifZiyaret {
   qr_ile_giris: boolean;
 }
 
+interface GpsCoords { lat: number; lng: number; }
+
+interface FirmaGpsInfo {
+  name: string;
+  gps_required: boolean;
+  gps_radius: number;
+  gps_strict: boolean;
+  firma_lat: number | null;
+  firma_lng: number | null;
+}
+
+/** GPS konumu alır. Hata/izin yoksa null döner */
+function getGpsCoords(): Promise<GpsCoords | null> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { timeout: 10000, maximumAge: 30000, enableHighAccuracy: true }
+    );
+  });
+}
+
+/** Haversine formülü — metre cinsinden mesafe */
+function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // Dünya yarıçapı (metre)
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+type GpsStatusType = 'idle' | 'loading' | 'checking' | 'ok' | 'denied' | 'blocked';
+
 export default function ZiyaretCheckIn() {
   const { user } = useAuth();
   const { addToast } = useApp();
@@ -22,12 +60,13 @@ export default function ZiyaretCheckIn() {
   const [showQr, setShowQr] = useState(false);
   const [gecmis, setGecmis] = useState<AktifZiyaret[]>([]);
   const [elapsed, setElapsed] = useState('');
+  const [gpsStatus, setGpsStatus] = useState<GpsStatusType>('idle');
+  const [gpsError, setGpsError] = useState<string | null>(null);
 
-  // Kullanıcının osgb_org_id ve display_name'ini tutan state
   const [osgbOrgId, setOsgbOrgId] = useState<string | null>(null);
   const [uzmanAd, setUzmanAd] = useState<string>('');
 
-  // Aktif ziyaret süresini say
+  // Süre sayacı
   useEffect(() => {
     if (!aktifZiyaret) { setElapsed(''); return; }
     const update = () => {
@@ -42,24 +81,20 @@ export default function ZiyaretCheckIn() {
     return () => clearInterval(interval);
   }, [aktifZiyaret]);
 
-  // Kullanıcının osgb_org_id + display_name çek
   const fetchAtanmisFirmalar = useCallback(async () => {
     if (!user?.id) return;
-
     const { data: uoData } = await supabase
       .from('user_organizations')
       .select('organization_id, display_name')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .maybeSingle();
-
     if (uoData) {
       setOsgbOrgId(uoData.organization_id);
       setUzmanAd(uoData.display_name ?? user.email ?? 'Uzman');
     }
   }, [user?.id, user?.email]);
 
-  // Aktif ziyareti ve geçmişi çek
   const fetchZiyaret = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
@@ -72,7 +107,6 @@ export default function ZiyaretCheckIn() {
         .maybeSingle();
       setAktifZiyaret(data ?? null);
 
-      // Son 5 tamamlanmış ziyaret
       const { data: gecmisData } = await supabase
         .from('osgb_ziyaretler')
         .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
@@ -91,14 +125,10 @@ export default function ZiyaretCheckIn() {
     void fetchAtanmisFirmalar();
   }, [fetchZiyaret, fetchAtanmisFirmalar]);
 
-  // Check-in yap (firma ID ile)
+  // ── CHECK-IN ──
   const handleCheckIn = useCallback(async (firmaId: string, qr = false) => {
-    if (!user?.id) {
-      addToast('Oturum bulunamadı.', 'error');
-      return;
-    }
+    if (!user?.id) { addToast('Oturum bulunamadı.', 'error'); return; }
 
-    // osgbOrgId henüz gelmemişse DB'den tekrar çek
     let resolvedOsgbOrgId = osgbOrgId;
     let resolvedUzmanAd = uzmanAd;
 
@@ -109,44 +139,109 @@ export default function ZiyaretCheckIn() {
         .eq('user_id', user.id)
         .eq('is_active', true)
         .maybeSingle();
-      
-      if (!uoData) {
-        addToast('Organizasyon bilgisi bulunamadı.', 'error');
-        return;
-      }
+      if (!uoData) { addToast('Organizasyon bilgisi bulunamadı.', 'error'); return; }
       resolvedOsgbOrgId = uoData.organization_id;
       resolvedUzmanAd = uoData.display_name ?? user.email ?? 'Uzman';
     }
 
     setActionLoading(true);
+    setGpsError(null);
+
+    // 1) Firma bilgisini çek (GPS alanları dahil)
+    const { data: firmaData } = await supabase
+      .from('organizations')
+      .select('name, gps_required, gps_radius, gps_strict, firma_lat, firma_lng')
+      .eq('id', firmaId)
+      .maybeSingle() as { data: FirmaGpsInfo | null };
+
+    if (!firmaData) {
+      addToast('Firma bulunamadı. QR geçersiz olabilir.', 'error');
+      setActionLoading(false);
+      return;
+    }
+
+    // 2) Aktif ziyaret çakışma kontrolü
+    const { data: existing } = await supabase
+      .from('osgb_ziyaretler')
+      .select('id, firma_ad')
+      .eq('uzman_user_id', user.id)
+      .eq('durum', 'aktif')
+      .maybeSingle();
+
+    if (existing) {
+      addToast(`Zaten aktif bir ziyaretiniz var: ${existing.firma_ad ?? 'Firma'}. Önce mevcut ziyareti bitirin.`, 'error');
+      setActionLoading(false);
+      return;
+    }
+
+    // 3) GPS kontrolü — sadece gps_required = true firmalar için
+    let coords: GpsCoords | null = null;
+    let checkInGpsStatus: 'ok' | 'too_far' | 'no_permission' = 'ok';
+    let checkInDistanceM: number | null = null;
+
+    if (firmaData.gps_required) {
+      setGpsStatus('loading');
+      coords = await getGpsCoords();
+
+      if (!coords) {
+        checkInGpsStatus = 'no_permission';
+        // gps_strict = true → engelle; false → uyar ama devam et
+        const strict = firmaData.gps_strict !== false; // default true
+        if (strict) {
+          setGpsStatus('denied');
+          setGpsError('Konum izni gerekli. Tarayıcı ayarlarından konum iznini etkinleştirin ve tekrar deneyin.');
+          setActionLoading(false);
+          return;
+        }
+        // gps_strict = false → sadece uyarı, check-in devam edecek (coords = null kalır)
+        setGpsStatus('denied');
+      }
+
+      // Firma koordinatları tanımlı mı?
+      if (coords && firmaData.firma_lat !== null && firmaData.firma_lng !== null) {
+        setGpsStatus('checking');
+        const distance = haversineMetres(coords.lat, coords.lng, firmaData.firma_lat, firmaData.firma_lng);
+        const radius = firmaData.gps_radius ?? 1000;
+
+        if (distance > radius) {
+          // Mesafe dışında → ENGELLENDİ
+          checkInGpsStatus = 'too_far';
+          checkInDistanceM = Math.round(distance);
+          const distStr = distance >= 1000
+            ? `${(distance / 1000).toFixed(1)} km`
+            : `${Math.round(distance)} m`;
+          setGpsStatus('blocked');
+          setGpsError(`Firma konumunda değilsiniz. Mesafeniz: ${distStr} — İzin verilen: ${radius} m`);
+          setActionLoading(false);
+          return;
+        }
+        checkInDistanceM = Math.round(distance);
+        // Mesafe içinde → devam
+        checkInGpsStatus = 'ok';
+        setGpsStatus('ok');
+      } else if (!coords) {
+        // coords yok, gps_strict = false ile devam
+        checkInGpsStatus = 'no_permission';
+      } else {
+        // Firma koordinatı tanımlı değil → GPS al ama engelleme
+        checkInGpsStatus = 'ok';
+        setGpsStatus('ok');
+      }
+    } else {
+      // gps_required = false → GPS al ama engelleme yok
+      setGpsStatus('loading');
+      coords = await getGpsCoords();
+      if (coords) {
+        checkInGpsStatus = 'ok';
+        setGpsStatus('ok');
+      } else {
+        checkInGpsStatus = 'no_permission';
+        setGpsStatus('denied');
+      }
+    }
+
+    // 4) Check-in kaydı oluştur
     try {
-      // Önce aktif ziyaret var mı kontrol et
-      const { data: existing } = await supabase
-        .from('osgb_ziyaretler')
-        .select('id, firma_ad')
-        .eq('uzman_user_id', user.id)
-        .eq('durum', 'aktif')
-        .maybeSingle();
-
-      if (existing) {
-        addToast(`Zaten aktif bir ziyaretiniz var: ${existing.firma_ad ?? 'Firma'}. Önce mevcut ziyareti bitirin.`, 'error');
-        setActionLoading(false);
-        return;
-      }
-
-      // Firma adını al
-      const { data: firmaData } = await supabase
-        .from('organizations')
-        .select('name')
-        .eq('id', firmaId)
-        .maybeSingle();
-
-      if (!firmaData) {
-        addToast('Firma bulunamadı. QR geçersiz olabilir.', 'error');
-        setActionLoading(false);
-        return;
-      }
-
       const now = new Date().toISOString();
       const { data: yeniZiyaret, error } = await supabase
         .from('osgb_ziyaretler')
@@ -162,34 +257,40 @@ export default function ZiyaretCheckIn() {
           qr_ile_giris: qr,
           created_at: now,
           updated_at: now,
+          check_in_lat: coords?.lat ?? null,
+          check_in_lng: coords?.lng ?? null,
+          gps_status: checkInGpsStatus,
+          check_in_distance_m: checkInDistanceM,
         })
         .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
         .maybeSingle();
 
-      if (error) {
-        console.error('[ZiyaretCheckIn] insert error:', error);
-        throw error;
-      }
+      if (error) throw error;
       setAktifZiyaret(yeniZiyaret ?? null);
       addToast(`${firmaData.name} ziyareti başlatıldı!`, 'success');
     } catch (err) {
-      console.error('[ZiyaretCheckIn] handleCheckIn error:', err);
       addToast(`Check-in yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
     } finally {
       setActionLoading(false);
+      if (gpsStatus !== 'blocked' && gpsStatus !== 'denied') {
+        setTimeout(() => { setGpsStatus('idle'); setGpsError(null); }, 3000);
+      }
     }
-  }, [user, osgbOrgId, uzmanAd, addToast]);
+  }, [user, osgbOrgId, uzmanAd, addToast, gpsStatus]);
 
-  // Check-out yap
+  // ── CHECK-OUT — engelleme yok ──
   const handleCheckOut = useCallback(async () => {
     if (!aktifZiyaret || !user?.id) return;
     setActionLoading(true);
+    setGpsError(null);
+    setGpsStatus('loading');
+    const coords = await getGpsCoords();
+    setGpsStatus(coords ? 'ok' : 'denied');
+
     try {
       const now = new Date().toISOString();
-      const giris = new Date(aktifZiyaret.giris_saati);
-      const sureDakika = Math.round((Date.now() - giris.getTime()) / 60000);
+      const sureDakika = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
 
-      // Sadece ID ile update et — RLS zaten uzman_user_id = auth.uid() kontrol ediyor
       const { error, data: updatedData } = await supabase
         .from('osgb_ziyaretler')
         .update({
@@ -197,85 +298,61 @@ export default function ZiyaretCheckIn() {
           durum: 'tamamlandi',
           sure_dakika: sureDakika,
           updated_at: now,
+          check_out_lat: coords?.lat ?? null,
+          check_out_lng: coords?.lng ?? null,
         })
         .eq('id', aktifZiyaret.id)
         .select('id')
         .maybeSingle();
 
-      if (error) {
-        console.error('[ZiyaretCheckIn] checkout error:', JSON.stringify(error));
-        throw new Error(error.message || error.code || 'Güncelleme başarısız');
-      }
-      if (!updatedData) {
-        // RLS engeli — ziyaret kaydı bulunamadı veya yetki yok
-        throw new Error('Ziyaret kaydı güncellenemedi. Yetki hatası olabilir.');
-      }
+      if (error) throw new Error(error.message || 'Güncelleme başarısız');
+      if (!updatedData) throw new Error('Ziyaret kaydı güncellenemedi.');
+
       addToast(`Ziyaret tamamlandı! Süre: ${sureDakika} dakika`, 'success');
       setAktifZiyaret(null);
       void fetchZiyaret();
     } catch (err) {
-      console.error('[ZiyaretCheckIn] checkout err:', err);
-      // Sessizce başarısız — ziyaret durumu yenile
+      console.error('[CheckOut] err:', err);
       void fetchZiyaret();
     } finally {
       setActionLoading(false);
+      setTimeout(() => { setGpsStatus('idle'); setGpsError(null); }, 3000);
     }
   }, [aktifZiyaret, user?.id, addToast, fetchZiyaret]);
 
-  // QR scan sonucu — yeni format: {"type":"firm","id":"..."} veya legacy UUID
+  // QR sonucu
   const handleQrResult = useCallback((text: string) => {
     setShowQr(false);
-
+    setGpsError(null);
+    setGpsStatus('idle');
     let firmaId: string | null = null;
 
-    // 1) Yeni format: JSON {"type":"firm","id":"uuid"}
     try {
       const parsed = JSON.parse(text) as { type?: string; id?: string };
-      if (parsed.type === 'firm' && parsed.id) {
-        firmaId = parsed.id;
-      }
-    } catch { /* JSON değil, devam */ }
-
-    // 2) Direkt UUID
-    if (!firmaId) {
-      const uuidMatch = text.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
-      if (uuidMatch) firmaId = text.trim();
-    }
-
-    // 3) URL içinde firma_id parametresi
-    if (!firmaId) {
-      firmaId = text.match(/firma[_-]?id=([0-9a-f-]{36})/i)?.[1] ?? null;
-    }
-
-    // 4) URL path'inden son UUID segment
-    if (!firmaId) {
-      const segments = text.replace(/[?#].*/, '').split('/').filter(Boolean);
-      const last = segments[segments.length - 1] ?? '';
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(last)) {
-        firmaId = last;
-      }
-    }
+      if (parsed.type === 'firm' && parsed.id) firmaId = parsed.id;
+    } catch { /* JSON değil */ }
 
     if (!firmaId) {
-      addToast('Geçersiz QR kodu. Firma QR\'ı değil veya okunamadı.', 'error');
-      return;
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text.trim())) firmaId = text.trim();
     }
+    if (!firmaId) firmaId = text.match(/firma[_-]?id=([0-9a-f-]{36})/i)?.[1] ?? null;
+    if (!firmaId) {
+      const segs = text.replace(/[?#].*/, '').split('/').filter(Boolean);
+      const last = segs[segs.length - 1] ?? '';
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(last)) firmaId = last;
+    }
+
+    if (!firmaId) { addToast('Geçersiz QR kodu.', 'error'); return; }
 
     if (aktifZiyaret) {
-      if (aktifZiyaret.firma_org_id === firmaId) {
-        void handleCheckOut();
-      } else {
-        addToast(`Farklı firmada aktif ziyaretiniz var (${aktifZiyaret.firma_ad}). Önce bitirin.`, 'error');
-      }
+      if (aktifZiyaret.firma_org_id === firmaId) void handleCheckOut();
+      else addToast(`Farklı firmada aktif ziyaretiniz var (${aktifZiyaret.firma_ad}). Önce bitirin.`, 'error');
     } else {
       void handleCheckIn(firmaId, true);
     }
   }, [aktifZiyaret, handleCheckIn, handleCheckOut, addToast]);
 
-  const formatTime = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatTime = (iso: string) => new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     const today = new Date();
@@ -284,6 +361,16 @@ export default function ZiyaretCheckIn() {
     yesterday.setDate(yesterday.getDate() - 1);
     if (d.toDateString() === yesterday.toDateString()) return 'Dün';
     return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+  };
+
+  // GPS durum bandı config
+  const gpsBandConfig: Record<GpsStatusType, { bg: string; border: string; color: string; icon: string; text: string } | null> = {
+    idle: null,
+    loading: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', color: '#D97706', icon: 'ri-loader-4-line animate-spin', text: 'Konum alınıyor...' },
+    checking: { bg: 'rgba(14,165,233,0.08)', border: 'rgba(14,165,233,0.2)', color: '#0284C7', icon: 'ri-map-pin-2-line', text: 'Konum kontrol ediliyor...' },
+    ok: { bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', color: '#16A34A', icon: 'ri-map-pin-2-fill', text: 'Konum doğrulandı' },
+    denied: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', color: '#D97706', icon: 'ri-map-pin-line', text: gpsError ? 'Konum izni gerekli — check-in engellendi' : 'Konum alınamadı — ziyaret yine de devam ediyor' },
+    blocked: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', color: '#DC2626', icon: 'ri-map-pin-line', text: 'Firma konumunda değilsiniz' },
   };
 
   if (loading) {
@@ -295,12 +382,46 @@ export default function ZiyaretCheckIn() {
     );
   }
 
+  const band = gpsBandConfig[gpsStatus];
+
   return (
     <div className="space-y-4">
+
+      {/* GPS Durum Bandı */}
+      {band && (
+        <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${band.border}` }}>
+          <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: band.bg }}>
+            <i className={`${band.icon} text-sm flex-shrink-0`} style={{ color: band.color }} />
+            <span className="text-xs font-semibold flex-1" style={{ color: band.color }}>{band.text}</span>
+            {(gpsStatus === 'blocked' || gpsStatus === 'denied') && (
+              <button onClick={() => { setGpsStatus('idle'); setGpsError(null); }}
+                className="w-5 h-5 flex items-center justify-center rounded cursor-pointer flex-shrink-0"
+                style={{ color: band.color, opacity: 0.7 }}>
+                <i className="ri-close-line text-xs" />
+              </button>
+            )}
+          </div>
+          {/* Detay mesaj */}
+          {gpsError && gpsStatus === 'blocked' && (
+            <div className="px-3 pb-3 pt-1" style={{ background: band.bg }}>
+              <p className="text-[11px] leading-relaxed" style={{ color: '#64748B' }}>{gpsError}</p>
+              <div className="flex items-center gap-1.5 mt-2 text-[10px] font-semibold" style={{ color: '#DC2626' }}>
+                <i className="ri-error-warning-line" />
+                Check-in engellendi — fiziksel olarak firmada olmanız gerekiyor
+              </div>
+            </div>
+          )}
+          {gpsError && gpsStatus === 'denied' && (
+            <div className="px-3 pb-3 pt-1" style={{ background: band.bg }}>
+              <p className="text-[11px] leading-relaxed" style={{ color: '#64748B' }}>{gpsError}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── AKTİF ZİYARET KARTI ── */}
       {aktifZiyaret ? (
         <div className="rounded-2xl p-5" style={{ background: 'rgba(14,165,233,0.07)', border: '2px solid rgba(14,165,233,0.3)' }}>
-          {/* Pulse indicator */}
           <div className="flex items-center gap-2.5 mb-4">
             <div className="relative flex-shrink-0">
               <div className="w-3 h-3 rounded-full" style={{ background: '#0EA5E9' }} />
@@ -330,7 +451,6 @@ export default function ZiyaretCheckIn() {
             </div>
           </div>
 
-          {/* Süre sayacı */}
           <div className="flex items-center justify-center py-3 rounded-xl mb-4"
             style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.15)' }}>
             <div className="text-center">
@@ -341,11 +461,10 @@ export default function ZiyaretCheckIn() {
             </div>
           </div>
 
-          {/* QR ile bitir — buton + bilgi */}
           {showQr ? (
             <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(14,165,233,0.2)' }}>
               <div className="flex items-center justify-between px-4 pt-3 pb-2">
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Aynı Firma QR\'ını Okut</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Aynı Firma QR&apos;ını Okut</p>
                 <button onClick={() => setShowQr(false)}
                   className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
                   style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
@@ -367,7 +486,9 @@ export default function ZiyaretCheckIn() {
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.08)'; }}>
               <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
                 style={{ background: 'rgba(14,165,233,0.15)' }}>
-                <i className="ri-qr-scan-2-line text-base" style={{ color: '#0EA5E9' }} />
+                {actionLoading
+                  ? <i className="ri-loader-4-line animate-spin text-base" style={{ color: '#0EA5E9' }} />
+                  : <i className="ri-qr-scan-2-line text-base" style={{ color: '#0EA5E9' }} />}
               </div>
               <div className="text-left">
                 <p className="text-sm font-bold" style={{ color: '#0EA5E9' }}>QR ile Ziyareti Bitir</p>
@@ -377,9 +498,7 @@ export default function ZiyaretCheckIn() {
           )}
         </div>
       ) : (
-        /* ── CHECK-IN ALANI ── */
         <div className="space-y-3">
-          {/* QR ile başlat */}
           <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(14,165,233,0.2)', background: 'rgba(255,255,255,0.02)' }}>
             {showQr ? (
               <div className="p-4">
@@ -399,25 +518,30 @@ export default function ZiyaretCheckIn() {
             ) : (
               <button
                 onClick={() => setShowQr(true)}
+                disabled={actionLoading}
                 className="w-full flex flex-col items-center justify-center gap-3 py-8 cursor-pointer transition-all"
-                style={{ background: 'transparent' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.04)'; }}
+                style={{ background: 'transparent', opacity: actionLoading ? 0.6 : 1 }}
+                onMouseEnter={e => { if (!actionLoading) e.currentTarget.style.background = 'rgba(14,165,233,0.04)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                <div className="relative">
-                  <div className="w-20 h-20 flex items-center justify-center rounded-2xl"
-                    style={{ background: 'rgba(14,165,233,0.08)', border: '2px dashed rgba(14,165,233,0.3)' }}>
-                    <i className="ri-qr-scan-2-line text-4xl" style={{ color: '#0EA5E9' }} />
-                  </div>
+                <div className="w-20 h-20 flex items-center justify-center rounded-2xl"
+                  style={{ background: 'rgba(14,165,233,0.08)', border: '2px dashed rgba(14,165,233,0.3)' }}>
+                  {actionLoading
+                    ? <i className="ri-loader-4-line text-4xl animate-spin" style={{ color: '#0EA5E9' }} />
+                    : <i className="ri-qr-scan-2-line text-4xl" style={{ color: '#0EA5E9' }} />}
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-bold" style={{ color: '#0EA5E9' }}>QR ile Ziyaret Başlat</p>
-                  <p className="text-xs mt-1" style={{ color: '#475569' }}>Firma QR kodunu okutun — anında check-in</p>
+                  <p className="text-sm font-bold" style={{ color: '#0EA5E9' }}>
+                    {actionLoading ? 'İşleniyor...' : 'QR ile Ziyaret Başlat'}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: '#475569' }}>
+                    {actionLoading ? 'Konum ve firma bilgileri kontrol ediliyor' : 'Firma QR kodunu okutun — anında check-in'}
+                  </p>
                 </div>
               </button>
             )}
           </div>
 
-          {!showQr && (
+          {!showQr && !actionLoading && (
             <div className="rounded-2xl p-5" style={{ background: 'rgba(14,165,233,0.05)', border: '1px dashed rgba(14,165,233,0.3)' }}>
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
