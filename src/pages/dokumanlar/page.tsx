@@ -88,21 +88,21 @@ export default function DokumanlarPage() {
         style={{
           background: 'var(--bg-card-solid)',
           border: '1px solid var(--border-subtle)',
-          borderTop: '2px solid #10B981',
+          borderTop: '2px solid #0EA5E9',
         }}
       >
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-            style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}
+            style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.2)' }}
           >
-            <i className="ri-file-text-line text-lg" style={{ color: '#10B981' }} />
+            <i className="ri-file-text-line text-lg" style={{ color: '#0EA5E9' }} />
           </div>
           <div className="flex-1">
             <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Dökümanlar</h1>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>AI destekli belge ve plan oluşturma araçları</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
                 {tools.length} araç
               </span>
             </div>

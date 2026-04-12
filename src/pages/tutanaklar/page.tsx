@@ -870,11 +870,11 @@ export default function TutanaklarPage() {
       )}
 
       {/* Header */}
-      <div className="rounded-2xl px-5 py-4" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderTop: '2px solid #10B981' }}>
+      <div className="rounded-2xl px-5 py-4" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)', borderTop: '2px solid #0EA5E9' }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
-              <i className="ri-article-line text-lg" style={{ color: '#10B981' }} />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.2)' }}>
+              <i className="ri-article-line text-lg" style={{ color: '#0EA5E9' }} />
             </div>
             <div>
               <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)' }}>Tutanak Yönetimi</h1>
@@ -883,7 +883,7 @@ export default function TutanaklarPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {canCreate && (
-              <button onClick={openAdd} className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              <button onClick={openAdd} className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer" style={{ background: 'linear-gradient(135deg, #0284C7, #0EA5E9)' }}>
                 <i className="ri-add-line" /> Yeni Tutanak
               </button>
             )}
@@ -894,10 +894,10 @@ export default function TutanaklarPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Toplam Tutanak', value: stats.total,      icon: 'ri-article-line',         color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+          { label: 'Toplam Tutanak', value: stats.total,      icon: 'ri-article-line',         color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
           { label: 'Taslak',         value: stats.taslak,     icon: 'ri-draft-line',            color: '#94A3B8', bg: 'rgba(148,163,184,0.1)' },
           { label: 'Tamamlandı',     value: stats.tamamlandi, icon: 'ri-checkbox-circle-line',  color: '#34D399', bg: 'rgba(52,211,153,0.1)' },
-          { label: 'Onaylandı',      value: stats.onaylandi,  icon: 'ri-shield-check-line',     color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+          { label: 'Onaylandı',      value: stats.onaylandi,  icon: 'ri-shield-check-line',     color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
         ].map(s => (
           <div key={s.label} className="isg-card stat-card-interactive rounded-xl p-4 flex items-center gap-4">
             <div className="w-11 h-11 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
@@ -1085,7 +1085,7 @@ export default function TutanaklarPage() {
                     {/* Firma */}
                     <div className="min-w-0 pr-2">
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        style={{ background: 'rgba(14,165,233,0.08)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.15)' }}>
                         <i className="ri-building-2-line text-[9px]" />
                         <span className="truncate max-w-[80px]">{firma?.ad || '—'}</span>
                       </span>
@@ -1125,9 +1125,9 @@ export default function TutanaklarPage() {
                       <button
                         onClick={() => setViewId(t.id)}
                         className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-all whitespace-nowrap"
-                        style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.2)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; }}>
+                        style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.2)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.1)'; }}>
                         <i className="ri-eye-line text-xs" />
                       </button>
                       {canEdit && <TableBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(t)} title="Düzenle" />}

@@ -11,7 +11,7 @@ import Modal from '../../components/base/Modal';
 import { usePermissions } from '../../hooks/usePermissions';
 
 function NcBtn({ icon, title, onClick }: { icon: string; title: string; onClick: () => void }) {
-  const accent = '#10B981';
+  const accent = '#0EA5E9';
   return (
     <button
       onClick={onClick}
@@ -165,7 +165,7 @@ export default function UygunsuzluklarPage() {
   };
 
   const statCards = [
-    { label: 'Toplam Kayıt', val: stats.total, icon: 'ri-file-list-3-line', c: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+    { label: 'Toplam Kayıt', val: stats.total, icon: 'ri-file-list-3-line', c: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
     { label: 'Açık Uygunsuzluk', val: stats.acik, icon: 'ri-error-warning-line', c: '#EF4444', bg: 'rgba(239,68,68,0.1)', badge: stats.acik > 0 },
     { label: 'Kapandı', val: stats.kapandi, icon: 'ri-checkbox-circle-line', c: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
     { label: 'Kritik Açık', val: stats.kritik, icon: 'ri-fire-line', c: '#EF4444', bg: 'rgba(239,68,68,0.08)' },
@@ -175,11 +175,11 @@ export default function UygunsuzluklarPage() {
     <div className="space-y-5">
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399, #059669)' }} />
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #0284C7, #0EA5E9, #38BDF8)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #0284C7, #0EA5E9)' }}>
               <i className="ri-map-pin-user-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -214,7 +214,7 @@ export default function UygunsuzluklarPage() {
             {canCreateNonconformity && (
               <button onClick={() => { setEditRecord(null); setShowForm(true); }}
                 className="whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontSize: '12px' }}>
+                style={{ background: 'linear-gradient(135deg, #0284C7, #0EA5E9)', fontSize: '12px' }}>
                 <i className="ri-add-line" />Yeni Kayıt
               </button>
             )}
@@ -332,8 +332,8 @@ export default function UygunsuzluklarPage() {
           <div className="isg-card rounded-xl overflow-hidden">
             {filtered.length === 0 ? (
               <div className="py-20 text-center">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                  <i className="ri-alert-line text-3xl" style={{ color: '#10B981' }} />
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.15)' }}>
+                  <i className="ri-alert-line text-3xl" style={{ color: '#0EA5E9' }} />
                 </div>
                 <p className="font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
                   {hasFilters ? 'Arama kriterlerine uygun kayıt bulunamadı' : 'Henüz uygunsuzluk kaydı yok'}

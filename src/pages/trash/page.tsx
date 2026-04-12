@@ -226,11 +226,11 @@ export default function CopKutusuPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px] w-full" style={{ background: 'linear-gradient(90deg, #10B981, #34D399, #059669)' }} />
+        <div className="h-[2px] w-full" style={{ background: 'linear-gradient(90deg, #0EA5E9, #38BDF8, #0284C7)' }} />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
-              <i className="ri-delete-bin-2-line text-lg" style={{ color: '#10B981' }} />
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.2)' }}>
+              <i className="ri-delete-bin-2-line text-lg" style={{ color: '#0EA5E9' }} />
             </div>
             <div>
               <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Çöp Kutusu</h2>
@@ -274,7 +274,7 @@ export default function CopKutusuPage() {
               onClick={() => handleTabChange(tab.id)}
               className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap"
               style={activeTab === tab.id
-                ? { background: 'linear-gradient(135deg, #10B981, #059669)', color: 'white', boxShadow: '0 4px 15px rgba(16,185,129,0.3)' }
+                ? { background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', color: 'white', boxShadow: '0 4px 15px rgba(14,165,233,0.3)' }
                 : { color: 'var(--text-muted)' }}
             >
               <i className={tab.icon} />
@@ -300,7 +300,7 @@ export default function CopKutusuPage() {
             <button
               onClick={() => setBulkRestoreConfirm(true)}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
-              style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}
+              style={{ background: 'rgba(14,165,233,0.15)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.25)' }}
             >
               <i className="ri-arrow-go-back-line" /> Seçilenleri Geri Yükle
             </button>

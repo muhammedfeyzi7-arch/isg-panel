@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 
+const LOGO_URL =
+  'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
+
 const STEPS = [
   { label: 'Bağlantı kuruluyor...', icon: 'ri-wifi-line', duration: 600 },
   { label: 'Organizasyon yükleniyor...', icon: 'ri-building-2-line', duration: 700 },
@@ -40,10 +43,9 @@ export default function AppLoadingScreen({ onDone }: AppLoadingScreenProps) {
       setTimeout(() => {
         clearInterval(interval);
         current++;
+        elapsed = stepStart + stepDuration;
         tick();
       }, stepDuration);
-
-      elapsed = stepStart + stepDuration;
     };
 
     tick();
@@ -62,79 +64,66 @@ export default function AppLoadingScreen({ onDone }: AppLoadingScreenProps) {
         pointerEvents: fadeOut ? 'none' : 'all',
       }}
     >
-      {/* Logo */}
-      <div className="flex flex-col items-center gap-6 mb-10">
+      {/* Logo & Başlık */}
+      <div className="flex flex-col items-center gap-5 mb-10">
         <div
           className="w-16 h-16 flex items-center justify-center rounded-2xl"
           style={{
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.08))',
-            border: '1px solid rgba(99,102,241,0.3)',
-            boxShadow: '0 0 40px rgba(99,102,241,0.15)',
+            background: 'linear-gradient(135deg, rgba(14,165,233,0.18), rgba(14,165,233,0.06))',
+            border: '1px solid rgba(14,165,233,0.3)',
+            boxShadow: '0 0 40px rgba(14,165,233,0.15)',
           }}
         >
           <img
-            src="https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518"
+            src={LOGO_URL}
             alt="ISG Logo"
-            style={{ height: '32px', width: 'auto', objectFit: 'contain', filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(99,102,241,0.5))' }}
+            style={{
+              height: '32px', width: 'auto', objectFit: 'contain',
+              filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(14,165,233,0.5))',
+            }}
           />
         </div>
         <div className="text-center">
-          <h1
-            className="text-2xl font-black"
-            style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}
-          >
+          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>
             ISG Denetim
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Yönetim Sistemi
+          <p className="text-sm mt-1 font-semibold" style={{ color: '#0EA5E9' }}>
+            Yönetim Paneli
           </p>
         </div>
       </div>
 
       {/* Progress bar */}
       <div className="w-64 mb-5">
-        <div
-          className="h-1 rounded-full overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.06)' }}
-        >
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
           <div
             className="h-full rounded-full transition-all duration-300"
             style={{
               width: `${progress}%`,
-              background: 'linear-gradient(90deg, #6366F1, #818CF8)',
-              boxShadow: '0 0 8px rgba(99,102,241,0.5)',
+              background: 'linear-gradient(90deg, #0EA5E9, #38BDF8)',
+              boxShadow: '0 0 8px rgba(14,165,233,0.5)',
             }}
           />
         </div>
         <div className="flex justify-between mt-1.5">
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            {Math.round(progress)}%
-          </span>
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{Math.round(progress)}%</span>
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{stepIndex + 1}/{STEPS.length}</span>
         </div>
       </div>
 
-      {/* Step indicator */}
+      {/* Step badge */}
       <div
-        className="flex items-center gap-2 px-4 py-2 rounded-full"
+        className="flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300"
         style={{
-          background: isDone ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.08)',
-          border: `1px solid ${isDone ? 'rgba(16,185,129,0.2)' : 'rgba(99,102,241,0.15)'}`,
-          transition: 'all 0.3s ease',
+          background: isDone ? 'rgba(14,165,233,0.12)' : 'rgba(14,165,233,0.07)',
+          border: `1px solid ${isDone ? 'rgba(14,165,233,0.3)' : 'rgba(14,165,233,0.15)'}`,
         }}
       >
         <i
           className={`${step.icon} text-sm`}
-          style={{
-            color: isDone ? '#10B981' : '#818CF8',
-            animation: isDone ? 'none' : 'spin 1.5s linear infinite',
-          }}
+          style={{ color: '#0EA5E9', animation: isDone ? 'none' : 'appSpin 1.5s linear infinite' }}
         />
-        <span
-          className="text-xs font-semibold"
-          style={{ color: isDone ? '#10B981' : '#818CF8' }}
-        >
-          {step.label}
-        </span>
+        <span className="text-xs font-semibold" style={{ color: '#0EA5E9' }}>{step.label}</span>
       </div>
 
       {/* Step dots */}
@@ -147,17 +136,17 @@ export default function AppLoadingScreen({ onDone }: AppLoadingScreenProps) {
               width: i === stepIndex ? '20px' : '6px',
               height: '6px',
               background: i < stepIndex
-                ? '#10B981'
+                ? '#0EA5E9'
                 : i === stepIndex
-                  ? '#818CF8'
-                  : 'rgba(255,255,255,0.1)',
+                  ? '#38BDF8'
+                  : 'rgba(14,165,233,0.15)',
             }}
           />
         ))}
       </div>
 
       <style>{`
-        @keyframes spin {
+        @keyframes appSpin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }

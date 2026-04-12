@@ -1,6 +1,6 @@
 interface BadgeProps {
   label: string;
-  color?: 'green' | 'red' | 'amber' | 'sky' | 'gray' | 'purple' | 'orange' | 'teal' | 'pink';
+  color?: 'green' | 'red' | 'amber' | 'sky' | 'gray' | 'purple' | 'orange' | 'teal' | 'pink' | 'blue';
   size?: 'sm' | 'md';
   dot?: boolean;
 }
@@ -10,6 +10,7 @@ const colorMap: Record<string, { base: string; dot: string }> = {
   red:    { base: 'bg-red-500/10 text-red-500 border-red-500/20 dark:text-red-400',                   dot: 'bg-red-500' },
   amber:  { base: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400',           dot: 'bg-amber-500' },
   sky:    { base: 'bg-sky-500/10 text-sky-600 border-sky-500/20 dark:text-sky-400',                   dot: 'bg-sky-500' },
+  blue:   { base: 'bg-blue-600/10 text-blue-500 border-blue-600/20 dark:text-blue-400',               dot: 'bg-blue-500' },
   gray:   { base: 'bg-slate-500/10 text-slate-500 border-slate-500/20 dark:text-slate-400',           dot: 'bg-slate-400' },
   purple: { base: 'bg-violet-500/10 text-violet-600 border-violet-500/20 dark:text-violet-400',       dot: 'bg-violet-500' },
   orange: { base: 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400',       dot: 'bg-orange-500' },
@@ -18,14 +19,14 @@ const colorMap: Record<string, { base: string; dot: string }> = {
 };
 
 export function getFirmaStatusColor(s: string): BadgeProps['color'] {
-  if (s === 'Aktif') return 'green';
+  if (s === 'Aktif') return 'sky';
   if (s === 'Pasif') return 'gray';
-  return 'amber';
+  return 'sky';
 }
 
 export function getTehlikeColor(s: string): BadgeProps['color'] {
-  if (s === 'Az Tehlikeli') return 'green';
-  if (s === 'Tehlikeli') return 'amber';
+  if (s === 'Az Tehlikeli') return 'sky';
+  if (s === 'Tehlikeli') return 'blue';
   return 'red';
 }
 

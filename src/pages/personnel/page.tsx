@@ -625,11 +625,11 @@ export default function PersonellerPage() {
 
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #0EA5E9, #06B6D4)' }} />
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #2563EB, #3B82F6, #1D4ED8)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
               <i className="ri-team-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -641,7 +641,7 @@ export default function PersonellerPage() {
                   {personeller.filter(p => !p.silinmis).length} personel kayıtlı
                 </span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.18)', color: '#34D399' }}>
+                  style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.18)', color: '#3B82F6' }}>
                   {aktifCount} aktif
                 </span>
               </div>
@@ -658,7 +658,7 @@ export default function PersonellerPage() {
               <i className="ri-file-excel-2-line text-xs" /><span className="hidden sm:inline ml-1">Excel İndir</span>
             </button>
             {canCreate && (
-              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.4)' }}>
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', border: '1px solid rgba(37,99,235,0.4)' }}>
                 <i className="ri-user-add-line text-sm" /><span className="hidden sm:inline ml-1">Yeni Personel</span>
               </button>
             )}
@@ -789,8 +789,8 @@ export default function PersonellerPage() {
                       border: selected.has(p.id) ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = selected.has(p.id) ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.03)';
-                      (e.currentTarget as HTMLElement).style.borderColor = selected.has(p.id) ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)';
+                      (e.currentTarget as HTMLElement).style.background = selected.has(p.id) ? 'rgba(239,68,68,0.06)' : 'rgba(37,99,235,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = selected.has(p.id) ? 'rgba(239,68,68,0.3)' : 'rgba(37,99,235,0.2)';
                       (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
                     }}
                     onMouseLeave={e => {
@@ -809,7 +809,7 @@ export default function PersonellerPage() {
                       <PersonelAvatar adSoyad={p.adSoyad} fotoUrl={foto} size="sm" />
                       <div className="min-w-0">
                         <button onClick={() => setDetailId(p.id)} className="text-xs font-semibold cursor-pointer block text-left truncate transition-colors" style={{ color: 'var(--text-primary)' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#10B981'; }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#3B82F6'; }}
                           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}>
                           {p.adSoyad}
                         </button>
@@ -822,7 +822,7 @@ export default function PersonellerPage() {
                     {/* Firma */}
                     <div className="min-w-0 pr-2">
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap truncate max-w-full"
-                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
+                        style={{ background: 'rgba(37,99,235,0.08)', color: '#3B82F6', border: '1px solid rgba(37,99,235,0.18)' }}>
                         <i className="ri-building-2-line text-[9px] flex-shrink-0" />
                         <span className="truncate">{getFirmaAd(p.firmaId)}</span>
                       </span>
@@ -839,8 +839,8 @@ export default function PersonellerPage() {
                     {/* İşlemler */}
                     <div className="flex items-center gap-1 justify-end">
                       <ABtn icon="ri-contacts-book-2-line" color="#818CF8" onClick={() => setKartvizitId(p.id)} title="Kartvizit" />
-                      <ABtn icon="ri-eye-line" color="#10B981" onClick={() => setDetailId(p.id)} title="Detay" />
-                      {canEdit && <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(p)} title="Düzenle" />}
+                      <ABtn icon="ri-eye-line" color="#2563EB" onClick={() => setDetailId(p.id)} title="Detay" />
+                      {canEdit && <ABtn icon="ri-edit-line" color="#2563EB" onClick={() => openEdit(p)} title="Düzenle" />}
                       {canDelete && <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(p.id)} title="Sil" />}
                     </div>
                   </div>
@@ -1142,7 +1142,7 @@ export default function PersonellerPage() {
 }
 
 function ABtn({ icon, color: _color, onClick, title }: { icon: string; color: string; onClick: () => void; title: string }) {
-  const accentColor = '#10B981';
+  const accentColor = '#2563EB';
   return (
     <button onClick={onClick} title={title}
       className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"

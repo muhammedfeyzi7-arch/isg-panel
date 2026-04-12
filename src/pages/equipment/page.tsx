@@ -376,7 +376,7 @@ const STATUS_CONFIG: Record<EkipmanStatus, { label: string; color: string; bg: s
 };
 
 function EkipmanBtn({ icon, onClick, title }: { icon: string; onClick: () => void; title: string }) {
-  const accent = '#FB923C';
+  const accent = '#2563EB';
   return (
     <button onClick={onClick} title={title}
       className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
@@ -906,11 +906,11 @@ export default function EkipmanlarPage() {
     <div className="space-y-5">
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399, #059669)' }} />
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #2563EB, #3B82F6, #1D4ED8)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
               <i className="ri-tools-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -920,7 +920,7 @@ export default function EkipmanlarPage() {
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{aktifEkipmanlar.length} ekipman kayıtlı</span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.18)', color: '#10B981' }}>
+                  style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.18)', color: '#3B82F6' }}>
                   {stats.uygun} uygun
                 </span>
                 {stats.uygunDegil > 0 && (
@@ -942,7 +942,7 @@ export default function EkipmanlarPage() {
               </button>
             )}
             {canCreate && (
-              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.4)' }}>
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', border: '1px solid rgba(37,99,235,0.4)' }}>
                 <i className="ri-add-line" />
                 Ekipman Ekle
               </button>
@@ -1122,8 +1122,8 @@ export default function EkipmanlarPage() {
                       border: isSelected ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.03)';
-                      (e.currentTarget as HTMLElement).style.borderColor = isSelected ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.2)';
+                      (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(239,68,68,0.06)' : 'rgba(37,99,235,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = isSelected ? 'rgba(239,68,68,0.3)' : 'rgba(37,99,235,0.2)';
                       (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
                     }}
                     onMouseLeave={e => {
@@ -1155,7 +1155,7 @@ export default function EkipmanlarPage() {
                     {/* Firma */}
                     <div className="min-w-0 pr-2">
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        style={{ background: 'rgba(37,99,235,0.08)', color: '#3B82F6', border: '1px solid rgba(37,99,235,0.15)' }}>
                         <i className="ri-building-2-line text-[9px]" />
                         <span className="truncate max-w-[80px]">{firma?.ad || '—'}</span>
                       </span>

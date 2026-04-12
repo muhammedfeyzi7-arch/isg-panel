@@ -534,11 +534,11 @@ export default function EgitimlerPage() {
     <div className="space-y-5">
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #10B981, #059669, #34D399)' }} />
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #2563EB, #3B82F6, #1D4ED8)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
               <i className="ri-graduation-cap-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -548,7 +548,7 @@ export default function EgitimlerPage() {
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{aktifEgitimler.length} eğitim kayıtlı</span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.18)', color: '#34D399' }}>
+                  style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.18)', color: '#3B82F6' }}>
                   {stats.toplamKatilimci} katılımcı
                 </span>
               </div>
@@ -559,7 +559,7 @@ export default function EgitimlerPage() {
               <i className="ri-file-excel-2-line text-xs" />Excel
             </button>
             {canEdit && (
-              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.4)' }}>
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', border: '1px solid rgba(37,99,235,0.4)' }}>
                 <i className="ri-add-line" />
                 Eğitim Ekle
               </button>

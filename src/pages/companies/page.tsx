@@ -89,7 +89,7 @@ function FirmaLogoImg({ logoUrl, firmaAd, size = 'md' }: { logoUrl: string; firm
   if (error || !src) {
     return (
       <div className={`${wh} flex items-center justify-center rounded-lg flex-shrink-0 text-[11px] font-bold text-white`}
-        style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+        style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
         {firmaAd.charAt(0).toUpperCase()}
       </div>
     );
@@ -285,11 +285,11 @@ export default function FirmalarPage() {
     <div className="space-y-4">
       {/* ── Header — Hekim UI tarzı ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
-        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399, #059669)' }} />
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #2563EB, #3B82F6, #1D4ED8)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+              style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
               <i className="ri-building-2-line text-white text-sm" />
             </div>
             <div className="min-w-0">
@@ -299,7 +299,7 @@ export default function FirmalarPage() {
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{aktifFirmalarSayisi} firma kayıtlı</span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.18)', color: '#34D399' }}>
+                  style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.18)', color: '#3B82F6' }}>
                   {aktifCount} aktif
                 </span>
                 {cokTehlikeliCount > 0 && (
@@ -313,7 +313,7 @@ export default function FirmalarPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             {canManageFirma && (
-              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12.5px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #10B981, #059669)', border: '1px solid rgba(16,185,129,0.4)' }}>
+              <button onClick={openAdd} className="btn-primary whitespace-nowrap" style={{ fontSize: '12.5px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', border: '1px solid rgba(37,99,235,0.4)' }}>
                 <i className="ri-add-line text-sm" />
                 Yeni Firma Ekle
               </button>
@@ -404,7 +404,7 @@ export default function FirmalarPage() {
             {filtered.map((firma) => {
               const logoUrl = firma.logoUrl;
               return (
-                <div key={firma.id} className="isg-card rounded-xl p-4" style={{ background: selected.has(firma.id) ? 'rgba(16,185,129,0.04)' : undefined }}>
+                <div key={firma.id} className="isg-card rounded-xl p-4" style={{ background: selected.has(firma.id) ? 'rgba(37,99,235,0.04)' : undefined }}>
                   <div className="flex items-start gap-3">
                     {canDelete && (
                       <input type="checkbox" checked={selected.has(firma.id)} onChange={() => toggleOne(firma.id)} className="cursor-pointer mt-1 flex-shrink-0" />
@@ -414,7 +414,7 @@ export default function FirmalarPage() {
                         <FirmaLogoImg logoUrl={logoUrl} firmaAd={firma.ad} size="md" />
                       ) : (
                         <div className="w-10 h-10 flex items-center justify-center rounded-lg flex-shrink-0 text-sm font-bold text-white"
-                          style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                          style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
                           {firma.ad.charAt(0).toUpperCase()}
                         </div>
                       )}
@@ -431,8 +431,8 @@ export default function FirmalarPage() {
                       {firma.telefon && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{firma.telefon}</span>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <ActionBtn icon="ri-eye-line" color="#10B981" onClick={() => setDetailId(firma.id)} title="Detay" />
-                      {canManageFirma && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
+                      <ActionBtn icon="ri-eye-line" color="#2563EB" onClick={() => setDetailId(firma.id)} title="Detay" />
+                      {canManageFirma && <ActionBtn icon="ri-edit-line" color="#2563EB" onClick={() => openEdit(firma)} title="Düzenle" />}
                       {canManageFirma && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
                     </div>
                   </div>
@@ -469,17 +469,17 @@ export default function FirmalarPage() {
                     className="grid items-center px-4 py-3 rounded-xl transition-all cursor-pointer"
                     style={{
                       gridTemplateColumns: canManageFirma ? '32px 2.5fr 1.5fr 1.5fr 1fr 1fr 1.2fr 100px' : '2.5fr 1.5fr 1.5fr 1fr 1fr 1.2fr 100px',
-                      background: selected.has(firma.id) ? 'rgba(16,185,129,0.04)' : 'var(--bg-card-solid)',
-                      border: selected.has(firma.id) ? '1px solid rgba(16,185,129,0.2)' : '1px solid var(--border-subtle)',
+                      background: selected.has(firma.id) ? 'rgba(37,99,235,0.04)' : 'var(--bg-card-solid)',
+                      border: selected.has(firma.id) ? '1px solid rgba(37,99,235,0.2)' : '1px solid var(--border-subtle)',
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = selected.has(firma.id) ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.03)';
-                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.2)';
+                      (e.currentTarget as HTMLElement).style.background = selected.has(firma.id) ? 'rgba(37,99,235,0.06)' : 'rgba(37,99,235,0.03)';
+                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(37,99,235,0.2)';
                       (e.currentTarget as HTMLElement).style.transform = 'translateX(2px)';
                     }}
                     onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background = selected.has(firma.id) ? 'rgba(16,185,129,0.04)' : 'var(--bg-card-solid)';
-                      (e.currentTarget as HTMLElement).style.borderColor = selected.has(firma.id) ? 'rgba(16,185,129,0.2)' : 'var(--border-subtle)';
+                      (e.currentTarget as HTMLElement).style.background = selected.has(firma.id) ? 'rgba(37,99,235,0.04)' : 'var(--bg-card-solid)';
+                      (e.currentTarget as HTMLElement).style.borderColor = selected.has(firma.id) ? 'rgba(37,99,235,0.2)' : 'var(--border-subtle)';
                       (e.currentTarget as HTMLElement).style.transform = 'none';
                     }}
                   >
@@ -494,14 +494,14 @@ export default function FirmalarPage() {
                         <FirmaLogoImg logoUrl={logoUrl} firmaAd={firma.ad} size="sm" />
                       ) : (
                         <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
-                          style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                          style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
                           {firma.ad.charAt(0).toUpperCase()}
                         </div>
                       )}
                       <div className="min-w-0">
                         <button onClick={() => setDetailId(firma.id)} className="text-xs font-semibold cursor-pointer block text-left truncate transition-colors"
                           style={{ color: 'var(--text-primary)' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#10B981'; }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#3B82F6'; }}
                           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}>
                           {firma.ad}
                         </button>
@@ -533,8 +533,8 @@ export default function FirmalarPage() {
                     </div>
                     {/* İşlemler */}
                     <div className="flex items-center gap-1 justify-end">
-                      <ActionBtn icon="ri-eye-line" color="#10B981" onClick={() => setDetailId(firma.id)} title="Detay" />
-                      {canEdit && <ActionBtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(firma)} title="Düzenle" />}
+                      <ActionBtn icon="ri-eye-line" color="#2563EB" onClick={() => setDetailId(firma.id)} title="Detay" />
+                      {canEdit && <ActionBtn icon="ri-edit-line" color="#2563EB" onClick={() => openEdit(firma)} title="Düzenle" />}
                       {canDelete && <ActionBtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(firma.id)} title="Sil" />}
                     </div>
                   </div>
@@ -702,11 +702,11 @@ export default function FirmalarPage() {
             )}
             <div>
               <div className="flex items-center gap-3 mb-3">
-                <i className="ri-team-line" style={{ color: '#10B981' }} />
+                <i className="ri-team-line" style={{ color: '#3B82F6' }} />
                 <h4 className="text-sm font-bold text-slate-200">Firma Personelleri</h4>
                 <span
                   className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(59,130,246,0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}
+                  style={{ background: 'rgba(37,99,235,0.15)', color: '#60A5FA', border: '1px solid rgba(37,99,235,0.2)' }}
                 >
                   {firmaPersoneller.length}
                 </span>
@@ -722,8 +722,8 @@ export default function FirmalarPage() {
                       className="rounded-xl px-3.5 py-3 flex items-center gap-2.5 text-left w-full cursor-pointer transition-all duration-200 group"
                       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.background = 'rgba(16,185,129,0.08)';
-                        e.currentTarget.style.borderColor = 'rgba(16,185,129,0.2)';
+                        e.currentTarget.style.background = 'rgba(37,99,235,0.08)';
+                        e.currentTarget.style.borderColor = 'rgba(37,99,235,0.2)';
                       }}
                       onMouseLeave={e => {
                         e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
@@ -732,7 +732,7 @@ export default function FirmalarPage() {
                     >
                       <div
                         className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0 text-xs font-bold text-white"
-                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
+                        style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}
                       >
                         {p.adSoyad.charAt(0)}
                       </div>
@@ -740,7 +740,7 @@ export default function FirmalarPage() {
                         <p className="text-xs font-semibold text-slate-200 truncate group-hover:text-blue-400 transition-colors">{p.adSoyad}</p>
                         <p className="text-[10px] truncate" style={{ color: '#475569' }}>{p.gorev || '—'}</p>
                       </div>
-                      <i className="ri-arrow-right-s-line text-xs flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#10B981' }} />
+                      <i className="ri-arrow-right-s-line text-xs flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#3B82F6' }} />
                     </button>
                   ))}
                 </div>

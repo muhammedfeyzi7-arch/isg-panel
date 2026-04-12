@@ -239,10 +239,10 @@ export default function SettingsPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)' }}>
-        <div className="h-[3px] w-full" style={{ background: 'linear-gradient(90deg, #10B981, #34D399, #059669)' }} />
+        <div className="h-[3px] w-full" style={{ background: 'linear-gradient(90deg, #0EA5E9, #38BDF8, #0284C7)' }} />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+            <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
               <i className="ri-settings-3-line text-lg text-white" />
             </div>
             <div>
@@ -251,12 +251,12 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
               <i className="ri-user-settings-line" />
               {currentUser.ad || 'Kullanıcı'}
             </span>
-            <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+            <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />
               {org?.role === 'admin' ? 'Admin' : 'Kullanıcı'}
             </span>
           </div>
@@ -281,7 +281,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               <div
                 className="w-11 h-11 rounded-2xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 4px 14px rgba(14,165,233,0.35)' }}
               >
                 {(currentUser.ad || 'U').charAt(0).toUpperCase()}
               </div>
@@ -290,7 +290,7 @@ export default function SettingsPage() {
                 <p className="text-[11px] truncate mt-0.5" style={{ color: subColor }}>{user?.email || currentUser.email}</p>
                 <span
                   className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1"
-                  style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+                  style={{ background: 'rgba(14,165,233,0.12)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}
                 >
                   {org?.role === 'admin' ? 'Admin Kullanıcı' : org?.role === 'denetci' ? 'Saha Personeli' : 'Evrak/Dökümantasyon Denetçi'}
                 </span>
@@ -309,10 +309,10 @@ export default function SettingsPage() {
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left cursor-pointer transition-all duration-150 mb-0.5"
                   style={{
                     background: isActive
-                      ? 'rgba(16,185,129,0.1)'
+                      ? 'rgba(14,165,233,0.1)'
                       : 'transparent',
                     border: isActive
-                      ? '1px solid rgba(16,185,129,0.2)'
+                      ? '1px solid rgba(14,165,233,0.2)'
                       : '1px solid transparent',
                   }}
                   onMouseEnter={e => {
@@ -325,25 +325,25 @@ export default function SettingsPage() {
                   <div
                     className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
                     style={{
-                      background: isActive ? 'rgba(16,185,129,0.15)' : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
+                      background: isActive ? 'rgba(14,165,233,0.15)' : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
                     }}
                   >
                     <i
                       className={`${item.icon} text-sm`}
-                      style={{ color: isActive ? '#10B981' : subColor }}
+                      style={{ color: isActive ? '#0EA5E9' : subColor }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p
                       className="text-[12.5px] font-semibold truncate"
-                      style={{ color: isActive ? '#10B981' : nameColor }}
+                      style={{ color: isActive ? '#0EA5E9' : nameColor }}
                     >
                       {item.label}
                     </p>
                     <p className="text-[10px] truncate mt-0.5" style={{ color: subColor }}>{item.desc}</p>
                   </div>
                   {isActive && (
-                    <i className="ri-arrow-right-s-line text-sm flex-shrink-0" style={{ color: '#10B981' }} />
+                    <i className="ri-arrow-right-s-line text-sm flex-shrink-0" style={{ color: '#0EA5E9' }} />
                   )}
                 </button>
               );
@@ -351,10 +351,10 @@ export default function SettingsPage() {
           </nav>
 
           {/* Sidebar footer */}
-          <div className="px-4 py-3 mx-2 mb-2 rounded-xl" style={{ background: isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)' }}>
+          <div className="px-4 py-3 mx-2 mb-2 rounded-xl" style={{ background: isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.12)' }}>
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-              <span className="text-[10px] font-bold" style={{ color: '#10B981' }}>Sistem Aktif</span>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />
+              <span className="text-[10px] font-bold" style={{ color: '#0EA5E9' }}>Sistem Aktif</span>
             </div>
             <p className="text-[10px]" style={{ color: subColor }}>ISG Denetim v2.0.0</p>
           </div>
@@ -372,9 +372,9 @@ export default function SettingsPage() {
               onClick={() => setActiveTab(item.id)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap transition-all"
               style={{
-                background: activeTab === item.id ? 'rgba(16,185,129,0.12)' : 'transparent',
-                color: activeTab === item.id ? '#10B981' : subColor,
-                border: activeTab === item.id ? '1px solid rgba(16,185,129,0.22)' : '1px solid transparent',
+                background: activeTab === item.id ? 'rgba(14,165,233,0.12)' : 'transparent',
+                color: activeTab === item.id ? '#0EA5E9' : subColor,
+                border: activeTab === item.id ? '1px solid rgba(14,165,233,0.22)' : '1px solid transparent',
               }}
             >
               <i className={`${item.icon} text-xs`} />
@@ -407,7 +407,7 @@ export default function SettingsPage() {
             >
               <div
                 className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 6px 20px rgba(16,185,129,0.4)' }}
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 6px 20px rgba(14,165,233,0.4)' }}
               >
                 {(profileData.ad || 'U').charAt(0).toUpperCase()}
               </div>
@@ -634,7 +634,7 @@ export default function SettingsPage() {
               <SectionHeader
                 icon="ri-database-2-line"
                 iconBg="rgba(16,185,129,0.1)"
-                iconColor="#10B981"
+                iconColor="#0EA5E9"
                 title="Veri Yedekleme"
                 desc="Tüm verilerinizi ZIP formatında indirin"
               />
@@ -666,7 +666,7 @@ export default function SettingsPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)' }}>
-                    <i className="ri-download-cloud-2-line text-base" style={{ color: '#10B981' }} />
+                    <i className="ri-download-cloud-2-line text-base" style={{ color: '#0EA5E9' }} />
                   </div>
                   <div>
                     <p className="text-sm font-bold" style={{ color: nameColor }}>ZIP Yedek İndir</p>
@@ -681,7 +681,7 @@ export default function SettingsPage() {
                   onClick={handleExport}
                   disabled={backupLoading}
                   className="whitespace-nowrap flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all"
-                  style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.3)', opacity: backupLoading ? 0.7 : 1 }}
+                  style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 4px 14px rgba(14,165,233,0.3)', opacity: backupLoading ? 0.7 : 1 }}
                 >
                   <i className={backupLoading ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} />
                   {backupLoading ? 'Hazırlanıyor...' : 'İndir'}

@@ -22,11 +22,11 @@ import { uploadFileToStorage } from '@/utils/fileUpload';
 type SahaTab = 'ziyaret' | 'qr' | 'ekipman' | 'izin' | 'uygunsuzluk';
 
 const TABS: { id: SahaTab; label: string; icon: string; color: string; activeBg: string }[] = [
-  { id: 'ziyaret',      label: 'Ziyaret',     icon: 'ri-map-pin-user-line',     color: '#34D399', activeBg: 'rgba(52,211,153,0.15)' },
-  { id: 'qr',           label: 'QR Tara',     icon: 'ri-qr-code-line',          color: '#818CF8', activeBg: 'rgba(129,140,248,0.15)' },
-  { id: 'ekipman',      label: 'Ekipmanlar',  icon: 'ri-tools-line',            color: '#818CF8', activeBg: 'rgba(129,140,248,0.15)' },
-  { id: 'izin',         label: 'İş İzinleri', icon: 'ri-shield-keyhole-line',   color: '#F59E0B', activeBg: 'rgba(245,158,11,0.15)' },
-  { id: 'uygunsuzluk',  label: 'Uygunsuzluk', icon: 'ri-error-warning-line',    color: '#F87171', activeBg: 'rgba(248,113,113,0.15)' },
+  { id: 'ziyaret',      label: 'Ziyaret',     icon: 'ri-map-pin-user-line',     color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
+  { id: 'qr',           label: 'QR Tara',     icon: 'ri-qr-code-line',          color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
+  { id: 'ekipman',      label: 'Ekipmanlar',  icon: 'ri-tools-line',            color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
+  { id: 'izin',         label: 'İş İzinleri', icon: 'ri-shield-keyhole-line',   color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
+  { id: 'uygunsuzluk',  label: 'Uygunsuzluk', icon: 'ri-error-warning-line',    color: '#0EA5E9', activeBg: 'rgba(14,165,233,0.15)' },
 ];
 
 // ─── QR Sekme ─────────────────────────────────────────────────────────────────
@@ -647,16 +647,16 @@ export default function SahaPage() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
 
       {/* ── Premium Başlık Kartı ── */}
-      <div className="rounded-2xl overflow-hidden mb-4" style={{ background: 'var(--bg-card-solid, rgba(17,24,39,0.8))', border: '1px solid rgba(16,185,129,0.2)' }}>
+      <div className="rounded-2xl overflow-hidden mb-4" style={{ background: 'var(--bg-card-solid, rgba(17,24,39,0.8))', border: '1px solid rgba(14,165,233,0.2)' }}>
         {/* Üst gradient çizgi */}
-        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10B981 0%, #34D399 50%, #059669 100%)' }} />
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #0284C7 0%, #0EA5E9 50%, #38BDF8 100%)' }} />
         
         <div className="px-4 pt-3.5 pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {/* İkon */}
-              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}>
-                <i className="ri-map-pin-user-line text-lg" style={{ color: '#10B981' }} />
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.25)' }}>
+                <i className="ri-map-pin-user-line text-lg" style={{ color: '#0EA5E9' }} />
               </div>
               <div>
                 <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary, #f1f5f9)', letterSpacing: '-0.02em' }}>Saha Denetimleri</h2>
@@ -678,8 +678,8 @@ export default function SahaPage() {
               )}
               {/* Online badge */}
               <span className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-full whitespace-nowrap"
-                style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}>
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+                style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />
                 {isOnline ? 'Aktif' : 'Çevrimdışı'}
               </span>
             </div>

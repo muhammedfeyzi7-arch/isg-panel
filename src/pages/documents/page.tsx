@@ -269,27 +269,19 @@ export default function EvraklarPage() {
   return (
     <div className="space-y-4">
       {/* ── Header ── */}
-      <div
-        className="rounded-2xl px-5 py-4"
-        style={{
-          background: 'var(--bg-card-solid)',
-          border: '1px solid var(--border-subtle)',
-          borderTop: '2px solid #F59E0B',
-        }}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #2563EB, #3B82F6, #1D4ED8)' }} />
+        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' }}
-            >
-              <i className="ri-file-list-3-line text-lg" style={{ color: '#F59E0B' }} />
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
+              <i className="ri-file-list-3-line text-white text-sm" />
             </div>
             <div>
-              <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Belge Takibi</h1>
+              <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Belge Takibi</h1>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Durum otomatik hesaplanır</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(37,99,235,0.1)', color: '#3B82F6', border: '1px solid rgba(37,99,235,0.18)' }}>
                   {evraklar.length} Evrak
                 </span>
               </div>
@@ -297,15 +289,15 @@ export default function EvraklarPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={openAdd}
-              className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
-              style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}>
+              className="btn-primary whitespace-nowrap"
+              style={{ fontSize: '12.5px', padding: '8px 16px', height: 'auto', background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', border: '1px solid rgba(37,99,235,0.4)' }}>
               <i className="ri-file-add-line text-sm" />
               Yeni Evrak
             </button>
             <button
               onClick={() => setBulkOpen(true)}
-              className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer"
-              style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: '#F59E0B' }}
+              className="btn-secondary whitespace-nowrap"
+              style={{ fontSize: '12.5px', padding: '8px 14px', height: 'auto' }}
             >
               <i className="ri-upload-cloud-2-line text-sm" />
               Toplu Yükle
@@ -686,7 +678,7 @@ export default function EvraklarPage() {
 }
 
 function ABtn({ icon, onClick, title }: { icon: string; color?: string; onClick: () => void; title: string }) {
-  const accent = '#F59E0B';
+  const accent = '#2563EB';
   return (
     <button onClick={onClick} title={title}
       className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150"

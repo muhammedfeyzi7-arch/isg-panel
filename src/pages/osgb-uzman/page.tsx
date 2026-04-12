@@ -51,21 +51,21 @@ export default function OsgbUzmanPage() {
       >
         <div className="absolute pointer-events-none glow-pulse"
           style={{ top: '-120px', left: '-80px', width: '600px', height: '600px',
-            background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 65%)', filter: 'blur(60px)' }} />
+            background: 'radial-gradient(circle, rgba(14,165,233,0.12) 0%, transparent 65%)', filter: 'blur(60px)' }} />
         <div className="absolute pointer-events-none glow-pulse"
           style={{ bottom: '-100px', right: '-60px', width: '500px', height: '500px',
-            background: 'radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 65%)', filter: 'blur(60px)', animationDelay: '2s' }} />
+            background: 'radial-gradient(circle, rgba(14,165,233,0.07) 0%, transparent 65%)', filter: 'blur(60px)', animationDelay: '2s' }} />
 
         <div className="relative z-10 flex flex-col h-full px-12 py-12">
           {/* Brand */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.22)' }}>
+              style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.22)' }}>
               <img src={LOGO_URL} alt="ISG" className="w-6 h-6 object-contain" />
             </div>
             <div>
-              <p className="text-sm font-bold" style={{ color: '#e2f8fb', letterSpacing: '-0.01em' }}>ISG Denetim</p>
-              <p className="text-[11px]" style={{ color: '#4aad8a' }}>Gezici Uzman Paneli</p>
+              <p className="text-sm font-bold" style={{ color: '#e0f2fe', letterSpacing: '-0.01em' }}>ISG Denetim</p>
+              <p className="text-[11px]" style={{ color: '#38bdf8' }}>Gezici Uzman Paneli</p>
             </div>
           </div>
 
@@ -75,12 +75,12 @@ export default function OsgbUzmanPage() {
               <h2 className="text-3xl font-extrabold leading-snug mb-3"
                 style={{ color: '#f0f9ff', letterSpacing: '-0.03em' }}>
                 ISG Uzmanı<br />
-                <span style={{ background: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
+                <span style={{ background: 'linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%)',
                   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                   paneline hoş geldiniz
                 </span>
               </h2>
-              <p className="text-sm leading-relaxed" style={{ color: '#4a8a6a' }}>
+              <p className="text-sm leading-relaxed" style={{ color: '#4a7a9a' }}>
                 Saha denetimleri, uygunsuzluk kayıtları ve iş izni formlarını tek ekrandan yönetin.
               </p>
             </div>
@@ -88,27 +88,27 @@ export default function OsgbUzmanPage() {
             {/* Feature list */}
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-widest mb-3"
-                style={{ color: '#2e6a4e' }}>Uzman Yetkileri</p>
+                style={{ color: '#2e5a7a' }}>Uzman Yetkileri</p>
               {UZMAN_FEATURES.map((f) => (
                 <div key={f.label} className="feature-row">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                    <i className={`${f.icon} text-sm`} style={{ color: '#34D399' }} />
+                    style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                    <i className={`${f.icon} text-sm`} style={{ color: '#38BDF8' }} />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold" style={{ color: '#b8f0d8' }}>{f.label}</p>
-                    <p className="text-[11px]" style={{ color: '#4a7a5a' }}>{f.desc}</p>
+                    <p className="text-xs font-semibold" style={{ color: '#bae6fd' }}>{f.label}</p>
+                    <p className="text-[11px]" style={{ color: '#4a6a8a' }}>{f.desc}</p>
                   </div>
                   <div className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    style={{ background: 'rgba(16,185,129,0.4)' }} />
+                    style={{ background: 'rgba(14,165,233,0.4)' }} />
                 </div>
               ))}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-            <span className="text-xs" style={{ color: '#2e6a4e' }}>Tüm sistemler çalışıyor</span>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />
+            <span className="text-xs" style={{ color: '#2e5a7a' }}>Tüm sistemler çalışıyor</span>
           </div>
         </div>
       </div>
@@ -120,7 +120,7 @@ export default function OsgbUzmanPage() {
       >
         <div className="absolute top-0 right-0 pointer-events-none"
           style={{ width: '260px', height: '260px',
-            background: 'radial-gradient(circle, rgba(16,185,129,0.05) 0%, transparent 70%)', filter: 'blur(40px)' }} />
+            background: 'radial-gradient(circle, rgba(14,165,233,0.05) 0%, transparent 70%)', filter: 'blur(40px)' }} />
 
         {/* Mobile logo */}
         <div className="lg:hidden flex items-center gap-3 mb-8">
@@ -134,7 +134,7 @@ export default function OsgbUzmanPage() {
         <div className="relative z-10 w-full max-w-[380px] mx-auto">
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5 text-xs font-semibold"
-            style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981' }}>
+            style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}>
             <i className="ri-user-star-line text-xs" />
             ISG Uzmanı
           </div>
@@ -187,7 +187,7 @@ export default function OsgbUzmanPage() {
             {/* Yetki satırı */}
             <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
               <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                <i className="ri-shield-check-line text-sm" style={{ color: '#10B981' }} />
+                <i className="ri-shield-check-line text-sm" style={{ color: '#0EA5E9' }} />
               </div>
               <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Yetki</p>
               <p className="text-[12px] font-medium ml-auto" style={{ color: 'var(--text-primary)' }}>Saha denetimi &amp; raporlama</p>
@@ -196,11 +196,11 @@ export default function OsgbUzmanPage() {
             {/* Saha denetimi satırı */}
             <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
               <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                <i className="ri-map-pin-line text-sm" style={{ color: '#10B981' }} />
+                <i className="ri-map-pin-line text-sm" style={{ color: '#0EA5E9' }} />
               </div>
               <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Saha Denetimi</p>
               <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold"
-                style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.2)' }}>
                 <i className="ri-check-line text-[9px]" />
                 Aktif
               </span>
@@ -209,11 +209,11 @@ export default function OsgbUzmanPage() {
             {/* Uygunsuzluk satırı */}
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                <i className="ri-alert-line text-sm" style={{ color: '#10B981' }} />
+                <i className="ri-alert-line text-sm" style={{ color: '#0EA5E9' }} />
               </div>
               <p className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Uygunsuzluk Kaydı</p>
               <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold"
-                style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+                style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.2)' }}>
                 <i className="ri-check-line text-[9px]" />
                 Aktif
               </span>
@@ -222,9 +222,9 @@ export default function OsgbUzmanPage() {
 
           {/* Info note */}
           <div className="flex items-start gap-3 p-3.5 rounded-xl mb-6"
-            style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)' }}>
-            <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
-            <p className="text-xs leading-relaxed" style={{ color: '#059669' }}>
+            style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.18)' }}>
+            <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#0EA5E9' }} />
+            <p className="text-xs leading-relaxed" style={{ color: '#0284C7' }}>
               OSGB admininiz size bir müşteri firma ataması yaptığında panel otomatik olarak açılacaktır.
             </p>
           </div>
@@ -242,7 +242,7 @@ export default function OsgbUzmanPage() {
                 className="flex items-center gap-3 px-4 py-3"
                 style={{ borderBottom: idx < UZMAN_FEATURES.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                 <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                  <i className={`${f.icon} text-sm`} style={{ color: '#10B981' }} />
+                  <i className={`${f.icon} text-sm`} style={{ color: '#0EA5E9' }} />
                 </div>
                 <div>
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</p>
@@ -257,7 +257,7 @@ export default function OsgbUzmanPage() {
             <button
               onClick={() => window.location.reload()}
               className="whitespace-nowrap flex items-center justify-center gap-2 w-full px-6 py-3.5 rounded-xl text-sm font-bold cursor-pointer text-white"
-              style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)' }}
+              style={{ background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 100%)' }}
             >
               <i className="ri-refresh-line" />
               Sayfayı Yenile

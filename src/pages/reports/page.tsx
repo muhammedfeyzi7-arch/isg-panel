@@ -1317,16 +1317,16 @@ export default function RaporlarPage() {
         style={{
           background: 'var(--bg-card-solid)',
           border: '1px solid var(--border-subtle)',
-          borderTop: '2px solid #10B981',
+          borderTop: '2px solid #0EA5E9',
         }}
       >
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
               className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
-              style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}
+              style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.2)' }}
             >
-              <i className="ri-bar-chart-grouped-line text-lg" style={{ color: '#10B981' }} />
+              <i className="ri-bar-chart-grouped-line text-lg" style={{ color: '#0EA5E9' }} />
             </div>
             <div>
               <h1 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Raporlar</h1>
@@ -1351,9 +1351,9 @@ export default function RaporlarPage() {
               onClick={() => setDateDropdownOpen(v => !v)}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all"
               style={{
-                background: isDateActive ? 'rgba(16,185,129,0.1)' : 'var(--bg-card)',
-                border: isDateActive ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-main)',
-                color: isDateActive ? '#10B981' : 'var(--text-secondary)',
+                background: isDateActive ? 'rgba(14,165,233,0.1)' : 'var(--bg-card)',
+                border: isDateActive ? '1px solid rgba(14,165,233,0.3)' : '1px solid var(--border-main)',
+                color: isDateActive ? '#0EA5E9' : 'var(--text-secondary)',
                 minWidth: 150,
               }}
             >
@@ -1382,13 +1382,13 @@ export default function RaporlarPage() {
                       onClick={() => applyPreset(preset.id)}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-lg text-left text-xs font-medium transition-colors cursor-pointer"
                       style={{
-                        background: datePreset === preset.id ? 'rgba(16,185,129,0.08)' : 'transparent',
-                        color: datePreset === preset.id ? '#10B981' : 'var(--text-secondary)',
+                        background: datePreset === preset.id ? 'rgba(14,165,233,0.08)' : 'transparent',
+                        color: datePreset === preset.id ? '#0EA5E9' : 'var(--text-secondary)',
                       }}
                     >
                       <i className={`ri-${preset.id === 'all' ? 'time-line' : preset.id === 'this_month' ? 'calendar-2-line' : preset.id === 'last_month' ? 'arrow-left-s-line' : 'history-line'} text-[10px]`} />
                       {preset.label}
-                      {datePreset === preset.id && <i className="ri-check-line text-[10px] ml-auto" style={{ color: '#10B981' }} />}
+                      {datePreset === preset.id && <i className="ri-check-line text-[10px] ml-auto" style={{ color: '#0EA5E9' }} />}
                     </button>
                   ))}
                 </div>
@@ -1431,7 +1431,7 @@ export default function RaporlarPage() {
                       <button
                         onClick={() => { setDateDropdownOpen(false); }}
                         className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
-                        style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+                        style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}
                       >
                         Uygula
                       </button>
@@ -1455,9 +1455,9 @@ export default function RaporlarPage() {
               onClick={() => setFirmaDropdownOpen(v => !v)}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-all"
               style={{
-                background: secilenFirma ? 'rgba(16,185,129,0.1)' : 'var(--bg-card)',
-                border: secilenFirma ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-main)',
-                color: secilenFirma ? '#10B981' : 'var(--text-secondary)',
+                background: secilenFirma ? 'rgba(14,165,233,0.1)' : 'var(--bg-card)',
+                border: secilenFirma ? '1px solid rgba(14,165,233,0.3)' : '1px solid var(--border-main)',
+                color: secilenFirma ? '#0EA5E9' : 'var(--text-secondary)',
                 minWidth: 160,
               }}
             >
@@ -1547,14 +1547,14 @@ export default function RaporlarPage() {
       {isDateActive && (
         <div
           className="flex items-center gap-3 px-4 py-3 rounded-xl"
-          style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}
+          style={{ background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)' }}
         >
           <div className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0"
-            style={{ background: 'rgba(16,185,129,0.12)' }}>
-            <i className="ri-calendar-line text-xs" style={{ color: '#10B981' }} />
+            style={{ background: 'rgba(14,165,233,0.12)' }}>
+            <i className="ri-calendar-line text-xs" style={{ color: '#0EA5E9' }} />
           </div>
           <div className="flex-1 min-w-0">
-            <span className="text-[12px] font-semibold" style={{ color: '#10B981' }}>Tarih Filtresi Aktif: </span>
+            <span className="text-[12px] font-semibold" style={{ color: '#0EA5E9' }}>Tarih Filtresi Aktif: </span>
             <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
               <strong>{activeDateLabel}</strong> dönemine ait veriler gösteriliyor.
             </span>
@@ -1562,7 +1562,7 @@ export default function RaporlarPage() {
           <button
             onClick={() => applyPreset('all')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap cursor-pointer transition-all"
-            style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+            style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}
           >
             <i className="ri-close-line text-xs" />
             Filtreyi Kaldır
