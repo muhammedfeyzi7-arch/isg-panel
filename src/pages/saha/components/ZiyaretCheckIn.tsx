@@ -339,15 +339,22 @@ export default function ZiyaretCheckIn() {
             </div>
           </div>
 
-          <button
-            onClick={handleCheckOut}
-            disabled={actionLoading}
-            className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all whitespace-nowrap"
-            style={{ background: actionLoading ? '#64748B' : 'linear-gradient(135deg, #EF4444, #DC2626)', opacity: actionLoading ? 0.7 : 1 }}>
-            {actionLoading
-              ? <><i className="ri-loader-4-line animate-spin" />İşleniyor...</>
-              : <><i className="ri-logout-box-r-line text-base" />Ziyareti Bitir (Check-out)</>}
-          </button>
+          {/* QR ile bitir bilgisi */}
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
+            style={{ background: 'rgba(14,165,233,0.06)', border: '1px dashed rgba(14,165,233,0.3)' }}>
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'rgba(14,165,233,0.1)' }}>
+              <i className="ri-qr-scan-2-line text-base" style={{ color: '#0EA5E9' }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Ziyareti bitirmek için QR okutun
+              </p>
+              <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#64748B' }}>
+                Aynı firma QR kodunu tekrar okutun — ziyaret otomatik tamamlanır.
+              </p>
+            </div>
+          </div>
         </div>
       ) : (
         /* ── CHECK-IN ALANI ── */

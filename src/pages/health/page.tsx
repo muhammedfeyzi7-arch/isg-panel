@@ -307,7 +307,10 @@ function HealthActionBtn({ icon, onClick, title }: { icon: string; onClick: () =
 
 // ─── Ana Sayfa ────────────────────────────────────────────────────────────────
 export default function MuayenelerPage() {
-  const { muayeneler, personeller, firmalar, addMuayene, updateMuayene, deleteMuayene, addToast, refreshData } = useApp();
+  const { muayeneler, personeller, firmalar, addMuayene, updateMuayene, deleteMuayene, addToast, refreshData, org } = useApp();
+
+  // Gezici uzman kontrolü
+  const isGeziciUzman = (org as { osgbRole?: string } | null)?.osgbRole === 'gezici_uzman';
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -380,10 +383,8 @@ export default function MuayenelerPage() {
   const handleBulkDelete = async () => {
     const ids = [...selectedIds];
     const count = ids.length;
-    // Her birini sırayla sil — race condition önlemek için
     for (const id of ids) {
       deleteMuayene(id);
-      // Kısa bekleme — aynı anda çok sayıda DB yazımı önle
       await new Promise(r => setTimeout(r, 30));
     }
     addToast(`${count} kayıt silindi.`, 'success');
@@ -422,7 +423,6 @@ export default function MuayenelerPage() {
       muayeneTarihi: form.muayeneTarihi,
       sonrakiTarih: form.sonrakiTarih,
       saglikDurumu: form.saglikDurumu,
-      // Zorunlu ama kullanılmayan alanlar — boş bırak
       sonuc: 'Çalışabilir' as const,
       hastane: '',
       doktor: '',
@@ -463,11 +463,9 @@ export default function MuayenelerPage() {
       const rows = await parseImportFile(file);
       const preview = rows.map(r => {
         const normR = normalize(r.adSoyad);
-        // Önce tam eşleşme dene
         let matched = aktifPersoneller.find(p =>
           normalize(p.adSoyad) === normR
         );
-        // Tam eşleşme yoksa içerme dene (kısmi ad)
         if (!matched) {
           matched = aktifPersoneller.find(p =>
             normalize(p.adSoyad).includes(normR) || normR.includes(normalize(p.adSoyad))
@@ -491,7 +489,6 @@ export default function MuayenelerPage() {
       if (!r.matched) return;
       const p = aktifPersoneller.find(x => x.id === r.matched);
       if (!p) return;
-      // Tarih parse — DD.MM.YYYY veya YYYY-MM-DD
       const parseDate = (s: string) => {
         if (!s) return '';
         if (s.includes('.')) {
@@ -514,9 +511,15 @@ export default function MuayenelerPage() {
     setImportPreview(null);
   };
 
+  // ── GEZİCİ UZMAN KISITLI GÖRÜNÜM ────────────────────────────────────────────
+  if (isGeziciUzman) {
+    return <GeziciUzmanHealthView muayeneler={aktif} personeller={personeller} firmalar={firmalar} />;
+  }
+
+  // ── NORMAL TAM GÖRÜNÜM ────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      {/* ── Header — Hekim UI tarzı ── */}
+      {/* ── Header ── */}
       <div className="rounded-2xl overflow-hidden isg-card">
         <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #0284C7, #0EA5E9, #38BDF8)' }} />
         <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
@@ -608,16 +611,10 @@ export default function MuayenelerPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              className="btn-secondary whitespace-nowrap text-xs"
-            >
+            <button onClick={() => setSelectedIds(new Set())} className="btn-secondary whitespace-nowrap text-xs">
               <i className="ri-close-line mr-1" />Seçimi Temizle
             </button>
-            <button
-              onClick={() => setShowBulkDeleteModal(true)}
-              className="btn-danger whitespace-nowrap text-xs"
-            >
+            <button onClick={() => setShowBulkDeleteModal(true)} className="btn-danger whitespace-nowrap text-xs">
               <i className="ri-delete-bin-line mr-1" />{selectedIds.size} Kaydı Sil
             </button>
           </div>
@@ -635,7 +632,6 @@ export default function MuayenelerPage() {
         </div>
       ) : (
         <div className="space-y-1">
-          {/* Sütun başlıkları */}
           <div className="grid items-center px-4 py-2"
             style={{
               gridTemplateColumns: '32px 2fr 1.5fr 1.2fr 1.2fr 1.3fr 1fr 100px',
@@ -738,7 +734,7 @@ export default function MuayenelerPage() {
         </div>
       )}
 
-      {/* ── Kayıt Ekle/Düzenle Modal ── */}
+      {/* Modaller */}
       <Modal
         open={showModal}
         onClose={() => setShowModal(false)}
@@ -790,7 +786,6 @@ export default function MuayenelerPage() {
         </div>
       </Modal>
 
-      {/* ── Toplu Silme Modal ── */}
       <Modal
         open={showBulkDeleteModal}
         onClose={() => setShowBulkDeleteModal(false)}
@@ -813,11 +808,10 @@ export default function MuayenelerPage() {
           <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
             {selectedIds.size} kaydı silmek istediğinizden emin misiniz?
           </p>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Seçili kayıtlar çöp kutusuna taşınacak. Bu işlem geri alınabilir.</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Seçili kayıtlar çöp kutusuna taşınacak.</p>
         </div>
       </Modal>
 
-      {/* ── Silme Modal ── */}
       <Modal
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
@@ -840,7 +834,6 @@ export default function MuayenelerPage() {
         </div>
       </Modal>
 
-      {/* ── Excel Import Önizleme Modal ── */}
       <Modal
         open={!!importPreview}
         onClose={() => setImportPreview(null)}
@@ -864,7 +857,7 @@ export default function MuayenelerPage() {
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
             <i className="ri-information-line" style={{ color: '#60A5FA' }} />
             <p className="text-xs" style={{ color: '#60A5FA' }}>
-              {importPreview?.filter(r => r.matched).length} kayıt eşleşti, {importPreview?.filter(r => !r.matched).length} kayıt eşleşmedi (personel bulunamadı).
+              {importPreview?.filter(r => r.matched).length} kayıt eşleşti, {importPreview?.filter(r => !r.matched).length} kayıt eşleşmedi.
             </p>
           </div>
           <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--bg-item-border)' }}>
@@ -897,6 +890,212 @@ export default function MuayenelerPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+// ── Gezici Uzman Kısıtlı Görünüm ──────────────────────────────────────────────
+const SONUC_STYLE_MAP: Record<string, { bg: string; color: string; border: string; icon: string }> = {
+  'Çalışabilir':         { bg: 'rgba(52,211,153,0.1)',  color: '#34D399', border: 'rgba(52,211,153,0.25)',  icon: 'ri-checkbox-circle-line' },
+  'Kısıtlı Çalışabilir': { bg: 'rgba(245,158,11,0.1)',  color: '#F59E0B', border: 'rgba(245,158,11,0.25)',  icon: 'ri-alert-line' },
+  'Çalışamaz':           { bg: 'rgba(239,68,68,0.1)',   color: '#EF4444', border: 'rgba(239,68,68,0.25)',   icon: 'ri-close-circle-line' },
+};
+
+function GeziciUzmanHealthView({
+  muayeneler,
+  personeller,
+  firmalar,
+}: {
+  muayeneler: { id: string; personelId: string; firmaId: string; muayeneTarihi: string; sonrakiTarih: string; saglikDurumu?: string }[];
+  personeller: { id: string; adSoyad: string; gorev?: string }[];
+  firmalar: { id: string; ad: string }[];
+}) {
+  const [search, setSearch] = useState('');
+  const [durumFilter, setDurumFilter] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return muayeneler.filter(m => {
+      const p = personeller.find(x => x.id === m.personelId);
+      const f = firmalar.find(x => x.id === m.firmaId);
+      const matchQ = !q
+        || (p?.adSoyad.toLowerCase().includes(q) ?? false)
+        || (f?.ad.toLowerCase().includes(q) ?? false);
+      const sonuc = (m as unknown as { saglikDurumu?: string }).saglikDurumu ?? '';
+      const matchDurum = !durumFilter || sonuc === durumFilter;
+      return matchQ && matchDurum;
+    });
+  }, [muayeneler, personeller, firmalar, search, durumFilter]);
+
+  const calisabilir = muayeneler.filter(m => (m as unknown as { saglikDurumu?: string }).saglikDurumu === 'Çalışabilir').length;
+  const kisitli = muayeneler.filter(m => (m as unknown as { saglikDurumu?: string }).saglikDurumu === 'Kısıtlı Çalışabilir').length;
+  const calisamaz = muayeneler.filter(m => (m as unknown as { saglikDurumu?: string }).saglikDurumu === 'Çalışamaz').length;
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="rounded-2xl overflow-hidden isg-card">
+        <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #0284C7, #0EA5E9, #38BDF8)' }} />
+        <div className="px-5 py-4 flex items-center gap-3">
+          <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #0284C7, #0EA5E9)' }}>
+            <i className="ri-heart-pulse-line text-white text-sm" />
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+              Sağlık Durumu
+            </h1>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              İşyeri hekimi muayene kayıtları — sadece görüntüleme
+            </p>
+          </div>
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+            style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9', border: '1px solid rgba(14,165,233,0.2)' }}>
+            <i className="ri-eye-line text-[11px]" />
+            Salt Okunur
+          </span>
+        </div>
+      </div>
+
+      {/* Bilgi notu */}
+      <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
+        style={{ background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.2)' }}>
+        <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+          style={{ background: 'rgba(14,165,233,0.1)' }}>
+          <i className="ri-information-line text-sm" style={{ color: '#0EA5E9' }} />
+        </div>
+        <p className="text-xs leading-relaxed pt-1" style={{ color: '#64748B' }}>
+          Bu bölümde yalnızca işyeri hekimi tarafından girilen muayene sonuçları görüntülenmektedir.
+          Kayıt ekleme, düzenleme veya silme yapılamaz.
+        </p>
+      </div>
+
+      {/* KPI Kartları */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Toplam', value: muayeneler.length, color: '#60A5FA', bg: 'rgba(96,165,250,0.1)', icon: 'ri-heart-pulse-line' },
+          { label: 'Çalışabilir', value: calisabilir, color: '#34D399', bg: 'rgba(52,211,153,0.1)', icon: 'ri-checkbox-circle-line' },
+          { label: 'Kısıtlı', value: kisitli, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', icon: 'ri-alert-line' },
+          { label: 'Çalışamaz', value: calisamaz, color: '#EF4444', bg: 'rgba(239,68,68,0.1)', icon: 'ri-close-circle-line' },
+        ].map(s => (
+          <div key={s.label} className="isg-card stat-card-interactive rounded-xl p-3 flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: s.bg }}>
+              <i className={`${s.icon} text-base`} style={{ color: s.color }} />
+            </div>
+            <div>
+              <p className="text-xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{s.value}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtreler */}
+      <div className="flex flex-wrap gap-3 px-4 py-3 rounded-2xl isg-card">
+        <div className="relative flex-1 min-w-[180px]">
+          <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-muted)' }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="İsim veya firma ara..."
+            className="isg-input pl-9"
+          />
+        </div>
+        <select value={durumFilter} onChange={e => setDurumFilter(e.target.value)} className="isg-input" style={{ minWidth: '160px' }}>
+          <option value="">Tüm Durumlar</option>
+          <option value="Çalışabilir">Çalışabilir</option>
+          <option value="Kısıtlı Çalışabilir">Kısıtlı Çalışabilir</option>
+          <option value="Çalışamaz">Çalışamaz</option>
+        </select>
+        {(search || durumFilter) && (
+          <button onClick={() => { setSearch(''); setDurumFilter(''); }} className="btn-secondary whitespace-nowrap">
+            <i className="ri-filter-off-line" /> Temizle
+          </button>
+        )}
+        <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <i className="ri-list-check text-xs" />{filtered.length} kayıt
+        </div>
+      </div>
+
+      {/* Liste */}
+      {filtered.length === 0 ? (
+        <div className="isg-card rounded-xl py-20 text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
+            <i className="ri-heart-pulse-line text-3xl" style={{ color: '#60A5FA' }} />
+          </div>
+          <p className="font-semibold" style={{ color: 'var(--text-muted)' }}>Kayıt bulunamadı</p>
+          <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+            {search || durumFilter ? 'Farklı bir arama deneyin' : 'Henüz işyeri hekimi tarafından kayıt girilmemiş.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {/* Sütun başlıkları */}
+          <div className="grid items-center px-4 py-2"
+            style={{
+              gridTemplateColumns: '2fr 1.5fr 1.2fr',
+              borderBottom: '1px solid var(--border-subtle)',
+            }}>
+            {['PERSONEL', 'FİRMA', 'ÇALIŞMA DURUMU'].map(h => (
+              <span key={h} className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</span>
+            ))}
+          </div>
+
+          {/* Satırlar */}
+          <div className="space-y-1.5 pt-1">
+            {filtered.map(m => {
+              const p = personeller.find(x => x.id === m.personelId);
+              const f = firmalar.find(x => x.id === m.firmaId);
+              const sonuc = (m as unknown as { saglikDurumu?: string }).saglikDurumu ?? '';
+              const styleMap = SONUC_STYLE_MAP[sonuc] ?? { bg: 'rgba(100,116,139,0.1)', color: '#94A3B8', border: 'rgba(100,116,139,0.2)', icon: 'ri-question-line' };
+              return (
+                <div
+                  key={m.id}
+                  className="grid items-center px-4 py-3 rounded-xl"
+                  style={{
+                    gridTemplateColumns: '2fr 1.5fr 1.2fr',
+                    background: 'var(--bg-card-solid)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  {/* Personel */}
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                      {(p?.adSoyad || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{p?.adSoyad || '—'}</p>
+                    </div>
+                  </div>
+
+                  {/* Firma */}
+                  <div className="min-w-0 pr-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap max-w-full"
+                      style={{ background: 'rgba(16,185,129,0.08)', color: '#059669', border: '1px solid rgba(16,185,129,0.18)' }}>
+                      <i className="ri-building-2-line text-[9px] flex-shrink-0" />
+                      <span className="truncate">{f?.ad || '—'}</span>
+                    </span>
+                  </div>
+
+                  {/* Çalışma Durumu */}
+                  <div>
+                    {sonuc ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
+                        style={{ background: styleMap.bg, color: styleMap.color, border: `1px solid ${styleMap.border}` }}>
+                        <i className={`${styleMap.icon} text-[9px]`} />{sonuc}
+                      </span>
+                    ) : (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
