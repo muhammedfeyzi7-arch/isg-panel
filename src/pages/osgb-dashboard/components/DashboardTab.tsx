@@ -25,6 +25,7 @@ interface Ziyaret {
   id: string;
   uzman_user_id: string;
   firma_org_id: string;
+  firma_ad: string | null;
   giris_saati: string;
   cikis_saati: string | null;
   qr_ile_giris?: boolean;
@@ -144,7 +145,7 @@ export default function DashboardTab({
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const { data } = await supabase
           .from('osgb_ziyaretler')
-          .select('id, uzman_user_id, firma_org_id, giris_saati, cikis_saati, qr_ile_giris')
+          .select('id, uzman_user_id, firma_org_id, firma_ad, giris_saati, cikis_saati, qr_ile_giris')
           .eq('osgb_org_id', orgId)
           .gte('giris_saati', thirtyDaysAgo.toISOString())
           .order('giris_saati', { ascending: false });
@@ -189,7 +190,8 @@ export default function DashboardTab({
     return u?.display_name ?? u?.email ?? 'Bilinmeyen';
   };
 
-  const getFirmaAd = (fid: string) => {
+  const getFirmaAd = (fid: string, firmaAd?: string | null) => {
+    if (firmaAd) return firmaAd;
     const f = altFirmalar.find(x => x.id === fid);
     return f?.name ?? 'Bilinmeyen Firma';
   };
@@ -285,7 +287,7 @@ export default function DashboardTab({
           <p className="text-base font-black leading-snug mb-1" style={{ color: '#F59E0B' }}>
             {sonZiyaret ? timeAgo(sonZiyaret.giris_saati) : '—'}
           </p>
-          {sonZiyaret && <p className="text-[11px] font-semibold truncate" style={{ color: textSecondary }}>{getFirmaAd(sonZiyaret.firma_id)}</p>}
+          {sonZiyaret && <p className="text-[11px] font-semibold truncate" style={{ color: textSecondary }}>{getFirmaAd(sonZiyaret.firma_org_id, sonZiyaret.firma_ad)}</p>}
           {!sonZiyaret && <p className="text-[11px] font-medium" style={{ color: textSecondary }}>Henüz ziyaret yok</p>}
         </div>
       </div>
@@ -500,7 +502,7 @@ export default function DashboardTab({
                 {son5.map((z, idx) => {
                   const isAktif = !z.cikis_saati;
                   const uzmanAd = getUzmanAd(z.uzman_user_id);
-                  const firmaAd = getFirmaAd(z.firma_org_id);
+                  const firmaAd = getFirmaAd(z.firma_org_id, z.firma_ad);
                   const girisSaat = new Date(z.giris_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
                   const sure = formatDuration(z.giris_saati, z.cikis_saati);
                   const initial = uzmanAd.charAt(0).toUpperCase();
