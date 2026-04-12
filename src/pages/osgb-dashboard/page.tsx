@@ -15,6 +15,7 @@ import OsgbSidebar from './components/OsgbSidebar';
 import OsgbHeader from './components/OsgbHeader';
 import OsgbSettings from './components/OsgbSettings';
 import ZiyaretlerTab from './components/ZiyaretlerTab';
+import CopKutusuTab from './components/CopKutusuTab';
 import OsgbLoadingScreen from './components/OsgbLoadingScreen';
 import OsgbOnboarding from './components/OsgbOnboarding';
 import OnboardingTour from '../../components/feature/OnboardingTour';
@@ -43,7 +44,7 @@ interface Uzman {
   osgb_role?: string | null;
 }
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'copkutusu' | 'ayarlar';
 
 interface FirmaDetay {
   id: string;
@@ -128,12 +129,13 @@ export default function OsgbDashboardPage() {
     if (!org?.id) return;
     setDataLoading(true);
     try {
-      // Alt firmalar (parent_org_id = bu OSGB'nin org id'si)
+      // Alt firmalar (parent_org_id = bu OSGB'nin org id'si) — silinmemişler
       const { data: firmData } = await supabase
         .from('organizations')
         .select('id, name, invite_code, created_at')
         .eq('parent_org_id', org.id)
         .eq('org_type', 'firma')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       // Tüm personel (gezici_uzman + isyeri_hekimi)
@@ -798,6 +800,11 @@ export default function OsgbDashboardPage() {
               {/* ── ZİYARETLER TAB ── */}
               {activeTab === 'ziyaretler' && (
                 <ZiyaretlerTab isDark={isDark} />
+              )}
+
+              {/* ── ÇÖP KUTUSU TAB ── */}
+              {activeTab === 'copkutusu' && org?.id && (
+                <CopKutusuTab orgId={org.id} isDark={isDark} onFirmaRestored={fetchData} />
               )}
 
               {/* ── AYARLAR TAB ── */}

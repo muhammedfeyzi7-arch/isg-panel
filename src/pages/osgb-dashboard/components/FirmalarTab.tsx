@@ -149,16 +149,16 @@ export default function FirmalarTab({
     void fetchVisits();
   }, [orgId, altFirmalar, fetchGpsInfo]);
 
-  const handleSil = async (firmaId: string, firmaAdi: string) => {
+  const handleSil = async (firmaId: string, _firmaAdi: string) => {
     setSilLoading(true);
     try {
+      const now = new Date().toISOString();
       const { error } = await supabase
         .from('organizations')
-        .update({ is_active: false, name: `[SİLİNDİ] ${firmaAdi}` })
+        .update({ deleted_at: now })
         .eq('id', firmaId);
       if (error) throw error;
       setSilOnayId(null);
-      // Callback ile parent state'i güncelle (reload yok)
       if (onFirmaDeleted) {
         onFirmaDeleted(firmaId);
       }

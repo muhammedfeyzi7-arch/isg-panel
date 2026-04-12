@@ -202,7 +202,10 @@ export default function ForcePasswordChange() {
         >
           {/* Mobile brand */}
           <div className="lg:hidden flex items-center gap-2.5 mb-7">
-            <img src={LOGO_URL} alt="ISG" className="w-7 h-7 object-contain" />
+            <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <i className="ri-shield-keyhole-line text-sm" style={{ color: '#10B981' }} />
+            </div>
             <p className="text-sm font-bold" style={{ color: textPrimary }}>ISG Denetim</p>
           </div>
 

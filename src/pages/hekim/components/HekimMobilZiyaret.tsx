@@ -353,13 +353,31 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
 
     if (!firmaId) { addToast('Geçersiz QR kodu.', 'error'); return; }
 
-    if (aktifZiyaret) {
-      if (aktifZiyaret.firma_org_id === firmaId) void handleCheckOut();
-      else addToast(`Başka firmada aktif ziyaret var (${aktifZiyaret.firma_ad}). Önce bitirin.`, 'error');
-    } else {
-      void handleCheckIn(firmaId, true);
-    }
-  }, [aktifZiyaret, handleCheckIn, handleCheckOut, addToast]);
+    // aktifZiyaret state'ini doğrudan okumak yerine DB'den kontrol et
+    const resolvedFirmaId = firmaId;
+    void (async () => {
+      if (!user?.id) return;
+      const { data: aktif } = await supabase
+        .from('osgb_ziyaretler')
+        .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
+        .eq('uzman_user_id', user.id)
+        .eq('durum', 'aktif')
+        .maybeSingle();
+
+      if (aktif) {
+        if (aktif.firma_org_id === resolvedFirmaId) {
+          // Checkout yap — state'i güncelle
+          setAktifZiyaret(aktif as AktifZiyaret);
+          // Kısa gecikme ile checkout çağır
+          setTimeout(() => void handleCheckOut(), 100);
+        } else {
+          addToast(`Başka firmada aktif ziyaret var (${aktif.firma_ad ?? 'Firma'}). Önce bitirin.`, 'error');
+        }
+      } else {
+        void handleCheckIn(resolvedFirmaId, true);
+      }
+    })();
+  }, [user?.id, handleCheckIn, handleCheckOut, addToast]);
 
   const formatTime = (iso: string) => new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const formatDate = (iso: string) => {
@@ -592,21 +610,15 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
                 </button>
               )}
 
-              {/* Manuel bitir butonu */}
-              {!showQr && (
-                <button
-                  onClick={handleCheckOut}
-                  disabled={actionLoading}
-                  className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl text-sm font-bold text-white cursor-pointer transition-all"
-                  style={{
-                    background: actionLoading ? '#334155' : 'linear-gradient(135deg, #EF4444, #DC2626)',
-                    opacity: actionLoading ? 0.7 : 1,
-                  }}
-                >
-                  {actionLoading
-                    ? <><i className="ri-loader-4-line animate-spin" />İşleniyor...</>
-                    : <><i className="ri-logout-box-r-line text-base" />Ziyareti Bitir (Check-out)</>}
-                </button>
+              {/* Sadece QR ile bitirme — manuel buton yok */}
+              {!showQr && !actionLoading && (
+                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
+                  style={{ background: 'rgba(14,165,233,0.04)', border: '1px dashed rgba(14,165,233,0.2)' }}>
+                  <i className="ri-information-line text-xs flex-shrink-0 mt-0.5" style={{ color: ACCENT }} />
+                  <p className="text-[10px] leading-relaxed" style={{ color: '#64748B' }}>
+                    Ziyareti bitirmek için aynı firmanın QR kodunu tekrar okutun.
+                  </p>
+                </div>
               )}
             </div>
           </div>
