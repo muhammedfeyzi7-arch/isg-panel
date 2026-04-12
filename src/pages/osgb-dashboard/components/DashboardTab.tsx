@@ -191,9 +191,8 @@ export default function DashboardTab({
   };
 
   const getFirmaAd = (fid: string, firmaAd?: string | null) => {
-    if (firmaAd) return firmaAd;
     const f = altFirmalar.find(x => x.id === fid);
-    return f?.name ?? 'Bilinmeyen Firma';
+    return f?.name ?? firmaAd ?? 'Bilinmeyen Firma';
   };
 
   void bugunZiyaretler;

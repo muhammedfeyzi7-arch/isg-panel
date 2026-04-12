@@ -214,7 +214,9 @@ export default function ZiyaretCheckIn() {
       setAktifZiyaret(null);
       void fetchZiyaret();
     } catch (err) {
-      addToast(`Check-out yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      console.error('[ZiyaretCheckIn] checkout err:', err);
+      // Sessizce başarısız — ziyaret durumu yenile
+      void fetchZiyaret();
     } finally {
       setActionLoading(false);
     }
@@ -339,46 +341,39 @@ export default function ZiyaretCheckIn() {
             </div>
           </div>
 
-          {/* QR ile bitir — tıklanabilir buton */}
-          {!showQr ? (
-            <button
-              onClick={() => setShowQr(true)}
-              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl cursor-pointer transition-all"
-              style={{ background: 'rgba(14,165,233,0.08)', border: '2px dashed rgba(14,165,233,0.4)' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.14)'; e.currentTarget.style.borderColor = 'rgba(14,165,233,0.6)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.08)'; e.currentTarget.style.borderColor = 'rgba(14,165,233,0.4)'; }}>
-              <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
-                style={{ background: 'rgba(14,165,233,0.15)' }}>
-                <i className="ri-qr-scan-2-line text-base" style={{ color: '#0EA5E9' }} />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-bold" style={{ color: '#0EA5E9' }}>
-                  QR Okut — Ziyareti Bitir
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: '#64748B' }}>
-                  Aynı firma QR&apos;ını okutun → otomatik tamamlanır
-                </p>
-              </div>
-              <i className="ri-arrow-right-s-line text-xl ml-auto" style={{ color: '#0EA5E9' }} />
-            </button>
-          ) : (
-            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(14,165,233,0.3)' }}>
-              <div className="flex items-center justify-between px-4 py-2.5"
-                style={{ background: 'rgba(14,165,233,0.08)', borderBottom: '1px solid rgba(14,165,233,0.2)' }}>
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Firma QR Kodunu Okut</p>
+          {/* QR ile bitir — buton + bilgi */}
+          {showQr ? (
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(14,165,233,0.2)' }}>
+              <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Aynı Firma QR\'ını Okut</p>
                 <button onClick={() => setShowQr(false)}
                   className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer"
                   style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
                   <i className="ri-close-line text-sm" />
                 </button>
               </div>
-              <div className="p-3">
-                <QrScanner onResult={handleQrResult} onClose={() => setShowQr(false)} />
-                <p className="text-center text-xs mt-2" style={{ color: '#64748B' }}>
-                  Aynı firma QR&apos;ını tarat → ziyaret otomatik biter
-                </p>
-              </div>
+              <QrScanner onResult={handleQrResult} onClose={() => setShowQr(false)} />
+              <p className="text-center text-xs py-2" style={{ color: '#64748B' }}>
+                Aynı firmayı okutunca ziyaret otomatik biter
+              </p>
             </div>
+          ) : (
+            <button
+              onClick={() => setShowQr(true)}
+              disabled={actionLoading}
+              className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl cursor-pointer transition-all"
+              style={{ background: 'rgba(14,165,233,0.08)', border: '2px dashed rgba(14,165,233,0.35)', color: '#0EA5E9' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.14)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.08)'; }}>
+              <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(14,165,233,0.15)' }}>
+                <i className="ri-qr-scan-2-line text-base" style={{ color: '#0EA5E9' }} />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold" style={{ color: '#0EA5E9' }}>QR ile Ziyareti Bitir</p>
+                <p className="text-xs" style={{ color: '#64748B' }}>Aynı firma QR kodunu okutun</p>
+              </div>
+            </button>
           )}
         </div>
       ) : (

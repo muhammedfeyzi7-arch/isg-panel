@@ -67,7 +67,8 @@ export function usePermissions(): Permissions {
     canAccessSettings: isAdmin,
     canAccessModule,
     canViewSensitiveData: !isDenetci,
-    // Gezici uzman firma ekleyemez/düzenleyemez/silemez
+    // Firma ekle/düzenle/sil: sadece admin, member, firma_user
+    // Gezici uzman ve işyeri hekimi firmalar üzerinde yönetim yapamaz
     canManageFirma: isAdmin || isMember || isFirmaUser,
   };
 }

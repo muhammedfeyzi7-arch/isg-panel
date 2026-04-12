@@ -4,7 +4,6 @@ import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
 import LoginPage from "../pages/login/page";
 import OsgbDashboardPage from "../pages/osgb-dashboard/page";
-import OsgbOnboardingPage from "../pages/osgb-onboarding/page";
 import OsgbUzmanPage from "../pages/osgb-uzman/page";
 import HekimPage from "../pages/hekim/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
@@ -51,14 +50,6 @@ const routes: RouteObject[] = [
     ),
   },
   {
-    path: "/osgb-onboarding",
-    element: (
-      <ProtectedRoute>
-        <OsgbOnboardingPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
     path: "/osgb-uzman",
     element: (
       <ProtectedRoute>
@@ -81,10 +72,6 @@ const routes: RouteObject[] = [
   {
     path: "/reset-password",
     element: <ResetPasswordPage />,
-  },
-  {
-    path: "/onboarding",
-    element: <Navigate to="/" replace />,
   },
   // Login sonrası resolve → rol bazlı yönlendirme
   {
