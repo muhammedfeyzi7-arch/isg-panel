@@ -1,13 +1,27 @@
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import Human3DModel from './Human3DModel';
+
+interface TekrarUyari {
+  tip: 'personel' | 'firma';
+  kazaTuru: string;
+  sayi: number;
+  sonTarih: string;
+  etiket: string;
+}
 
 interface PersonelOption {
   id: string;
   adSoyad: string;
   gorev: string;
   firmaId: string;
+}
+
+interface BesNedenItem {
+  sira: number;
+  neden: string;
+  aciklama: string;
 }
 
 interface IsKazasiFormData {
@@ -27,6 +41,13 @@ interface IsKazasiFormData {
   tanikBilgileri: string;
   onlemler: string;
   durum: string;
+  // Yeni alanlar
+  sgkBildirildi: boolean;
+  sgkBildirimTarihi: string;
+  sgkBildirimNotu: string;
+  fotografPaths: string[];
+  olayYeriDiagram: string;
+  besNeden: BesNedenItem[];
 }
 
 interface HekimIsKazasiModalProps {
@@ -38,6 +59,14 @@ interface HekimIsKazasiModalProps {
   editData?: (IsKazasiFormData & { id: string }) | null;
   preselectedPersonelId?: string | null;
 }
+
+const BES_NEDEN_TEMPLATE: BesNedenItem[] = [
+  { sira: 1, neden: '', aciklama: '' },
+  { sira: 2, neden: '', aciklama: '' },
+  { sira: 3, neden: '', aciklama: '' },
+  { sira: 4, neden: '', aciklama: '' },
+  { sira: 5, neden: '', aciklama: '' },
+];
 
 const KAZA_TURLERI = ['Düşme', 'Çarpma/Temas', 'Elektrik Çarpması', 'Yanma/Haşlanma', 'Kesik/Yara', 'Kimyasal Temas', 'Kas-İskelet Zorlanması', 'Trafik Kazası', 'Diğer'];
 const YARALANMA_TURLERI = ['Kırık', 'Burkulma/Gerilme', 'Kesik/Yara', 'Yanık', 'Ezilme', 'Zehirlenme', 'Çıkık', 'Diğer'];
@@ -95,6 +124,9 @@ const emptyForm: IsKazasiFormData = {
   yaraliVucutBolgeleri: [], yaralanmaTuru: '', yaralanmaSiddeti: 'Hafif',
   isGunuKaybi: 0, hastaneyeKaldirildi: false, hastaneAdi: '',
   tanikBilgileri: '', onlemler: '', durum: 'Açık',
+  sgkBildirildi: false, sgkBildirimTarihi: '', sgkBildirimNotu: '',
+  fotografPaths: [], olayYeriDiagram: '',
+  besNeden: JSON.parse(JSON.stringify(BES_NEDEN_TEMPLATE)),
 };
 
 export default function HekimIsKazasiModal({
@@ -105,7 +137,17 @@ export default function HekimIsKazasiModal({
   const [firmaAdMap, setFirmaAdMap] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<'kaza' | 'yaralanma' | 'onceki'>('kaza');
+  const [activeTab, setActiveTab] = useState<'kaza' | 'yaralanma' | 'onceki' | 'sgk' | 'foto' | 'analiz'>('kaza');
+  const [tekrarUyarilari, setTekrarUyarilari] = useState<TekrarUyari[]>([]);
+  const [uyariGizle, setUyariGizle] = useState(false);
+  const [fotografYukleniyor, setFotografYukleniyor] = useState(false);
+  const [fotografOnizleme, setFotografOnizleme] = useState<string[]>([]);
+  const [canvasRef, setCanvasRef] = useState<HTMLCanvasElement | null>(null);
+  const [cizimAraci, setCizimAraci] = useState<'kalem' | 'ok' | 'daire' | 'silgi'>('kalem');
+  const [cizimRengi, setCizimRengi] = useState('#ef4444');
+  const [cizimKalinlik, setCizimKalinlik] = useState(3);
+  const [cizimAktif, setCizimAktif] = useState(false);
+  const [sgkSonGun, setSgkSonGun] = useState<string | null>(null);
   const [pastKazalar, setPastKazalar] = useState<{
     id: string; kaza_tarihi: string; kaza_yeri: string;
     yarali_vucut_bolgeleri: string[]; yaralanma_siddeti: string; durum: string;
@@ -180,7 +222,15 @@ export default function HekimIsKazasiModal({
   useEffect(() => {
     if (!open) return;
     if (editData) {
-      setForm({ ...editData });
+      setForm({
+        ...editData,
+        sgkBildirildi: editData.sgkBildirildi ?? false,
+        sgkBildirimTarihi: editData.sgkBildirimTarihi ?? '',
+        sgkBildirimNotu: editData.sgkBildirimNotu ?? '',
+        fotografPaths: editData.fotografPaths ?? [],
+        olayYeriDiagram: editData.olayYeriDiagram ?? '',
+        besNeden: editData.besNeden?.length ? editData.besNeden : JSON.parse(JSON.stringify(BES_NEDEN_TEMPLATE)),
+      });
     } else if (preselectedPersonelId) {
       const p = personelOptions.find(x => x.id === preselectedPersonelId);
       setForm({ ...emptyForm, personelId: preselectedPersonelId, firmaId: p?.firmaId ?? '' });
@@ -190,6 +240,10 @@ export default function HekimIsKazasiModal({
     setErrors({});
     setActiveTab('kaza');
     setPastKazalar([]);
+    setTekrarUyarilari([]);
+    setUyariGizle(false);
+    setFotografOnizleme([]);
+    setSgkSonGun(null);
   }, [open, editData, preselectedPersonelId, personelOptions]);
 
   useEffect(() => {
@@ -213,6 +267,121 @@ export default function HekimIsKazasiModal({
     };
     fetchPast();
   }, [form.personelId, editData?.id]);
+
+  // ── SGK son bildirim günü hesapla (3 iş günü) ──
+  useEffect(() => {
+    if (!form.kazaTarihi) { setSgkSonGun(null); return; }
+    try {
+      const start = new Date(form.kazaTarihi);
+      let count = 0;
+      const cur = new Date(start);
+      cur.setDate(cur.getDate() + 1);
+      while (count < 3) {
+        const day = cur.getDay();
+        if (day !== 0 && day !== 6) count++;
+        if (count < 3) cur.setDate(cur.getDate() + 1);
+      }
+      setSgkSonGun(cur.toISOString().split('T')[0]);
+    } catch { setSgkSonGun(null); }
+  }, [form.kazaTarihi]);
+
+  // ── Kaza tekrar analizi ──
+  const analizTekrar = useCallback(async (personelId: string, firmaId: string, kazaTuru: string) => {
+    if (!personelId && !firmaId) { setTekrarUyarilari([]); return; }
+    const altıAyOnce = new Date();
+    altıAyOnce.setMonth(altıAyOnce.getMonth() - 6);
+    const sinir = altıAyOnce.toISOString().split('T')[0];
+
+    try {
+      const uyarilar: TekrarUyari[] = [];
+
+      // Aynı personelde tekrar eden kaza türü
+      if (personelId) {
+        const { data: pRows } = await supabase
+          .from('is_kazalari')
+          .select('id, kaza_turu, kaza_tarihi')
+          .eq('personel_id', personelId)
+          .gte('kaza_tarihi', sinir)
+          .is('deleted_at', null);
+
+        const pFiltered = (pRows ?? []).filter(r => r.id !== editData?.id);
+
+        // Tüm kaza türlerini say (kaza türü seçiliyse o türü, seçili değilse genel sayım)
+        const turSayac: Record<string, { sayi: number; sonTarih: string }> = {};
+        pFiltered.forEach(r => {
+          const tur = r.kaza_turu || 'Belirtilmemiş';
+          if (!turSayac[tur]) turSayac[tur] = { sayi: 0, sonTarih: r.kaza_tarihi };
+          turSayac[tur].sayi += 1;
+          if (r.kaza_tarihi > turSayac[tur].sonTarih) turSayac[tur].sonTarih = r.kaza_tarihi;
+        });
+
+        // Eğer kaza türü seçiliyse o türe bak, yoksa tekrarlayan her türü bul
+        if (kazaTuru) {
+          const entry = turSayac[kazaTuru];
+          if (entry && entry.sayi >= 1) {
+            uyarilar.push({
+              tip: 'personel',
+              kazaTuru,
+              sayi: entry.sayi,
+              sonTarih: entry.sonTarih,
+              etiket: 'Aynı Personel',
+            });
+          }
+        } else {
+          // Kaza türü henüz seçilmemişse genel uyarı ver (1+ kaza varsa)
+          if (pFiltered.length >= 2) {
+            const enYeniTarih = pFiltered.reduce((acc, r) => r.kaza_tarihi > acc ? r.kaza_tarihi : acc, '');
+            uyarilar.push({
+              tip: 'personel',
+              kazaTuru: '',
+              sayi: pFiltered.length,
+              sonTarih: enYeniTarih,
+              etiket: 'Aynı Personel',
+            });
+          }
+        }
+      }
+
+      // Aynı firmada tekrar eden kaza türü
+      if (firmaId && kazaTuru) {
+        const { data: fRows } = await supabase
+          .from('is_kazalari')
+          .select('id, kaza_turu, kaza_tarihi, personel_id')
+          .eq('organization_id', firmaId)
+          .eq('kaza_turu', kazaTuru)
+          .gte('kaza_tarihi', sinir)
+          .is('deleted_at', null);
+
+        const fFiltered = (fRows ?? []).filter(r => r.id !== editData?.id);
+
+        if (fFiltered.length >= 2) {
+          const enYeniTarih = fFiltered.reduce((acc, r) => r.kaza_tarihi > acc ? r.kaza_tarihi : acc, '');
+          // Personel uyarısıyla zaten kapsanmıyorsa ekle
+          const zatenVar = uyarilar.some(u => u.tip === 'personel' && u.kazaTuru === kazaTuru);
+          if (!zatenVar || fFiltered.length > 2) {
+            uyarilar.push({
+              tip: 'firma',
+              kazaTuru,
+              sayi: fFiltered.length,
+              sonTarih: enYeniTarih,
+              etiket: 'Aynı Firma',
+            });
+          }
+        }
+      }
+
+      setTekrarUyarilari(uyarilar);
+      if (uyarilar.length > 0) setUyariGizle(false);
+    } catch {
+      setTekrarUyarilari([]);
+    }
+  }, [editData?.id]);
+
+  // Personel, firma veya kaza türü değişince tekrar analizi yap
+  useEffect(() => {
+    if (!open) return;
+    analizTekrar(form.personelId, form.firmaId, form.kazaTuru);
+  }, [open, form.personelId, form.firmaId, form.kazaTuru, analizTekrar]);
 
   const toggleBolge = (id: string) => {
     setForm(prev => ({
@@ -253,6 +422,12 @@ export default function HekimIsKazasiModal({
         tanik_bilgileri: form.tanikBilgileri,
         onlemler: form.onlemler,
         durum: form.durum,
+        sgk_bildirildi: form.sgkBildirildi,
+        sgk_bildirim_tarihi: form.sgkBildirimTarihi || null,
+        sgk_bildirim_notu: form.sgkBildirimNotu || null,
+        fotograf_paths: form.fotografPaths,
+        olay_yeri_diagram: form.olayYeriDiagram || null,
+        bes_neden: form.besNeden,
       };
       if (editData?.id) {
         await supabase.from('is_kazalari').update(payload).eq('id', editData.id);
@@ -461,34 +636,159 @@ export default function HekimIsKazasiModal({
             </div>
 
             {/* Tabs */}
-            <div className="flex-shrink-0 flex items-center gap-1 px-4 py-2"
+            <div className="flex-shrink-0 flex items-center gap-0.5 px-3 py-1.5 flex-wrap"
               style={{ borderBottom: `1px solid ${borderSubtle}`, background: isDark ? 'rgba(255,255,255,0.01)' : '#f8fafc' }}>
               {([
-                { id: 'kaza',      label: 'Kaza Bilgisi', icon: 'ri-alert-line',            color: '#ef4444' },
-                { id: 'yaralanma', label: 'Yaralanma',    icon: 'ri-first-aid-kit-line',    color: '#f97316' },
-                { id: 'onceki',    label: 'Geçmiş',       icon: 'ri-history-line',           color: '#fbbf24' },
-              ] as { id: 'kaza' | 'yaralanma' | 'onceki'; label: string; icon: string; color: string }[]).map(tab => (
+                { id: 'kaza',      label: 'Kaza',      icon: 'ri-alert-line',            color: '#ef4444' },
+                { id: 'yaralanma', label: 'Yaralanma', icon: 'ri-first-aid-kit-line',    color: '#f97316' },
+                { id: 'sgk',       label: 'SGK',       icon: 'ri-government-line',       color: '#6366f1' },
+                { id: 'foto',      label: 'Fotoğraf',  icon: 'ri-camera-line',           color: '#0ea5e9' },
+                { id: 'analiz',    label: '5 Neden',   icon: 'ri-mind-map',              color: '#10b981' },
+                { id: 'onceki',    label: 'Geçmiş',    icon: 'ri-history-line',          color: '#fbbf24' },
+              ] as { id: 'kaza' | 'yaralanma' | 'onceki' | 'sgk' | 'foto' | 'analiz'; label: string; icon: string; color: string }[]).map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all whitespace-nowrap"
                   style={{
                     background: activeTab === tab.id ? `${tab.color}12` : 'transparent',
                     color: activeTab === tab.id ? tab.color : textMuted,
                     border: activeTab === tab.id ? `1px solid ${tab.color}28` : '1px solid transparent',
                   }}
                 >
-                  <i className={`${tab.icon} text-[11px]`} />
+                  <i className={`${tab.icon} text-[10px]`} />
                   {tab.label}
                   {tab.id === 'onceki' && pastKazalar.length > 0 && (
-                    <span className="w-4 h-4 rounded-full text-[8px] font-extrabold flex items-center justify-center"
+                    <span className="w-3.5 h-3.5 rounded-full text-[8px] font-extrabold flex items-center justify-center"
                       style={{ background: 'rgba(251,191,36,0.18)', color: '#fbbf24' }}>
                       {pastKazalar.length}
+                    </span>
+                  )}
+                  {tab.id === 'sgk' && !form.sgkBildirildi && form.kazaTarihi && (
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ background: '#ef4444', boxShadow: '0 0 4px rgba(239,68,68,0.6)' }} />
+                  )}
+                  {tab.id === 'foto' && form.fotografPaths.length > 0 && (
+                    <span className="w-3.5 h-3.5 rounded-full text-[8px] font-extrabold flex items-center justify-center"
+                      style={{ background: 'rgba(14,165,233,0.18)', color: '#0ea5e9' }}>
+                      {form.fotografPaths.length}
                     </span>
                   )}
                 </button>
               ))}
             </div>
+
+            {/* ── TEKRAR UYARI BANNER'I ── */}
+            {tekrarUyarilari.length > 0 && !uyariGizle && (
+              <div className="flex-shrink-0 mx-4 mt-3 rounded-xl overflow-hidden"
+                style={{ border: '1.5px solid rgba(251,191,36,0.35)', background: isDark ? 'rgba(251,191,36,0.07)' : 'rgba(251,191,36,0.06)' }}>
+                {/* Banner header */}
+                <div className="flex items-center justify-between px-3.5 py-2.5"
+                  style={{ borderBottom: '1px solid rgba(251,191,36,0.18)', background: isDark ? 'rgba(251,191,36,0.1)' : 'rgba(251,191,36,0.09)' }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0"
+                      style={{ background: 'rgba(251,191,36,0.2)', border: '1px solid rgba(251,191,36,0.35)' }}>
+                      <i className="ri-repeat-2-line text-[11px]" style={{ color: '#fbbf24' }} />
+                    </div>
+                    <span className="text-[11px] font-bold" style={{ color: '#fbbf24' }}>
+                      Tekrar Kaza Uyarısı
+                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
+                      {tekrarUyarilari.length} uyarı
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setUyariGizle(true)}
+                    className="w-5 h-5 flex items-center justify-center rounded cursor-pointer transition-all"
+                    style={{ color: 'rgba(251,191,36,0.6)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#fbbf24'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(251,191,36,0.6)'; }}
+                  >
+                    <i className="ri-close-line text-xs" />
+                  </button>
+                </div>
+
+                {/* Uyarı listesi */}
+                <div className="px-3.5 py-2.5 space-y-2">
+                  {tekrarUyarilari.map((u, idx) => {
+                    const isPers = u.tip === 'personel';
+                    const iconClass = isPers ? 'ri-user-line' : 'ri-building-2-line';
+                    const badgeColor = isPers ? '#f97316' : '#ef4444';
+                    const badgeBg = isPers ? 'rgba(249,115,22,0.12)' : 'rgba(239,68,68,0.1)';
+                    const badgeBorder = isPers ? 'rgba(249,115,22,0.3)' : 'rgba(239,68,68,0.25)';
+
+                    return (
+                      <div key={idx} className="flex items-start gap-2.5 rounded-lg px-2.5 py-2"
+                        style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)', border: `1px solid rgba(251,191,36,0.12)` }}>
+                        <div className="w-5 h-5 flex items-center justify-center rounded flex-shrink-0 mt-0.5"
+                          style={{ background: badgeBg, border: `1px solid ${badgeBorder}` }}>
+                          <i className={`${iconClass} text-[9px]`} style={{ color: badgeColor }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                              style={{ background: badgeBg, color: badgeColor, border: `1px solid ${badgeBorder}` }}>
+                              {u.etiket}
+                            </span>
+                            {u.kazaTuru && (
+                              <span className="text-[10px] font-semibold" style={{ color: textPrimary }}>
+                                &ldquo;{u.kazaTuru}&rdquo;
+                              </span>
+                            )}
+                            <span className="text-[10px]" style={{ color: textMuted }}>
+                              son 6 ayda
+                            </span>
+                            <span className="text-[10px] font-extrabold"
+                              style={{ color: u.sayi >= 3 ? '#ef4444' : '#fbbf24' }}>
+                              {u.sayi}x
+                            </span>
+                            <span className="text-[10px]" style={{ color: textMuted }}>tekrar</span>
+                          </div>
+                          <p className="text-[9px] mt-0.5" style={{ color: textFaint }}>
+                            <i className="ri-calendar-line mr-1" />
+                            Son kaza: {u.sonTarih ? new Date(u.sonTarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setActiveTab('onceki')}
+                          className="flex-shrink-0 text-[9px] font-bold px-2 py-1 rounded-lg cursor-pointer whitespace-nowrap transition-all"
+                          style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(251,191,36,0.18)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(251,191,36,0.1)'; }}
+                        >
+                          Geçmişi Gör
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Alt açıklama */}
+                <div className="px-3.5 pb-2.5">
+                  <p className="text-[9px] leading-relaxed" style={{ color: textFaint }}>
+                    <i className="ri-error-warning-line mr-1" />
+                    Tekrar eden kaza türleri sistemik bir risk işareti olabilir. İyileştirme önlemleri alındığından emin olun.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Uyarı gizlendiğinde küçük badge */}
+            {tekrarUyarilari.length > 0 && uyariGizle && (
+              <div className="flex-shrink-0 mx-4 mt-2 flex justify-end">
+                <button
+                  onClick={() => setUyariGizle(false)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all text-[10px] font-bold whitespace-nowrap"
+                  style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(251,191,36,0.18)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(251,191,36,0.1)'; }}
+                >
+                  <i className="ri-repeat-2-line text-xs" />
+                  {tekrarUyarilari.length} tekrar uyarısı
+                </button>
+              </div>
+            )}
 
             {/* Form içerik */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
@@ -763,6 +1063,449 @@ export default function HekimIsKazasiModal({
                     </div>
                   </div>
                 </>
+              )}
+
+              {/* ── TAB: SGK BİLDİRİM ── */}
+              {activeTab === 'sgk' && (
+                <div className="space-y-3">
+                  {/* SGK Bildirimi durumu */}
+                  <div style={SECTION_STYLE}>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5 mb-3" style={{ color: '#6366f1' }}>
+                      <i className="ri-government-line" />SGK Bildirimi
+                    </p>
+
+                    {/* Yasal bilgi */}
+                    {form.kazaTarihi && sgkSonGun && (
+                      <div className="rounded-xl px-3.5 py-3 mb-3 flex items-start gap-3"
+                        style={{
+                          background: form.sgkBildirildi ? 'rgba(16,185,129,0.07)' : 'rgba(239,68,68,0.07)',
+                          border: `1.5px solid ${form.sgkBildirildi ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                        }}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: form.sgkBildirildi ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)' }}>
+                          <i className={`${form.sgkBildirildi ? 'ri-check-double-line' : 'ri-time-line'} text-sm`}
+                            style={{ color: form.sgkBildirildi ? '#10b981' : '#ef4444' }} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[11px] font-bold mb-0.5"
+                            style={{ color: form.sgkBildirildi ? '#10b981' : '#ef4444' }}>
+                            {form.sgkBildirildi ? 'SGK bildirimi yapıldı' : 'SGK bildirimi bekleniyor'}
+                          </p>
+                          <p className="text-[10px]" style={{ color: textFaint }}>
+                            <span>Son bildirim tarihi: </span>
+                            <strong style={{ color: textPrimary }}>
+                              {new Date(sgkSonGun).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                            </strong>
+                          </p>
+                          {!form.sgkBildirildi && (() => {
+                            const today = new Date();
+                            const son = new Date(sgkSonGun);
+                            const kalan = Math.ceil((son.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                            return kalan >= 0 ? (
+                              <p className="text-[10px] mt-0.5" style={{ color: kalan <= 1 ? '#ef4444' : '#fbbf24' }}>
+                                <i className="ri-alarm-warning-line mr-1" />
+                                {kalan === 0 ? 'Bugün son gün!' : `${kalan} gün kaldı`}
+                              </p>
+                            ) : (
+                              <p className="text-[10px] mt-0.5 font-bold" style={{ color: '#ef4444' }}>
+                                <i className="ri-error-warning-line mr-1" />
+                                Bildirim süresi {Math.abs(kalan)} gün geçti!
+                              </p>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bildirildi toggle */}
+                    <div className="flex items-center justify-between p-3 rounded-xl mb-3"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)', border: `1px solid ${border}` }}>
+                      <div>
+                        <p className="text-xs font-bold" style={{ color: textPrimary }}>SGK&apos;ya bildirildi</p>
+                        <p className="text-[10px]" style={{ color: textFaint }}>6331 s. İSG Kanunu gereği 3 iş günü içinde</p>
+                      </div>
+                      <button
+                        onClick={() => setForm(p => ({ ...p, sgkBildirildi: !p.sgkBildirildi }))}
+                        className="relative flex-shrink-0 cursor-pointer transition-all"
+                        style={{ width: 44, height: 24 }}>
+                        <div className="absolute inset-0 rounded-full transition-all"
+                          style={{ background: form.sgkBildirildi ? '#10b981' : (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.15)') }} />
+                        <div className="absolute top-0.5 rounded-full transition-all"
+                          style={{
+                            width: 20, height: 20,
+                            background: '#fff',
+                            left: form.sgkBildirildi ? 22 : 2,
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                          }} />
+                      </button>
+                    </div>
+
+                    {form.sgkBildirildi && (
+                      <div className="space-y-3">
+                        <div>
+                          <label style={LABEL_STYLE}>Bildirim Tarihi</label>
+                          <input type="date" value={form.sgkBildirimTarihi}
+                            onChange={e => setForm(p => ({ ...p, sgkBildirimTarihi: e.target.value }))}
+                            style={{ ...INPUT_STYLE, colorScheme }}
+                            onFocus={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; }}
+                            onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
+                        </div>
+                        <div>
+                          <label style={LABEL_STYLE}>Bildirim Notu / Referans No</label>
+                          <textarea value={form.sgkBildirimNotu} rows={3} maxLength={500}
+                            placeholder="SGK referans numarası veya bildirim notu..."
+                            onChange={e => setForm(p => ({ ...p, sgkBildirimNotu: e.target.value }))}
+                            style={{ ...INPUT_STYLE, resize: 'none' }}
+                            onFocus={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; }}
+                            onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Yasal bilgi kutusu */}
+                  <div className="rounded-xl px-3.5 py-3"
+                    style={{ background: isDark ? 'rgba(251,191,36,0.06)' : 'rgba(251,191,36,0.05)', border: '1.5px solid rgba(251,191,36,0.2)' }}>
+                    <p className="text-[9px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: '#fbbf24' }}>
+                      <i className="ri-scales-3-line" />6331 Sayılı İSG Kanunu
+                    </p>
+                    <p className="text-[10px] leading-relaxed" style={{ color: textFaint }}>
+                      İş kazaları işveren tarafından kazanın gerçekleştiği tarihten itibaren
+                      <strong style={{ color: textPrimary }}> en geç 3 iş günü içinde</strong> SGK&apos;ya bildirilmek zorundadır.
+                      Meslek hastalıklarının bildirim süresi ise <strong style={{ color: textPrimary }}>3 iş günü</strong>dür.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB: FOTOĞRAF / KANIT ── */}
+              {activeTab === 'foto' && (
+                <div className="space-y-3">
+                  <div style={SECTION_STYLE}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5" style={{ color: '#0ea5e9' }}>
+                        <i className="ri-camera-line" />Fotoğraf &amp; Kanıt
+                      </p>
+                      <span className="text-[9px]" style={{ color: textFaint }}>Maks. 5 MB / dosya · JPG, PNG</span>
+                    </div>
+
+                    {/* Upload alanı */}
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-all"
+                      style={{
+                        border: `2px dashed ${isDark ? 'rgba(14,165,233,0.25)' : 'rgba(14,165,233,0.3)'}`,
+                        background: isDark ? 'rgba(14,165,233,0.04)' : 'rgba(14,165,233,0.03)',
+                        padding: '20px 12px',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.08)' : 'rgba(14,165,233,0.06)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.04)' : 'rgba(14,165,233,0.03)'; }}>
+                      <input type="file" multiple accept="image/jpeg,image/png"
+                        className="hidden"
+                        disabled={fotografYukleniyor}
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files ?? []);
+                          if (!files.length) return;
+                          setFotografYukleniyor(true);
+                          try {
+                            const { uploadFileToStorage, getSignedUrl } = await import('@/utils/fileUpload');
+                            const newPaths: string[] = [];
+                            const newPreviews: string[] = [];
+                            for (const file of files.slice(0, 10)) {
+                              if (file.size > 5 * 1024 * 1024) continue;
+                              const path = await uploadFileToStorage(file, form.firmaId || 'genel', 'is_kazasi_foto');
+                              if (path) {
+                                newPaths.push(path);
+                                const url = await getSignedUrl(path);
+                                if (url) newPreviews.push(url);
+                              }
+                            }
+                            setForm(p => ({ ...p, fotografPaths: [...p.fotografPaths, ...newPaths] }));
+                            setFotografOnizleme(p => [...p, ...newPreviews]);
+                          } finally {
+                            setFotografYukleniyor(false);
+                            e.target.value = '';
+                          }
+                        }} />
+                      {fotografYukleniyor ? (
+                        <>
+                          <i className="ri-loader-4-line animate-spin text-xl" style={{ color: '#0ea5e9' }} />
+                          <span className="text-[11px] font-semibold" style={{ color: '#0ea5e9' }}>Yükleniyor...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                            style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                            <i className="ri-upload-cloud-2-line text-lg" style={{ color: '#0ea5e9' }} />
+                          </div>
+                          <span className="text-[11px] font-bold" style={{ color: '#0ea5e9' }}>Fotoğraf ekle</span>
+                          <span className="text-[10px]" style={{ color: textFaint }}>Tıkla veya sürükle</span>
+                        </>
+                      )}
+                    </label>
+
+                    {/* Önizleme grid */}
+                    {fotografOnizleme.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2 mt-3">
+                        {fotografOnizleme.map((url, idx) => (
+                          <div key={idx} className="relative rounded-xl overflow-hidden"
+                            style={{ border: `1px solid ${border}`, aspectRatio: '1' }}>
+                            <img src={url} alt={`Kanıt ${idx + 1}`}
+                              className="w-full h-full object-cover" />
+                            <button
+                              onClick={() => {
+                                setFotografOnizleme(p => p.filter((_, i) => i !== idx));
+                                setForm(p => ({ ...p, fotografPaths: p.fotografPaths.filter((_, i) => i !== idx) }));
+                              }}
+                              className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
+                              style={{ background: 'rgba(239,68,68,0.85)', color: '#fff' }}>
+                              <i className="ri-close-line text-[10px]" />
+                            </button>
+                            <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1"
+                              style={{ background: 'rgba(0,0,0,0.55)' }}>
+                              <span className="text-[9px] font-bold text-white">Fotoğraf {idx + 1}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {form.fotografPaths.length === 0 && fotografOnizleme.length === 0 && (
+                      <p className="text-[10px] text-center mt-2" style={{ color: textFaint }}>
+                        Henüz fotoğraf eklenmedi
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Olay yeri diyagramı */}
+                  <div style={SECTION_STYLE}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5" style={{ color: '#f97316' }}>
+                        <i className="ri-map-2-line" />Olay Yeri Diyagramı
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        {/* Araç seçimi */}
+                        {[
+                          { id: 'kalem', icon: 'ri-pencil-line', title: 'Kalem' },
+                          { id: 'silgi', icon: 'ri-eraser-line', title: 'Silgi' },
+                        ].map(tool => (
+                          <button key={tool.id}
+                            onClick={() => setCizimAraci(tool.id as typeof cizimAraci)}
+                            title={tool.title}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                            style={{
+                              background: cizimAraci === tool.id ? 'rgba(249,115,22,0.15)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'),
+                              border: `1px solid ${cizimAraci === tool.id ? 'rgba(249,115,22,0.4)' : border}`,
+                              color: cizimAraci === tool.id ? '#f97316' : textMuted,
+                            }}>
+                            <i className={`${tool.icon} text-xs`} />
+                          </button>
+                        ))}
+                        {/* Renk seçimi */}
+                        {['#ef4444', '#fbbf24', '#22d3ee', '#10b981', '#0f172a'].map(c => (
+                          <button key={c}
+                            onClick={() => { setCizimRengi(c); setCizimAraci('kalem'); }}
+                            className="rounded-full cursor-pointer transition-all"
+                            style={{
+                              width: 18, height: 18,
+                              background: c,
+                              border: cizimRengi === c && cizimAraci === 'kalem' ? '2px solid white' : '2px solid transparent',
+                              outline: cizimRengi === c && cizimAraci === 'kalem' ? `2px solid ${c}` : 'none',
+                            }} />
+                        ))}
+                        {/* Kalem kalınlığı */}
+                        <select value={cizimKalinlik}
+                          onChange={e => setCizimKalinlik(Number(e.target.value))}
+                          style={{ ...INPUT_STYLE, width: 48, padding: '3px 4px', fontSize: 10, colorScheme }}>
+                          {[2, 3, 5, 8].map(k => <option key={k} value={k}>{k}px</option>)}
+                        </select>
+                        <button
+                          onClick={() => {
+                            if (!canvasRef) return;
+                            const ctx = canvasRef.getContext('2d');
+                            if (ctx) ctx.clearRect(0, 0, canvasRef.width, canvasRef.height);
+                            setForm(p => ({ ...p, olayYeriDiagram: '' }));
+                          }}
+                          className="text-[9px] font-bold px-2 py-1 rounded-lg cursor-pointer"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', color: textMuted, border: `1px solid ${border}` }}>
+                          Temizle
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Canvas */}
+                    <div className="rounded-xl overflow-hidden"
+                      style={{ border: `1px solid ${border}`, background: isDark ? '#0f172a' : '#f8fafc', cursor: cizimAraci === 'silgi' ? 'cell' : 'crosshair' }}>
+                      <canvas
+                        ref={(el) => {
+                          if (el && !canvasRef) {
+                            setCanvasRef(el);
+                            // Canvas'ı mevcut diyagramla doldur
+                            if (form.olayYeriDiagram) {
+                              const img = new Image();
+                              img.onload = () => {
+                                const ctx = el.getContext('2d');
+                                if (ctx) ctx.drawImage(img, 0, 0);
+                              };
+                              img.src = form.olayYeriDiagram;
+                            }
+                          }
+                        }}
+                        width={700}
+                        height={300}
+                        className="w-full"
+                        style={{ display: 'block', touchAction: 'none' }}
+                        onMouseDown={(e) => {
+                          if (!canvasRef) return;
+                          setCizimAktif(true);
+                          const rect = canvasRef.getBoundingClientRect();
+                          const scaleX = canvasRef.width / rect.width;
+                          const scaleY = canvasRef.height / rect.height;
+                          const ctx = canvasRef.getContext('2d');
+                          if (!ctx) return;
+                          ctx.beginPath();
+                          ctx.moveTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+                        }}
+                        onMouseMove={(e) => {
+                          if (!cizimAktif || !canvasRef) return;
+                          const rect = canvasRef.getBoundingClientRect();
+                          const scaleX = canvasRef.width / rect.width;
+                          const scaleY = canvasRef.height / rect.height;
+                          const ctx = canvasRef.getContext('2d');
+                          if (!ctx) return;
+                          if (cizimAraci === 'silgi') {
+                            ctx.clearRect(
+                              (e.clientX - rect.left) * scaleX - 15,
+                              (e.clientY - rect.top) * scaleY - 15,
+                              30, 30
+                            );
+                          } else {
+                            ctx.lineWidth = cizimKalinlik;
+                            ctx.strokeStyle = cizimRengi;
+                            ctx.lineCap = 'round';
+                            ctx.lineJoin = 'round';
+                            ctx.lineTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+                            ctx.stroke();
+                          }
+                        }}
+                        onMouseUp={() => {
+                          setCizimAktif(false);
+                          if (canvasRef) {
+                            setForm(p => ({ ...p, olayYeriDiagram: canvasRef.toDataURL() }));
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          if (cizimAktif) {
+                            setCizimAktif(false);
+                            if (canvasRef) setForm(p => ({ ...p, olayYeriDiagram: canvasRef.toDataURL() }));
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-[9px] mt-1.5" style={{ color: textFaint }}>
+                      <i className="ri-information-line mr-1" />Kaza yerini, ekipmanları ve hareket yönlerini çizerek görselleştirin
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── TAB: 5 NEDEN ANALİZİ ── */}
+              {activeTab === 'analiz' && (
+                <div className="space-y-3">
+                  {/* Açıklama */}
+                  <div className="rounded-xl px-3.5 py-3"
+                    style={{ background: isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.05)', border: '1.5px solid rgba(16,185,129,0.2)' }}>
+                    <p className="text-[10px] font-bold flex items-center gap-1.5 mb-1" style={{ color: '#10b981' }}>
+                      <i className="ri-mind-map" />5 Neden Kök Neden Analizi
+                    </p>
+                    <p className="text-[10px] leading-relaxed" style={{ color: textFaint }}>
+                      Kazanın temel nedenine ulaşmak için &quot;Neden oldu?&quot; sorusunu 5 kez sor.
+                      Her cevap bir sonraki soruyu doğurur — köke ulaşınca önlem belirlenir.
+                    </p>
+                  </div>
+
+                  {/* 5 Neden formu */}
+                  <div style={SECTION_STYLE}>
+                    <div className="space-y-3">
+                      {form.besNeden.map((item, idx) => (
+                        <div key={idx} className="rounded-xl p-3"
+                          style={{
+                            background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
+                            border: `1px solid ${item.neden ? 'rgba(16,185,129,0.25)' : border}`,
+                          }}>
+                          {/* Numara + başlık */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-extrabold"
+                              style={{
+                                background: item.neden ? 'rgba(16,185,129,0.15)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)'),
+                                color: item.neden ? '#10b981' : textMuted,
+                                border: `1.5px solid ${item.neden ? 'rgba(16,185,129,0.35)' : border}`,
+                              }}>
+                              {idx + 1}
+                            </div>
+                            <span className="text-[10px] font-bold" style={{ color: item.neden ? textPrimary : textMuted }}>
+                              {idx === 0 ? 'Neden kaza oldu?' : `Neden? (${idx + 1}. tekrar)`}
+                            </span>
+                            {idx > 0 && item.neden && (
+                              <i className="ri-arrow-left-line text-[10px] ml-auto" style={{ color: 'rgba(16,185,129,0.5)' }} />
+                            )}
+                          </div>
+
+                          <input
+                            type="text"
+                            value={item.neden}
+                            placeholder={idx === 0 ? 'Kazanın ilk sebebi...' : `${idx + 1}. nedenin nedeni...`}
+                            onChange={e => setForm(p => ({
+                              ...p,
+                              besNeden: p.besNeden.map((n, i) => i === idx ? { ...n, neden: e.target.value } : n),
+                            }))}
+                            style={INPUT_STYLE}
+                            onFocus={e => { e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)'; }}
+                            onBlur={e => { e.currentTarget.style.borderColor = item.neden ? 'rgba(16,185,129,0.25)' : inputBorder; }}
+                          />
+
+                          {/* Ek açıklama (isteğe bağlı) */}
+                          {item.neden && (
+                            <textarea
+                              value={item.aciklama}
+                              placeholder="Detay / kanıt (isteğe bağlı)..."
+                              rows={1}
+                              maxLength={300}
+                              onChange={e => setForm(p => ({
+                                ...p,
+                                besNeden: p.besNeden.map((n, i) => i === idx ? { ...n, aciklama: e.target.value } : n),
+                              }))}
+                              style={{ ...INPUT_STYLE, resize: 'none', marginTop: 6, fontSize: 11 }}
+                              onFocus={e => { e.currentTarget.style.borderColor = 'rgba(16,185,129,0.35)'; }}
+                              onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Kök neden özeti */}
+                    {form.besNeden.some(n => n.neden) && (
+                      <div className="mt-3 rounded-xl p-3"
+                        style={{ background: 'rgba(16,185,129,0.08)', border: '1.5px solid rgba(16,185,129,0.25)' }}>
+                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: '#10b981' }}>
+                          <i className="ri-focus-3-line mr-1.5" />Kök Neden Zinciri
+                        </p>
+                        <div className="flex items-start gap-1.5 flex-wrap">
+                          {form.besNeden.filter(n => n.neden).map((n, i, arr) => (
+                            <>
+                              <span key={`chip-${n.sira}`} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
+                                {n.neden}
+                              </span>
+                              {i < arr.length - 1 && (
+                                <i key={`arrow-${n.sira}`} className="ri-arrow-right-line text-[10px]" style={{ color: textFaint, marginTop: 3 }} />
+                              )}
+                            </>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
               {/* ── TAB: GEÇMİŞ ── */}

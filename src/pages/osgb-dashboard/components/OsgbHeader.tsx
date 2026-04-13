@@ -42,7 +42,7 @@ export default function OsgbHeader({
   activeTab, setActiveTab, collapsed, orgName, onMobileMenuToggle, onFirmaEkle, onUzmanEkle, theme = 'dark', onToggleTheme,
 }: OsgbHeaderProps) {
   const { user, logout } = useAuth();
-  const meta = tabMeta[activeTab] ?? { label: 'Panel', icon: 'ri-layout-grid-line' };
+  const meta = tabMeta[activeTab];
   const isDark = theme === 'dark';
 
   const hour = new Date().getHours();

@@ -236,7 +236,8 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
     { header: 'Çıkış', key: 'cikis', width: 12 },
     { header: 'Süre (dk)', key: 'sure_dk', width: 12 },
     { header: 'Süre', key: 'sure', width: 11 },
-    { header: 'GPS', key: 'gps', width: 16 },
+    { header: 'Mesafe', key: 'mesafe', width: 14 },
+    { header: 'GPS Durumu', key: 'gps', width: 16 },
     { header: 'Durum', key: 'durum', width: 14 },
   ];
 
@@ -261,11 +262,20 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
     const gpsText = z.gps_status === 'ok' ? 'Doğrulandı'
       : z.gps_status === 'too_far' ? 'Kapsam Dışı'
       : z.gps_status === 'no_permission' ? 'İzin Yok' : '—';
+
+    const mesafeText = z.check_in_distance_m != null
+      ? (z.check_in_distance_m >= 1000
+        ? `${(z.check_in_distance_m / 1000).toFixed(2)} km`
+        : `${z.check_in_distance_m} m`)
+      : '—';
+
     const row = wsAll.addRow({
       no: i + 1, tarih: fmtTarih(z.giris_saati),
       uzman: z.uzman_ad ?? z.uzman_email ?? '—', firma: z.firma_ad ?? '—',
       giris: fmtSaat(z.giris_saati), cikis: z.cikis_saati ? fmtSaat(z.cikis_saati) : '—',
-      sure_dk: sureDk ?? '—', sure: fmtSure(sureDk), gps: gpsText,
+      sure_dk: sureDk ?? '—', sure: fmtSure(sureDk),
+      mesafe: mesafeText,
+      gps: gpsText,
       durum: z.durum === 'aktif' ? 'Devam Ediyor' : 'Tamamlandı',
     });
     row.height = 22;
@@ -276,6 +286,14 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
       cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF334155' } };
       cell.border = { bottom: { style: 'thin', color: { argb: 'FFE9F0F8' } } };
     });
+
+    // Mesafe renk kodlaması
+    const distM = z.check_in_distance_m;
+    if (distM != null) {
+      const mesafeColor = distM > 1000 ? 'FFDC2626' : distM > 200 ? 'FFD97706' : 'FF16A34A';
+      row.getCell('mesafe').font = { bold: true, size: 10, name: 'Calibri', color: { argb: mesafeColor } };
+    }
+
     const gpsColor = z.gps_status === 'ok' ? 'FF16A34A' : z.gps_status === 'too_far' ? 'FFDC2626' : z.gps_status === 'no_permission' ? 'FFD97706' : 'FF94A3B8';
     row.getCell('gps').font = { bold: true, size: 10, name: 'Calibri', color: { argb: gpsColor } };
     row.getCell('durum').font = { bold: true, size: 10, name: 'Calibri', color: { argb: z.durum === 'aktif' ? 'FF16A34A' : 'FF64748B' } };
@@ -290,7 +308,7 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   const totRow = wsAll.addRow({
     no: '', tarih: `TOPLAM: ${sorted.length} ziyaret`, uzman: '', firma: '',
     giris: '', cikis: '', sure_dk: totalSure, sure: fmtSure(totalSure),
-    gps: '', durum: `${tamamlanan} tam.`,
+    mesafe: '', gps: '', durum: `${tamamlanan} tam.`,
   });
   totRow.height = 26;
   totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
@@ -299,9 +317,25 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
     cell.alignment = { vertical: 'middle', horizontal: ci === 2 ? 'left' : 'center' };
     cell.border = { top: { style: 'medium', color: { argb: ACCENT } } };
   });
+
+  // Alt imza satırı
+  wsAll.addRow([]);
+  wsAll.addRow([]);
+  const now = new Date();
+  const signatureRow = wsAll.addRow({
+    no: '',
+    tarih: `Bu rapor isgdenetim.com.tr tarafından ${now.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} tarihinde oluşturulmuştur.`,
+  });
+  signatureRow.height = 20;
+  signatureRow.getCell('tarih').font = { italic: true, size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } };
+  signatureRow.getCell('tarih').alignment = { horizontal: 'left', vertical: 'middle' };
+  // Imza hücrelerini birleştir
+  const lastColLetter = 'K';
+  const sigRowNum = signatureRow.number;
+  wsAll.mergeCells(`B${sigRowNum}:${lastColLetter}${sigRowNum}`);
+
   wsAll.views = [{ state: 'frozen', ySplit: 1 }];
 
-  const now = new Date();
   const fileName = `Ziyaret-Raporu-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}.xlsx`;
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -786,7 +820,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
           {/* Desktop tablo — sütun başlıkları */}
           <div className="hidden lg:grid px-5 py-2.5 text-[10px] font-bold uppercase tracking-wide"
             style={{
-              gridTemplateColumns: '40px 1fr 1fr 90px 90px 70px 100px 80px 80px',
+              gridTemplateColumns: '36px 1fr 1fr 85px 85px 72px 90px 90px 80px 72px',
               borderBottom: '1px solid var(--border-subtle)',
               color: textMuted,
               background: isDark ? 'rgba(15,23,42,0.4)' : 'rgba(248,250,252,0.8)',
@@ -797,6 +831,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
             <div>Giriş</div>
             <div>Çıkış</div>
             <div>Süre</div>
+            <div>Mesafe</div>
             <div>GPS</div>
             <div>Durum</div>
             <div className="text-right">Aksiyon</div>
@@ -819,7 +854,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                   {/* Desktop layout */}
                   <div
                     className="hidden lg:grid px-5 py-3 items-center cursor-pointer"
-                    style={{ gridTemplateColumns: '40px 1fr 1fr 90px 90px 70px 100px 80px 80px' }}
+                    style={{ gridTemplateColumns: '36px 1fr 1fr 85px 85px 72px 90px 90px 80px 72px' }}
                     onClick={() => setSecilenZiyaret(z)}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isAktif ? 'rgba(34,197,94,0.08)' : 'var(--bg-row-hover)'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
@@ -873,7 +908,40 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                     <div>
                       {isAktif
                         ? <ElapsedTimer since={z.giris_saati} />
-                        : <span className="text-xs font-semibold" style={{ color: textMuted }}>{formatSure(z.sure_dakika)}</span>}
+                        : (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-lg"
+                            style={{
+                              background: z.sure_dakika ? 'rgba(99,102,241,0.08)' : 'transparent',
+                              color: z.sure_dakika ? '#6366F1' : textMuted,
+                            }}>
+                            {formatSure(z.sure_dakika)}
+                          </span>
+                        )}
+                    </div>
+
+                    {/* Mesafe */}
+                    <div>
+                      {z.check_in_distance_m != null ? (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-lg"
+                          style={{
+                            background: z.check_in_distance_m > 1000
+                              ? 'rgba(239,68,68,0.08)'
+                              : z.check_in_distance_m > 200
+                                ? 'rgba(245,158,11,0.08)'
+                                : 'rgba(34,197,94,0.08)',
+                            color: z.check_in_distance_m > 1000
+                              ? '#EF4444'
+                              : z.check_in_distance_m > 200
+                                ? '#F59E0B'
+                                : '#22C55E',
+                          }}>
+                          {z.check_in_distance_m >= 1000
+                            ? `${(z.check_in_distance_m / 1000).toFixed(1)} km`
+                            : `${z.check_in_distance_m} m`}
+                        </span>
+                      ) : (
+                        <span className="text-xs" style={{ color: textMuted }}>—</span>
+                      )}
                     </div>
 
                     {/* GPS */}
@@ -882,7 +950,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                         <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap w-fit"
                           style={{ background: gpsCfg.bg, color: gpsCfg.color, border: `1px solid ${gpsCfg.border}` }}>
                           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: gpsCfg.dot }} />
-                          {gpsCfg.text}
+                          {z.gps_status === 'ok' ? 'Doğrulandı' : z.gps_status === 'too_far' ? 'Uzakta' : 'GPS yok'}
                         </span>
                       ) : (
                         <span className="text-xs" style={{ color: textMuted }}>—</span>

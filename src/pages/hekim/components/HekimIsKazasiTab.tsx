@@ -4,6 +4,12 @@ import HekimIsKazasiModal from './HekimIsKazasiModal';
 import HekimIsKazasiRaporBolumu from './HekimIsKazasiRaporBolumu';
 import { printIsKazasiTutanagi, downloadIsKazasiHtml } from '@/pages/hekim/utils/isKazasiRaporGenerator';
 
+interface BesNedenItem {
+  sira: number;
+  neden: string;
+  aciklama: string;
+}
+
 interface KazaRow {
   id: string;
   personelId: string;
@@ -24,6 +30,12 @@ interface KazaRow {
   hastaneAdi: string;
   tanikBilgileri: string;
   onlemler: string;
+  sgkBildirildi: boolean;
+  sgkBildirimTarihi: string;
+  sgkBildirimNotu: string;
+  fotografPaths: string[];
+  olayYeriDiagram: string;
+  besNeden: BesNedenItem[];
 }
 
 interface HekimIsKazasiTabProps {
@@ -109,6 +121,12 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark }: HekimIsKaz
             hastaneAdi: r.hastane_adi ?? '',
             tanikBilgileri: r.tanik_bilgileri ?? '',
             onlemler: r.onlemler ?? '',
+            sgkBildirildi: r.sgk_bildirildi ?? false,
+            sgkBildirimTarihi: r.sgk_bildirim_tarihi ?? '',
+            sgkBildirimNotu: r.sgk_bildirim_notu ?? '',
+            fotografPaths: Array.isArray(r.fotograf_paths) ? r.fotograf_paths : [],
+            olayYeriDiagram: r.olay_yeri_diagram ?? '',
+            besNeden: Array.isArray(r.bes_neden) ? r.bes_neden : [],
           });
         });
       }));
@@ -710,6 +728,12 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark }: HekimIsKaz
           tanikBilgileri: editData.tanikBilgileri,
           onlemler: editData.onlemler,
           durum: editData.durum,
+          sgkBildirildi: editData.sgkBildirildi,
+          sgkBildirimTarihi: editData.sgkBildirimTarihi,
+          sgkBildirimNotu: editData.sgkBildirimNotu,
+          fotografPaths: editData.fotografPaths,
+          olayYeriDiagram: editData.olayYeriDiagram,
+          besNeden: editData.besNeden,
         } : null}
       />
 

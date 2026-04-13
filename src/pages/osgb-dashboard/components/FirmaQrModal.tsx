@@ -27,27 +27,29 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
   const [qrReady, setQrReady] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const qrData = JSON.stringify({ type: 'firm', id: firmaId });
-
   const modalBg = 'var(--modal-bg)';
   const modalBorder = 'var(--modal-border)';
   const textPrimary = 'var(--text-primary)';
   const textMuted = 'var(--text-muted)';
 
-  // QRCode.js CDN'den yüklü değilse yükle, sonra oluştur
+  const ACCENT = '#6366F1';
+  const ACCENT_DARK = '#4F46E5';
+  const ACCENT_ALPHA_20 = 'rgba(99,102,241,0.2)';
+  const ACCENT_ALPHA_10 = 'rgba(99,102,241,0.1)';
+  const ACCENT_ALPHA_25 = 'rgba(99,102,241,0.25)';
+
   useEffect(() => {
     const buildQr = () => {
       if (!qrRef.current || !window.QRCode) return;
       qrRef.current.innerHTML = '';
       new window.QRCode(qrRef.current, {
-        text: qrData,
+        text: JSON.stringify({ type: 'firm', id: firmaId }),
         width: 240,
         height: 240,
-        colorDark: isDark ? '#0f172a' : '#0f172a',
+        colorDark: '#0f172a',
         colorLight: '#ffffff',
-        correctLevel: 2, // H
+        correctLevel: 2,
       });
-      // Canvas referansını yakala
       setTimeout(() => {
         const canvas = qrRef.current?.querySelector('canvas') as HTMLCanvasElement | null;
         canvasRef.current = canvas;
@@ -58,20 +60,20 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
     if (window.QRCode) {
       buildQr();
     } else {
-      // Yükle
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
       script.onload = buildQr;
       document.head.appendChild(script);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qrData, isDark]);
+  }, [firmaId, isDark]);
+
+  const qrData = JSON.stringify({ type: 'firm', id: firmaId });
 
   const handleDownload = () => {
     const canvas = canvasRef.current ?? (qrRef.current?.querySelector('canvas') as HTMLCanvasElement | null);
     if (!canvas) return;
 
-    // Başlıklı tam QR görseli oluştur
     const outputCanvas = document.createElement('canvas');
     const padding = 40;
     const headerH = 80;
@@ -82,15 +84,12 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
     const ctx = outputCanvas.getContext('2d');
     if (!ctx) return;
 
-    // Beyaz arka plan
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
 
-    // Yeşil üst şerit
-    ctx.fillStyle = '#10B981';
+    ctx.fillStyle = ACCENT;
     ctx.fillRect(0, 0, outputCanvas.width, headerH);
 
-    // Başlık metni
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'center';
@@ -98,10 +97,8 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
     ctx.font = 'bold 13px sans-serif';
     ctx.fillText(firmaAdi, outputCanvas.width / 2, 55);
 
-    // QR
     ctx.drawImage(canvas, padding, headerH + padding);
 
-    // Alt açıklama
     ctx.fillStyle = '#64748b';
     ctx.font = '12px sans-serif';
     ctx.fillText('Uzmanlar bu kodu okutarak ziyaret başlatır', outputCanvas.width / 2, headerH + padding + canvas.height + padding / 2 + 10);
@@ -125,7 +122,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
           <title>Ziyaret QR - ${firmaAdi}</title>
           <style>
             body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fff; }
-            .header { background: #10B981; color: #fff; width: 320px; padding: 20px; text-align: center; border-radius: 12px 12px 0 0; }
+            .header { background: #6366F1; color: #fff; width: 320px; padding: 20px; text-align: center; border-radius: 12px 12px 0 0; }
             .header h2 { margin: 0 0 4px; font-size: 16px; letter-spacing: 1px; }
             .header p { margin: 0; font-size: 13px; opacity: 0.9; }
             .qr-box { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px; padding: 24px; text-align: center; }
@@ -171,7 +168,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
         {/* Başlık */}
         <div
           className="flex items-center justify-between px-5 py-4"
-          style={{ background: 'linear-gradient(135deg, #10B981, #059669)', color: '#fff' }}
+          style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_DARK})`, color: '#fff' }}
         >
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 flex items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.15)' }}>
@@ -196,12 +193,12 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
           {/* QR Görsel */}
           <div
             className="rounded-2xl p-4 flex items-center justify-center"
-            style={{ background: '#ffffff', border: '2px solid rgba(16,185,129,0.2)' }}
+            style={{ background: '#ffffff', border: `2px solid ${ACCENT_ALPHA_20}` }}
           >
             <div ref={qrRef} style={{ lineHeight: 0 }} />
             {!qrReady && (
               <div className="w-60 h-60 flex items-center justify-center">
-                <i className="ri-loader-4-line text-3xl animate-spin" style={{ color: '#10B981' }} />
+                <i className="ri-loader-4-line text-3xl animate-spin" style={{ color: ACCENT }} />
               </div>
             )}
           </div>
@@ -209,7 +206,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
           {/* Açıklama */}
           <div className="text-center px-2">
             <p className="text-xs font-semibold" style={{ color: textPrimary }}>
-              <i className="ri-information-line mr-1" style={{ color: '#10B981' }} />
+              <i className="ri-information-line mr-1" style={{ color: ACCENT }} />
               Uzmanlar bu kodu okutarak ziyaret başlatır
             </p>
             <p className="text-[10px] mt-1" style={{ color: textMuted }}>
@@ -229,7 +226,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
             <button
               onClick={handleCopy}
               className="text-[10px] font-semibold cursor-pointer flex-shrink-0 whitespace-nowrap"
-              style={{ color: copied ? '#10B981' : textMuted }}
+              style={{ color: copied ? ACCENT : textMuted }}
             >
               {copied ? <><i className="ri-check-line" /> Kopyalandı</> : 'Kopyala'}
             </button>
@@ -242,9 +239,9 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
               disabled={!qrReady}
               className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-all"
               style={{
-                background: qrReady ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)',
-                border: `1px solid ${qrReady ? 'rgba(16,185,129,0.25)' : 'rgba(148,163,184,0.2)'}`,
-                color: qrReady ? '#10B981' : '#94A3B8',
+                background: qrReady ? ACCENT_ALPHA_10 : 'rgba(148,163,184,0.1)',
+                border: `1px solid ${qrReady ? ACCENT_ALPHA_25 : 'rgba(148,163,184,0.2)'}`,
+                color: qrReady ? ACCENT : '#94A3B8',
               }}
             >
               <i className="ri-download-2-line text-base" />
@@ -255,7 +252,7 @@ export default function FirmaQrModal({ firmaId, firmaAdi, isDark = false, onClos
               disabled={!qrReady}
               className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-all text-white"
               style={{
-                background: qrReady ? 'linear-gradient(135deg, #10B981, #059669)' : 'rgba(148,163,184,0.2)',
+                background: qrReady ? `linear-gradient(135deg, ${ACCENT}, ${ACCENT_DARK})` : 'rgba(148,163,184,0.2)',
                 opacity: qrReady ? 1 : 0.6,
               }}
             >

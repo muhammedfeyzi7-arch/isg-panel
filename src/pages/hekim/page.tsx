@@ -72,7 +72,7 @@ function HekimLoadingScreen({ isDark }: { isDark: boolean }) {
 }
 
 export default function HekimPage() {
-  const { org, theme, mustChangePassword } = useApp();
+  const { org, theme, mustChangePassword, addToast } = useApp();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<HekimTab>('genel_bakis');
   const [collapsed, setCollapsed] = useState(false);
@@ -210,7 +210,7 @@ export default function HekimPage() {
       case 'personeller':
         return <HekimPersonellerTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
       case 'saglik':
-        return <HekimSaglikTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
+        return <HekimSaglikTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} addToast={addToast} hekimOrgId={orgId} />;
       case 'is_kazasi':
         return <HekimIsKazasiTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
       case 'cop':

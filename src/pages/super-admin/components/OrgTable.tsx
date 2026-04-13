@@ -97,7 +97,7 @@ function ActionButtons({ org, onSelect, onToggleActive }: {
       <Tooltip label="Detaya Git">
         <button
           onClick={(e) => { e.stopPropagation(); onSelect(org); }}
-          className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 cursor-pointer transition-colors"
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer transition-colors"
         >
           <i className="ri-eye-line text-sm"></i>
         </button>
@@ -108,10 +108,10 @@ function ActionButtons({ org, onSelect, onToggleActive }: {
         <button
           onClick={handleToggle}
           disabled={toggling}
-          className={`w-7 h-7 flex items-center justify-center rounded-lg border cursor-pointer transition-colors ${
+          className={`w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-colors ${
             org.is_active
-              ? 'border-red-200 bg-red-50 text-red-500 hover:bg-red-100'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+              ? 'hover:bg-red-50 text-slate-400 hover:text-red-500'
+              : 'hover:bg-emerald-50 text-slate-400 hover:text-emerald-600'
           }`}
         >
           {toggling
@@ -125,7 +125,7 @@ function ActionButtons({ org, onSelect, onToggleActive }: {
       <Tooltip label="Süre Uzat">
         <button
           onClick={(e) => { e.stopPropagation(); onSelect(org); }}
-          className="w-7 h-7 flex items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100 cursor-pointer transition-colors"
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 cursor-pointer transition-colors"
         >
           <i className="ri-calendar-line text-sm"></i>
         </button>
@@ -197,10 +197,8 @@ function MobileOrgCard({ org, onSelect, onToggleActive }: {
         <button
           onClick={handleToggle}
           disabled={toggling}
-          className={`w-7 h-7 flex items-center justify-center rounded-lg border cursor-pointer transition-colors ${
-            org.is_active
-              ? 'border-red-200 bg-red-50 text-red-500 hover:bg-red-100'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+          className={`w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-colors ${
+            org.is_active ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'
           }`}
         >
           {toggling
@@ -210,7 +208,7 @@ function MobileOrgCard({ org, onSelect, onToggleActive }: {
         </button>
         <button
           onClick={() => onSelect(org)}
-          className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 cursor-pointer transition-colors hover:bg-slate-50"
+          className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 cursor-pointer transition-colors hover:bg-slate-200"
         >
           <i className="ri-arrow-right-s-line text-sm"></i>
         </button>

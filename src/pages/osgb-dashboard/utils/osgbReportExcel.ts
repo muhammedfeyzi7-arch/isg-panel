@@ -142,6 +142,16 @@ export async function downloadOsgbReportExcel(data: OsgbRaporData): Promise<void
 
   wsFirma.views = [{ state: 'frozen', ySplit: 1 }];
 
+  // Firma sayfası imza
+  wsFirma.addRow({});
+  const firmaSignRow = wsFirma.addRow({
+    name: `Bu rapor isgdenetim.com.tr tarafından ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })} tarihinde oluşturulmuştur.`,
+  });
+  firmaSignRow.height = 18;
+  firmaSignRow.getCell('name').font = { italic: true, size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } };
+  firmaSignRow.getCell('name').alignment = { horizontal: 'left', vertical: 'middle' };
+  wsFirma.mergeCells(`A${firmaSignRow.number}:H${firmaSignRow.number}`);
+
   // ── UZMAN SAYFASI ──────────────────────────────────────────────────────────
   const wsUzman = wb.addWorksheet('Gezici Uzmanlar');
   wsUzman.columns = [
@@ -180,6 +190,26 @@ export async function downloadOsgbReportExcel(data: OsgbRaporData): Promise<void
     });
   });
   wsUzman.views = [{ state: 'frozen', ySplit: 1 }];
+
+  // Uzman sayfası imza
+  wsUzman.addRow({});
+  const uzmanSignRow = wsUzman.addRow({
+    display_name: `Bu rapor isgdenetim.com.tr tarafından ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })} tarihinde oluşturulmuştur.`,
+  });
+  uzmanSignRow.height = 18;
+  uzmanSignRow.getCell('display_name').font = { italic: true, size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } };
+  uzmanSignRow.getCell('display_name').alignment = { horizontal: 'left', vertical: 'middle' };
+  wsUzman.mergeCells(`A${uzmanSignRow.number}:D${uzmanSignRow.number}`);
+
+  // Özet sayfası imza
+  wsOzet.addRow({});
+  const ozetSignRow = wsOzet.addRow({
+    label: `Bu rapor isgdenetim.com.tr tarafından ${new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })} tarihinde oluşturulmuştur.`,
+  });
+  ozetSignRow.height = 18;
+  ozetSignRow.getCell('label').font = { italic: true, size: 9, name: 'Calibri', color: { argb: 'FF94A3B8' } };
+  ozetSignRow.getCell('label').alignment = { horizontal: 'left', vertical: 'middle' };
+  wsOzet.mergeCells(`A${ozetSignRow.number}:B${ozetSignRow.number}`);
 
   // Download
   const buffer = await wb.xlsx.writeBuffer();
