@@ -190,29 +190,51 @@ export default function ZiyaretCheckIn() {
   const getOrgFromDB = useCallback(async (): Promise<{ orgId: string; uzman: string } | null> => {
     if (!user?.id) return null;
 
-    // HER ZAMAN DB — cache, localStorage, state KULLANILMAZ
-    const { data, error } = await supabase
+    // ── Önce osgb_role olan kayıttan OSGB org'unu çek (en güvenilir) ──
+    const { data: osgbRow } = await supabase
       .from('user_organizations')
       .select('organization_id, display_name')
       .eq('user_id', user.id)
       .eq('is_active', true)
+      .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi'])
       .order('joined_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (osgbRow?.organization_id) {
+      console.log('[getOrgFromDB] osgb_role ile bulundu:', osgbRow.organization_id);
+      return {
+        orgId: osgbRow.organization_id,
+        uzman: osgbRow.display_name ?? user.email ?? 'Uzman',
+      };
+    }
+
+    // ── Fallback: herhangi aktif kayıt ──
+    const { data, error } = await supabase
+      .from('user_organizations')
+      .select('organization_id, display_name, osgb_role')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('joined_at', { ascending: false })
+      .limit(5);
 
     if (error) {
       console.error('[getOrgFromDB] DB error:', error);
       return null;
     }
 
-    if (!data?.organization_id) {
+    if (!data || data.length === 0) {
       console.error('[getOrgFromDB] Org bulunamadı! user_id:', user.id);
       return null;
     }
 
+    // osgb_role null olan kaydı önce dene (OSGB üyeliği, firma değil)
+    const best = data[0];
+    console.log('[getOrgFromDB] fallback ile bulundu:', best.organization_id, 'osgb_role:', best.osgb_role);
+
     return {
-      orgId: data.organization_id,
-      uzman: data.display_name ?? user.email ?? 'Uzman',
+      orgId: best.organization_id,
+      uzman: best.display_name ?? user.email ?? 'Uzman',
     };
   }, [user?.id, user?.email]);
 

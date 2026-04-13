@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
+const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
+
 interface AltFirma {
   id: string;
   name: string;
@@ -152,50 +154,23 @@ export default function FirmalarTab({
   const handleSil = async (firmaId: string, _firmaAdi: string) => {
     setSilLoading(true);
     try {
-      const now = new Date().toISOString();
+      // Edge function üzerinden sil — service_role ile RLS bypass
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Oturum bulunamadı.');
 
-      // 1. Soft delete — organizations.deleted_at set et
-      const { error } = await supabase
-        .from('organizations')
-        .update({ deleted_at: now })
-        .eq('id', firmaId);
-      if (error) throw error;
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: 'delete_firm',
+          organization_id: orgId,
+          firma_id: firmaId,
+        }),
+      });
 
-      // 2. TÜM user_organizations kayıtlarını tara — organization_id filtresi yok
-      //    Çünkü gezici uzman farklı bir org satırında da bu firmayı taşıyor olabilir
-      const { data: allUsers } = await supabase
-        .from('user_organizations')
-        .select('user_id, organization_id, active_firm_id, active_firm_ids');
-
-      if (allUsers && allUsers.length > 0) {
-        // Sadece bu firmayı referans eden kayıtları filtrele
-        const affectedUsers = allUsers.filter(u => {
-          const inIds = Array.isArray(u.active_firm_ids) && u.active_firm_ids.includes(firmaId);
-          const isActive = u.active_firm_id === firmaId;
-          return inIds || isActive;
-        });
-
-        if (affectedUsers.length > 0) {
-          await Promise.all(
-            affectedUsers.map(async (u) => {
-              const newFirmIds = ((u.active_firm_ids ?? []) as string[]).filter(
-                (id: string) => id !== firmaId
-              );
-              const newActiveFirmId =
-                u.active_firm_id === firmaId ? (newFirmIds[0] ?? null) : u.active_firm_id;
-
-              return supabase
-                .from('user_organizations')
-                .update({
-                  active_firm_id: newActiveFirmId,
-                  active_firm_ids: newFirmIds.length > 0 ? newFirmIds : null,
-                })
-                .eq('user_id', u.user_id)
-                .eq('organization_id', u.organization_id); // ← her satırı kendi org'uyla güncelle
-            })
-          );
-        }
-      }
+      const json = await res.json() as { error?: string; success?: boolean };
+      if (json.error) throw new Error(json.error);
 
       setSilOnayId(null);
       if (onFirmaDeleted) {
@@ -203,6 +178,7 @@ export default function FirmalarTab({
       }
     } catch (err) {
       console.error('[Sil] err:', err);
+      alert(`Silme hatası: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSilLoading(false);
     }

@@ -24,6 +24,7 @@ const ACTIONS = {
   FIRM_ASSIGN    : 'FIRM_ASSIGN',
   FIRM_UNASSIGN  : 'FIRM_UNASSIGN',
   FIRMS_BULK_UPDATE: 'FIRMS_BULK_UPDATE',
+  FIRM_DELETE    : 'FIRM_DELETE',
 } as const;
 
 type ActionKey = typeof ACTIONS[keyof typeof ACTIONS];
@@ -271,6 +272,110 @@ async function handleRequest(
     });
   }
 
+  // ── DELETE FIRM (soft delete + user_organizations cleanup) ──
+  if (action === 'delete_firm') {
+    const { firma_id } = body as { firma_id: string };
+
+    if (!firma_id) {
+      return new Response(JSON.stringify({ error: 'firma_id zorunludur.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Güvenlik: Firma bu OSGB'ye (orgId) ait mi kontrol et
+    const { data: firmaRow } = await adminClient
+      .from('organizations')
+      .select('id, name, parent_org_id')
+      .eq('id', firma_id)
+      .maybeSingle();
+
+    if (!firmaRow) {
+      return new Response(JSON.stringify({ error: 'Firma bulunamadı.' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (firmaRow.parent_org_id !== orgId) {
+      return new Response(JSON.stringify({ error: 'Bu firmayı silme yetkiniz yok.' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    // 1. Soft delete — organizations.deleted_at set et (service role, RLS bypass)
+    const { error: deleteErr } = await adminClient
+      .from('organizations')
+      .update({ deleted_at: now })
+      .eq('id', firma_id);
+
+    if (deleteErr) {
+      console.error('[DELETE_FIRM] organizations update error:', deleteErr);
+      return new Response(JSON.stringify({ error: 'Firma silinemedi: ' + deleteErr.message }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 2. Bu firmayı referans eden tüm user_organizations kayıtlarını temizle
+    const { data: allUsers } = await adminClient
+      .from('user_organizations')
+      .select('user_id, organization_id, active_firm_id, active_firm_ids');
+
+    if (allUsers && allUsers.length > 0) {
+      const affectedUsers = allUsers.filter((u: {
+        user_id: string;
+        organization_id: string;
+        active_firm_id: string | null;
+        active_firm_ids: string[] | null;
+      }) => {
+        const inIds = Array.isArray(u.active_firm_ids) && u.active_firm_ids.includes(firma_id);
+        const isActive = u.active_firm_id === firma_id;
+        return inIds || isActive;
+      });
+
+      if (affectedUsers.length > 0) {
+        await Promise.all(
+          affectedUsers.map(async (u: {
+            user_id: string;
+            organization_id: string;
+            active_firm_id: string | null;
+            active_firm_ids: string[] | null;
+          }) => {
+            const newFirmIds = ((u.active_firm_ids ?? []) as string[]).filter(
+              (id: string) => id !== firma_id
+            );
+            const newActiveFirmId =
+              u.active_firm_id === firma_id ? (newFirmIds[0] ?? null) : u.active_firm_id;
+
+            return adminClient
+              .from('user_organizations')
+              .update({
+                active_firm_id: newActiveFirmId,
+                active_firm_ids: newFirmIds.length > 0 ? newFirmIds : null,
+              })
+              .eq('user_id', u.user_id)
+              .eq('organization_id', u.organization_id);
+          })
+        );
+      }
+    }
+
+    const firmaAdi = (firmaRow.name as string) ?? firma_id;
+    await logAction({
+      action: ACTIONS.FIRM_DELETE,
+      targetId: firma_id,
+      targetName: firmaAdi,
+      description: `${firmaAdi} firması silindi (soft delete).`,
+      metadata: { firma_id, firma_adi: firmaAdi },
+      severity: 'critical',
+      module: 'Firma Yönetimi',
+    });
+
+    return new Response(JSON.stringify({ success: true, firma_adi: firmaAdi }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   // ── CREATE USER ──
   if (action === 'create') {
     const {
@@ -303,7 +408,6 @@ async function handleRequest(
       });
     }
 
-    // Gezici uzman veya işyeri hekimi için firma ataması zorunlu
     if ((assignedOsgbRole === 'gezici_uzman' || assignedOsgbRole === 'isyeri_hekimi') &&
         (!active_firm_ids || active_firm_ids.length === 0) && !active_firm_id) {
       return new Response(JSON.stringify({ error: `${assignedOsgbRole === 'isyeri_hekimi' ? 'İşyeri Hekimi' : 'Gezici Uzman'} için en az bir firma ataması zorunludur.` }), {
@@ -371,7 +475,6 @@ async function handleRequest(
     if (assignedRole === 'firma_user' && firm_id) insertPayload.firm_id = firm_id;
     if (assignedOsgbRole) insertPayload.osgb_role = assignedOsgbRole;
 
-    // Gezici uzman VE işyeri hekimi için active_firm_ids ata
     if (assignedOsgbRole === 'gezici_uzman' || assignedOsgbRole === 'isyeri_hekimi') {
       if (active_firm_ids?.length) {
         insertPayload.active_firm_ids = active_firm_ids;
@@ -384,13 +487,11 @@ async function handleRequest(
 
     const { error: memberError } = await adminClient.from('user_organizations').insert(insertPayload);
     if (memberError) {
-      // Üyelik eklenemedi — Auth'tan da silelim (orphan user oluşmasın)
       if (memberError.code === '23505') {
         return new Response(JSON.stringify({ error: 'Bu kullanıcı zaten organizasyonda kayıtlı.' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      // Yeni oluşturulan auth user'ı temizle
       if (!existingAuthUser) {
         try { await adminClient.auth.admin.deleteUser(newUserId); } catch { /* ignore */ }
       }
@@ -678,7 +779,6 @@ async function handleRequest(
       });
     }
 
-    // Önce log yaz (silmeden önce)
     const targetName = (target.display_name as string) || (target.email as string) || target_user_id;
     await logAction({
       action: ACTIONS.USER_DELETE, targetId: target_user_id, targetName,
@@ -687,7 +787,6 @@ async function handleRequest(
       severity: 'critical',
     });
 
-    // user_organizations kaydını sil
     const { error: deleteError } = await adminClient.from('user_organizations')
       .delete().eq('user_id', target_user_id).eq('organization_id', orgId);
 
@@ -697,19 +796,16 @@ async function handleRequest(
       });
     }
 
-    // Başka aktif org üyeliği var mı kontrol et
     const { data: others } = await adminClient.from('user_organizations')
       .select('organization_id').eq('user_id', target_user_id).limit(1);
 
     const hadOtherOrgs = (others?.length ?? 0) > 0;
 
-    // Başka org yoksa Auth'tan da sil
     if (!hadOtherOrgs) {
       try {
         const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(target_user_id);
         if (authDeleteError) {
           console.error('[DELETE] Auth delete error:', authDeleteError.message);
-          // Auth silme başarısız olsa bile user_organizations zaten silindi — devam et
         } else {
           console.log('[DELETE] Auth user deleted:', target_user_id);
         }
