@@ -269,9 +269,15 @@ export default function UzmanPage() {
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
           style={{ minHeight: 'calc(100vh - 56px)' }}
         >
-          <div className="px-3 sm:px-5 md:px-6 py-4 max-w-[1600px] w-full">
-            {renderContent()}
-          </div>
+          {activeTab === 'mobil_saha' ? (
+            <div className="w-full">
+              {renderContent()}
+            </div>
+          ) : (
+            <div className="px-3 sm:px-5 md:px-6 py-4 max-w-[1600px] w-full">
+              {renderContent()}
+            </div>
+          )}
         </div>
       </main>
 

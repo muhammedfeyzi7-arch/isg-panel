@@ -217,10 +217,22 @@ function ZiyaretTab({ isDark }: { isDark: boolean }) {
     setGpsStatus(coords ? 'ok' : 'idle');
     try {
       const now = new Date().toISOString();
-      const sure = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
-      const { error } = await supabase.from('osgb_ziyaretler').update({ cikis_saati: now, durum: 'tamamlandi', sure_dakika: sure, updated_at: now, check_out_lat: coords?.lat ?? null, check_out_lng: coords?.lng ?? null }).eq('id', aktifZiyaret.id).eq('uzman_user_id', user.id);
+      const sureDakika = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
+      const { error } = await supabase
+        .from('osgb_ziyaretler')
+        .update({
+          cikis_saati: now,
+          durum: 'tamamlandi',
+          sure_dakika: sureDakika,
+          updated_at: now,
+          check_out_lat: coords?.lat ?? null,
+          check_out_lng: coords?.lng ?? null,
+        })
+        .eq('id', aktifZiyaret.id)
+        .eq('uzman_user_id', user.id)
+        .is('cikis_saati', null);
       if (error) throw new Error(error.message);
-      addToast(`Ziyaret tamamlandı! Süre: ${sure} dakika`, 'success');
+      addToast(`Ziyaret tamamlandı! Süre: ${sureDakika} dakika`, 'success');
       setAktifZiyaret(null); setShowQr(false); void fetchZiyaret();
     } catch (err) {
       addToast(`Check-out yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
@@ -751,7 +763,7 @@ export default function UzmanMobilSaha({ isDark }: Props) {
   void dataLoading;
 
   return (
-    <div className="flex flex-col pb-8" style={{ maxWidth: '600px', margin: '0 auto', fontFamily: "'Inter', sans-serif" }}>
+    <div className="flex flex-col pb-8 px-3 sm:px-5" style={{ maxWidth: '640px', margin: '0 auto', fontFamily: "'Inter', sans-serif" }}>
       {/* Header */}
       <div className="rounded-2xl overflow-hidden mb-4" style={{ background: 'var(--bg-card-solid, rgba(17,24,39,0.8))', border: '1px solid rgba(14,165,233,0.2)' }}>
         <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #0284C7, #0EA5E9, #38BDF8)' }} />
