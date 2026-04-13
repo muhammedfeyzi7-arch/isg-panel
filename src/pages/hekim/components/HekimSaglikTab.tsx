@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import HekimMuayeneModal from './HekimMuayeneModal';
+import { generateEK2Docx } from '@/pages/hekim/utils/ek2DocxGenerator';
 
 const ACCENT = '#0EA5E9';
 const ACCENT_DARK = '#0284C7';
@@ -368,6 +369,42 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark, addToast, heki
 
                       {/* İşlem */}
                       <div className="px-4 py-3 flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                        {/* Word İndir */}
+                        <button
+                          onClick={async () => {
+                            try {
+                              await generateEK2Docx({
+                                personelAd: m.personelAd,
+                                firmaAd: m.firmaAd,
+                                kronikHastaliklar: m.kronikHastaliklar,
+                                ilacKullanim: m.ilacKullanim,
+                                ameliyatGecmisi: m.ameliyatGecmisi,
+                                tansiyon: m.tansiyon,
+                                nabiz: m.nabiz,
+                                gorme: m.gorme,
+                                isitme: m.isitme,
+                                sonuc: m.sonuc,
+                                aciklama: m.aciklama,
+                                doktor: m.doktor,
+                                hastane: m.hastane,
+                                muayeneTarihi: m.muayeneTarihi,
+                                sonrakiTarih: m.sonrakiTarih,
+                              });
+                              addToast?.('EK-2 Word belgesi indiriliyor...', 'success');
+                            } catch (err) {
+                              addToast?.('Word oluşturulurken hata oluştu.', 'error');
+                              console.error('[EK2 Word]', err);
+                            }
+                          }}
+                          className="flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer transition-all whitespace-nowrap"
+                          style={{ background: 'rgba(34,197,94,0.08)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.2)', fontSize: '10px', fontWeight: 700 }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.16)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.08)'; }}
+                          title="EK-2 Word İndir"
+                        >
+                          <i className="ri-file-word-line text-xs" />
+                          .docx
+                        </button>
                         <button onClick={() => setExpandedId(isExpanded ? null : m.id)}
                           className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
                           style={{ background: isExpanded ? 'rgba(14,165,233,0.1)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'), border: `1px solid ${isExpanded ? 'rgba(14,165,233,0.3)' : borderColor}` }}>

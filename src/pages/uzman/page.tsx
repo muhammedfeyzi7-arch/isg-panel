@@ -97,7 +97,13 @@ export default function UzmanPage() {
   const { org, theme, mustChangePassword, sidebarCollapsed, setSidebarCollapsed } = useApp();
   const { user, logout } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<UzmanTab>('genel_bakis');
+  const [activeTab, setActiveTab] = useState<UzmanTab>(() => {
+    try { return (localStorage.getItem('uzman_active_tab') as UzmanTab) || 'genel_bakis'; } catch { return 'genel_bakis'; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('uzman_active_tab', activeTab); } catch { /* ignore */ }
+  }, [activeTab]);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const [atanmisFirmaIds, setAtanmisFirmaIds] = useState<string[]>([]);

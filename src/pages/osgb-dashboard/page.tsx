@@ -60,7 +60,13 @@ interface FirmaDetay {
 export default function OsgbDashboardPage() {
   const { user } = useAuth();
   const { org, addToast, mustChangePassword, theme } = useApp();
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    try { return (localStorage.getItem('osgb_active_tab') as Tab) || 'dashboard'; } catch { return 'dashboard'; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('osgb_active_tab', activeTab); } catch { /* ignore */ }
+  }, [activeTab]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [osgbTheme, setOsgbTheme] = useState<'dark' | 'light'>(() => {

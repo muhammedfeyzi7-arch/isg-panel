@@ -483,19 +483,25 @@ export default function ZiyaretCheckIn() {
         }
 
         if (ziyaretId) {
-          // Önce cikis_saati null kontrolü olmadan update et — kapatılmış olsa da force update
+          // sure_dakika generated/computed column — DB'ye gönderilmez, sadece frontend'de hesaplanır
           const { error, count } = await supabase
             .from('osgb_ziyaretler')
             .update({
-              cikis_saati: now, durum: 'tamamlandi', sure_dakika: sureDakika,
-              updated_at: now, check_out_lat: coords?.lat ?? null, check_out_lng: coords?.lng ?? null,
+              cikis_saati: now,
+              durum: 'tamamlandi',
+              updated_at: now,
+              check_out_lat: coords?.lat ?? null,
+              check_out_lng: coords?.lng ?? null,
             })
             .eq('id', ziyaretId)
             .eq('uzman_user_id', user.id)
             .is('cikis_saati', null)
             .select('id');
 
-          if (error) throw new Error(error.message);
+          if (error) {
+            addToast(`Ziyaret sonlandırılamadı: ${error.message}`, 'error');
+            throw new Error(error.message);
+          }
 
           if (!count || count === 0) {
             // cikis_saati null filtresi eşleşmedi — zaten kapatılmış olabilir, temizle

@@ -74,7 +74,13 @@ function HekimLoadingScreen({ isDark }: { isDark: boolean }) {
 export default function HekimPage() {
   const { org, theme, mustChangePassword, addToast } = useApp();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<HekimTab>('genel_bakis');
+  const [activeTab, setActiveTab] = useState<HekimTab>(() => {
+    try { return (localStorage.getItem('hekim_active_tab') as HekimTab) || 'genel_bakis'; } catch { return 'genel_bakis'; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('hekim_active_tab', activeTab); } catch { /* ignore */ }
+  }, [activeTab]);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
