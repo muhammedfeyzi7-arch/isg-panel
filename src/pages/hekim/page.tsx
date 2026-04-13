@@ -212,11 +212,15 @@ export default function HekimPage() {
       case 'saglik':
         return <HekimSaglikTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} addToast={addToast} hekimOrgId={orgId} />;
       case 'is_kazasi':
-        return <HekimIsKazasiTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
+        return <HekimIsKazasiTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} addToast={addToast} />;
       case 'cop':
         return <HekimCopTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
       case 'ziyaret':
-        return <HekimMobilZiyaret isDark={isDark} />;
+        return (
+          <div className="lg:hidden -mx-3 sm:-mx-5 md:-mx-6 -my-4">
+            <HekimMobilZiyaret isDark={isDark} />
+          </div>
+        );
       default:
         return null;
     }
@@ -476,18 +480,10 @@ export default function HekimPage() {
 
         {/* ── İçerik ── */}
         <div
-          className={`hekim-content transition-all duration-300 ${collapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
+          className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'} ${activeTab === 'ziyaret' ? 'pb-24 lg:pb-4' : ''}`}
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
         >
-          {activeTab === 'ziyaret' ? (
-            <div className="pb-24 lg:pb-4">
-              {renderContent()}
-            </div>
-          ) : (
-            <div className="px-3 sm:px-5 md:px-6 py-4">
-              {renderContent()}
-            </div>
-          )}
+          {renderContent()}
         </div>
 
         {/* ── Mobil Alt Tab Bar ── */}

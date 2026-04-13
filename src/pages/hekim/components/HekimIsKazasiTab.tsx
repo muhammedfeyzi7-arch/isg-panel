@@ -41,6 +41,7 @@ interface KazaRow {
 interface HekimIsKazasiTabProps {
   atanmisFirmaIds: string[];
   isDark: boolean;
+  addToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
 const ACCENT = '#0EA5E9';
@@ -61,7 +62,7 @@ const DURUM_CONFIG: Record<string, { color: string; bg: string }> = {
 
 type TabView = 'liste' | 'rapor';
 
-export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark }: HekimIsKazasiTabProps) {
+export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: HekimIsKazasiTabProps) {
   const [kazalar, setKazalar] = useState<KazaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -710,6 +711,7 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark }: HekimIsKaz
         onSaved={loadKazalar}
         atanmisFirmaIds={atanmisFirmaIds}
         isDark={isDark}
+        addToast={addToast}
         editData={editData ? {
           id: editData.id,
           personelId: editData.personelId,

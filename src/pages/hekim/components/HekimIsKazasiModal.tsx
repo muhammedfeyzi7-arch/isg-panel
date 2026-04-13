@@ -31,16 +31,20 @@ interface IsKazasiFormData {
   kazaSaati: string;
   kazaYeri: string;
   kazaTuru: string;
+  kazaTipi: string;
   kazaAciklamasi: string;
   yaraliVucutBolgeleri: string[];
   yaralanmaTuru: string;
   yaralanmaSiddeti: string;
+  riskSeviyesi: string;
   isGunuKaybi: number;
   hastaneyeKaldirildi: boolean;
   hastaneAdi: string;
   tanikBilgileri: string;
   onlemler: string;
   durum: string;
+  olumNedeni: string;
+  olumTarihi: string;
   // Yeni alanlar
   sgkBildirildi: boolean;
   sgkBildirimTarihi: string;
@@ -58,6 +62,7 @@ interface HekimIsKazasiModalProps {
   isDark: boolean;
   editData?: (IsKazasiFormData & { id: string }) | null;
   preselectedPersonelId?: string | null;
+  addToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
 const BES_NEDEN_TEMPLATE: BesNedenItem[] = [
@@ -91,11 +96,25 @@ const VUCUT_BOLGELERI: { id: string; label: string }[] = [
   { id: 'sol_ayak', label: 'Sol Ayak' },
 ];
 
+const KAZA_TIPI_OPTIONS = [
+  { value: 'is_kazasi', label: 'İş Kazası' },
+  { value: 'ramak_kala', label: 'Ramak Kala (Near Miss)' },
+  { value: 'meslek_hastaligi', label: 'Meslek Hastalığı' },
+];
+
+const RISK_SEVIYESI_OPTIONS = [
+  { value: 'dusuk', label: 'Düşük' },
+  { value: 'orta', label: 'Orta' },
+  { value: 'yuksek', label: 'Yüksek' },
+  { value: 'kritik', label: 'Kritik' },
+];
+
 const SIDDET_OPTIONS = [
-  { label: 'Hafif',    color: '#22d3ee', bg: 'rgba(34,211,238,0.15)',  border: 'rgba(34,211,238,0.4)'  },
-  { label: 'Orta',    color: '#fbbf24', bg: 'rgba(251,191,36,0.15)',  border: 'rgba(251,191,36,0.4)'  },
-  { label: 'Ağır',    color: '#f97316', bg: 'rgba(249,115,22,0.15)',  border: 'rgba(249,115,22,0.4)'  },
-  { label: 'Çok Ağır', color: '#ef4444', bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.4)'  },
+  { label: 'Hafif',    value: 'Hafif',    color: '#22d3ee', bg: 'rgba(34,211,238,0.15)',  border: 'rgba(34,211,238,0.4)'  },
+  { label: 'Orta',    value: 'Orta',     color: '#fbbf24', bg: 'rgba(251,191,36,0.15)',  border: 'rgba(251,191,36,0.4)'  },
+  { label: 'Ağır',    value: 'Ağır',     color: '#f97316', bg: 'rgba(249,115,22,0.15)',  border: 'rgba(249,115,22,0.4)'  },
+  { label: 'Çok Ağır', value: 'Çok Ağır', color: '#ef4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)'  },
+  { label: 'Ölüm',   value: 'Ölüm',     color: '#7f1d1d', bg: 'rgba(127,29,29,0.2)',    border: 'rgba(127,29,29,0.5)'  },
 ];
 
 const BOLGE_RISK_MAP: Record<string, { color: string; label: string; note: string }> = {
@@ -120,17 +139,19 @@ const BOLGE_RISK_MAP: Record<string, { color: string; label: string; note: strin
 
 const emptyForm: IsKazasiFormData = {
   personelId: '', firmaId: '', kazaTarihi: '', kazaSaati: '',
-  kazaYeri: '', kazaTuru: '', kazaAciklamasi: '',
+  kazaYeri: '', kazaTuru: '', kazaTipi: 'is_kazasi', kazaAciklamasi: '',
   yaraliVucutBolgeleri: [], yaralanmaTuru: '', yaralanmaSiddeti: 'Hafif',
+  riskSeviyesi: 'orta',
   isGunuKaybi: 0, hastaneyeKaldirildi: false, hastaneAdi: '',
   tanikBilgileri: '', onlemler: '', durum: 'Açık',
+  olumNedeni: '', olumTarihi: '',
   sgkBildirildi: false, sgkBildirimTarihi: '', sgkBildirimNotu: '',
   fotografPaths: [], olayYeriDiagram: '',
   besNeden: JSON.parse(JSON.stringify(BES_NEDEN_TEMPLATE)),
 };
 
 export default function HekimIsKazasiModal({
-  open, onClose, onSaved, atanmisFirmaIds, isDark, editData, preselectedPersonelId,
+  open, onClose, onSaved, atanmisFirmaIds, isDark, editData, preselectedPersonelId, addToast,
 }: HekimIsKazasiModalProps) {
   const [form, setForm] = useState<IsKazasiFormData>(emptyForm);
   const [personelOptions, setPersonelOptions] = useState<PersonelOption[]>([]);
@@ -223,7 +244,12 @@ export default function HekimIsKazasiModal({
     if (!open) return;
     if (editData) {
       setForm({
+        ...emptyForm,
         ...editData,
+        kazaTipi: (editData as IsKazasiFormData).kazaTipi ?? 'is_kazasi',
+        riskSeviyesi: (editData as IsKazasiFormData).riskSeviyesi ?? 'orta',
+        olumNedeni: (editData as IsKazasiFormData).olumNedeni ?? '',
+        olumTarihi: (editData as IsKazasiFormData).olumTarihi ?? '',
         sgkBildirildi: editData.sgkBildirildi ?? false,
         sgkBildirimTarihi: editData.sgkBildirimTarihi ?? '',
         sgkBildirimNotu: editData.sgkBildirimNotu ?? '',
@@ -397,47 +423,117 @@ export default function HekimIsKazasiModal({
     if (!form.personelId) e.personelId = 'Personel zorunludur';
     if (!form.kazaTarihi) e.kazaTarihi = 'Tarih zorunludur';
     if (!form.kazaAciklamasi) e.kazaAciklamasi = 'Açıklama zorunludur';
+
+    // Ramak kala ise yaralanma alanları validate edilmez
+    const isRamakKala = form.kazaTipi === 'ramak_kala';
+
+    if (!isRamakKala) {
+      if (form.yaralanmaSiddeti === 'Ölüm') {
+        // Ölüm durumunda sadece ölüm alanları zorunlu
+        if (!form.olumNedeni) e.olumNedeni = 'Ölüm nedeni zorunludur';
+        if (!form.olumTarihi) e.olumTarihi = 'Ölüm tarihi zorunludur';
+      }
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSave = async () => {
-    if (!validate()) return;
+    if (saving) return;
+    if (!validate()) {
+      addToast?.('Lütfen zorunlu alanları doldurun', 'error');
+      return;
+    }
+
+    if (!form.firmaId) {
+      addToast?.('Firma seçilmedi. Lütfen personel veya firma seçin.', 'error');
+      return;
+    }
+
     setSaving(true);
     try {
-      const payload = {
+      // undefined alanları temizle, sadece aktif alanları gönder
+      const isRamakKala = form.kazaTipi === 'ramak_kala';
+      const isOlum = form.yaralanmaSiddeti === 'Ölüm';
+
+      const payload: Record<string, unknown> = {
         organization_id: form.firmaId,
         personel_id: form.personelId,
         kaza_tarihi: form.kazaTarihi,
-        kaza_saati: form.kazaSaati || null,
-        kaza_yeri: form.kazaYeri,
-        kaza_turu: form.kazaTuru,
+        kaza_turu: form.kazaTuru || null,
         kaza_aciklamasi: form.kazaAciklamasi,
-        yarali_vucut_bolgeleri: form.yaraliVucutBolgeleri,
-        yaralanma_turu: form.yaralanmaTuru,
-        yaralanma_siddeti: form.yaralanmaSiddeti,
-        is_gunu_kaybi: form.isGunuKaybi,
-        hastaneye_kaldirildi: form.hastaneyeKaldirildi,
-        hastane_adi: form.hastaneAdi,
-        tanik_bilgileri: form.tanikBilgileri,
-        onlemler: form.onlemler,
         durum: form.durum,
-        sgk_bildirildi: form.sgkBildirildi,
-        sgk_bildirim_tarihi: form.sgkBildirimTarihi || null,
-        sgk_bildirim_notu: form.sgkBildirimNotu || null,
-        fotograf_paths: form.fotografPaths,
-        olay_yeri_diagram: form.olayYeriDiagram || null,
         bes_neden: form.besNeden,
       };
-      if (editData?.id) {
-        await supabase.from('is_kazalari').update(payload).eq('id', editData.id);
+
+      if (form.kazaSaati) payload.kaza_saati = form.kazaSaati;
+      if (form.kazaYeri) payload.kaza_yeri = form.kazaYeri;
+      if (form.tanikBilgileri) payload.tanik_bilgileri = form.tanikBilgileri;
+      if (form.onlemler) payload.onlemler = form.onlemler;
+      if (form.fotografPaths.length > 0) payload.fotograf_paths = form.fotografPaths;
+      if (form.olayYeriDiagram) payload.olay_yeri_diagram = form.olayYeriDiagram;
+
+      // SGK alanları
+      payload.sgk_bildirildi = form.sgkBildirildi;
+      if (form.sgkBildirimTarihi) payload.sgk_bildirim_tarihi = form.sgkBildirimTarihi;
+      if (form.sgkBildirimNotu) payload.sgk_bildirim_notu = form.sgkBildirimNotu;
+
+      // Kaza tipi ve risk seviyesi — data kolonuna değil direkt kolonlara
+      // (tablo yoksa ek alanları yaralanma/durum alanlarıyla birlikte göndereceğiz)
+      // Kaza tipini kaza_turu içine ekle veya ayrı bir alan olarak gönder
+      // Mevcut tabloda kazaTipi kolonu yok — durum alanına encode edelim ya da kaza_turu'na prefix ekleyelim
+      // En temiz yol: yaralanma alanlarını koşula göre gönder
+      if (!isRamakKala) {
+        payload.yarali_vucut_bolgeleri = form.yaraliVucutBolgeleri;
+        payload.yaralanma_turu = form.yaralanmaTuru || null;
+        payload.yaralanma_siddeti = form.yaralanmaSiddeti;
+        payload.is_gunu_kaybi = form.isGunuKaybi;
+        payload.hastaneye_kaldirildi = form.hastaneyeKaldirildi;
+        payload.hastane_adi = form.hastaneyeKaldirildi ? form.hastaneAdi : null;
+
+        if (isOlum) {
+          // Ölüm durumunda ek bilgileri notlar alanına ekle
+          const olumBilgisi = `ÖLÜM VAKASI | Ölüm Nedeni: ${form.olumNedeni} | Ölüm Tarihi: ${form.olumTarihi}`;
+          payload.tanik_bilgileri = form.tanikBilgileri
+            ? `${form.tanikBilgileri}\n\n${olumBilgisi}`
+            : olumBilgisi;
+        }
       } else {
-        await supabase.from('is_kazalari').insert(payload);
+        // Ramak kala — yaralanma alanları boş gönder
+        payload.yarali_vucut_bolgeleri = [];
+        payload.yaralanma_turu = null;
+        payload.yaralanma_siddeti = 'Hafif';
+        payload.is_gunu_kaybi = 0;
+        payload.hastaneye_kaldirildi = false;
+        payload.hastane_adi = null;
       }
+
+      console.log('[HekimIsKazasiModal] payload:', payload);
+
+      let error: { message?: string } | null = null;
+      if (editData?.id) {
+        const res = await supabase.from('is_kazalari').update(payload).eq('id', editData.id);
+        error = res.error;
+      } else {
+        const res = await supabase.from('is_kazalari').insert(payload);
+        error = res.error;
+      }
+
+      console.log('[HekimIsKazasiModal] supabase error:', error);
+
+      if (error) {
+        addToast?.(`Kayıt hatası: ${error.message ?? 'Bilinmeyen hata'}`, 'error');
+        return;
+      }
+
+      addToast?.(editData ? 'Kayıt güncellendi' : 'Kaza kaydı oluşturuldu', 'success');
       onSaved();
       onClose();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[HekimIsKazasiModal] save error:', err);
+      const msg = err instanceof Error ? err.message : 'Beklenmeyen bir hata oluştu';
+      addToast?.(`Hata: ${msg}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -838,6 +934,24 @@ export default function HekimIsKazasiModal({
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
+                        <label style={LABEL_STYLE}>Kaza Tipi</label>
+                        <select value={form.kazaTipi} onChange={e => setForm(p => ({ ...p, kazaTipi: e.target.value }))}
+                          style={{ ...INPUT_STYLE, colorScheme }}
+                          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.5)'; }}
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }}>
+                          {KAZA_TIPI_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={LABEL_STYLE}>Risk Seviyesi</label>
+                        <select value={form.riskSeviyesi} onChange={e => setForm(p => ({ ...p, riskSeviyesi: e.target.value }))}
+                          style={{ ...INPUT_STYLE, colorScheme }}
+                          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.5)'; }}
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }}>
+                          {RISK_SEVIYESI_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
                         <label style={LABEL_STYLE}>Tarih <span style={{ color: '#ef4444' }}>*</span></label>
                         <input type="date" value={form.kazaTarihi}
                           onChange={e => setForm(p => ({ ...p, kazaTarihi: e.target.value }))}
@@ -963,7 +1077,7 @@ export default function HekimIsKazasiModal({
                           style={{ background: 'rgba(239,68,68,0.08)', border: '1px dashed rgba(239,68,68,0.2)' }}>
                           <i className="ri-cursor-line text-lg" style={{ color: 'rgba(239,68,68,0.4)' }} />
                         </div>
-                        <p className="text-[11px] font-semibold" style={{ color: textMuted }}>Henüz bölge seçilmedi</p>
+                        <p className="text-xs font-semibold" style={{ color: textMuted }}>Henüz bölge seçilmedi</p>
                         <p className="text-[10px] mt-0.5" style={{ color: textFaint }}>Sol taraftaki 3D modele tıklayın</p>
                       </div>
                     ) : (
@@ -992,7 +1106,24 @@ export default function HekimIsKazasiModal({
                   <div style={SECTION_STYLE}>
                     <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5 mb-3" style={{ color: '#f97316' }}>
                       <i className="ri-first-aid-kit-line" />Yaralanma Bilgisi
+                      {form.kazaTipi === 'ramak_kala' && (
+                        <span className="normal-case text-[9px] font-normal ml-2 px-2 py-0.5 rounded-full"
+                          style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.25)' }}>
+                          Ramak kala — yaralanma yok
+                        </span>
+                      )}
                     </p>
+
+                    {form.kazaTipi === 'ramak_kala' ? (
+                      <div className="flex flex-col items-center py-6 gap-2 text-center">
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                          style={{ background: 'rgba(34,211,238,0.08)', border: '1px dashed rgba(34,211,238,0.25)' }}>
+                          <i className="ri-shield-check-line text-xl" style={{ color: '#22d3ee' }} />
+                        </div>
+                        <p className="text-xs font-semibold" style={{ color: textMuted }}>Ramak kala vakasında yaralanma bilgisi girilmez</p>
+                      </div>
+                    ) : (
+                      <>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label style={LABEL_STYLE}>Yaralanma Türü</label>
@@ -1017,12 +1148,12 @@ export default function HekimIsKazasiModal({
                     {/* Şiddet */}
                     <div className="mt-3">
                       <label style={LABEL_STYLE}>Yaralanma Şiddeti</label>
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-5 gap-2">
                         {SIDDET_OPTIONS.map(opt => {
-                          const active = form.yaralanmaSiddeti === opt.label;
+                          const active = form.yaralanmaSiddeti === opt.value;
                           return (
-                            <button key={opt.label} onClick={() => setForm(p => ({ ...p, yaralanmaSiddeti: opt.label }))}
-                              className="py-2.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all whitespace-nowrap flex flex-col items-center gap-1"
+                            <button key={opt.value} onClick={() => setForm(p => ({ ...p, yaralanmaSiddeti: opt.value }))}
+                              className="py-2.5 rounded-xl text-[10px] font-bold cursor-pointer transition-all whitespace-nowrap flex flex-col items-center gap-1"
                               style={{
                                 background: active ? opt.bg : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)'),
                                 color: active ? opt.color : textMuted,
@@ -1037,6 +1168,37 @@ export default function HekimIsKazasiModal({
                         })}
                       </div>
                     </div>
+
+                    {/* Ölüm alanları */}
+                    {form.yaralanmaSiddeti === 'Ölüm' && (
+                      <div className="mt-3 rounded-xl p-3 space-y-3"
+                        style={{ background: 'rgba(127,29,29,0.08)', border: '1.5px solid rgba(127,29,29,0.3)' }}>
+                        <p className="text-[10px] font-bold flex items-center gap-1.5" style={{ color: '#ef4444' }}>
+                          <i className="ri-error-warning-fill" />Ölüm Vakası — Ek Bilgiler
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label style={LABEL_STYLE}>Ölüm Nedeni <span style={{ color: '#ef4444' }}>*</span></label>
+                            <input type="text" value={form.olumNedeni}
+                              placeholder="Ölüm nedeni..."
+                              onChange={e => setForm(p => ({ ...p, olumNedeni: e.target.value }))}
+                              style={{ ...INPUT_STYLE, borderColor: errors.olumNedeni ? '#ef4444' : inputBorder }}
+                              onFocus={e => { e.currentTarget.style.borderColor = '#ef4444'; }}
+                              onBlur={e => { e.currentTarget.style.borderColor = errors.olumNedeni ? '#ef4444' : inputBorder; }} />
+                            {errors.olumNedeni && <p className="text-[9px] mt-1" style={{ color: '#ef4444' }}>{errors.olumNedeni}</p>}
+                          </div>
+                          <div>
+                            <label style={LABEL_STYLE}>Ölüm Tarihi <span style={{ color: '#ef4444' }}>*</span></label>
+                            <input type="date" value={form.olumTarihi}
+                              onChange={e => setForm(p => ({ ...p, olumTarihi: e.target.value }))}
+                              style={{ ...INPUT_STYLE, borderColor: errors.olumTarihi ? '#ef4444' : inputBorder, colorScheme }}
+                              onFocus={e => { e.currentTarget.style.borderColor = '#ef4444'; }}
+                              onBlur={e => { e.currentTarget.style.borderColor = errors.olumTarihi ? '#ef4444' : inputBorder; }} />
+                            {errors.olumTarihi && <p className="text-[9px] mt-1" style={{ color: '#ef4444' }}>{errors.olumTarihi}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Hastane */}
                     <div className="mt-3">
@@ -1061,6 +1223,8 @@ export default function HekimIsKazasiModal({
                           onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
                       )}
                     </div>
+                      </>
+                    )}
                   </div>
                 </>
               )}
@@ -1129,7 +1293,7 @@ export default function HekimIsKazasiModal({
                         className="relative flex-shrink-0 cursor-pointer transition-all"
                         style={{ width: 44, height: 24 }}>
                         <div className="absolute inset-0 rounded-full transition-all"
-                          style={{ background: form.sgkBildirildi ? '#10b981' : (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.15)') }} />
+                          style={{ background: form.sgkBildirildi ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)' }} />
                         <div className="absolute top-0.5 rounded-full transition-all"
                           style={{
                             width: 20, height: 20,

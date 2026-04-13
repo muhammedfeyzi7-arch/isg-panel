@@ -364,7 +364,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
 
       <div className="pt-4"><HekimOfflineBant isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} isDark={isDark} /></div>
 
-      <div className="px-3 sm:px-5 space-y-4 max-w-[640px] mx-auto">
+      <div className="px-4 space-y-4">
         {band && (
           <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${band.border}` }}>
             <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: band.bg }}>
