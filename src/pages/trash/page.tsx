@@ -1,9 +1,21 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/AppContext';
 import Modal from '../../components/base/Modal';
 import Badge, { getFirmaStatusColor, getPersonelStatusColor, getEvrakStatusColor } from '../../components/base/Badge';
+import { supabase } from '../../lib/supabase';
 
-type Tab = 'firmalar' | 'personeller' | 'evraklar' | 'egitimler' | 'muayeneler' | 'ekipmanlar' | 'uygunsuzluklar' | 'tutanaklar' | 'is_izinleri';
+type Tab = 'firmalar' | 'personeller' | 'evraklar' | 'egitimler' | 'muayeneler' | 'ekipmanlar' | 'uygunsuzluklar' | 'tutanaklar' | 'is_izinleri' | 'is_kazalari';
+
+interface DeletedKaza {
+  id: string;
+  personelAd: string;
+  firmaAd: string;
+  kazaTarihi: string;
+  kazaTuru: string;
+  yaralanmaSiddeti: string;
+  deletedAt: string;
+  organizationId: string;
+}
 
 export default function CopKutusuPage() {
   const {
@@ -26,6 +38,84 @@ export default function CopKutusuPage() {
   const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
 
   const [activeTab, setActiveTab] = useState<Tab>(() => isGeziciUzman ? 'personeller' : 'firmalar');
+
+  // İş kazaları — AppContext'te yok, DB'den çekiyoruz
+  const [deletedKazalar, setDeletedKazalar] = useState<DeletedKaza[]>([]);
+  const [kazalarLoading, setKazalarLoading] = useState(false);
+
+  const fetchDeletedKazalar = useCallback(async () => {
+    if (!org?.id) return;
+    setKazalarLoading(true);
+    try {
+      const { data: orgRows } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .or(`id.eq.${org.id},parent_org_id.eq.${org.id}`);
+      const orgIds = (orgRows ?? []).map(o => o.id);
+      const firmaAdMap: Record<string, string> = {};
+      (orgRows ?? []).forEach(o => { firmaAdMap[o.id] = o.name; });
+
+      if (orgIds.length === 0) { setDeletedKazalar([]); return; }
+
+      const { data: kazaRows } = await supabase
+        .from('is_kazalari')
+        .select('id, organization_id, personel_id, kaza_tarihi, kaza_turu, yaralanma_siddeti, deleted_at')
+        .in('organization_id', orgIds)
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
+
+      if (!kazaRows || kazaRows.length === 0) { setDeletedKazalar([]); return; }
+
+      // Personel adlarını çek
+      const personelIds = [...new Set(kazaRows.map(r => r.personel_id).filter(Boolean))];
+      const pAdMap: Record<string, string> = {};
+      if (personelIds.length > 0) {
+        await Promise.all(orgIds.map(async (orgId) => {
+          const { data: pRows } = await supabase.from('personeller').select('id, data').eq('organization_id', orgId);
+          (pRows ?? []).forEach(r => {
+            const d = r.data as Record<string, unknown>;
+            pAdMap[r.id] = (d.adSoyad as string) ?? 'Bilinmiyor';
+          });
+        }));
+      }
+
+      setDeletedKazalar(kazaRows.map(r => ({
+        id: r.id,
+        personelAd: pAdMap[r.personel_id] ?? 'Bilinmiyor',
+        firmaAd: firmaAdMap[r.organization_id] ?? r.organization_id,
+        kazaTarihi: r.kaza_tarihi ?? '',
+        kazaTuru: r.kaza_turu ?? '—',
+        yaralanmaSiddeti: r.yaralanma_siddeti ?? '—',
+        deletedAt: r.deleted_at ?? '',
+        organizationId: r.organization_id,
+      })));
+    } catch (err) {
+      console.error('[Trash] fetchDeletedKazalar error:', err);
+    } finally {
+      setKazalarLoading(false);
+    }
+  }, [org?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'is_kazalari') fetchDeletedKazalar();
+  }, [activeTab, fetchDeletedKazalar]);
+
+  const handleRestoreKaza = async (id: string) => {
+    const { error } = await supabase
+      .from('is_kazalari')
+      .update({ deleted_at: null })
+      .eq('id', id);
+    if (error) { addToast('Geri yükleme başarısız.', 'error'); return; }
+    addToast('İş kazası kaydı geri yüklendi.', 'success');
+    fetchDeletedKazalar();
+  };
+
+  const handlePermDeleteKaza = async (id: string) => {
+    const { error } = await supabase.from('is_kazalari').delete().eq('id', id);
+    if (error) { addToast('Kalıcı silme başarısız.', 'error'); return; }
+    addToast('İş kazası kaydı kalıcı olarak silindi.', 'info');
+    fetchDeletedKazalar();
+  };
   const [permDeleteItem, setPermDeleteItem] = useState<{ id: string; tip: Tab; ad: string } | null>(null);
 
   // Toplu seçim
@@ -76,7 +166,7 @@ export default function CopKutusuPage() {
     deletedPersoneller.length +
     deletedEvraklar.length + deletedEgitimler.length + deletedMuayeneler.length +
     deletedEkipmanlar.length + deletedUygunsuzluklar.length +
-    deletedTutanaklar.length + deletedIsIzinleri.length;
+    deletedTutanaklar.length + deletedIsIzinleri.length + deletedKazalar.length;
 
   const firmaCascadeSayilari = useMemo(() => {
     const result: Record<string, { personel: number; evrak: number }> = {};
@@ -134,6 +224,7 @@ export default function CopKutusuPage() {
       if (tip === 'uygunsuzluklar') await permanentDeleteUygunsuzluk(id);
       if (tip === 'tutanaklar')     await permanentDeleteTutanak(id);
       if (tip === 'is_izinleri')    await permanentDeleteIsIzni(id);
+      if (tip === 'is_kazalari')    await handlePermDeleteKaza(id);
       addToast('Kayıt kalıcı olarak silindi.', 'info');
     } catch {
       addToast('Silme işlemi başarısız oldu. Lütfen tekrar deneyin.', 'error');
@@ -189,6 +280,7 @@ export default function CopKutusuPage() {
     { id: 'uygunsuzluklar', label: 'Saha Denetim',  icon: 'ri-map-pin-user-line',     count: deletedUygunsuzluklar.length, color: '#F97316' },
     { id: 'tutanaklar',     label: 'Tutanaklar',     icon: 'ri-article-line',          count: deletedTutanaklar.length,     color: '#14B8A6' },
     { id: 'is_izinleri',    label: 'İş İzinleri',   icon: 'ri-shield-check-line',     count: deletedIsIzinleri.length,     color: '#8B5CF6' },
+    { id: 'is_kazalari',    label: 'İş Kazaları',   icon: 'ri-alert-line',            count: deletedKazalar.length,        color: '#EF4444' },
   ];
 
   const fmt = (d?: string) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
@@ -633,6 +725,55 @@ export default function CopKutusuPage() {
             </div>
         )}
 
+        {/* İş Kazaları Tab */}
+        {activeTab === 'is_kazalari' && (
+          kazalarLoading
+            ? <div className="flex items-center justify-center py-16 gap-2"><i className="ri-loader-4-line animate-spin text-xl" style={{ color: '#EF4444' }} /><span className="text-sm" style={{ color: 'var(--text-muted)' }}>Yükleniyor...</span></div>
+            : deletedKazalar.length === 0
+              ? <TrashEmpty type="is_kazasi" />
+              : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                {deletedKazalar.map(kaza => {
+                  const SIDDET_COLOR: Record<string, string> = { 'Hafif': '#0EA5E9', 'Orta': '#F59E0B', 'Ağır': '#EF4444', 'Çok Ağır': '#F97316' };
+                  const sc = SIDDET_COLOR[kaza.yaralanmaSiddeti] ?? '#94A3B8';
+                  return (
+                    <div key={kaza.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(kaza.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                      <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0 text-sm font-bold text-white"
+                        style={{ background: 'linear-gradient(135deg, #DC2626, #EF4444)' }}>
+                        {kaza.personelAd.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{kaza.personelAd}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {kaza.firmaAd} · {kaza.kazaTuru || '—'} · {kaza.kazaTarihi ? new Date(kaza.kazaTarihi).toLocaleDateString('tr-TR') : '—'}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
+                        {kaza.yaralanmaSiddeti || '—'}
+                      </span>
+                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                        <input type="checkbox" checked={selected.has(kaza.id)} onChange={() => toggleOne(kaza.id)} className="cursor-pointer" />
+                        <button onClick={() => handleRestoreKaza(kaza.id)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+                          style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.25)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; }}>
+                          <i className="ri-arrow-go-back-line" /><span className="hidden sm:inline">Geri Yükle</span>
+                        </button>
+                        <button onClick={() => setPermDeleteItem({ id: kaza.id, tip: 'is_kazalari', ad: `${kaza.personelAd} - ${kaza.kazaTarihi}` })}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                          style={{ color: '#EF4444' }} title="Kalıcı Sil"
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+                          <i className="ri-delete-bin-line text-sm" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+        )}
+
         {/* İş İzinleri Tab */}
         {activeTab === 'is_izinleri' && (
           deletedIsIzinleri.length === 0
@@ -781,6 +922,7 @@ function TrashEmpty({ type }: { type: string }) {
     uygunsuzluk:    'Çöp kutusunda saha denetim kaydı yok',
     tutanak:        'Çöp kutusunda tutanak yok',
     is_izni:        'Çöp kutusunda iş izni yok',
+    is_kazasi:      'Çöp kutusunda iş kazası kaydı yok',
   };
   return (
     <div className="flex flex-col items-center py-16 gap-3">

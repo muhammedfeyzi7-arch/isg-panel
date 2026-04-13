@@ -133,10 +133,32 @@ function ZiyaretTab({ isDark }: { isDark: boolean }) {
 
   const fetchOrgInfo = useCallback(async () => {
     if (!user?.id) return;
-    if (org?.id) { setOsgbOrgId(org.id); setUzmanAd(user.user_metadata?.display_name ?? user.email ?? 'Uzman'); return; }
-    const { data } = await supabase.from('user_organizations').select('organization_id, display_name').eq('user_id', user.id).eq('is_active', true).maybeSingle();
+    // Önce osgb_role'e göre gerçek OSGB org'unu bul (firma org'u değil)
+    const { data: osgbRow } = await supabase
+      .from('user_organizations')
+      .select('organization_id, display_name')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi'])
+      .order('joined_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (osgbRow?.organization_id) {
+      setOsgbOrgId(osgbRow.organization_id);
+      setUzmanAd(osgbRow.display_name ?? user.email ?? 'Uzman');
+      return;
+    }
+    // Fallback: herhangi aktif kayıt (eski hesaplar için)
+    const { data } = await supabase
+      .from('user_organizations')
+      .select('organization_id, display_name')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('joined_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (data) { setOsgbOrgId(data.organization_id); setUzmanAd(data.display_name ?? user.email ?? 'Uzman'); }
-  }, [user?.id, user?.email, user?.user_metadata, org?.id]);
+  }, [user?.id, user?.email]);
 
   useEffect(() => { void fetchZiyaret(); void fetchOrgInfo(); }, [fetchZiyaret, fetchOrgInfo]);
 
@@ -145,10 +167,25 @@ function ZiyaretTab({ isDark }: { isDark: boolean }) {
     let resolvedOsgbOrgId = osgbOrgId;
     let resolvedUzmanAd = uzmanAd;
     if (!resolvedOsgbOrgId) {
-      const { data } = await supabase.from('user_organizations').select('organization_id, display_name').eq('user_id', user.id).eq('is_active', true).maybeSingle();
-      if (!data) { addToast('Organizasyon bulunamadı.', 'error'); return; }
-      resolvedOsgbOrgId = data.organization_id;
-      resolvedUzmanAd = data.display_name ?? user.email ?? 'Uzman';
+      // osgb_role filtresi ile gerçek OSGB org'unu çek (firma değil)
+      const { data: osgbRow } = await supabase
+        .from('user_organizations')
+        .select('organization_id, display_name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi'])
+        .order('joined_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (osgbRow?.organization_id) {
+        resolvedOsgbOrgId = osgbRow.organization_id;
+        resolvedUzmanAd = osgbRow.display_name ?? user.email ?? 'Uzman';
+      } else {
+        const { data } = await supabase.from('user_organizations').select('organization_id, display_name').eq('user_id', user.id).eq('is_active', true).order('joined_at', { ascending: false }).limit(1).maybeSingle();
+        if (!data) { addToast('Organizasyon bulunamadı.', 'error'); return; }
+        resolvedOsgbOrgId = data.organization_id;
+        resolvedUzmanAd = data.display_name ?? user.email ?? 'Uzman';
+      }
     }
     setActionLoading(true); setGpsError(null);
 

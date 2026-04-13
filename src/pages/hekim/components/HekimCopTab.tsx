@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 interface DeletedItem {
   id: string;
-  type: 'muayene';
+  type: 'muayene' | 'is_kazasi';
   label: string;
   subLabel: string;
   firmaAd: string;
@@ -18,7 +18,7 @@ interface HekimCopTabProps {
 export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProps) {
   const [items, setItems] = useState<DeletedItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeType, setActiveType] = useState<'tumu' | 'muayene'>('tumu');
+  const [activeType, setActiveType] = useState<'tumu' | 'muayene' | 'is_kazasi'>('tumu');
 
   const ACCENT = '#0EA5E9';
   const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
@@ -41,22 +41,19 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
 
         const allItems: DeletedItem[] = [];
         await Promise.all(safeIds.map(async (firmaId) => {
-          const { data: muayeneRows } = await supabase
-            .from('muayeneler')
-            .select('id, data, deleted_at')
-            .eq('organization_id', firmaId)
-            .not('deleted_at', 'is', null);
-          const { data: personellerForMap } = await supabase
-            .from('personeller')
-            .select('id, data')
-            .eq('organization_id', firmaId);
+          const [muayeneResult, kazaResult, personelResult] = await Promise.all([
+            supabase.from('muayeneler').select('id, data, deleted_at').eq('organization_id', firmaId).not('deleted_at', 'is', null),
+            supabase.from('is_kazalari').select('id, personel_id, kaza_tarihi, kaza_turu, deleted_at').eq('organization_id', firmaId).not('deleted_at', 'is', null),
+            supabase.from('personeller').select('id, data').eq('organization_id', firmaId),
+          ]);
+
           const pAdMap: Record<string, string> = {};
-          (personellerForMap ?? []).forEach(r => {
+          (personelResult.data ?? []).forEach(r => {
             const d = r.data as Record<string, unknown>;
             pAdMap[r.id] = (d.adSoyad as string) ?? 'Bilinmiyor';
           });
 
-          (muayeneRows ?? []).forEach(r => {
+          (muayeneResult.data ?? []).forEach(r => {
             const d = r.data as Record<string, unknown>;
             const pid = (d.personelId as string) ?? '';
             const tarih = (d.muayeneTarihi as string) ?? '';
@@ -65,6 +62,17 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
               type: 'muayene',
               label: pAdMap[pid] ?? 'Bilinmiyor',
               subLabel: tarih ? new Date(tarih).toLocaleDateString('tr-TR') : '—',
+              firmaAd: firmaAdMap[firmaId] ?? firmaId,
+              deletedAt: r.deleted_at ?? '',
+            });
+          });
+
+          (kazaResult.data ?? []).forEach(r => {
+            allItems.push({
+              id: r.id,
+              type: 'is_kazasi',
+              label: pAdMap[r.personel_id] ?? 'Bilinmiyor',
+              subLabel: r.kaza_tarihi ? new Date(r.kaza_tarihi).toLocaleDateString('tr-TR') : '—',
               firmaAd: firmaAdMap[firmaId] ?? firmaId,
               deletedAt: r.deleted_at ?? '',
             });
@@ -84,6 +92,7 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
 
   const filtered = items.filter(item => activeType === 'tumu' || item.type === activeType);
   const muayeneCount = items.filter(i => i.type === 'muayene').length;
+  const kazaCount = items.filter(i => i.type === 'is_kazasi').length;
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '—';
@@ -92,6 +101,7 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
 
   const typeConfig = {
     muayene: { icon: 'ri-heart-pulse-line', color: '#F43F5E', bg: 'rgba(244,63,94,0.1)', label: 'Muayene' },
+    is_kazasi: { icon: 'ri-alert-line', color: '#EF4444', bg: 'rgba(239,68,68,0.1)', label: 'İş Kazası' },
   };
 
   return (
@@ -115,6 +125,7 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
         {[
           { key: 'tumu' as const, label: `Tümü (${items.length})` },
           { key: 'muayene' as const, label: `Muayene (${muayeneCount})` },
+          { key: 'is_kazasi' as const, label: `İş Kazası (${kazaCount})` },
         ].map(opt => (
           <button key={opt.key} onClick={() => setActiveType(opt.key)}
             className="whitespace-nowrap px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"

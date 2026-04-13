@@ -132,18 +132,22 @@ export default function UzmanPage() {
           .maybeSingle();
 
         if (data) {
-          const firmIds: string[] =
+          const rawFirmIds: string[] =
             Array.isArray(data.active_firm_ids) && data.active_firm_ids.length > 0
               ? data.active_firm_ids
               : [data.organization_id];
-          setAtanmisFirmaIds(firmIds);
 
+          // Silinmemiş firmaları filtrele (deleted_at IS NULL)
           const { data: orgs } = await supabase
             .from('organizations')
             .select('id, name')
-            .in('id', firmIds);
+            .in('id', rawFirmIds)
+            .is('deleted_at', null);
 
           const options: FirmaOption[] = (orgs ?? []).map(o => ({ id: o.id, name: o.name }));
+          const firmIds = options.map(o => o.id);
+
+          setAtanmisFirmaIds(firmIds);
           setFirmaOptions(options);
           if (options.length === 1) setAktiveFirmaId(options[0].id);
         }
