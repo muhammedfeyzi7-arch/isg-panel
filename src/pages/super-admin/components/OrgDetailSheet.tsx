@@ -252,7 +252,7 @@ export default function OrgDetailSheet({ org, superAdminUserId, onClose, onUpdat
                     disabled={saving}
                     className={`w-full py-3 rounded-xl text-sm font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 border ${
                       org.is_active
-                        ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
+                        ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
                         : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
                     }`}
                   >

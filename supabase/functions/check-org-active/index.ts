@@ -56,10 +56,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Organizasyonun aktif olup olmadığını kontrol et
+    // Organizasyonun aktif ve aboneliğinin geçerli olup olmadığını kontrol et
     const { data: org, error: orgErr } = await adminClient
       .from('organizations')
-      .select('id, is_active')
+      .select('id, is_active, subscription_end')
       .eq('id', membership.organization_id)
       .maybeSingle();
 
@@ -73,6 +73,17 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ allowed: false, reason: 'org_inactive' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Abonelik süresi dolmuş mu kontrol et
+    if (org.subscription_end) {
+      const expiry = new Date(org.subscription_end);
+      const now = new Date();
+      if (expiry < now) {
+        return new Response(JSON.stringify({ allowed: false, reason: 'subscription_expired' }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     return new Response(JSON.stringify({ allowed: true }), {

@@ -168,10 +168,12 @@ export default function OsgbDashboardPage() {
           ]);
 
           // Bu firmaya atanmış uzmanı bul (active_firm_id veya active_firm_ids içinde)
-          const atananUzman = (uzmanData ?? []).find(u =>
-            u.active_firm_id === f.id ||
-            (Array.isArray(u.active_firm_ids) && u.active_firm_ids.includes(f.id))
-          );
+          // active_firm_ids boş array [] gelirse active_firm_id'ye fallback yap
+          const atananUzman = (uzmanData ?? []).find(u => {
+            const ids: string[] = Array.isArray(u.active_firm_ids) ? u.active_firm_ids.filter((id: string) => !!id) : [];
+            if (ids.length > 0) return ids.includes(f.id);
+            return u.active_firm_id === f.id;
+          });
 
           const base: AltFirma = {
             id: f.id,
@@ -203,25 +205,37 @@ export default function OsgbDashboardPage() {
       // Uzmanlar için aktif firma adını/adlarını çek
       const enrichedUzmanlar: Uzman[] = await Promise.all(
         (uzmanData ?? []).map(async (u) => {
-          // active_firm_ids varsa tüm firma adlarını çek
-          const firmIds: string[] = (u.active_firm_ids && u.active_firm_ids.length > 0)
-            ? u.active_firm_ids
-            : u.active_firm_id ? [u.active_firm_id] : [];
+          // active_firm_ids öncelikli, boş array [] de null gibi ele al
+          const rawIds: string[] = Array.isArray(u.active_firm_ids) ? u.active_firm_ids.filter((id: string) => !!id) : [];
+          const firmIds: string[] = rawIds.length > 0
+            ? rawIds
+            : (u.active_firm_id ? [u.active_firm_id] : []);
 
+          // Önce zaten yüklenmiş firmalar içinde ara (DB sorgusu azalt)
           let active_firm_name: string | null = null;
           if (firmIds.length > 0) {
-            const { data: firmRows } = await supabase
-              .from('organizations')
-              .select('id, name')
-              .in('id', firmIds);
-            if (firmRows && firmRows.length > 0) {
-              // Birden fazla firma varsa isimlerini virgülle birleştir
-              active_firm_name = firmRows.map(r => r.name).join(', ');
+            const localMatches = firmIds.map(id => {
+              const found = (firmData ?? []).find((f: { id: string; name: string }) => f.id === id);
+              return found?.name ?? null;
+            }).filter(Boolean) as string[];
+
+            if (localMatches.length > 0) {
+              active_firm_name = localMatches.join(', ');
+            } else {
+              // Local'de yoksa DB'den çek
+              const { data: firmRows } = await supabase
+                .from('organizations')
+                .select('id, name')
+                .in('id', firmIds)
+                .is('deleted_at', null);
+              if (firmRows && firmRows.length > 0) {
+                active_firm_name = firmRows.map((r: { name: string }) => r.name).join(', ');
+              }
             }
           }
           return {
             ...u,
-            active_firm_ids: u.active_firm_ids ?? null,
+            active_firm_ids: firmIds.length > 0 ? firmIds : null,
             active_firm_name,
           };
         })

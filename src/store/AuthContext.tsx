@@ -130,6 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (checkData.reason === 'org_inactive') {
               return { error: 'Organizasyonunuz askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.' };
             }
+            if (checkData.reason === 'subscription_expired') {
+              return { error: 'Organizasyonunuzun abonelik süresi dolmuştur. Lütfen yöneticinizle iletişime geçin.' };
+            }
             return { error: 'Hesabınız devre dışı bırakılmış veya organizasyondan çıkarılmış. Lütfen yöneticinizle iletişime geçin.' };
           }
         } catch {
