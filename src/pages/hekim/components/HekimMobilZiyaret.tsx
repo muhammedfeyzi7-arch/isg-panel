@@ -266,7 +266,8 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
     const sureDakika = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
     try {
       if (isOnline && aktifZiyaret.id && !aktifZiyaret.isOffline) {
-        const { error } = await supabase.from('osgb_ziyaretler').update({ cikis_saati: now, durum: 'tamamlandi', sure_dakika: sureDakika, updated_at: now, check_out_lat: coords?.lat ?? null, check_out_lng: coords?.lng ?? null }).eq('id', aktifZiyaret.id).eq('uzman_user_id', user.id).is('cikis_saati', null);
+        // sure_dakika GENERATED ALWAYS — DB'ye gönderilmez, cikis_saati'nden otomatik hesaplanır
+        const { error } = await supabase.from('osgb_ziyaretler').update({ cikis_saati: now, durum: 'tamamlandi', updated_at: now, check_out_lat: coords?.lat ?? null, check_out_lng: coords?.lng ?? null }).eq('id', aktifZiyaret.id).is('cikis_saati', null);
         if (error) throw new Error(error.message);
         addToast(`İşlem başarıyla kaydedildi — ziyaret tamamlandı (${sureDakika} dk)`, 'success');
       } else {

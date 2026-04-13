@@ -218,7 +218,8 @@ function ZiyaretTab({ isDark }: { isDark: boolean }) {
     try {
       const now = new Date().toISOString();
       const sure = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
-      const { error } = await supabase.from('osgb_ziyaretler').update({ cikis_saati: now, durum: 'tamamlandi', sure_dakika: sure, updated_at: now, check_out_lat: coords?.lat ?? null, check_out_lng: coords?.lng ?? null }).eq('id', aktifZiyaret.id).eq('uzman_user_id', user.id);
+      // sure_dakika GENERATED ALWAYS — DB'ye gönderilmez, cikis_saati'nden otomatik hesaplanır
+      const { error } = await supabase.from('osgb_ziyaretler').update({ cikis_saati: now, durum: 'tamamlandi', updated_at: now, check_out_lat: coords?.lat ?? null, check_out_lng: coords?.lng ?? null }).eq('id', aktifZiyaret.id).eq('uzman_user_id', user.id);
       if (error) throw new Error(error.message);
       addToast(`Ziyaret tamamlandı! Süre: ${sure} dakika`, 'success');
       setAktifZiyaret(null); setShowQr(false); void fetchZiyaret();
