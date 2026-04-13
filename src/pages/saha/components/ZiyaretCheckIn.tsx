@@ -452,25 +452,20 @@ export default function ZiyaretCheckIn() {
     actionInProgress.current = true;
     setActionLoading(true);
     setGpsError(null);
-    // Önce UI'ı kapat — QR scanner açıksa kapat
     setShowQr(false);
 
     setGpsStatus('loading');
     const coords = await getGpsCoords(5000).catch(() => null);
     setGpsStatus(coords ? 'ok' : 'idle');
 
-    const now        = new Date().toISOString();
-    const sureDakika = aktifZiyaret.girisAt
-      ? Math.round((Date.now() - new Date(aktifZiyaret.girisAt).getTime()) / 60000)
-      : null;
+    const now = new Date().toISOString();
 
     try {
       if (isOnline) {
-        // ID var mı yoksa DB'den bul
+        // ── Adım 1: ID çözümle ──────────────────────────────────────────
         let ziyaretId = aktifZiyaret.id;
 
         if (!ziyaretId || aktifZiyaret.isOffline) {
-          // Offline kaydedilmişse veya ID yoksa DB'den aktif ziyareti bul
           const { data: dbZiyaret } = await supabase
             .from('osgb_ziyaretler')
             .select('id')
@@ -482,65 +477,84 @@ export default function ZiyaretCheckIn() {
           ziyaretId = dbZiyaret?.id ?? null;
         }
 
+        // ── Adım 2: ID hâlâ yoksa DB'den zorla çek ───────────────────────
+        if (!ziyaretId) {
+          const { data: forceFetch } = await supabase
+            .from('osgb_ziyaretler')
+            .select('id')
+            .eq('uzman_user_id', user.id)
+            .is('cikis_saati', null)
+            .order('giris_saati', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          ziyaretId = forceFetch?.id ?? null;
+        }
+
+        console.log('CHECKOUT START', {
+          aktifZiyaret,
+          ziyaretId,
+        });
+
         if (ziyaretId) {
-          // sure_dakika generated/computed column — DB'ye gönderilmez, sadece frontend'de hesaplanır
-          const { error, count } = await supabase
+          // ── sure_dakika GENERATED ALWAYS — DB'ye gönderilmez ──────────
+          // cikis_saati yazılınca DB otomatik hesaplar
+          const { data: updateData, error, count } = await supabase
             .from('osgb_ziyaretler')
             .update({
-              cikis_saati: now,
-              durum: 'tamamlandi',
-              updated_at: now,
+              cikis_saati:   now,
+              durum:         'tamamlandi',
+              updated_at:    now,
               check_out_lat: coords?.lat ?? null,
               check_out_lng: coords?.lng ?? null,
             })
             .eq('id', ziyaretId)
             .eq('uzman_user_id', user.id)
             .is('cikis_saati', null)
-            .select('id');
+            .select('id', { count: 'exact' });
+
+          console.log('UPDATE RESULT', { data: updateData, error, count });
 
           if (error) {
+            console.error('CHECKOUT ERROR', {
+              message: error.message,
+              code:    error.code,
+              details: error.details,
+            });
             addToast(`Ziyaret sonlandırılamadı: ${error.message}`, 'error');
             throw new Error(error.message);
           }
 
           if (!count || count === 0) {
-            // cikis_saati null filtresi eşleşmedi — zaten kapatılmış olabilir, temizle
+            // cikis_saati null filtresi eşleşmedi — zaten kapatılmış
             addToast('Ziyaret zaten tamamlanmış. Kayıt temizlendi.', 'info');
           } else {
-            addToast(`İşlem başarıyla kaydedildi — ziyaret tamamlandı (${sureDakika ?? 0} dk)`, 'success');
+            addToast('Ziyaret başarıyla tamamlandı.', 'success');
           }
         } else {
-          // DB'de aktif ziyaret yok, queue'ya ekle
-          const payload: ZiyaretCheckoutPayload = {
-            tempId: aktifZiyaret.tempId, realId: null,
-            uzmanUserId: user.id, cikisAt: now, sureDakika,
-            checkOutLat: coords?.lat ?? null, checkOutLng: coords?.lng ?? null,
-          };
-          await addToQueue({
-            type: 'ziyaret_checkout',
-            label: `Ziyaret bitirildi — Süre: ${sureDakika ?? 0} dk`,
-            payload: payload as unknown as Record<string, unknown>,
-          });
-          addToast(`Ziyaret tamamlandı (${sureDakika ?? 0} dk)`, 'success');
+          // DB'de hiç aktif kayıt yok — sadece local state'i temizle
+          console.warn('CHECKOUT: DB\'de aktif ziyaret bulunamadı, sadece local temizleniyor');
+          addToast('Yerel ziyaret kaydı temizlendi.', 'info');
         }
       } else {
-        // Offline checkout
+        // ── Offline checkout — sadece cikis_saati + coords ───────────────
         const payload: ZiyaretCheckoutPayload = {
-          tempId: aktifZiyaret.tempId, realId: aktifZiyaret.id,
-          uzmanUserId: user.id, cikisAt: now, sureDakika,
-          checkOutLat: coords?.lat ?? null, checkOutLng: coords?.lng ?? null,
+          tempId:      aktifZiyaret.tempId,
+          realId:      aktifZiyaret.id,
+          uzmanUserId: user.id,
+          cikisAt:     now,
+          sureDakika:  null,   // sure_dakika GENERATED — gönderilmez
+          checkOutLat: coords?.lat ?? null,
+          checkOutLng: coords?.lng ?? null,
         };
         await addToQueue({
-          type: 'ziyaret_checkout',
-          label: `Ziyaret bitirildi (çevrimdışı) — Süre: ${sureDakika ?? 0} dk`,
+          type:    'ziyaret_checkout',
+          label:   'Ziyaret bitirildi (çevrimdışı)',
           payload: payload as unknown as Record<string, unknown>,
         });
         addToast('İşlem kaydedildi (çevrimdışı) — bağlantı gelince sunucuya gönderilecek', 'success');
       }
 
-      // Her durumda yerel state'i temizle
       setAktifZiyaret(null);
-
       if (isOnline) await fetchZiyaret();
     } catch (err) {
       addToast(`Check-out yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
@@ -584,14 +598,18 @@ export default function ZiyaretCheckIn() {
       return;
     }
 
+    console.log('QR OKUNDU', firmaId);
+
     if (aktifZiyaret) {
-      // Aktif ziyaret varsa → checkout (aynı firma olsun veya olmasın, QR ile çıkış desteklenir)
-      if (aktifZiyaret.firmaOrgId === firmaId) {
-        // Kısa bir delay ile çağır — setShowQr(false) state'inin settle etmesi için
-        setTimeout(() => { void handleCheckOut(); }, 50);
-      } else {
-        addToast(`Farklı firmada aktif ziyaret var (${aktifZiyaret.firmaAd ?? 'Firma'}). Önce mevcut ziyareti bitirin.`, 'error');
+      // Aktif ziyaret varsa → her zaman checkout (firma mismatch bloklama)
+      if (aktifZiyaret.firmaOrgId !== firmaId) {
+        console.warn('QR firma mismatch ama checkout devam etti', {
+          aktifFirma: aktifZiyaret.firmaOrgId,
+          qrFirma:    firmaId,
+        });
       }
+      // Kısa delay — setShowQr(false) settle için
+      setTimeout(() => { void handleCheckOut(); }, 50);
     } else {
       // Aktif ziyaret yoksa → checkin
       void handleCheckIn(firmaId);
