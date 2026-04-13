@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
+import { generateEK2Docx } from '@/pages/hekim/utils/ek2DocxGenerator';
 
 const ACCENT = '#0EA5E9';
 const ACCENT_DARK = '#0284C7';
@@ -330,15 +331,45 @@ export default function HekimMuayeneModal({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* PDF placeholder */}
-            <button
-              onClick={() => addToast?.('PDF özelliği yakında aktif olacak.', 'info')}
-              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary, border: `1px solid ${borderColor}` }}
-            >
-              <i className="ri-file-pdf-line text-xs" />
-              PDF İndir
-            </button>
+            {/* Word İndir butonu — sadece edit modunda (kayıtlı veri varsa) */}
+            {editData && (
+              <button
+                onClick={async () => {
+                  const selectedP = personelOptions.find(p => p.id === form.personelId);
+                  try {
+                    await generateEK2Docx({
+                      personelAd: selectedP?.adSoyad ?? 'Personel',
+                      personelGorev: selectedP?.gorev,
+                      firmaAd: selectedP ? (firmaAdMap[selectedP.firmaId] ?? '') : (firmaAdMap[form.firmaId] ?? ''),
+                      kronikHastaliklar: form.kronikHastaliklar,
+                      ilacKullanim: form.ilacKullanim,
+                      ameliyatGecmisi: form.ameliyatGecmisi,
+                      tansiyon: form.tansiyon,
+                      nabiz: form.nabiz,
+                      gorme: form.gorme,
+                      isitme: form.isitme,
+                      sonuc: form.sonuc,
+                      aciklama: form.aciklama,
+                      doktor: form.doktor,
+                      hastane: form.hastane,
+                      muayeneTarihi: form.muayeneTarihi,
+                      sonrakiTarih: form.sonrakiTarih,
+                    });
+                    addToast?.('Word belgesi indiriliyor...', 'success');
+                  } catch (err) {
+                    addToast?.('Word oluşturulurken hata oluştu.', 'error');
+                    console.error('[EK2 Word]', err);
+                  }
+                }}
+                className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
+                style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.25)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.18)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.1)'; }}
+              >
+                <i className="ri-file-word-line text-xs" />
+                Word İndir
+              </button>
+            )}
             <button onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
               style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary }}

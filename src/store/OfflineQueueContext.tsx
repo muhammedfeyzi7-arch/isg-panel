@@ -106,12 +106,12 @@ async function applyQueueItem(item: OfflineQueueItem): Promise<void> {
         throw new Error('[checkout] Hedef kayıt bulunamadı — check-in sync bekleniyor olabilir');
       }
 
-      // sure_dakika GENERATED ALWAYS kolonu — DB'ye gönderilmez, cikis_saati'nden otomatik hesaplanır
       const { error } = await supabase
         .from('osgb_ziyaretler')
         .update({
           cikis_saati:   p.cikisAt,
           durum:         'tamamlandi',
+          sure_dakika:   p.sureDakika,
           check_out_lat: p.checkOutLat,
           check_out_lng: p.checkOutLng,
           updated_at:    new Date().toISOString(),
