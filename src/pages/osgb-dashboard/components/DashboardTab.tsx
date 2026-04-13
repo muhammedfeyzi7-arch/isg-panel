@@ -249,7 +249,7 @@ export default function DashboardTab({
           </div>
           <p className="relative text-[32px] font-black leading-none mb-2" style={{ color: aktifZiyaretler.length > 0 ? '#22C55E' : textPrimary }}>{aktifZiyaretler.length}</p>
           <p className="relative text-[11px] font-medium" style={{ color: aktifZiyaretler.length > 0 ? '#22C55E' : textSecondary }}>
-            {aktifZiyaretler.length === 0 ? 'Sahada kimse yok' : `${aktifZiyaretler.length} uzman şu an sahada`}
+            {aktifZiyaretler.length === 0 ? 'Sahada kimse yok' : `${aktifZiyaretler.length} personel şu an sahada`}
           </p>
         </div>
 
@@ -364,7 +364,7 @@ export default function DashboardTab({
                         <div className="min-w-0">
                           <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{f.name}</p>
                           {isAktif && <span className="text-[9px] font-bold" style={{ color: '#22C55E' }}>● Aktif</span>}
-                          {!isAktif && <span className="text-[9px]" style={{ color: textSecondary }}>{f.uzmanAd ?? 'Uzman atanmadı'}</span>}
+                          {!isAktif && <span className="text-[9px]" style={{ color: textSecondary }}>{f.uzmanAd ?? 'Personel atanmadı'}</span>}
                         </div>
                       </div>
                       <div><span className="text-xs" style={{ color: textSecondary }}>{f.personelSayisi}</span></div>
@@ -386,9 +386,9 @@ export default function DashboardTab({
                 <i className="ri-user-star-fill text-sm" style={{ color: '#0EA5E9' }} />
               </div>
               <div>
-                <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Gezici Uzmanlar</h3>
+                <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Personeller</h3>
                 <p className="text-[10px]" style={{ color: textSecondary }}>
-                  {aktifUzmanIds.size > 0 ? `${aktifUzmanIds.size} uzman şu an sahada` : `${uzmanlar.length} uzman kayıtlı`}
+                  {aktifUzmanIds.size > 0 ? `${aktifUzmanIds.size} personel şu an sahada` : `${uzmanlar.length} personel kayıtlı`}
                 </p>
               </div>
             </div>
@@ -406,18 +406,18 @@ export default function DashboardTab({
               <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.12)' }}>
                 <i className="ri-user-star-line text-xl" style={{ color: '#0EA5E9' }} />
               </div>
-              <p className="text-xs text-center" style={{ color: textSecondary }}>Henüz uzman eklenmedi</p>
+              <p className="text-xs text-center" style={{ color: textSecondary }}>Henüz personel eklenmedi</p>
               <button onClick={onUzmanEkle}
                 className="whitespace-nowrap flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
                 style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
-                <i className="ri-user-add-line" />Uzman Ekle
+                <i className="ri-user-add-line" />Personel Ekle
               </button>
             </div>
           ) : (
             <>
               <div className="grid grid-cols-[2fr_1.2fr_1fr] items-center px-4 py-2"
                 style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }}>
-                {['UZMAN', 'FİRMA', 'DURUM'].map(h => (
+                {['PERSONEL', 'FİRMA', 'DURUM'].map(h => (
                   <div key={h}><span className="text-[9px] font-bold tracking-wider" style={{ color: textSecondary }}>{h}</span></div>
                 ))}
               </div>

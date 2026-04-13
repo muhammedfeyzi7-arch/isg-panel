@@ -26,15 +26,6 @@ interface Ziyaret {
   check_in_distance_m: number | null;
 }
 
-function calcSureDakika(z: Ziyaret): number | null {
-  if (z.sure_dakika != null && z.sure_dakika > 0) return z.sure_dakika;
-  if (z.cikis_saati && z.giris_saati) {
-    const dk = Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000);
-    return dk > 0 ? dk : null;
-  }
-  return null;
-}
-
 async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   const { default: ExcelJS } = await import('exceljs');
   const wb = new ExcelJS.Workbook();
@@ -63,119 +54,41 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
     const m = dk % 60;
     return h > 0 ? `${h}s ${m}dk` : `${m} dk`;
   };
-  const fmtGps = (status: string | null) => {
-    if (!status) return '—';
-    if (status === 'ok') return '✓ Doğrulandı';
-    if (status === 'too_far') return '✗ Konum Dışı';
-    if (status === 'no_permission') return '⚠ İzin Yok';
-    return status;
-  };
+
+  const columns = [
+    { header: 'Tarih', key: 'tarih', width: 14 },
+    { header: 'Uzman Adı', key: 'uzman', width: 26 },
+    { header: 'Giriş Saati', key: 'giris', width: 14 },
+    { header: 'Çıkış Saati', key: 'cikis', width: 14 },
+    { header: 'Süre (dakika)', key: 'sure_dk', width: 16 },
+    { header: 'Süre', key: 'sure', width: 12 },
+    { header: 'Tip', key: 'tip', width: 10 },
+  ];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const headerFill: any = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0369A1' } };
-  const headerFont = { bold: true, size: 11, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
-  const headerAlignment = { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true };
-  const thinBorder = { style: 'thin' as const, color: { argb: 'FFCBD5E1' } };
-
-  // ── ÖZET SAYFASI ──────────────────────────────────────────────────────────
-  const wsOzet = wb.addWorksheet('📊 Özet');
-  wsOzet.columns = [
-    { header: 'Firma', key: 'firma', width: 32 },
-    { header: 'Toplam Ziyaret', key: 'toplam', width: 16 },
-    { header: 'Tamamlanan', key: 'tamamlanan', width: 16 },
-    { header: 'Aktif', key: 'aktif', width: 10 },
-    { header: 'Toplam Süre', key: 'toplamSure', width: 16 },
-    { header: 'Ort. Süre (dk)', key: 'ortSure', width: 16 },
-    { header: 'QR Oranı (%)', key: 'qrOran', width: 16 },
-    { header: 'GPS Uyum (%)', key: 'gpsUyum', width: 16 },
-  ];
-  wsOzet.getRow(1).height = 30;
-  wsOzet.getRow(1).eachCell(cell => {
-    cell.fill = headerFill; cell.font = headerFont; cell.alignment = headerAlignment;
-    cell.border = { bottom: { style: 'medium', color: { argb: 'FF38BDF8' } }, right: thinBorder };
-  });
-
-  let ozetToplam = 0, ozetTamamlanan = 0, ozetSureToplam = 0, ozetQr = 0, ozetGpsOk = 0, ozetGpsToplam = 0;
-  for (const [, { ad, ziyaretler: fz }] of firmaMap) {
-    const tamamlanan = fz.filter(z => z.durum === 'tamamlandi').length;
-    const aktifCount = fz.filter(z => z.durum === 'aktif').length;
-    const sureler = fz.map(z => calcSureDakika(z)).filter(Boolean) as number[];
-    const toplamSure = sureler.reduce((s, v) => s + v, 0);
-    const ortSure = sureler.length > 0 ? Math.round(toplamSure / sureler.length) : 0;
-    const qrCount = fz.filter(z => z.qr_ile_giris).length;
-    const gpsOk = fz.filter(z => z.gps_status === 'ok').length;
-    const gpsToplam = fz.filter(z => z.gps_status != null).length;
-
-    ozetToplam += fz.length; ozetTamamlanan += tamamlanan; ozetSureToplam += toplamSure;
-    ozetQr += qrCount; ozetGpsOk += gpsOk; ozetGpsToplam += gpsToplam;
-
-    const row = wsOzet.addRow({
-      firma: ad,
-      toplam: fz.length,
-      tamamlanan,
-      aktif: aktifCount,
-      toplamSure: fmtSure(toplamSure),
-      ortSure,
-      qrOran: fz.length > 0 ? Math.round((qrCount / fz.length) * 100) : 0,
-      gpsUyum: gpsToplam > 0 ? Math.round((gpsOk / gpsToplam) * 100) : 100,
+  const applyHeaderStyle = (ws: any) => {
+    ws.getRow(1).height = 28;
+    ws.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0C4A6E' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { bottom: { style: 'medium', color: { argb: 'FF0EA5E9' } } };
     });
-    row.height = 22;
-    row.eachCell({ includeEmpty: true }, (cell, colNum) => {
-      const isEven = (wsOzet.rowCount % 2 === 0);
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFFFF' : 'FFF0F9FF' } };
-      cell.font = { size: 11, name: 'Calibri', color: { argb: 'FF1E293B' } };
-      cell.alignment = { vertical: 'middle', horizontal: colNum === 1 ? 'left' : 'center' };
-      cell.border = { bottom: thinBorder, right: thinBorder };
-    });
-    const qrCell = row.getCell('qrOran');
-    const qrVal = typeof qrCell.value === 'number' ? qrCell.value : 0;
-    qrCell.font = { bold: true, size: 11, name: 'Calibri', color: { argb: qrVal >= 80 ? 'FF0284C7' : qrVal >= 50 ? 'FFF59E0B' : 'FFEF4444' } };
-    const gpsCell = row.getCell('gpsUyum');
-    const gpsVal = typeof gpsCell.value === 'number' ? gpsCell.value : 100;
-    gpsCell.font = { bold: true, size: 11, name: 'Calibri', color: { argb: gpsVal >= 90 ? 'FF16A34A' : gpsVal >= 70 ? 'FFF59E0B' : 'FFEF4444' } };
-  }
-  // Toplam satırı
-  const ozetSum = wsOzet.addRow({
-    firma: `GENEL TOPLAM (${ozetToplam} ziyaret)`,
-    toplam: ozetToplam, tamamlanan: ozetTamamlanan, aktif: ozetToplam - ozetTamamlanan,
-    toplamSure: fmtSure(ozetSureToplam),
-    ortSure: ozetTamamlanan > 0 ? Math.round(ozetSureToplam / ozetTamamlanan) : 0,
-    qrOran: ozetToplam > 0 ? Math.round((ozetQr / ozetToplam) * 100) : 0,
-    gpsUyum: ozetGpsToplam > 0 ? Math.round((ozetGpsOk / ozetGpsToplam) * 100) : 100,
-  });
-  ozetSum.height = 26;
-  ozetSum.eachCell({ includeEmpty: true }, cell => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
-    cell.font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF0369A1' } };
-    cell.border = { top: { style: 'medium', color: { argb: 'FF38BDF8' } }, bottom: thinBorder };
-  });
-  wsOzet.views = [{ state: 'frozen', ySplit: 1 }];
+  };
 
-  // ── FİRMA SAYFASI ──────────────────────────────────────────────────────────
   for (const [, { ad, ziyaretler: fZiyaretler }] of firmaMap) {
     const sheetName = ad.replace(/[\\/?*[\]:]/g, '').slice(0, 31);
     const ws = wb.addWorksheet(sheetName);
-    ws.columns = [
-      { header: 'Tarih', key: 'tarih', width: 14 },
-      { header: 'Uzman Adı', key: 'uzman', width: 26 },
-      { header: 'Giriş', key: 'giris', width: 12 },
-      { header: 'Çıkış', key: 'cikis', width: 12 },
-      { header: 'Süre (dk)', key: 'sure_dk', width: 12 },
-      { header: 'Süre', key: 'sure', width: 12 },
-      { header: 'Durum', key: 'durum', width: 14 },
-      { header: 'Tip', key: 'tip', width: 10 },
-      { header: 'GPS', key: 'gps', width: 18 },
-      { header: 'Mesafe (m)', key: 'mesafe', width: 14 },
-    ];
-    ws.getRow(1).height = 28;
-    ws.getRow(1).eachCell(cell => {
-      cell.fill = headerFill; cell.font = headerFont; cell.alignment = headerAlignment;
-      cell.border = { bottom: { style: 'medium', color: { argb: 'FF38BDF8' } }, right: thinBorder };
-    });
+    ws.columns = columns;
+    applyHeaderStyle(ws);
 
     fZiyaretler.forEach((z, i) => {
-      const sureDk = calcSureDakika(z);
-      const isEven = i % 2 === 0;
+      const sureDk = z.sure_dakika != null
+        ? z.sure_dakika
+        : z.cikis_saati
+          ? Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000)
+          : null;
+
       const row = ws.addRow({
         tarih: fmtTarih(z.giris_saati),
         uzman: z.uzman_ad ?? z.uzman_email ?? '—',
@@ -183,60 +96,56 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
         cikis: z.cikis_saati ? fmtSaat(z.cikis_saati) : '—',
         sure_dk: sureDk ?? '—',
         sure: fmtSure(sureDk),
-        durum: z.durum === 'aktif' ? '▶ Devam Ediyor' : '✓ Tamamlandı',
         tip: z.qr_ile_giris ? 'QR' : 'Manuel',
-        gps: fmtGps(z.gps_status),
-        mesafe: z.check_in_distance_m ?? '—',
       });
       row.height = 22;
+
       row.eachCell({ includeEmpty: true }, (cell, colNum) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFFFFFFF' : 'FFF8FAFC' } };
+        const zebraColor = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F9FF';
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: zebraColor } };
         cell.alignment = { vertical: 'middle', horizontal: colNum === 2 ? 'left' : 'center' };
         cell.font = { size: 11, name: 'Calibri', color: { argb: 'FF1E293B' } };
-        cell.border = { bottom: thinBorder, right: thinBorder };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
       });
 
-      // Durum rengi
-      const durumCell = row.getCell('durum');
-      durumCell.font = { bold: true, size: 11, name: 'Calibri',
-        color: { argb: z.durum === 'aktif' ? 'FF16A34A' : 'FF64748B' } };
-
-      // Tip rengi
       const tipCell = row.getCell('tip');
-      tipCell.font = { bold: true, size: 11, name: 'Calibri',
-        color: { argb: z.qr_ile_giris ? 'FF0284C7' : 'FF475569' } };
+      tipCell.font = {
+        bold: true, size: 11, name: 'Calibri',
+        color: { argb: z.qr_ile_giris ? 'FF7C3AED' : 'FF475569' },
+      };
 
-      // GPS rengi
-      const gpsCell = row.getCell('gps');
-      const gpsColor = z.gps_status === 'ok' ? 'FF16A34A' : z.gps_status === 'too_far' ? 'FFDC2626' : z.gps_status === 'no_permission' ? 'FFD97706' : 'FF94A3B8';
-      gpsCell.font = { bold: z.gps_status !== null, size: 11, name: 'Calibri', color: { argb: gpsColor } };
-
-      // Süre rengi
+      const sureDkCell = row.getCell('sure_dk');
       if (typeof sureDk === 'number') {
-        row.getCell('sure_dk').font = { bold: true, size: 11, name: 'Calibri',
-          color: { argb: sureDk > 120 ? 'FF0284C7' : sureDk > 60 ? 'FF0891B2' : 'FF94A3B8' } };
+        sureDkCell.font = {
+          bold: true, size: 11, name: 'Calibri',
+          color: { argb: sureDk > 120 ? 'FF0284C7' : sureDk > 60 ? 'FF0891B2' : 'FF94A3B8' },
+        };
       }
     });
 
-    // Toplam satırı
-    const totalSure = fZiyaretler.reduce((s, z) => s + (calcSureDakika(z) ?? 0), 0);
     ws.addRow({});
     const sumRow = ws.addRow({
       tarih: `Toplam: ${fZiyaretler.length} ziyaret`,
-      uzman: `Tamamlanan: ${fZiyaretler.filter(z => z.durum === 'tamamlandi').length}`,
-      giris: '', cikis: '',
-      sure_dk: totalSure,
-      sure: fmtSure(totalSure),
-      durum: `Aktif: ${fZiyaretler.filter(z => z.durum === 'aktif').length}`,
-      tip: `QR: %${fZiyaretler.length > 0 ? Math.round((fZiyaretler.filter(z => z.qr_ile_giris).length / fZiyaretler.length) * 100) : 0}`,
-      gps: '',
-      mesafe: '',
+      uzman: '', giris: '', cikis: '',
+      sure_dk: fZiyaretler.reduce((s, z) => {
+        const dk = z.sure_dakika ?? (z.cikis_saati
+          ? Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000)
+          : 0);
+        return s + dk;
+      }, 0),
+      sure: fmtSure(fZiyaretler.reduce((s, z) => {
+        const dk = z.sure_dakika ?? (z.cikis_saati
+          ? Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000)
+          : 0);
+        return s + dk;
+      }, 0)),
+      tip: '',
     });
-    sumRow.height = 26;
+    sumRow.height = 24;
     sumRow.eachCell({ includeEmpty: true }, cell => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
-      cell.font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF0369A1' } };
-      cell.border = { top: { style: 'medium', color: { argb: 'FF38BDF8' } } };
+      cell.font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF0C4A6E' } };
+      cell.border = { top: { style: 'medium', color: { argb: 'FF0EA5E9' } } };
     });
     ws.views = [{ state: 'frozen', ySplit: 1 }];
   }
@@ -244,8 +153,7 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const donemStr = donem ? `-${donem.replace(/\s+/g, '-')}` : '';
-  const fileName = `Ziyaret-Raporu${donemStr}-${yyyy}-${mm}.xlsx`;
+  const fileName = `Ziyaret-Raporu-${yyyy}-${mm}.xlsx`;
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -255,6 +163,8 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   a.download = fileName;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  void donem; // suppress unused warning
 }
 
 interface ZiyaretlerTabProps {
@@ -549,22 +459,11 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
   const aktifZiyaretler = useMemo(() => ziyaretler.filter(z => z.durum === 'aktif'), [ziyaretler]);
   const aktifSahaUzman = useMemo(() => [...new Set(aktifZiyaretler.map(z => z.uzman_user_id))].length, [aktifZiyaretler]);
 
-  // sure_dakika yoksa cikis_saati - giris_saati ile hesapla
-  const getSureDakika = useCallback((z: Ziyaret): number | null => {
-    if (z.sure_dakika != null && z.sure_dakika > 0) return z.sure_dakika;
-    if (z.cikis_saati && z.giris_saati) {
-      const dk = Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000);
-      return dk > 0 ? dk : null;
-    }
-    return null;
-  }, []);
-
-  const tamamlananlar = useMemo(() => tumZiyaretler.filter(z => z.durum === 'tamamlandi'), [tumZiyaretler]);
-  const ortalamaSure = useMemo(() => {
-    const sureli = tamamlananlar.filter(z => getSureDakika(z) != null);
-    if (sureli.length === 0) return 0;
-    return Math.round(sureli.reduce((s, z) => s + (getSureDakika(z) ?? 0), 0) / sureli.length);
-  }, [tamamlananlar, getSureDakika]);
+  const tamamlananlar = useMemo(() => tumZiyaretler.filter(z => z.sure_dakika && z.sure_dakika > 0), [tumZiyaretler]);
+  const ortalamaSure = useMemo(() =>
+    tamamlananlar.length > 0 ? Math.round(tamamlananlar.reduce((s, z) => s + (z.sure_dakika ?? 0), 0) / tamamlananlar.length) : 0,
+    [tamamlananlar]
+  );
   const qrOrani = useMemo(() =>
     tumZiyaretler.length > 0 ? Math.round((tumZiyaretler.filter(z => z.qr_ile_giris).length / tumZiyaretler.length) * 100) : 0,
     [tumZiyaretler]
@@ -1057,16 +956,12 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                   <div className="flex-shrink-0">
                     {isAktif ? (
                       <ElapsedTimer since={z.giris_saati} />
-                    ) : (() => {
-                        const sureDk = getSureDakika(z);
-                        return (
-                          <span className="text-[10px] font-bold px-2 py-1 rounded-lg"
-                            style={{ background: sureDk ? 'rgba(6,182,212,0.08)' : 'transparent', color: sureDk ? '#06B6D4' : textMuted, border: sureDk ? '1px solid rgba(6,182,212,0.15)' : 'none' }}>
-                            {formatSure(sureDk)}
-                          </span>
-                        );
-                      })()
-                    }
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-lg"
+                        style={{ background: z.sure_dakika ? 'rgba(6,182,212,0.08)' : 'transparent', color: z.sure_dakika ? '#06B6D4' : textMuted, border: z.sure_dakika ? '1px solid rgba(6,182,212,0.15)' : 'none' }}>
+                        {formatSure(z.sure_dakika)}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-shrink-0">

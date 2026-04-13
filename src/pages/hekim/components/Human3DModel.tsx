@@ -147,9 +147,9 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
   const [svgRect, setSvgRect] = useState<DOMRect | null>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
 
-  const bg = isDark ? '#0c1628' : '#eef4fb';
-  const textS = isDark ? '#64748b' : '#94a3b8';
-  const border = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
+  const bg = '#060c18';
+  const textS = '#334155';
+  const border = 'rgba(255,255,255,0.04)';
 
   const updateRects = useCallback(() => {
     if (svgRef.current)       setSvgRect(svgRef.current.getBoundingClientRect());
@@ -188,8 +188,12 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
           to   { opacity: 1; transform: scale(1)    translateY(0);   }
         }
         @keyframes hotspotPulse {
-          0%, 100% { r: 8; opacity: 0.55; }
-          50%       { r: 13; opacity: 0; }
+          0%, 100% { r: 8; opacity: 0.4; }
+          50%       { r: 16; opacity: 0; }
+        }
+        @keyframes selectedGlow {
+          0%, 100% { opacity: 0.7; }
+          50%       { opacity: 1; }
         }
       `}</style>
 
@@ -197,10 +201,10 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
       <div className="flex-1 relative" style={{ minHeight: 0 }}>
         {!loaded && (
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-3"
             style={{ background: bg, zIndex: 10 }}
           >
-            <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border border-red-600 rounded-full animate-spin" style={{ borderTopColor: 'transparent' }} />
             <span className="text-xs" style={{ color: textS }}>3D model yükleniyor...</span>
           </div>
         )}
@@ -211,7 +215,7 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
           onLoad={() => { setLoaded(true); setTimeout(updateRects, 100); }}
           style={{
             width: '100%', height: '100%', border: 'none', display: 'block',
-            opacity: loaded ? 1 : 0, transition: 'opacity 0.3s',
+            opacity: loaded ? 1 : 0, transition: 'opacity 0.4s',
           }}
         />
 
@@ -228,46 +232,60 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
               const isSel     = selected.includes(region.id);
               const isHovered = hoveredId === region.id;
 
-              // Seçilmişse kırmızı dolgu, hover ise yarı saydam
-              const fillOpacity = isSel ? 0.45 : isHovered ? 0.25 : 0.0;
-              const strokeOpacity = isSel || isHovered ? 1 : 0.6;
-              const strokeWidth = isSel ? 2.5 : isHovered ? 2 : 1.5;
-              const dotR = isSel ? 6 : isHovered ? 7 : 5;
+              const fillOpacity = isSel ? 0.5 : isHovered ? 0.3 : 0.0;
+              const strokeOpacity = isSel || isHovered ? 1 : 0.5;
+              const strokeWidth = isSel ? 3 : isHovered ? 2.5 : 1.5;
+              const dotR = isSel ? 7 : isHovered ? 8 : 5;
 
               return (
                 <g key={region.id}>
-                  {/* Seçiliyse pulse ring */}
+                  {/* Seçiliyse outer pulse ring */}
                   {isSel && (
                     <ellipse
                       cx={region.cx} cy={region.cy}
-                      rx={region.rx + 8} ry={region.ry + 8}
+                      rx={region.rx + 10} ry={region.ry + 10}
                       fill="none"
                       stroke={RED}
                       strokeWidth="1"
                       opacity="0"
                       style={{
-                        animation: 'hotspotPulse 1.8s ease-in-out infinite',
+                        animation: 'hotspotPulse 1.6s ease-in-out infinite',
                         transformOrigin: `${region.cx}px ${region.cy}px`,
                       }}
                     />
                   )}
 
-                  {/* Tıklanabilir ellipse alanı */}
+                  {/* Inner pulse ring */}
+                  {isSel && (
+                    <ellipse
+                      cx={region.cx} cy={region.cy}
+                      rx={region.rx + 4} ry={region.ry + 4}
+                      fill="none"
+                      stroke={RED}
+                      strokeWidth="1.5"
+                      opacity="0.4"
+                      style={{
+                        animation: 'selectedGlow 2s ease-in-out infinite',
+                        transformOrigin: `${region.cx}px ${region.cy}px`,
+                      }}
+                    />
+                  )}
+
+                  {/* Tıklanabilir ellipse */}
                   <ellipse
                     cx={region.cx} cy={region.cy}
                     rx={region.rx} ry={region.ry}
                     fill={isSel || isHovered ? RED : 'transparent'}
                     fillOpacity={fillOpacity}
-                    stroke={isSel || isHovered ? RED : 'rgba(239,68,68,0.7)'}
+                    stroke={isSel || isHovered ? RED : 'rgba(239,68,68,0.5)'}
                     strokeOpacity={strokeOpacity}
                     strokeWidth={strokeWidth}
                     strokeDasharray={isSel ? 'none' : isHovered ? 'none' : '4 3'}
-                    rx={region.rx} ry={region.ry}
                     style={{
                       cursor: 'pointer',
                       pointerEvents: 'all',
                       transition: 'fill-opacity 0.2s, stroke-opacity 0.2s',
-                      filter: isSel ? `drop-shadow(0 0 6px ${RED})` : 'none',
+                      filter: isSel ? `drop-shadow(0 0 8px ${RED}) drop-shadow(0 0 16px ${RED}50)` : isHovered ? `drop-shadow(0 0 4px ${RED})` : 'none',
                     }}
                     onClick={e => handleEllipseClick(region, e as unknown as React.MouseEvent)}
                     onMouseEnter={() => handleEllipseHover(region.id)}
@@ -278,40 +296,40 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
                   <circle
                     cx={region.cx} cy={region.cy}
                     r={dotR}
-                    fill={isSel ? RED : isHovered ? RED : 'rgba(239,68,68,0.7)'}
-                    opacity={isSel || isHovered ? 1 : 0.75}
+                    fill={isSel ? RED : isHovered ? RED : 'rgba(239,68,68,0.6)'}
+                    opacity={isSel || isHovered ? 1 : 0.7}
                     style={{
                       cursor: 'pointer',
                       pointerEvents: 'all',
                       transition: 'r 0.15s, opacity 0.15s',
-                      filter: isSel ? `drop-shadow(0 0 4px ${RED})` : 'none',
+                      filter: isSel ? `drop-shadow(0 0 6px ${RED}) drop-shadow(0 0 12px ${RED})` : isHovered ? `drop-shadow(0 0 4px ${RED})` : 'none',
                     }}
                     onClick={e => handleEllipseClick(region, e as unknown as React.MouseEvent)}
                     onMouseEnter={() => handleEllipseHover(region.id)}
                     onMouseLeave={() => handleEllipseHover(null)}
                   />
 
-                  {/* Seçili ise label tag */}
+                  {/* Seçili ise label */}
                   {isSel && (
                     <foreignObject
-                      x={region.cx + region.rx + 4}
-                      y={region.cy - 10}
-                      width="72"
-                      height="20"
+                      x={region.cx + region.rx + 5}
+                      y={region.cy - 11}
+                      width="76"
+                      height="22"
                       style={{ pointerEvents: 'none', overflow: 'visible' }}
                     >
                       <div
                         style={{
-                          background: RED,
+                          background: 'linear-gradient(135deg, #b91c1c, #ef4444)',
                           borderRadius: '6px',
-                          padding: '2px 6px',
+                          padding: '3px 7px',
                           fontSize: '9px',
-                          fontWeight: 700,
+                          fontWeight: 800,
                           color: '#fff',
                           whiteSpace: 'nowrap',
                           display: 'inline-block',
-                          boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
-                          letterSpacing: '0.02em',
+                          boxShadow: '0 2px 12px rgba(239,68,68,0.6)',
+                          letterSpacing: '0.03em',
                         }}
                       >
                         {region.label}
@@ -329,7 +347,10 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
       {selected.length > 0 && (
         <div
           className="flex-shrink-0 flex items-center gap-2 px-3 py-2 flex-wrap"
-          style={{ borderTop: `1px solid ${border}`, background: isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.04)' }}
+          style={{
+            borderTop: '1px solid rgba(239,68,68,0.15)',
+            background: 'rgba(239,68,68,0.05)',
+          }}
         >
           <span className="text-[9px] font-bold uppercase tracking-wider flex-shrink-0" style={{ color: RED }}>
             <i className="ri-map-pin-2-fill mr-1" />Seçili ({selected.length})
@@ -342,9 +363,9 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
                   key={id}
                   onClick={() => onToggle(id)}
                   className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold cursor-pointer whitespace-nowrap transition-all"
-                  style={{ background: 'rgba(239,68,68,0.12)', color: RED, border: '1px solid rgba(239,68,68,0.25)' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.22)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)'; }}
+                  style={{ background: 'rgba(239,68,68,0.15)', color: RED, border: '1px solid rgba(239,68,68,0.3)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.28)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
                 >
                   {reg?.label ?? id}
                   <i className="ri-close-line text-[8px] ml-0.5" />
@@ -357,28 +378,28 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
 
       {/* ── Renk Kılavuzu ── */}
       <div
-        className="flex-shrink-0 flex items-center justify-between px-3 py-1.5"
+        className="flex-shrink-0 flex items-center justify-between px-3 py-2"
         style={{ borderTop: `1px solid ${border}` }}
       >
         <div className="flex items-center gap-3">
           {[
-            { color: 'rgba(239,68,68,0.6)', label: 'Bölge', dash: true },
-            { color: RED,                   label: 'Seçili', dash: false },
+            { color: 'rgba(239,68,68,0.5)', label: 'Bölge' },
+            { color: RED, label: 'Seçili', glow: true },
           ].map(item => (
-            <div key={item.label} className="flex items-center gap-1">
+            <div key={item.label} className="flex items-center gap-1.5">
               <div
-                className="w-3 h-3 rounded-full flex-shrink-0"
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{
                   background: item.color,
-                  border: item.dash ? `1.5px dashed ${RED}` : 'none',
+                  boxShadow: (item as { glow?: boolean }).glow ? `0 0 6px ${RED}` : 'none',
                 }}
               />
-              <span className="text-[9px]" style={{ color: textS }}>{item.label}</span>
+              <span className="text-[9px] font-medium" style={{ color: '#1e293b' }}>{item.label}</span>
             </div>
           ))}
         </div>
-        <span className="text-[9px] flex items-center gap-1" style={{ color: textS }}>
-          <i className="ri-cursor-line text-[9px]" />Bölgeye tıkla: seç
+        <span className="text-[9px] flex items-center gap-1" style={{ color: '#1e293b' }}>
+          <i className="ri-cursor-line text-[9px]" />Bölgeye tıkla
         </span>
       </div>
 
@@ -388,7 +409,7 @@ export default function Human3DModel({ selected, onToggle, isDark }: Human3DMode
           region={tooltipRegion}
           containerRect={containerRect}
           svgRect={svgRect}
-          isDark={isDark}
+          isDark={true}
           onClose={dismissTooltip}
         />
       )}

@@ -287,9 +287,8 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
   }, [user, osgbOrgId, hekimAd, addToast, gpsStatus]);
 
   // ── CHECK-OUT ──
-  const handleCheckOut = useCallback(async (overrideZiyaret?: AktifZiyaret) => {
-    const targetZiyaret = overrideZiyaret ?? aktifZiyaret;
-    if (!targetZiyaret || !user?.id) return;
+  const handleCheckOut = useCallback(async () => {
+    if (!aktifZiyaret || !user?.id) return;
     setActionLoading(true);
     setGpsError(null);
     setGpsStatus('loading');
@@ -300,7 +299,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
 
     try {
       const now = new Date().toISOString();
-      const sureDakika = Math.max(1, Math.round((Date.now() - new Date(targetZiyaret.giris_saati).getTime()) / 60000));
+      const sureDakika = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
 
       const { error } = await supabase
         .from('osgb_ziyaretler')
@@ -312,7 +311,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
           check_out_lat: coords?.lat ?? null,
           check_out_lng: coords?.lng ?? null,
         })
-        .eq('id', targetZiyaret.id)
+        .eq('id', aktifZiyaret.id)
         .eq('uzman_user_id', user.id);
 
       if (error) throw new Error(error.message || 'Güncelleme başarısız');
@@ -367,11 +366,10 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
 
       if (aktif) {
         if (aktif.firma_org_id === resolvedFirmaId) {
-          // Checkout yap — DB'den gelen güncel veriye override olarak geç
-          const aktifZiyaretData = aktif as AktifZiyaret;
-          setAktifZiyaret(aktifZiyaretData);
-          // Override parametresi ile doğrudan checkout — closure sorununu bypass eder
-          void handleCheckOut(aktifZiyaretData);
+          // Checkout yap — state'i güncelle
+          setAktifZiyaret(aktif as AktifZiyaret);
+          // Kısa gecikme ile checkout çağır
+          setTimeout(() => void handleCheckOut(), 100);
         } else {
           addToast(`Başka firmada aktif ziyaret var (${aktif.firma_ad ?? 'Firma'}). Önce bitirin.`, 'error');
         }

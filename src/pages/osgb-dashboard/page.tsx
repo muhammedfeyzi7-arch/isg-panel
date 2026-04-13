@@ -167,8 +167,11 @@ export default function OsgbDashboardPage() {
             supabase.from('egitimler').select('id', { count: 'exact', head: true }).eq('organization_id', f.id),
           ]);
 
-          // Bu firmaya atanmış uzmanı bul
-          const atananUzman = (uzmanData ?? []).find(u => u.active_firm_id === f.id);
+          // Bu firmaya atanmış uzmanı bul (active_firm_id veya active_firm_ids içinde)
+          const atananUzman = (uzmanData ?? []).find(u =>
+            u.active_firm_id === f.id ||
+            (Array.isArray(u.active_firm_ids) && u.active_firm_ids.includes(f.id))
+          );
 
           const base: AltFirma = {
             id: f.id,
