@@ -6,9 +6,6 @@ import { useQueue, LS_AKTIF_ZIYARET } from '@/store/OfflineQueueContext';
 import type { ZiyaretCheckinPayload, ZiyaretCheckoutPayload } from '@/hooks/useOfflineQueue';
 import QrScanner from './QrScanner';
 
-// ─── LocalStorage key ─────────────────────────────────────────────────────────
-const LS_OSGB_ORG = 'isg_osgb_org_info';
-
 // ─── Tipler ──────────────────────────────────────────────────────────────────
 interface AktifZiyaret {
   id: string | null;
@@ -151,7 +148,6 @@ export default function ZiyaretCheckIn() {
   const { user } = useAuth();
   const { addToast } = useApp();
 
-  // ── Global queue context (tek instance) ──────────────────────────────────
   const { isOnline, isSyncing, pendingCount, addToQueue, syncNow } = useQueue();
 
   // ── Aktif ziyaret state (localStorage persist) ───────────────────────────
@@ -162,20 +158,13 @@ export default function ZiyaretCheckIn() {
     } catch { return null; }
   });
 
-  const [gecmis, setGecmis]           = useState<AktifZiyaret[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [showQr, setShowQr]           = useState(false);
-  const [elapsed, setElapsed]         = useState('');
-  const [gpsStatus, setGpsStatus]     = useState<GpsStatusType>('idle');
-  const [gpsError, setGpsError]       = useState<string | null>(null);
+  const [gecmis, setGecmis]               = useState<AktifZiyaret[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [showQr, setShowQr]               = useState(false);
+  const [elapsed, setElapsed]             = useState('');
+  const [gpsStatus, setGpsStatus]         = useState<GpsStatusType>('idle');
+  const [gpsError, setGpsError]           = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-
-  const [osgbOrgId, setOsgbOrgId] = useState<string | null>(() => {
-    try { return JSON.parse(localStorage.getItem(LS_OSGB_ORG) ?? 'null')?.orgId ?? null; } catch { return null; }
-  });
-  const [uzmanAd, setUzmanAd] = useState<string>(() => {
-    try { return JSON.parse(localStorage.getItem(LS_OSGB_ORG) ?? 'null')?.uzmanAd ?? ''; } catch { return ''; }
-  });
 
   const actionInProgress = useRef(false);
 
@@ -195,26 +184,39 @@ export default function ZiyaretCheckIn() {
     return () => clearInterval(id);
   }, [aktifZiyaret]);
 
-  // ── Org bilgisi çek (cache'li) ────────────────────────────────────────────
-  const fetchOrg = useCallback(async () => {
-    if (!user?.id || osgbOrgId) return;
-    const { data } = await supabase
+  // ────────────────────────────────────────────────────────────────────────
+  // ORG ÇÖZÜCÜ — Her çağrıda doğrudan DB'den çeker, cache YOK
+  // ────────────────────────────────────────────────────────────────────────
+  const getOrgFromDB = useCallback(async (): Promise<{ orgId: string; uzman: string } | null> => {
+    if (!user?.id) return null;
+
+    // HER ZAMAN DB — cache, localStorage, state KULLANILMAZ
+    const { data, error } = await supabase
       .from('user_organizations')
       .select('organization_id, display_name')
       .eq('user_id', user.id)
       .eq('is_active', true)
+      .order('joined_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
-    if (data) {
-      setOsgbOrgId(data.organization_id);
-      setUzmanAd(data.display_name ?? user.email ?? 'Uzman');
-      localStorage.setItem(LS_OSGB_ORG, JSON.stringify({
-        orgId: data.organization_id,
-        uzmanAd: data.display_name ?? user.email ?? 'Uzman',
-      }));
-    }
-  }, [user?.id, user?.email, osgbOrgId]);
 
-  // ── DB'den aktif ziyaret çek + localStorage ile uzlaştır ─────────────────
+    if (error) {
+      console.error('[getOrgFromDB] DB error:', error);
+      return null;
+    }
+
+    if (!data?.organization_id) {
+      console.error('[getOrgFromDB] Org bulunamadı! user_id:', user.id);
+      return null;
+    }
+
+    return {
+      orgId: data.organization_id,
+      uzman: data.display_name ?? user.email ?? 'Uzman',
+    };
+  }, [user?.id, user?.email]);
+
+  // ── DB'den aktif ziyaret çek ─────────────────────────────────────────────
   const fetchZiyaret = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
@@ -229,7 +231,6 @@ export default function ZiyaretCheckIn() {
         .maybeSingle();
 
       if (aktif) {
-        // DB'de aktif kayıt var → localStorage'ı güncelle (firma adı da dahil)
         setAktifZiyaret({
           id: aktif.id,
           tempId: aktif.id,
@@ -240,13 +241,12 @@ export default function ZiyaretCheckIn() {
           isOffline: false,
         });
       } else {
-        // DB'de yok
         const local = (() => {
           try { const r = localStorage.getItem(LS_AKTIF_ZIYARET); return r ? JSON.parse(r) as AktifZiyaret : null; }
           catch { return null; }
         })();
-        if (local && !local.isOffline) setAktifZiyaret(null); // online'dan açılmış ama DB'de yok → temizle
-        // offline kaydedildiyse dokunma — sync bekliyor
+        // Online'dan kayıt açılmış ama DB'de yoksa temizle
+        if (local && !local.isOffline) setAktifZiyaret(null);
       }
 
       const { data: gecmisData } = await supabase
@@ -267,34 +267,8 @@ export default function ZiyaretCheckIn() {
     }
   }, [user?.id, setAktifZiyaret]);
 
-  useEffect(() => {
-    void fetchOrg();
-    void fetchZiyaret();
-  }, [fetchOrg, fetchZiyaret]);
-
-  // Online gelince DB ile uzlaştır
+  useEffect(() => { void fetchZiyaret(); }, [fetchZiyaret]);
   useEffect(() => { if (isOnline) void fetchZiyaret(); }, [isOnline, fetchZiyaret]);
-
-  // ── Org çözücü ────────────────────────────────────────────────────────────
-  const resolveOrg = useCallback(async (): Promise<{ orgId: string; uzman: string } | null> => {
-    if (osgbOrgId) return { orgId: osgbOrgId, uzman: uzmanAd || user?.email || 'Uzman' };
-    try {
-      const cached = JSON.parse(localStorage.getItem(LS_OSGB_ORG) ?? 'null') as { orgId: string; uzmanAd: string } | null;
-      if (cached?.orgId) return { orgId: cached.orgId, uzman: cached.uzmanAd };
-    } catch { /* ignore */ }
-    if (!user?.id) return null;
-    const { data } = await supabase
-      .from('user_organizations')
-      .select('organization_id, display_name')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (!data) return null;
-    setOsgbOrgId(data.organization_id);
-    setUzmanAd(data.display_name ?? user.email ?? 'Uzman');
-    localStorage.setItem(LS_OSGB_ORG, JSON.stringify({ orgId: data.organization_id, uzmanAd: data.display_name ?? user.email ?? 'Uzman' }));
-    return { orgId: data.organization_id, uzman: data.display_name ?? user.email ?? 'Uzman' };
-  }, [osgbOrgId, uzmanAd, user]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CHECK-IN
@@ -307,9 +281,15 @@ export default function ZiyaretCheckIn() {
     setGpsError(null);
 
     try {
-      let orgInfo = await resolveOrg();
-      if (!orgInfo) { addToast('Organizasyon bilgisi bulunamadı.', 'error'); return; }
+      // ── 1. Her zaman DB'den org çek ─────────────────────────────────────
+      const orgInfo = await getOrgFromDB();
+      if (!orgInfo) {
+        addToast('Organizasyon bilgisi bulunamadı. Lütfen tekrar giriş yapın.', 'error');
+        return;
+      }
 
+      // user.id = auth.uid() — state veya prop DEĞİL
+      const authUserId = user.id;
       const now    = new Date().toISOString();
       const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       let coords: GpsCoords | null = null;
@@ -317,6 +297,7 @@ export default function ZiyaretCheckIn() {
       let checkInDistanceM: number | null = null;
 
       if (isOnline) {
+        // ── 2. Firma bilgisini çek ─────────────────────────────────────────
         const { data: firmaData } = await supabase
           .from('organizations')
           .select('name, gps_required, gps_radius, gps_strict, firma_lat, firma_lng')
@@ -325,11 +306,11 @@ export default function ZiyaretCheckIn() {
 
         if (!firmaData) { addToast('Firma bulunamadı. QR geçersiz olabilir.', 'error'); return; }
 
-        // Çakışma kontrolü
+        // ── 3. Çakışma kontrolü — user.id ile ─────────────────────────────
         const { data: existing } = await supabase
           .from('osgb_ziyaretler')
           .select('id, firma_ad')
-          .eq('uzman_user_id', user.id)
+          .eq('uzman_user_id', authUserId)
           .is('cikis_saati', null)
           .limit(1)
           .maybeSingle();
@@ -338,6 +319,7 @@ export default function ZiyaretCheckIn() {
           return;
         }
 
+        // ── 4. GPS kontrolü ────────────────────────────────────────────────
         const firmaHasCoords = firmaData.firma_lat !== null && firmaData.firma_lng !== null;
         if (firmaData.gps_required || firmaHasCoords) {
           setGpsStatus('loading');
@@ -356,9 +338,9 @@ export default function ZiyaretCheckIn() {
             const distance = haversineMetres(coords.lat, coords.lng, firmaData.firma_lat!, firmaData.firma_lng!);
             const radius   = firmaData.gps_radius ?? 1000;
             if (distance > radius) {
-              checkInGpsStatus  = 'too_far';
-              checkInDistanceM  = Math.round(distance);
-              const distStr = distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${Math.round(distance)} m`;
+              checkInGpsStatus = 'too_far';
+              checkInDistanceM = Math.round(distance);
+              const distStr    = distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${Math.round(distance)} m`;
               if (firmaData.gps_required || firmaData.gps_strict !== false) {
                 setGpsStatus('blocked');
                 setGpsError(`Firma konumunda değilsiniz. Mesafeniz: ${distStr} — İzin verilen: ${radius} m`);
@@ -367,8 +349,8 @@ export default function ZiyaretCheckIn() {
               setGpsStatus('denied');
               setGpsError(`Firma konumundan uzaktasınız: ${distStr}. Ziyaret yine de başlatılıyor.`);
             } else {
-              checkInDistanceM  = Math.round(distance);
-              checkInGpsStatus  = 'ok';
+              checkInDistanceM = Math.round(distance);
+              checkInGpsStatus = 'ok';
               setGpsStatus('ok');
             }
           } else if (coords && !firmaHasCoords) {
@@ -382,30 +364,55 @@ export default function ZiyaretCheckIn() {
           setGpsStatus(coords ? 'ok' : 'idle');
         }
 
+        // ── 5. INSERT — osgb_org_id DB'den, uzman_user_id = auth.uid() ────
+        const insertPayload = {
+          osgb_org_id:         orgInfo.orgId,   // ← DB'den gelen gerçek org
+          firma_org_id:        firmaId,
+          firma_ad:            firmaData.name,
+          uzman_user_id:       authUserId,       // ← auth.uid(), state değil
+          uzman_ad:            orgInfo.uzman || user.email || 'Uzman',
+          uzman_email:         user.email,
+          giris_saati:         now,
+          durum:               'aktif',
+          qr_ile_giris:        true,
+          created_at:          now,
+          updated_at:          now,
+          check_in_lat:        coords?.lat ?? null,
+          check_in_lng:        coords?.lng ?? null,
+          gps_status:          checkInGpsStatus,
+          check_in_distance_m: checkInDistanceM,
+        };
+
+        // Zorunlu log — veri tutarlılığı doğrulama
+        console.log('CHECKIN FINAL', {
+          osgb_org_id:   insertPayload.osgb_org_id,
+          uzman_user_id: insertPayload.uzman_user_id,
+          firma_org_id:  insertPayload.firma_org_id,
+          firma_ad:      insertPayload.firma_ad,
+        });
+
         const { data: yeni, error } = await supabase
           .from('osgb_ziyaretler')
-          .insert({
-            osgb_org_id: orgInfo.orgId, firma_org_id: firmaId, firma_ad: firmaData.name,
-            uzman_user_id: user.id, uzman_ad: orgInfo.uzman || user.email || 'Uzman',
-            uzman_email: user.email, giris_saati: now, durum: 'aktif', qr_ile_giris: true,
-            created_at: now, updated_at: now,
-            check_in_lat: coords?.lat ?? null, check_in_lng: coords?.lng ?? null,
-            gps_status: checkInGpsStatus, check_in_distance_m: checkInDistanceM,
-          })
+          .insert(insertPayload)
           .select('id')
           .maybeSingle();
+
         if (error) throw error;
 
         setAktifZiyaret({
-          id: yeni?.id ?? null, tempId: yeni?.id ?? tempId,
-          firmaOrgId: firmaId, firmaAd: firmaData.name,
-          girisAt: now, qrIleGiris: true, isOffline: false,
+          id:          yeni?.id ?? null,
+          tempId:      yeni?.id ?? tempId,
+          firmaOrgId:  firmaId,
+          firmaAd:     firmaData.name,
+          girisAt:     now,
+          qrIleGiris:  true,
+          isOffline:   false,
         });
         addToast(`İşlem başarıyla kaydedildi — ${firmaData.name} ziyareti başladı`, 'success');
         if (checkInGpsStatus === 'ok') setTimeout(() => { setGpsStatus('idle'); setGpsError(null); }, 3000);
 
       } else {
-        // OFFLINE
+        // ── OFFLINE ─────────────────────────────────────────────────────────
         setGpsStatus('loading');
         coords = await getGpsCoords(5000).catch(() => null);
         checkInGpsStatus = coords ? 'ok' : 'no_permission';
@@ -415,15 +422,22 @@ export default function ZiyaretCheckIn() {
         if (local) { addToast('Aktif bir ziyaret zaten var (çevrimdışı). Önce bitirin.', 'error'); return; }
 
         const payload: ZiyaretCheckinPayload = {
-          tempId, osgbOrgId: orgInfo.orgId, firmaOrgId: firmaId,
-          firmaAd: `Firma (${firmaId.slice(0, 6)}...)`,
-          uzmanUserId: user.id, uzmanAd: orgInfo.uzman || user.email || 'Uzman',
-          uzmanEmail: user.email ?? null, girisAt: now, qrIleGiris: true,
-          checkInLat: coords?.lat ?? null, checkInLng: coords?.lng ?? null,
-          gpsStatus: checkInGpsStatus, checkInDistanceM,
+          tempId,
+          osgbOrgId:         orgInfo.orgId,   // ← DB'den gelen org
+          firmaOrgId:        firmaId,
+          firmaAd:           `Firma (${firmaId.slice(0, 6)}...)`,
+          uzmanUserId:       authUserId,       // ← auth.uid()
+          uzmanAd:           orgInfo.uzman || user.email || 'Uzman',
+          uzmanEmail:        user.email ?? null,
+          girisAt:           now,
+          qrIleGiris:        true,
+          checkInLat:        coords?.lat ?? null,
+          checkInLng:        coords?.lng ?? null,
+          gpsStatus:         checkInGpsStatus,
+          checkInDistanceM,
         };
         await addToQueue({
-          type: 'ziyaret_checkin',
+          type:  'ziyaret_checkin',
           label: `Ziyaret başlatıldı (çevrimdışı) — ${new Date(now).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`,
           payload: payload as unknown as Record<string, unknown>,
         });
@@ -441,7 +455,7 @@ export default function ZiyaretCheckIn() {
       setActionLoading(false);
       actionInProgress.current = false;
     }
-  }, [user, resolveOrg, addToast, isOnline, addToQueue, setAktifZiyaret]);
+  }, [user, getOrgFromDB, addToast, isOnline, addToQueue, setAktifZiyaret]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CHECK-OUT
@@ -452,7 +466,6 @@ export default function ZiyaretCheckIn() {
     actionInProgress.current = true;
     setActionLoading(true);
     setGpsError(null);
-    // Önce UI'ı kapat — QR scanner açıksa kapat
     setShowQr(false);
 
     setGpsStatus('loading');
@@ -460,43 +473,72 @@ export default function ZiyaretCheckIn() {
     setGpsStatus(coords ? 'ok' : 'idle');
 
     const now        = new Date().toISOString();
-    const sureDakika = aktifZiyaret.girisAt
-      ? Math.round((Date.now() - new Date(aktifZiyaret.girisAt).getTime()) / 60000)
-      : null;
+    const authUserId = user.id; // auth.uid() — state değil
 
     try {
       if (isOnline) {
-        // ID var mı yoksa DB'den bul
-        let ziyaretId = aktifZiyaret.id;
+        // ── Adım 1: ID çözüm — önce aktifZiyaret.id ──────────────────────
+        let ziyaretId: string | null = aktifZiyaret.id;
 
+        // ── Adım 2: ID yoksa veya offline ise — user.id ile fallback ──────
         if (!ziyaretId || aktifZiyaret.isOffline) {
-          // Offline kaydedilmişse veya ID yoksa DB'den aktif ziyareti bul
-          const { data: dbZiyaret } = await supabase
+          const { data: byUser } = await supabase
             .from('osgb_ziyaretler')
             .select('id')
-            .eq('uzman_user_id', user.id)
+            .eq('uzman_user_id', authUserId)
             .is('cikis_saati', null)
             .order('giris_saati', { ascending: false })
             .limit(1)
             .maybeSingle();
-          ziyaretId = dbZiyaret?.id ?? null;
+          ziyaretId = byUser?.id ?? null;
         }
 
+        // ── Adım 3: Hâlâ yoksa — DB'den org alıp osgb_org_id ile fallback ─
+        if (!ziyaretId) {
+          const orgInfo = await getOrgFromDB();
+          if (orgInfo) {
+            const { data: byOrg } = await supabase
+              .from('osgb_ziyaretler')
+              .select('id')
+              .eq('osgb_org_id', orgInfo.orgId)
+              .eq('uzman_user_id', authUserId)
+              .is('cikis_saati', null)
+              .order('giris_saati', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            ziyaretId = byOrg?.id ?? null;
+          }
+        }
+
+        console.log('CHECKOUT START', {
+          aktifZiyaretId: aktifZiyaret.id,
+          resolvedId:     ziyaretId,
+          authUserId,
+        });
+
         if (ziyaretId) {
-          // sure_dakika generated/computed column — DB'ye gönderilmez, sadece frontend'de hesaplanır
-          const { error, count } = await supabase
+          // ── UPDATE — sadece id + cikis_saati null filtresi
+          // .eq('uzman_user_id') KALDIRILDI — user mismatch bypass
+          const { data: updateData, error, count } = await supabase
             .from('osgb_ziyaretler')
             .update({
-              cikis_saati: now,
-              durum: 'tamamlandi',
-              updated_at: now,
+              cikis_saati:   now,
+              durum:         'tamamlandi',
+              updated_at:    now,
               check_out_lat: coords?.lat ?? null,
               check_out_lng: coords?.lng ?? null,
             })
             .eq('id', ziyaretId)
-            .eq('uzman_user_id', user.id)
             .is('cikis_saati', null)
-            .select('id');
+            .select('id', { count: 'exact' });
+
+          // Zorunlu log — her zaman yazdır
+          console.log('CHECKOUT RESULT', {
+            ziyaretId,
+            data:  updateData,
+            error: error ? { message: error.message, code: error.code, details: error.details } : null,
+            count,
+          });
 
           if (error) {
             addToast(`Ziyaret sonlandırılamadı: ${error.message}`, 'error');
@@ -504,43 +546,34 @@ export default function ZiyaretCheckIn() {
           }
 
           if (!count || count === 0) {
-            // cikis_saati null filtresi eşleşmedi — zaten kapatılmış olabilir, temizle
             addToast('Ziyaret zaten tamamlanmış. Kayıt temizlendi.', 'info');
           } else {
-            addToast(`İşlem başarıyla kaydedildi — ziyaret tamamlandı (${sureDakika ?? 0} dk)`, 'success');
+            addToast('Ziyaret başarıyla tamamlandı.', 'success');
           }
         } else {
-          // DB'de aktif ziyaret yok, queue'ya ekle
-          const payload: ZiyaretCheckoutPayload = {
-            tempId: aktifZiyaret.tempId, realId: null,
-            uzmanUserId: user.id, cikisAt: now, sureDakika,
-            checkOutLat: coords?.lat ?? null, checkOutLng: coords?.lng ?? null,
-          };
-          await addToQueue({
-            type: 'ziyaret_checkout',
-            label: `Ziyaret bitirildi — Süre: ${sureDakika ?? 0} dk`,
-            payload: payload as unknown as Record<string, unknown>,
-          });
-          addToast(`Ziyaret tamamlandı (${sureDakika ?? 0} dk)`, 'success');
+          console.warn('CHECKOUT: Aktif ziyaret DB\'de bulunamadı, local temizleniyor', { authUserId });
+          addToast('Yerel ziyaret kaydı temizlendi.', 'info');
         }
       } else {
-        // Offline checkout
+        // ── Offline checkout ──────────────────────────────────────────────
         const payload: ZiyaretCheckoutPayload = {
-          tempId: aktifZiyaret.tempId, realId: aktifZiyaret.id,
-          uzmanUserId: user.id, cikisAt: now, sureDakika,
-          checkOutLat: coords?.lat ?? null, checkOutLng: coords?.lng ?? null,
+          tempId:      aktifZiyaret.tempId,
+          realId:      aktifZiyaret.id,
+          uzmanUserId: authUserId,
+          cikisAt:     now,
+          sureDakika:  null,    // GENERATED ALWAYS — gönderilmez
+          checkOutLat: coords?.lat ?? null,
+          checkOutLng: coords?.lng ?? null,
         };
         await addToQueue({
-          type: 'ziyaret_checkout',
-          label: `Ziyaret bitirildi (çevrimdışı) — Süre: ${sureDakika ?? 0} dk`,
+          type:    'ziyaret_checkout',
+          label:   'Ziyaret bitirildi (çevrimdışı)',
           payload: payload as unknown as Record<string, unknown>,
         });
         addToast('İşlem kaydedildi (çevrimdışı) — bağlantı gelince sunucuya gönderilecek', 'success');
       }
 
-      // Her durumda yerel state'i temizle
       setAktifZiyaret(null);
-
       if (isOnline) await fetchZiyaret();
     } catch (err) {
       addToast(`Check-out yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
@@ -550,50 +583,43 @@ export default function ZiyaretCheckIn() {
       actionInProgress.current = false;
       setTimeout(() => { setGpsStatus('idle'); setGpsError(null); }, 3000);
     }
-  }, [aktifZiyaret, user?.id, addToast, isOnline, addToQueue, setAktifZiyaret, fetchZiyaret]);
+  }, [aktifZiyaret, user?.id, getOrgFromDB, addToast, isOnline, addToQueue, setAktifZiyaret, fetchZiyaret]);
 
   // ── QR Sonucu ─────────────────────────────────────────────────────────────
   const handleQrResult = useCallback((text: string) => {
-    // Önce QR scanner'ı kapat, GPS/error state'ini temizle
     setShowQr(false);
     setGpsError(null);
     setGpsStatus('idle');
 
-    // QR içeriğini parse et
     let firmaId: string | null = null;
     try {
       const p = JSON.parse(text) as { type?: string; id?: string };
       if (p.type === 'firm' && p.id) firmaId = p.id;
     } catch { /* not JSON */ }
 
-    // UUID formatı direkt
-    if (!firmaId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text.trim())) {
+    if (!firmaId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text.trim()))
       firmaId = text.trim();
-    }
-    // URL param formatı
     if (!firmaId) firmaId = text.match(/firma[_-]?id=([0-9a-f-]{36})/i)?.[1] ?? null;
-    // URL path formatı
     if (!firmaId) {
       const segs = text.replace(/[?#].*/, '').split('/').filter(Boolean);
       const last = segs[segs.length - 1] ?? '';
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(last)) firmaId = last;
     }
 
-    if (!firmaId) {
-      addToast('Geçersiz QR kodu.', 'error');
-      return;
-    }
+    if (!firmaId) { addToast('Geçersiz QR kodu.', 'error'); return; }
+
+    console.log('QR OKUNDU', firmaId);
 
     if (aktifZiyaret) {
-      // Aktif ziyaret varsa → checkout (aynı firma olsun veya olmasın, QR ile çıkış desteklenir)
-      if (aktifZiyaret.firmaOrgId === firmaId) {
-        // Kısa bir delay ile çağır — setShowQr(false) state'inin settle etmesi için
-        setTimeout(() => { void handleCheckOut(); }, 50);
-      } else {
-        addToast(`Farklı firmada aktif ziyaret var (${aktifZiyaret.firmaAd ?? 'Firma'}). Önce mevcut ziyareti bitirin.`, 'error');
+      // Aktif ziyaret var → her zaman checkout (firma mismatch bloklama)
+      if (aktifZiyaret.firmaOrgId !== firmaId) {
+        console.warn('QR firma mismatch — checkout yine de devam etti', {
+          aktifFirma: aktifZiyaret.firmaOrgId,
+          qrFirma:    firmaId,
+        });
       }
+      setTimeout(() => { void handleCheckOut(); }, 50);
     } else {
-      // Aktif ziyaret yoksa → checkin
       void handleCheckIn(firmaId);
     }
   }, [aktifZiyaret, handleCheckIn, handleCheckOut, addToast]);

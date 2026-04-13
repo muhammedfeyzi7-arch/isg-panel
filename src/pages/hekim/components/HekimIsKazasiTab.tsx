@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import HekimIsKazasiModal from './HekimIsKazasiModal';
 import HekimIsKazasiRaporBolumu from './HekimIsKazasiRaporBolumu';
-import { generateIsKazasiDocx } from '@/pages/hekim/utils/isKazasiDocxGenerator';
+import { printIsKazasiTutanagi, downloadIsKazasiHtml } from '@/pages/hekim/utils/isKazasiRaporGenerator';
 
 interface BesNedenItem {
   sira: number;
@@ -35,9 +34,8 @@ interface KazaRow {
   sgkBildirimTarihi: string;
   sgkBildirimNotu: string;
   fotografPaths: string[];
+  olayYeriDiagram: string;
   besNeden: BesNedenItem[];
-  kazaTipi?: string;
-  riskSeviyesi?: string;
 }
 
 interface HekimIsKazasiTabProps {
@@ -49,21 +47,11 @@ interface HekimIsKazasiTabProps {
 const ACCENT = '#0EA5E9';
 const ACCENT_DARK = '#0284C7';
 
-const VUCUT_LABEL: Record<string, string> = {
-  bas: 'Baş', boyun: 'Boyun', sag_omuz: 'Sağ Omuz', sol_omuz: 'Sol Omuz',
-  gogus: 'Göğüs', sirt: 'Sırt', sag_kol: 'Sağ Kol', sol_kol: 'Sol Kol',
-  sag_el: 'Sağ El', sol_el: 'Sol El', karin: 'Karın/Bel',
-  sag_kalca: 'Sağ Kalça', sol_kalca: 'Sol Kalça',
-  sag_bacak: 'Sağ Bacak', sol_bacak: 'Sol Bacak',
-  sag_ayak: 'Sağ Ayak', sol_ayak: 'Sol Ayak',
-};
-
 const SIDDET_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
   'Hafif':    { color: ACCENT,    bg: 'rgba(14,165,233,0.1)',  border: 'rgba(14,165,233,0.25)' },
   'Orta':     { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.25)' },
   'Ağır':     { color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)' },
   'Çok Ağır': { color: '#F97316', bg: 'rgba(249,115,22,0.1)',  border: 'rgba(249,115,22,0.25)' },
-  'Ölüm':     { color: '#7F1D1D', bg: 'rgba(127,29,29,0.15)',  border: 'rgba(127,29,29,0.4)' },
 };
 
 const DURUM_CONFIG: Record<string, { color: string; bg: string }> = {
@@ -74,282 +62,6 @@ const DURUM_CONFIG: Record<string, { color: string; bg: string }> = {
 
 type TabView = 'liste' | 'rapor';
 
-// ── Detay Modal Bileşeni ──
-function KazaDetayModal({
-  kaza,
-  isDark,
-  onClose,
-  onEdit,
-  onWordExport,
-}: {
-  kaza: KazaRow;
-  isDark: boolean;
-  onClose: () => void;
-  onEdit: () => void;
-  onWordExport: () => void;
-}) {
-  const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
-  const textSecondary = isDark ? '#94A3B8' : '#64748B';
-  const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)';
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.02)';
-  const modalBg = isDark ? '#1e293b' : '#ffffff';
-
-  const siddetCfg = SIDDET_CONFIG[kaza.yaralanmaSiddeti] ?? SIDDET_CONFIG['Hafif'];
-  const durumCfg = DURUM_CONFIG[kaza.durum] ?? DURUM_CONFIG['Açık'];
-  const besNedenFiltered = kaza.besNeden.filter(n => n.neden);
-
-  const fmtDate = (d: string) => {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
-  };
-
-  const KAZA_TIPI_MAP: Record<string, string> = {
-    is_kazasi: 'İş Kazası',
-    ramak_kala: 'Ramak Kala (Near Miss)',
-    meslek_hastaligi: 'Meslek Hastalığı',
-  };
-  const RISK_MAP: Record<string, string> = {
-    dusuk: 'Düşük', orta: 'Orta', yuksek: 'Yüksek', kritik: 'Kritik',
-  };
-
-  const modalContent = (
-    <div
-      className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', zIndex: 99999 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        className="w-full max-w-2xl rounded-2xl flex flex-col"
-        style={{ background: modalBg, border: `1px solid ${borderColor}`, maxHeight: 'calc(100vh - 32px)', overflow: 'hidden' }}
-      >
-        {/* Accent bar */}
-        <div className="h-[3px] flex-shrink-0"
-          style={{ background: 'linear-gradient(90deg, #ef4444, #f97316, #fbbf24)' }} />
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
-          style={{ borderBottom: `1px solid ${borderColor}` }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
-              <i className="ri-alert-line text-sm" style={{ color: '#EF4444' }} />
-            </div>
-            <div>
-              <p className="text-sm font-bold" style={{ color: textPrimary }}>Kaza Detayı</p>
-              <p className="text-[10px]" style={{ color: textSecondary }}>{kaza.personelAd} — {kaza.firmaAd}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onWordExport}
-              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
-              style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.25)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.18)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.1)'; }}>
-              <i className="ri-file-word-line text-xs" />
-              Word İndir
-            </button>
-            <button onClick={onEdit}
-              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
-              style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT, border: `1px solid rgba(14,165,233,0.25)` }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.18)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; }}>
-              <i className="ri-edit-line text-xs" />
-              Düzenle
-            </button>
-            <button onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'; (e.currentTarget as HTMLElement).style.color = textSecondary; }}>
-              <i className="ri-close-line text-sm" />
-            </button>
-          </div>
-        </div>
-
-        {/* Scroll içerik */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-
-          {/* Status pills */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full"
-              style={{ background: siddetCfg.bg, color: siddetCfg.color, border: `1px solid ${siddetCfg.border}` }}>
-              <i className="ri-alert-line text-[10px]" />
-              {kaza.yaralanmaSiddeti}
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full"
-              style={{ background: durumCfg.bg, color: durumCfg.color }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: durumCfg.color }} />
-              {kaza.durum}
-            </span>
-            {kaza.sgkBildirildi && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full"
-                style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.25)' }}>
-                <i className="ri-check-double-line text-[10px]" />
-                SGK Bildirildi
-              </span>
-            )}
-          </div>
-
-          {/* Genel */}
-          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${borderColor}` }}>
-            <div className="px-4 py-2.5" style={{ background: isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.04)', borderBottom: `1px solid ${borderColor}` }}>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#EF4444' }}>
-                <i className="ri-information-line mr-1.5" />Kaza Bilgileri
-              </span>
-            </div>
-            <div className="divide-y" style={{ borderColor }}>
-              {[
-                { label: 'Firma', value: kaza.firmaAd },
-                { label: 'Personel', value: kaza.personelAd },
-                { label: 'Kaza Tarihi', value: fmtDate(kaza.kazaTarihi) + (kaza.kazaSaati ? ` — ${kaza.kazaSaati}` : '') },
-                { label: 'Kaza Yeri', value: kaza.kazaYeri || '—' },
-                { label: 'Kaza Türü', value: kaza.kazaTuru || '—' },
-                { label: 'Kaza Tipi', value: KAZA_TIPI_MAP[kaza.kazaTipi ?? ''] || '—' },
-                { label: 'Risk Seviyesi', value: RISK_MAP[kaza.riskSeviyesi ?? ''] || '—' },
-              ].map(row => (
-                <div key={row.label} className="flex items-center px-4 py-2.5">
-                  <span className="text-[10px] font-semibold w-32 flex-shrink-0" style={{ color: textSecondary }}>{row.label}</span>
-                  <span className="text-xs font-medium" style={{ color: textPrimary }}>{row.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Açıklama */}
-          {kaza.kazaAciklamasi && (
-            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${borderColor}` }}>
-              <div className="px-4 py-2.5" style={{ background: isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.04)', borderBottom: `1px solid ${borderColor}` }}>
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#EF4444' }}>
-                  <i className="ri-file-text-line mr-1.5" />Kaza Açıklaması
-                </span>
-              </div>
-              <p className="px-4 py-3 text-xs leading-relaxed" style={{ color: textPrimary }}>{kaza.kazaAciklamasi}</p>
-            </div>
-          )}
-
-          {/* Yaralanma */}
-          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${borderColor}` }}>
-            <div className="px-4 py-2.5" style={{ background: isDark ? 'rgba(249,115,22,0.08)' : 'rgba(249,115,22,0.04)', borderBottom: `1px solid ${borderColor}` }}>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#F97316' }}>
-                <i className="ri-first-aid-kit-line mr-1.5" />Yaralanma
-              </span>
-            </div>
-            <div className="divide-y" style={{ borderColor }}>
-              <div className="flex items-center px-4 py-2.5">
-                <span className="text-[10px] font-semibold w-32 flex-shrink-0" style={{ color: textSecondary }}>Yaralanma Türü</span>
-                <span className="text-xs font-medium" style={{ color: textPrimary }}>{kaza.yaralanmaTuru || '—'}</span>
-              </div>
-              <div className="flex items-center px-4 py-2.5">
-                <span className="text-[10px] font-semibold w-32 flex-shrink-0" style={{ color: textSecondary }}>Şiddet</span>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
-                  style={{ background: siddetCfg.bg, color: siddetCfg.color, border: `1px solid ${siddetCfg.border}` }}>
-                  {kaza.yaralanmaSiddeti}
-                </span>
-              </div>
-              <div className="flex items-center px-4 py-2.5">
-                <span className="text-[10px] font-semibold w-32 flex-shrink-0" style={{ color: textSecondary }}>İş Günü Kaybı</span>
-                <span className="text-xs font-medium" style={{ color: textPrimary }}>{kaza.isGunuKaybi > 0 ? `${kaza.isGunuKaybi} gün` : 'Yok'}</span>
-              </div>
-              {kaza.hastaneyeKaldirildi && (
-                <div className="flex items-center px-4 py-2.5">
-                  <span className="text-[10px] font-semibold w-32 flex-shrink-0" style={{ color: textSecondary }}>Hastane</span>
-                  <span className="text-xs font-medium" style={{ color: textPrimary }}>{kaza.hastaneAdi || 'Kaldırıldı'}</span>
-                </div>
-              )}
-              {kaza.yaraliVucutBolgeleri.length > 0 && (
-                <div className="px-4 py-3">
-                  <span className="text-[10px] font-semibold block mb-2" style={{ color: textSecondary }}>Yaralanan Bölgeler</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {kaza.yaraliVucutBolgeleri.map(id => (
-                      <span key={id} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}>
-                        {VUCUT_LABEL[id] ?? id}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* SGK */}
-          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${borderColor}` }}>
-            <div className="px-4 py-2.5" style={{ background: isDark ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.04)', borderBottom: `1px solid ${borderColor}` }}>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#6366F1' }}>
-                <i className="ri-government-line mr-1.5" />SGK Bildirimi
-              </span>
-            </div>
-            <div className="divide-y" style={{ borderColor }}>
-              {[
-                { label: 'Bildirildi mi', value: kaza.sgkBildirildi ? 'Evet' : 'Hayır' },
-                { label: 'Bildirim Tarihi', value: kaza.sgkBildirimTarihi ? fmtDate(kaza.sgkBildirimTarihi) : '—' },
-                { label: 'Bildirim Notu', value: kaza.sgkBildirimNotu || '—' },
-              ].map(row => (
-                <div key={row.label} className="flex items-center px-4 py-2.5">
-                  <span className="text-[10px] font-semibold w-32 flex-shrink-0" style={{ color: textSecondary }}>{row.label}</span>
-                  <span className="text-xs font-medium" style={{ color: textPrimary }}>{row.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 5 Neden */}
-          {besNedenFiltered.length > 0 && (
-            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${borderColor}` }}>
-              <div className="px-4 py-2.5" style={{ background: isDark ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.04)', borderBottom: `1px solid ${borderColor}` }}>
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#10B981' }}>
-                  <i className="ri-mind-map mr-1.5" />5 Neden Analizi
-                </span>
-              </div>
-              <div className="px-4 py-3 space-y-2">
-                {besNedenFiltered.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-2.5 rounded-lg px-3 py-2"
-                    style={{ background: cardBg, border: `1px solid ${borderColor}` }}>
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-extrabold flex-shrink-0"
-                      style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)' }}>
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold" style={{ color: textPrimary }}>{item.neden}</p>
-                      {item.aciklama && <p className="text-[10px] mt-0.5" style={{ color: textSecondary }}>{item.aciklama}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Önlemler */}
-          {kaza.onlemler && (
-            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${borderColor}` }}>
-              <div className="px-4 py-2.5" style={{ background: isDark ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.04)', borderBottom: `1px solid ${borderColor}` }}>
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#10B981' }}>
-                  <i className="ri-shield-check-line mr-1.5" />Alınan Önlemler
-                </span>
-              </div>
-              <p className="px-4 py-3 text-xs leading-relaxed" style={{ color: textPrimary }}>{kaza.onlemler}</p>
-            </div>
-          )}
-
-          {/* Tanık */}
-          {kaza.tanikBilgileri && (
-            <div className="flex items-start gap-2 px-4 py-3 rounded-xl"
-              style={{ background: cardBg, border: `1px solid ${borderColor}` }}>
-              <i className="ri-eye-line text-xs mt-0.5" style={{ color: textSecondary }} />
-              <div>
-                <p className="text-[10px] font-semibold mb-0.5" style={{ color: textSecondary }}>Tanık</p>
-                <p className="text-xs" style={{ color: textPrimary }}>{kaza.tanikBilgileri}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  return createPortal(modalContent, document.body);
-}
-
 export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: HekimIsKazasiTabProps) {
   const [kazalar, setKazalar] = useState<KazaRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -359,8 +71,7 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState<(KazaRow & { id: string }) | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [detayKaza, setDetayKaza] = useState<KazaRow | null>(null);
-  const [wordLoading, setWordLoading] = useState<string | null>(null);
+  const [raporMenuId, setRaporMenuId] = useState<string | null>(null);
 
   const textPrimary   = isDark ? '#f1f5f9' : '#0f172a';
   const textSecondary = isDark ? '#94A3B8' : '#64748B';
@@ -415,9 +126,8 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
             sgkBildirimTarihi: r.sgk_bildirim_tarihi ?? '',
             sgkBildirimNotu: r.sgk_bildirim_notu ?? '',
             fotografPaths: Array.isArray(r.fotograf_paths) ? r.fotograf_paths : [],
+            olayYeriDiagram: r.olay_yeri_diagram ?? '',
             besNeden: Array.isArray(r.bes_neden) ? r.bes_neden : [],
-            kazaTipi: r.kaza_tipi ?? undefined,
-            riskSeviyesi: r.risk_seviyesi ?? undefined,
           });
         });
       }));
@@ -440,43 +150,6 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
     loadKazalar();
   };
 
-  const handleWordExport = async (kaza: KazaRow) => {
-    setWordLoading(kaza.id);
-    try {
-      await generateIsKazasiDocx({
-        id: kaza.id,
-        personelAd: kaza.personelAd,
-        firmaAd: kaza.firmaAd,
-        kazaTarihi: kaza.kazaTarihi,
-        kazaSaati: kaza.kazaSaati,
-        kazaYeri: kaza.kazaYeri,
-        kazaTuru: kaza.kazaTuru,
-        kazaAciklamasi: kaza.kazaAciklamasi,
-        yaraliVucutBolgeleri: kaza.yaraliVucutBolgeleri,
-        yaralanmaTuru: kaza.yaralanmaTuru,
-        yaralanmaSiddeti: kaza.yaralanmaSiddeti,
-        isGunuKaybi: kaza.isGunuKaybi,
-        hastaneyeKaldirildi: kaza.hastaneyeKaldirildi,
-        hastaneAdi: kaza.hastaneAdi,
-        tanikBilgileri: kaza.tanikBilgileri,
-        onlemler: kaza.onlemler,
-        durum: kaza.durum,
-        sgkBildirildi: kaza.sgkBildirildi,
-        sgkBildirimTarihi: kaza.sgkBildirimTarihi,
-        sgkBildirimNotu: kaza.sgkBildirimNotu,
-        besNeden: kaza.besNeden,
-        kazaTipi: kaza.kazaTipi,
-        riskSeviyesi: kaza.riskSeviyesi,
-      });
-      addToast?.('İş kazası tutanağı Word olarak indiriliyor...', 'success');
-    } catch (err) {
-      addToast?.('Word oluşturulurken hata oluştu.', 'error');
-      console.error('[IsKazasi Word]', err);
-    } finally {
-      setWordLoading(null);
-    }
-  };
-
   const filtered = kazalar.filter(k =>
     k.personelAd.toLowerCase().includes(search.toLowerCase()) ||
     k.firmaAd.toLowerCase().includes(search.toLowerCase()) ||
@@ -490,7 +163,7 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
 
   const totalKaza = kazalar.length;
   const acikKaza = kazalar.filter(k => k.durum === 'Açık').length;
-  const agirKaza = kazalar.filter(k => k.yaralanmaSiddeti === 'Ağır' || k.yaralanmaSiddeti === 'Çok Ağır' || k.yaralanmaSiddeti === 'Ölüm').length;
+  const agirKaza = kazalar.filter(k => k.yaralanmaSiddeti === 'Ağır' || k.yaralanmaSiddeti === 'Çok Ağır').length;
   const toplamGunKaybi = kazalar.reduce((sum, k) => sum + (k.isGunuKaybi || 0), 0);
 
   return (
@@ -544,6 +217,7 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
       {activeView === 'rapor' && !loading && (
         <HekimIsKazasiRaporBolumu kazalar={kazalar} isDark={isDark} />
       )}
+
       {activeView === 'rapor' && loading && (
         <div className="rounded-xl p-12 flex items-center justify-center gap-3"
           style={{ background: isDark ? '#1e293b' : '#fff', border: `1px solid ${borderColor}` }}>
@@ -552,19 +226,19 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
         </div>
       )}
 
-      {/* Liste View */}
+      {/* Liste View — sadece liste modunda göster */}
       {activeView === 'liste' && (<>
 
-      {/* KPI */}
+      {/* KPI Kartlar */}
       {!loading && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
-            { label: 'Toplam Kaza',    value: totalKaza,       color: '#EF4444', bg: 'rgba(239,68,68,0.08)',   icon: 'ri-alert-line' },
-            { label: 'Açık Vaka',      value: acikKaza,        color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',  icon: 'ri-time-line' },
-            { label: 'Ağır/Ölüm',      value: agirKaza,        color: '#F97316', bg: 'rgba(249,115,22,0.08)',  icon: 'ri-error-warning-line' },
-            { label: 'İş Günü Kaybı',  value: toplamGunKaybi,  color: ACCENT,    bg: 'rgba(14,165,233,0.08)',  icon: 'ri-calendar-close-line' },
+            { label: 'Toplam Kaza',   value: totalKaza,      color: '#EF4444', bg: 'rgba(239,68,68,0.08)',   icon: 'ri-alert-line' },
+            { label: 'Açık Vaka',    value: acikKaza,       color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',  icon: 'ri-time-line' },
+            { label: 'Ağır/Çok Ağır', value: agirKaza,     color: '#F97316', bg: 'rgba(249,115,22,0.08)',  icon: 'ri-error-warning-line' },
+            { label: 'İş Günü Kaybı', value: toplamGunKaybi, color: ACCENT,  bg: 'rgba(14,165,233,0.08)', icon: 'ri-calendar-close-line' },
           ].map(kpi => (
-            <div key={kpi.label} className="rounded-xl px-4 py-3 flex items-center gap-3"
+            <div key={kpi.label} className="stat-card-interactive rounded-xl px-4 py-3 flex items-center gap-3"
               style={{ background: kpi.bg, border: `1px solid ${kpi.color}22` }}>
               <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: `${kpi.color}18` }}>
                 <i className={`${kpi.icon} text-sm`} style={{ color: kpi.color }} />
@@ -632,9 +306,9 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
       {/* Liste */}
       {!loading && filtered.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ background: isDark ? '#1e293b' : '#fff', border: `1px solid ${borderColor}` }}>
-          {/* Kolon başlıkları */}
+          {/* Kolon başlıkları — sadece desktop */}
           <div className="hidden md:grid px-4 py-2.5"
-            style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 110px',
+            style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 90px',
               background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)',
               borderBottom: `1px solid ${borderColor}` }}>
             {['KAZAZEDE', 'TARİH / YER', 'KAZA TÜRÜ', 'ŞİDDET', 'DURUM', 'İŞLEM'].map(h => (
@@ -642,29 +316,94 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
             ))}
           </div>
 
-          {/* Satırlar */}
-          <div className="space-y-1.5 p-2">
+          {/* Mobil kart görünümü */}
+          <div className="md:hidden divide-y" style={{ borderColor }}>
+            {filtered.map(kaza => {
+              const siddetCfg = SIDDET_CONFIG[kaza.yaralanmaSiddeti] ?? SIDDET_CONFIG['Hafif'];
+              const durumCfg = DURUM_CONFIG[kaza.durum] ?? DURUM_CONFIG['Açık'];
+
+              return (
+                <div key={kaza.id} className="p-4">
+                  <div className="flex items-start gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+                      style={{ background: `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})` }}>
+                      {kaza.personelAd.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: textPrimary }}>{kaza.personelAd}</p>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT_DARK }}>
+                        <i className="ri-building-2-line text-[9px]" />{kaza.firmaAd}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+                      style={{ background: siddetCfg.bg, color: siddetCfg.color, border: `1px solid ${siddetCfg.border}` }}>
+                      {kaza.yaralanmaSiddeti || '—'}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+                      style={{ background: durumCfg.bg, color: durumCfg.color }}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: durumCfg.color }} />
+                      {kaza.durum}
+                    </span>
+                    <span className="text-xs" style={{ color: textSecondary }}>{kaza.kazaTuru || '—'}</span>
+                  </div>
+                  <div className="text-xs mb-3" style={{ color: textSecondary }}>
+                    <span>{kaza.kazaTarihi ? new Date(kaza.kazaTarihi).toLocaleDateString('tr-TR') : '—'}</span>
+                    {kaza.kazaYeri && <span> · {kaza.kazaYeri}</span>}
+                  </div>
+                  <div className="flex items-center gap-1.5 justify-end flex-wrap pt-2" style={{ borderTop: `1px solid ${borderColor}` }}>
+                    <button onClick={() => { setEditData(kaza); setShowModal(true); }}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${borderColor}` }}>
+                      <i className="ri-edit-line text-xs" style={{ color: textSecondary }} />
+                    </button>
+                    <button onClick={() => setDeleteId(kaza.id)}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${borderColor}` }}>
+                      <i className="ri-delete-bin-line text-xs" style={{ color: textSecondary }} />
+                    </button>
+                    <button onClick={() => printIsKazasiTutanagi({
+                        id: kaza.id, personelAd: kaza.personelAd, personelGorev: undefined,
+                        firmaAd: kaza.firmaAd, kazaTarihi: kaza.kazaTarihi, kazaSaati: kaza.kazaSaati,
+                        kazaYeri: kaza.kazaYeri, kazaTuru: kaza.kazaTuru, kazaAciklamasi: kaza.kazaAciklamasi,
+                        yaraliVucutBolgeleri: kaza.yaraliVucutBolgeleri, yaralanmaTuru: kaza.yaralanmaTuru,
+                        yaralanmaSiddeti: kaza.yaralanmaSiddeti, isGunuKaybi: kaza.isGunuKaybi,
+                        hastaneyeKaldirildi: kaza.hastaneyeKaldirildi, hastaneAdi: kaza.hastaneAdi,
+                        tanikBilgileri: kaza.tanikBilgileri, onlemler: kaza.onlemler, durum: kaza.durum,
+                      })}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
+                      style={{ background: isDark ? 'rgba(14,165,233,0.08)' : 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.2)', color: ACCENT }}>
+                      <i className="ri-printer-line text-xs" />Yazdır
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Satırlar — desktop */}
+          <div className="hidden md:block space-y-1.5 p-2 overflow-x-auto">
             {filtered.map(kaza => {
               const isExpanded = expandedId === kaza.id;
               const siddetCfg = SIDDET_CONFIG[kaza.yaralanmaSiddeti] ?? SIDDET_CONFIG['Hafif'];
               const durumCfg = DURUM_CONFIG[kaza.durum] ?? DURUM_CONFIG['Açık'];
-              const isWordLoading = wordLoading === kaza.id;
 
               return (
-                <div key={kaza.id} className="rounded-xl overflow-hidden transition-all duration-200"
+                <div key={kaza.id} className="rounded-xl overflow-hidden transition-all duration-200 min-w-[700px]"
                   style={{
                     border: isExpanded ? '1px solid rgba(239,68,68,0.3)' : `1px solid ${borderColor}`,
                     background: isExpanded ? (isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.03)') : cardBg,
                   }}>
 
                   {/* Ana satır */}
-                  <div
-                    className="hidden md:grid items-center px-4 py-3 cursor-pointer transition-all duration-200"
-                    style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 110px' }}
+                  <div className="grid items-center px-4 py-3 cursor-pointer transition-all duration-200"
+                    style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 90px' }}
                     onClick={() => setExpandedId(isExpanded ? null : kaza.id)}
-                    onMouseEnter={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(239,68,68,0.05)' : 'rgba(239,68,68,0.03)'; }}
-                    onMouseLeave={e => { if (!isExpanded) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                  >
+                    onMouseEnter={e => { if (!isExpanded) { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(239,68,68,0.05)' : 'rgba(239,68,68,0.03)'; } }}
+                    onMouseLeave={e => { if (!isExpanded) { (e.currentTarget as HTMLElement).style.background = 'transparent'; } }}>
+
                     {/* Kazazede */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
@@ -713,33 +452,100 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
 
                     {/* İşlemler */}
                     <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                      {/* Detay Gör */}
                       <button
-                        onClick={() => setDetayKaza(kaza)}
+                        onClick={() => setExpandedId(isExpanded ? null : kaza.id)}
                         className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                        title="Detayı Gör"
-                        style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${borderColor}` }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.12)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.3)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
-                        <i className="ri-eye-line text-xs" style={{ color: textSecondary }} />
+                        style={{ background: isExpanded ? 'rgba(239,68,68,0.1)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'), border: `1px solid ${isExpanded ? 'rgba(239,68,68,0.3)' : borderColor}` }}>
+                        <i className={`${isExpanded ? 'ri-arrow-up-s-line' : 'ri-eye-line'} text-xs`} style={{ color: isExpanded ? '#EF4444' : textSecondary }} />
                       </button>
-
-                      {/* Word İndir */}
-                      <button
-                        onClick={() => handleWordExport(kaza)}
-                        disabled={isWordLoading}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                        title="Word İndir (.docx)"
-                        style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.16)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.08)'; }}>
-                        {isWordLoading
-                          ? <i className="ri-loader-4-line animate-spin text-xs" style={{ color: '#16a34a' }} />
-                          : <i className="ri-file-word-line text-xs" style={{ color: '#16a34a' }} />
-                        }
-                      </button>
-
-                      {/* Düzenle */}
+                      {/* Rapor butonu */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setRaporMenuId(raporMenuId === kaza.id ? null : kaza.id)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                          title="Tutanak Raporu"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${borderColor}` }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.12)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.3)'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
+                          <i className="ri-file-text-line text-xs" style={{ color: textSecondary }} />
+                        </button>
+                        {raporMenuId === kaza.id && (
+                          <div
+                            className="absolute right-0 bottom-full mb-1 z-[999] rounded-xl overflow-hidden"
+                            style={{
+                              background: isDark ? '#1e293b' : '#ffffff',
+                              border: `1px solid ${borderColor}`,
+                              minWidth: 160,
+                              boxShadow: '0 -8px 24px rgba(0,0,0,0.15)',
+                            }}
+                          >
+                            <button
+                              onClick={() => {
+                                setRaporMenuId(null);
+                                printIsKazasiTutanagi({
+                                  id: kaza.id,
+                                  personelAd: kaza.personelAd,
+                                  personelGorev: undefined,
+                                  firmaAd: kaza.firmaAd,
+                                  kazaTarihi: kaza.kazaTarihi,
+                                  kazaSaati: kaza.kazaSaati,
+                                  kazaYeri: kaza.kazaYeri,
+                                  kazaTuru: kaza.kazaTuru,
+                                  kazaAciklamasi: kaza.kazaAciklamasi,
+                                  yaraliVucutBolgeleri: kaza.yaraliVucutBolgeleri,
+                                  yaralanmaTuru: kaza.yaralanmaTuru,
+                                  yaralanmaSiddeti: kaza.yaralanmaSiddeti,
+                                  isGunuKaybi: kaza.isGunuKaybi,
+                                  hastaneyeKaldirildi: kaza.hastaneyeKaldirildi,
+                                  hastaneAdi: kaza.hastaneAdi,
+                                  tanikBilgileri: kaza.tanikBilgileri,
+                                  onlemler: kaza.onlemler,
+                                  durum: kaza.durum,
+                                });
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold cursor-pointer transition-all"
+                              style={{ color: textPrimary }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                            >
+                              <i className="ri-printer-line text-sm" style={{ color: ACCENT }} />
+                              Yazdır / PDF
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRaporMenuId(null);
+                                downloadIsKazasiHtml({
+                                  id: kaza.id,
+                                  personelAd: kaza.personelAd,
+                                  personelGorev: undefined,
+                                  firmaAd: kaza.firmaAd,
+                                  kazaTarihi: kaza.kazaTarihi,
+                                  kazaSaati: kaza.kazaSaati,
+                                  kazaYeri: kaza.kazaYeri,
+                                  kazaTuru: kaza.kazaTuru,
+                                  kazaAciklamasi: kaza.kazaAciklamasi,
+                                  yaraliVucutBolgeleri: kaza.yaraliVucutBolgeleri,
+                                  yaralanmaTuru: kaza.yaralanmaTuru,
+                                  yaralanmaSiddeti: kaza.yaralanmaSiddeti,
+                                  isGunuKaybi: kaza.isGunuKaybi,
+                                  hastaneyeKaldirildi: kaza.hastaneyeKaldirildi,
+                                  hastaneAdi: kaza.hastaneAdi,
+                                  tanikBilgileri: kaza.tanikBilgileri,
+                                  onlemler: kaza.onlemler,
+                                  durum: kaza.durum,
+                                });
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold cursor-pointer transition-all"
+                              style={{ color: textPrimary, borderTop: `1px solid ${borderColor}` }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                            >
+                              <i className="ri-download-line text-sm" style={{ color: '#10B981' }} />
+                              HTML İndir
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <button
                         onClick={() => { setEditData(kaza); setShowModal(true); }}
                         className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
@@ -748,8 +554,6 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
                         <i className="ri-edit-line text-xs" style={{ color: textSecondary }} />
                       </button>
-
-                      {/* Sil */}
                       <button
                         onClick={() => setDeleteId(kaza.id)}
                         className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
@@ -761,87 +565,134 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
                     </div>
                   </div>
 
-                  {/* Mobil kart */}
-                  <div className="md:hidden p-4">
-                    <div className="flex items-start gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
-                        style={{ background: `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})` }}>
-                        {kaza.personelAd.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold" style={{ color: textPrimary }}>{kaza.personelAd}</p>
-                        <span className="text-[10px]" style={{ color: ACCENT }}>{kaza.firmaAd}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap mb-2">
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                        style={{ background: siddetCfg.bg, color: siddetCfg.color, border: `1px solid ${siddetCfg.border}` }}>
-                        {kaza.yaralanmaSiddeti}
-                      </span>
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                        style={{ background: durumCfg.bg, color: durumCfg.color }}>
-                        {kaza.durum}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 pt-2 flex-wrap" style={{ borderTop: `1px solid ${borderColor}` }}>
-                      <button onClick={() => setDetayKaza(kaza)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
-                        style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT, border: '1px solid rgba(14,165,233,0.2)' }}>
-                        <i className="ri-eye-line text-xs" />Detay
-                      </button>
-                      <button onClick={() => handleWordExport(kaza)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
-                        style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.2)' }}>
-                        <i className="ri-file-word-line text-xs" />Word
-                      </button>
-                      <button onClick={() => { setEditData(kaza); setShowModal(true); }}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                        style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${borderColor}` }}>
-                        <i className="ri-edit-line text-xs" style={{ color: textSecondary }} />
-                      </button>
-                      <button onClick={() => setDeleteId(kaza.id)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
-                        style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${borderColor}` }}>
-                        <i className="ri-delete-bin-line text-xs" style={{ color: textSecondary }} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Expanded detay (mini özet) */}
+                  {/* Expanded detay */}
                   {isExpanded && (
-                    <div className="hidden md:block px-5 py-4 space-y-3"
+                    <div className="px-5 py-4 space-y-4"
                       style={{ borderTop: `1px solid rgba(239,68,68,0.15)`, background: isDark ? 'rgba(239,68,68,0.04)' : 'rgba(239,68,68,0.02)' }}>
+
+                      {/* Tutanak Yazdır butonu — genişletilmiş alanda */}
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: '#EF4444' }}>
-                          <i className="ri-file-list-3-line mr-1.5" />Kaza Özeti
+                          <i className="ri-file-list-3-line mr-1.5" />Kaza Detayı
                         </p>
-                        <button
-                          onClick={() => setDetayKaza(kaza)}
-                          className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer"
-                          style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT, border: '1px solid rgba(14,165,233,0.2)' }}>
-                          <i className="ri-eye-line text-xs" />
-                          Tam Detayı Gör
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              printIsKazasiTutanagi({
+                                id: kaza.id,
+                                personelAd: kaza.personelAd,
+                                personelGorev: undefined,
+                                firmaAd: kaza.firmaAd,
+                                kazaTarihi: kaza.kazaTarihi,
+                                kazaSaati: kaza.kazaSaati,
+                                kazaYeri: kaza.kazaYeri,
+                                kazaTuru: kaza.kazaTuru,
+                                kazaAciklamasi: kaza.kazaAciklamasi,
+                                yaraliVucutBolgeleri: kaza.yaraliVucutBolgeleri,
+                                yaralanmaTuru: kaza.yaralanmaTuru,
+                                yaralanmaSiddeti: kaza.yaralanmaSiddeti,
+                                isGunuKaybi: kaza.isGunuKaybi,
+                                hastaneyeKaldirildi: kaza.hastaneyeKaldirildi,
+                                hastaneAdi: kaza.hastaneAdi,
+                                tanikBilgileri: kaza.tanikBilgileri,
+                                onlemler: kaza.onlemler,
+                                durum: kaza.durum,
+                              });
+                            }}
+                            className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer text-white transition-all"
+                            style={{ background: 'linear-gradient(135deg, #1e3a5f, #1d4ed8)' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.87'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                          >
+                            <i className="ri-printer-line text-xs" />
+                            Tutanak Yazdır
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadIsKazasiHtml({
+                                id: kaza.id,
+                                personelAd: kaza.personelAd,
+                                personelGorev: undefined,
+                                firmaAd: kaza.firmaAd,
+                                kazaTarihi: kaza.kazaTarihi,
+                                kazaSaati: kaza.kazaSaati,
+                                kazaYeri: kaza.kazaYeri,
+                                kazaTuru: kaza.kazaTuru,
+                                kazaAciklamasi: kaza.kazaAciklamasi,
+                                yaraliVucutBolgeleri: kaza.yaraliVucutBolgeleri,
+                                yaralanmaTuru: kaza.yaralanmaTuru,
+                                yaralanmaSiddeti: kaza.yaralanmaSiddeti,
+                                isGunuKaybi: kaza.isGunuKaybi,
+                                hastaneyeKaldirildi: kaza.hastaneyeKaldirildi,
+                                hastaneAdi: kaza.hastaneAdi,
+                                tanikBilgileri: kaza.tanikBilgileri,
+                                onlemler: kaza.onlemler,
+                                durum: kaza.durum,
+                              });
+                            }}
+                            className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
+                            style={{ background: isDark ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.1)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.2)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.1)'; }}
+                          >
+                            <i className="ri-download-2-line text-xs" />
+                            HTML İndir
+                          </button>
+                        </div>
                       </div>
-                      {kaza.kazaAciklamasi && (
-                        <p className="text-xs leading-relaxed" style={{ color: textPrimary }}>{kaza.kazaAciklamasi}</p>
-                      )}
-                      {kaza.yaraliVucutBolgeleri.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {kaza.yaraliVucutBolgeleri.map(b => (
-                            <span key={b} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                              style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
-                              {VUCUT_LABEL[b] ?? b}
-                            </span>
-                          ))}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {kaza.kazaAciklamasi && (
+                          <div className="sm:col-span-2">
+                            <p className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: '#EF4444' }}>Açıklama</p>
+                            <p className="text-xs leading-relaxed" style={{ color: textPrimary }}>{kaza.kazaAciklamasi}</p>
+                          </div>
+                        )}
+
+                        {kaza.yaraliVucutBolgeleri.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: textSecondary }}>Yaralı Vücut Bölgeleri</p>
+                            <div className="flex flex-wrap gap-1">
+                              {kaza.yaraliVucutBolgeleri.map(b => (
+                                <span key={b} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                  style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                                  {b.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-4">
+                          {kaza.isGunuKaybi > 0 && (
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: textSecondary }}>İş Günü Kaybı</p>
+                              <p className="text-xs font-bold" style={{ color: textPrimary }}>{kaza.isGunuKaybi} gün</p>
+                            </div>
+                          )}
+                          {kaza.hastaneyeKaldirildi && (
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: textSecondary }}>Hastane</p>
+                              <p className="text-xs font-bold" style={{ color: textPrimary }}>{kaza.hastaneAdi || 'Kaldırıldı'}</p>
+                            </div>
+                          )}
+                          {kaza.tanikBilgileri && (
+                            <div>
+                              <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: textSecondary }}>Tanık</p>
+                              <p className="text-xs" style={{ color: textPrimary }}>{kaza.tanikBilgileri}</p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {kaza.onlemler && (
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: '#10B981' }}>Alınan Önlemler</p>
-                          <p className="text-xs" style={{ color: textPrimary }}>{kaza.onlemler}</p>
-                        </div>
-                      )}
+
+                        {kaza.onlemler && (
+                          <div className="sm:col-span-2">
+                            <p className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: '#10B981' }}>Alınan Önlemler</p>
+                            <p className="text-xs leading-relaxed" style={{ color: textPrimary }}>{kaza.onlemler}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -853,18 +704,7 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
 
       </>)}
 
-      {/* Detay Modal */}
-      {detayKaza && (
-        <KazaDetayModal
-          kaza={detayKaza}
-          isDark={isDark}
-          onClose={() => setDetayKaza(null)}
-          onEdit={() => { setEditData(detayKaza); setDetayKaza(null); setShowModal(true); }}
-          onWordExport={() => { handleWordExport(detayKaza); setDetayKaza(null); }}
-        />
-      )}
-
-      {/* Kayıt Modal */}
+      {/* Modal — her zaman render et */}
       <HekimIsKazasiModal
         open={showModal}
         onClose={() => { setShowModal(false); setEditData(null); }}
@@ -880,8 +720,6 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
           kazaSaati: editData.kazaSaati,
           kazaYeri: editData.kazaYeri,
           kazaTuru: editData.kazaTuru,
-          kazaTipi: editData.kazaTipi ?? 'is_kazasi',
-          riskSeviyesi: editData.riskSeviyesi ?? 'orta',
           kazaAciklamasi: editData.kazaAciklamasi,
           yaraliVucutBolgeleri: editData.yaraliVucutBolgeleri,
           yaralanmaTuru: editData.yaralanmaTuru,
@@ -892,13 +730,11 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
           tanikBilgileri: editData.tanikBilgileri,
           onlemler: editData.onlemler,
           durum: editData.durum,
-          olumNedeni: '',
-          olumTarihi: '',
           sgkBildirildi: editData.sgkBildirildi,
           sgkBildirimTarihi: editData.sgkBildirimTarihi,
           sgkBildirimNotu: editData.sgkBildirimNotu,
           fotografPaths: editData.fotografPaths,
-          olayYeriDiagram: '',
+          olayYeriDiagram: editData.olayYeriDiagram,
           besNeden: editData.besNeden,
         } : null}
       />

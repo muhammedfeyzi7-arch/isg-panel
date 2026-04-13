@@ -163,7 +163,11 @@ export default function HekimIsKazasiModal({
   const [uyariGizle, setUyariGizle] = useState(false);
   const [fotografYukleniyor, setFotografYukleniyor] = useState(false);
   const [fotografOnizleme, setFotografOnizleme] = useState<string[]>([]);
-  // canvas/diyagram state'leri kaldırıldı
+  const [canvasRef, setCanvasRef] = useState<HTMLCanvasElement | null>(null);
+  const [cizimAraci, setCizimAraci] = useState<'kalem' | 'ok' | 'daire' | 'silgi'>('kalem');
+  const [cizimRengi, setCizimRengi] = useState('#ef4444');
+  const [cizimKalinlik, setCizimKalinlik] = useState(3);
+  const [cizimAktif, setCizimAktif] = useState(false);
   const [sgkSonGun, setSgkSonGun] = useState<string | null>(null);
   const [pastKazalar, setPastKazalar] = useState<{
     id: string; kaza_tarihi: string; kaza_yeri: string;
@@ -1435,7 +1439,135 @@ export default function HekimIsKazasiModal({
                     )}
                   </div>
 
+                  {/* Olay yeri diyagramı */}
+                  <div style={SECTION_STYLE}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5" style={{ color: '#f97316' }}>
+                        <i className="ri-map-2-line" />Olay Yeri Diyagramı
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        {/* Araç seçimi */}
+                        {[
+                          { id: 'kalem', icon: 'ri-pencil-line', title: 'Kalem' },
+                          { id: 'silgi', icon: 'ri-eraser-line', title: 'Silgi' },
+                        ].map(tool => (
+                          <button key={tool.id}
+                            onClick={() => setCizimAraci(tool.id as typeof cizimAraci)}
+                            title={tool.title}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                            style={{
+                              background: cizimAraci === tool.id ? 'rgba(249,115,22,0.15)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'),
+                              border: `1px solid ${cizimAraci === tool.id ? 'rgba(249,115,22,0.4)' : border}`,
+                              color: cizimAraci === tool.id ? '#f97316' : textMuted,
+                            }}>
+                            <i className={`${tool.icon} text-xs`} />
+                          </button>
+                        ))}
+                        {/* Renk seçimi */}
+                        {['#ef4444', '#fbbf24', '#22d3ee', '#10b981', '#0f172a'].map(c => (
+                          <button key={c}
+                            onClick={() => { setCizimRengi(c); setCizimAraci('kalem'); }}
+                            className="rounded-full cursor-pointer transition-all"
+                            style={{
+                              width: 18, height: 18,
+                              background: c,
+                              border: cizimRengi === c && cizimAraci === 'kalem' ? '2px solid white' : '2px solid transparent',
+                              outline: cizimRengi === c && cizimAraci === 'kalem' ? `2px solid ${c}` : 'none',
+                            }} />
+                        ))}
+                        {/* Kalem kalınlığı */}
+                        <select value={cizimKalinlik}
+                          onChange={e => setCizimKalinlik(Number(e.target.value))}
+                          style={{ ...INPUT_STYLE, width: 48, padding: '3px 4px', fontSize: 10, colorScheme }}>
+                          {[2, 3, 5, 8].map(k => <option key={k} value={k}>{k}px</option>)}
+                        </select>
+                        <button
+                          onClick={() => {
+                            if (!canvasRef) return;
+                            const ctx = canvasRef.getContext('2d');
+                            if (ctx) ctx.clearRect(0, 0, canvasRef.width, canvasRef.height);
+                            setForm(p => ({ ...p, olayYeriDiagram: '' }));
+                          }}
+                          className="text-[9px] font-bold px-2 py-1 rounded-lg cursor-pointer"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', color: textMuted, border: `1px solid ${border}` }}>
+                          Temizle
+                        </button>
+                      </div>
+                    </div>
 
+                    {/* Canvas */}
+                    <div className="rounded-xl overflow-hidden"
+                      style={{ border: `1px solid ${border}`, background: isDark ? '#0f172a' : '#f8fafc', cursor: cizimAraci === 'silgi' ? 'cell' : 'crosshair' }}>
+                      <canvas
+                        ref={(el) => {
+                          if (el && !canvasRef) {
+                            setCanvasRef(el);
+                            // Canvas'ı mevcut diyagramla doldur
+                            if (form.olayYeriDiagram) {
+                              const img = new Image();
+                              img.onload = () => {
+                                const ctx = el.getContext('2d');
+                                if (ctx) ctx.drawImage(img, 0, 0);
+                              };
+                              img.src = form.olayYeriDiagram;
+                            }
+                          }
+                        }}
+                        width={700}
+                        height={300}
+                        className="w-full"
+                        style={{ display: 'block', touchAction: 'none' }}
+                        onMouseDown={(e) => {
+                          if (!canvasRef) return;
+                          setCizimAktif(true);
+                          const rect = canvasRef.getBoundingClientRect();
+                          const scaleX = canvasRef.width / rect.width;
+                          const scaleY = canvasRef.height / rect.height;
+                          const ctx = canvasRef.getContext('2d');
+                          if (!ctx) return;
+                          ctx.beginPath();
+                          ctx.moveTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+                        }}
+                        onMouseMove={(e) => {
+                          if (!cizimAktif || !canvasRef) return;
+                          const rect = canvasRef.getBoundingClientRect();
+                          const scaleX = canvasRef.width / rect.width;
+                          const scaleY = canvasRef.height / rect.height;
+                          const ctx = canvasRef.getContext('2d');
+                          if (!ctx) return;
+                          if (cizimAraci === 'silgi') {
+                            ctx.clearRect(
+                              (e.clientX - rect.left) * scaleX - 15,
+                              (e.clientY - rect.top) * scaleY - 15,
+                              30, 30
+                            );
+                          } else {
+                            ctx.lineWidth = cizimKalinlik;
+                            ctx.strokeStyle = cizimRengi;
+                            ctx.lineCap = 'round';
+                            ctx.lineJoin = 'round';
+                            ctx.lineTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+                            ctx.stroke();
+                          }
+                        }}
+                        onMouseUp={() => {
+                          setCizimAktif(false);
+                          if (canvasRef) {
+                            setForm(p => ({ ...p, olayYeriDiagram: canvasRef.toDataURL() }));
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          if (cizimAktif) {
+                            setCizimAktif(false);
+                            if (canvasRef) setForm(p => ({ ...p, olayYeriDiagram: canvasRef.toDataURL() }));
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-[9px] mt-1.5" style={{ color: textFaint }}>
+                      <i className="ri-information-line mr-1" />Kaza yerini, ekipmanları ve hareket yönlerini çizerek görselleştirin
+                    </p>
+                  </div>
                 </div>
               )}
 
