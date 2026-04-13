@@ -162,9 +162,11 @@ export default function UzmanPage() {
 
   const goruntulenenFirmaIds = aktiveFirmaId ? [aktiveFirmaId] : atanmisFirmaIds;
 
+  // Her iki loading de tamamlanana kadar yükleme ekranını göster
   if (showLoading || loading) return <UzmanLoadingScreen isDark={isDark} />;
   if (mustChangePassword) return <ForcePasswordChange />;
-  if (atanmisFirmaIds.length === 0) {
+  // Her iki loading bitti, firma ataması yoksa bekleme ekranı göster
+  if (!loading && !showLoading && atanmisFirmaIds.length === 0) {
     return <AtamaBekleyenEkran isDark={isDark} onLogout={logout} onRefresh={() => window.location.reload()} />;
   }
 

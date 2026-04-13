@@ -7,6 +7,7 @@ import OsgbDashboardPage from "../pages/osgb-dashboard/page";
 import OsgbUzmanPage from "../pages/osgb-uzman/page";
 import HekimPage from "../pages/hekim/page";
 import UzmanPage from "../pages/uzman/page";
+import SahaPage from "../pages/saha/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
@@ -70,6 +71,14 @@ const routes: RouteObject[] = [
     element: (
       <ProtectedRoute>
         <UzmanPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/saha",
+    element: (
+      <ProtectedRoute>
+        <SahaPage />
       </ProtectedRoute>
     ),
   },
