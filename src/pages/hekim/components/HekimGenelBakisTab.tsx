@@ -63,7 +63,7 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
         const { data: orgs } = await supabase.from('organizations').select('id, name').in('id', safeIds);
 
         const [muayeneAll, kazaAll] = await Promise.all([
-          supabase.from('muayeneler').select('organization_id, data').in('organization_id', safeIds),
+          supabase.from('muayeneler').select('organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
           supabase.from('is_kazalari').select('organization_id, durum, yaralanma_siddeti, is_gunu_kaybi').in('organization_id', safeIds).is('deleted_at', null),
         ]);
 

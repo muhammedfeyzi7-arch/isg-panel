@@ -33,22 +33,13 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // ── Gezici Uzman yönlendirme ──
   if (osgbRole === 'gezici_uzman') {
-    const hasActiveFirm = (org.activeFirmIds?.length ?? 0) > 0;
-
-    if (!hasActiveFirm) {
-      // Firma atanmamış → uzman bekleme sayfasında tut
-      if (location.pathname !== '/osgb-uzman') {
-        return <Navigate to="/osgb-uzman" replace />;
-      }
-      return <>{children}</>;
+    // Sadece /uzman ve /osgb-uzman sayfalarına erişebilir
+    const allowedPaths = ['/uzman', '/osgb-uzman'];
+    if (!allowedPaths.includes(location.pathname)) {
+      // Firma atanmamış → bekleme ekranı
+      const hasActiveFirm = (org.activeFirmIds?.length ?? 0) > 0;
+      return <Navigate to={hasActiveFirm ? '/uzman' : '/osgb-uzman'} replace />;
     }
-
-    // Firma atanmış → OSGB path'lerine girmeye çalışırsa /dashboard'a yönlendir
-    if (isOsgbPath) {
-      return <Navigate to="/dashboard" replace />;
-    }
-
-    // Normal firma panelinde çalışsın
     return <>{children}</>;
   }
 
@@ -81,10 +72,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // ── Normal firma kullanıcısı ──
-  // OSGB sayfalarına erişmeye çalışıyorsa → dashboard'a yönlendir
-  const isOsgbDashboard = location.pathname === '/osgb-dashboard';
-  const isOsgbUzman = location.pathname === '/osgb-uzman';
-  if (isOsgbDashboard || isOsgbUzman) {
+  // OSGB / uzman / hekim sayfalarına erişmeye çalışıyorsa → dashboard'a yönlendir
+  const blockedForFirma = ['/osgb-dashboard', '/osgb-uzman', '/uzman', '/hekim'];
+  if (blockedForFirma.includes(location.pathname)) {
     return <Navigate to="/dashboard" replace />;
   }
 

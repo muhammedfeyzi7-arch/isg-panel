@@ -59,7 +59,7 @@ interface FirmaDetay {
 
 export default function OsgbDashboardPage() {
   const { user } = useAuth();
-  const { org, addToast, mustChangePassword } = useApp();
+  const { org, addToast, mustChangePassword, theme } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -401,6 +401,7 @@ export default function OsgbDashboardPage() {
     setAtamaLoading(true);
     setAtamaError(null);
     try {
+      // 1. Seçilen uzmanın atamasını güncelle
       const { error } = await supabase
         .from('user_organizations')
         .update({
@@ -410,6 +411,50 @@ export default function OsgbDashboardPage() {
         .eq('user_id', atamaUzmanId)
         .eq('organization_id', org?.id ?? '');
       if (error) { setAtamaError(error.message); return; }
+
+      // 2. Aynı OSGB'deki tüm hekimlerin active_firm_ids'ini yeniden hesapla ve güncelle
+      //    Hekim; OSGB'ye bağlı tüm uzmanların atandığı firmaların birleşimini görmelidir.
+      if (org?.id) {
+        // Tüm gezici uzmanların güncel atamalarını çek (yeni atama dahil)
+        const { data: uzmanRows } = await supabase
+          .from('user_organizations')
+          .select('active_firm_ids, active_firm_id')
+          .eq('organization_id', org.id)
+          .eq('osgb_role', 'gezici_uzman');
+
+        // Tüm uzmanların firmalarının birleşimi
+        const allFirmIds: string[] = [];
+        (uzmanRows ?? []).forEach(u => {
+          if (Array.isArray(u.active_firm_ids) && u.active_firm_ids.length > 0) {
+            u.active_firm_ids.forEach((id: string) => { if (!allFirmIds.includes(id)) allFirmIds.push(id); });
+          } else if (u.active_firm_id && !allFirmIds.includes(u.active_firm_id)) {
+            allFirmIds.push(u.active_firm_id);
+          }
+        });
+
+        // Hekimleri bul ve güncelle (sadece active_firm_ids boşsa veya eskiyse)
+        if (allFirmIds.length > 0) {
+          const { data: hekimRows } = await supabase
+            .from('user_organizations')
+            .select('user_id, active_firm_ids')
+            .eq('organization_id', org.id)
+            .eq('osgb_role', 'isyeri_hekimi');
+
+          if (hekimRows && hekimRows.length > 0) {
+            await Promise.all(hekimRows.map(h => {
+              // Hekimin mevcut atamalarını koru + yeni firmaları ekle
+              const mevcut: string[] = Array.isArray(h.active_firm_ids) ? h.active_firm_ids : [];
+              const birlesim = [...new Set([...mevcut, ...allFirmIds])];
+              return supabase
+                .from('user_organizations')
+                .update({ active_firm_ids: birlesim, active_firm_id: birlesim[0] })
+                .eq('user_id', h.user_id)
+                .eq('organization_id', org.id);
+            }));
+          }
+        }
+      }
+
       addToast('Atama başarıyla güncellendi!', 'success');
       setShowAtamaModal(false);
       setAtamaUzmanId('');
@@ -492,7 +537,7 @@ export default function OsgbDashboardPage() {
   const textMuted = 'var(--text-muted)';
 
   if (showIntro) {
-    return <OsgbLoadingScreen onDone={() => setShowIntro(false)} />;
+    return <OsgbLoadingScreen onDone={() => setShowIntro(false)} isDark={theme === 'dark'} />;
   }
 
   if (mustChangePassword) {

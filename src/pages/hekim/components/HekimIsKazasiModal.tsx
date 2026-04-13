@@ -63,10 +63,10 @@ const VUCUT_BOLGELERI: { id: string; label: string }[] = [
 ];
 
 const SIDDET_OPTIONS = [
-  { label: 'Hafif', color: '#22d3ee', bg: 'rgba(34,211,238,0.15)', border: 'rgba(34,211,238,0.4)' },
-  { label: 'Orta', color: '#fbbf24', bg: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.4)' },
-  { label: 'Ağır', color: '#f97316', bg: 'rgba(249,115,22,0.15)', border: 'rgba(249,115,22,0.4)' },
-  { label: 'Çok Ağır', color: '#ef4444', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)' },
+  { label: 'Hafif',    color: '#22d3ee', bg: 'rgba(34,211,238,0.15)',  border: 'rgba(34,211,238,0.4)'  },
+  { label: 'Orta',    color: '#fbbf24', bg: 'rgba(251,191,36,0.15)',  border: 'rgba(251,191,36,0.4)'  },
+  { label: 'Ağır',    color: '#f97316', bg: 'rgba(249,115,22,0.15)',  border: 'rgba(249,115,22,0.4)'  },
+  { label: 'Çok Ağır', color: '#ef4444', bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.4)'  },
 ];
 
 const BOLGE_RISK_MAP: Record<string, { color: string; label: string; note: string }> = {
@@ -85,8 +85,8 @@ const BOLGE_RISK_MAP: Record<string, { color: string; label: string; note: strin
   sol_kalca: { color: '#22d3ee', label: 'Düşük', note: 'Kalça eklemi, femur boynu kırığı' },
   sag_bacak: { color: '#22d3ee', label: 'Düşük', note: 'Tibia/fibula kırığı, menisküs hasarı' },
   sol_bacak: { color: '#22d3ee', label: 'Düşük', note: 'Tibia/fibula kırığı, menisküs hasarı' },
-  sag_ayak:  { color: '#22d3ee', label: 'Düşük', note: 'Metatars kırığı, ayak bileği burkulmasi' },
-  sol_ayak:  { color: '#22d3ee', label: 'Düşük', note: 'Metatars kırığı, ayak bileği burkulmasi' },
+  sag_ayak:  { color: '#22d3ee', label: 'Düşük', note: 'Metatars kırığı, ayak bileği burkulması' },
+  sol_ayak:  { color: '#22d3ee', label: 'Düşük', note: 'Metatars kırığı, ayak bileği burkulması' },
 };
 
 const emptyForm: IsKazasiFormData = {
@@ -95,28 +95,6 @@ const emptyForm: IsKazasiFormData = {
   yaraliVucutBolgeleri: [], yaralanmaTuru: '', yaralanmaSiddeti: 'Hafif',
   isGunuKaybi: 0, hastaneyeKaldirildi: false, hastaneAdi: '',
   tanikBilgileri: '', onlemler: '', durum: 'Açık',
-};
-
-const INPUT_STYLE: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#f1f5f9',
-  borderRadius: 8,
-  padding: '8px 12px',
-  fontSize: 12,
-  width: '100%',
-  outline: 'none',
-  transition: 'border-color 0.2s',
-};
-
-const LABEL_STYLE: React.CSSProperties = {
-  color: 'rgba(148,163,184,0.8)',
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
-  display: 'block',
-  marginBottom: 5,
 };
 
 export default function HekimIsKazasiModal({
@@ -133,6 +111,50 @@ export default function HekimIsKazasiModal({
     yarali_vucut_bolgeleri: string[]; yaralanma_siddeti: string; durum: string;
   }[]>([]);
   const [loadingPast, setLoadingPast] = useState(false);
+
+  // ── Tema renkleri ──
+  const bg       = isDark ? '#0f172a'            : '#ffffff';
+  const bgPanel  = isDark ? '#070d1a'            : '#f8fafc';
+  const bgCard   = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)';
+  const border   = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)';
+  const borderSubtle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)';
+  const textPrimary  = isDark ? '#f1f5f9'       : '#0f172a';
+  const textMuted    = isDark ? '#94a3b8'       : '#64748b';
+  const textFaint    = isDark ? '#475569'       : '#94a3b8';
+  const inputBg  = isDark ? 'rgba(255,255,255,0.06)' : '#ffffff';
+  const inputBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.15)';
+  const colorScheme = isDark ? 'dark' : 'light';
+
+  const INPUT_STYLE: React.CSSProperties = {
+    background: inputBg,
+    border: `1px solid ${inputBorder}`,
+    color: textPrimary,
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 12,
+    width: '100%',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    colorScheme,
+  };
+
+  const LABEL_STYLE: React.CSSProperties = {
+    color: textMuted,
+    fontSize: 10,
+    fontWeight: 700,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.08em',
+    display: 'block',
+    marginBottom: 5,
+  };
+
+  const SECTION_STYLE: React.CSSProperties = {
+    background: bgCard,
+    border: `1px solid ${border}`,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 0,
+  };
 
   useEffect(() => {
     if (!open || atanmisFirmaIds.length === 0) return;
@@ -256,13 +278,17 @@ export default function HekimIsKazasiModal({
   const lastSelected = form.yaraliVucutBolgeleri[form.yaraliVucutBolgeleri.length - 1];
   const lastRisk = lastSelected ? BOLGE_RISK_MAP[lastSelected] : null;
   const lastBolgeLabel = lastSelected ? VUCUT_BOLGELERI.find(b => b.id === lastSelected)?.label : null;
-
   const siddetCfg = SIDDET_OPTIONS.find(s => s.label === form.yaralanmaSiddeti) ?? SIDDET_OPTIONS[0];
 
   const modal = (
     <div
       className="fixed inset-0 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(16px)', padding: '10px', zIndex: 9999 }}
+      style={{
+        background: isDark ? 'rgba(0,0,0,0.88)' : 'rgba(15,23,42,0.6)',
+        backdropFilter: 'blur(12px)',
+        padding: '10px',
+        zIndex: 9999,
+      }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
@@ -270,40 +296,42 @@ export default function HekimIsKazasiModal({
         style={{
           maxWidth: 1340,
           height: 'calc(100vh - 20px)',
-          background: '#080e1a',
-          border: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: '0 50px 120px rgba(0,0,0,0.9), 0 0 0 1px rgba(239,68,68,0.15)',
+          background: bg,
+          border: `1px solid ${border}`,
+          boxShadow: isDark
+            ? '0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(239,68,68,0.12)'
+            : '0 24px 64px rgba(15,23,42,0.18)',
         }}
       >
         {/* Top gradient bar */}
-        <div className="h-[2px] flex-shrink-0"
-          style={{ background: 'linear-gradient(90deg, #ef4444 0%, #f97316 30%, #fbbf24 60%, #22d3ee 100%)' }} />
+        <div className="h-[3px] flex-shrink-0"
+          style={{ background: 'linear-gradient(90deg, #ef4444 0%, #f97316 40%, #fbbf24 70%, #22d3ee 100%)' }} />
 
         {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-3 flex-shrink-0"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}
+          style={{ borderBottom: `1px solid ${borderSubtle}`, background: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc' }}
         >
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#ef4444', boxShadow: '0 0 8px #ef4444' }} />
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: 'rgba(148,163,184,0.6)' }}>
+              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#ef4444', boxShadow: '0 0 8px rgba(239,68,68,0.6)' }} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: textFaint }}>
                 İş Kazası Kayıt Sistemi
               </span>
             </div>
-            <div className="h-4 w-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-            <p className="text-sm font-bold" style={{ color: '#f1f5f9', letterSpacing: '-0.02em' }}>
+            <div className="h-4 w-px" style={{ background: borderSubtle }} />
+            <p className="text-sm font-bold" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>
               {editData ? 'Kaydı Düzenle' : 'Yeni Kaza Kaydı'}
             </p>
             {secilenPersonel && (
               <>
-                <div className="h-4 w-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                <div className="h-4 w-px" style={{ background: borderSubtle }} />
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
                     style={{ background: 'linear-gradient(135deg, #ef4444, #f97316)', color: '#fff' }}>
                     {secilenPersonel.adSoyad.charAt(0)}
                   </div>
-                  <span className="text-xs font-semibold" style={{ color: '#94a3b8' }}>{secilenPersonel.adSoyad}</span>
+                  <span className="text-xs font-semibold" style={{ color: textMuted }}>{secilenPersonel.adSoyad}</span>
                 </div>
               </>
             )}
@@ -312,7 +340,7 @@ export default function HekimIsKazasiModal({
           <div className="flex items-center gap-3">
             {form.yaraliVucutBolgeleri.length > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.22)' }}>
                 <i className="ri-body-scan-line text-[11px]" style={{ color: '#ef4444' }} />
                 <span className="text-[11px] font-bold" style={{ color: '#ef4444' }}>
                   {form.yaraliVucutBolgeleri.length} bölge işaretlendi
@@ -322,33 +350,33 @@ export default function HekimIsKazasiModal({
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as HTMLElement).style.color = '#64748b'; }}
+              style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', border: `1px solid ${border}`, color: textFaint }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'; (e.currentTarget as HTMLElement).style.color = textFaint; }}
             >
               <i className="ri-close-line text-sm" />
             </button>
           </div>
         </div>
 
-        {/* ══ 3 KOLON ══ */}
+        {/* ══ 2 KOLON ══ */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
 
           {/* ═══ SOL: 3D MODEL ═══ */}
-          <div className="flex flex-col" style={{ flex: '0 0 480px', borderRight: '1px solid rgba(255,255,255,0.06)', background: '#060c18' }}>
+          <div className="flex flex-col" style={{ flex: '0 0 460px', borderRight: `1px solid ${borderSubtle}`, background: bgPanel }}>
             {/* Model header */}
             <div className="flex items-center justify-between px-4 py-2.5 flex-shrink-0"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              style={{ borderBottom: `1px solid ${borderSubtle}` }}>
               <div className="flex items-center gap-2">
                 <i className="ri-body-scan-line text-xs" style={{ color: '#ef4444' }} />
-                <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: textFaint }}>
                   3D Vücut Modeli
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-[9px]" style={{ color: 'rgba(100,116,139,0.6)' }}>
+              <div className="flex items-center gap-3 text-[9px]" style={{ color: textFaint }}>
                 <span><i className="ri-drag-move-line mr-1" />Döndür</span>
                 <span><i className="ri-zoom-in-line mr-1" />Zoom</span>
-                <span><i className="ri-cursor-line mr-1" />Tıkla: seç</span>
+                <span><i className="ri-cursor-line mr-1" />Tıkla</span>
               </div>
             </div>
 
@@ -356,14 +384,14 @@ export default function HekimIsKazasiModal({
             <div className="flex-1 relative" style={{ minHeight: 0 }}>
               <Suspense fallback={
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                  <div className="w-8 h-8 border border-red-500 border-t-transparent rounded-full animate-spin" style={{ borderTopColor: 'transparent' }} />
-                  <span className="text-[11px]" style={{ color: '#475569' }}>Model yükleniyor...</span>
+                  <div className="w-8 h-8 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[11px]" style={{ color: textFaint }}>Model yükleniyor...</span>
                 </div>
               }>
                 <Human3DModel
                   selected={form.yaraliVucutBolgeleri}
                   onToggle={toggleBolge}
-                  isDark={true}
+                  isDark={isDark}
                 />
               </Suspense>
             </div>
@@ -371,21 +399,21 @@ export default function HekimIsKazasiModal({
             {/* Seçili bölge klinik notu */}
             {lastRisk && lastBolgeLabel && (
               <div className="flex-shrink-0 px-4 py-3"
-                style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
+                style={{ borderTop: `1px solid ${borderSubtle}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }}>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: `${lastRisk.color}18`, border: `1px solid ${lastRisk.color}30` }}>
+                    style={{ background: `${lastRisk.color}15`, border: `1px solid ${lastRisk.color}28` }}>
                     <i className="ri-stethoscope-line text-xs" style={{ color: lastRisk.color }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold" style={{ color: '#f1f5f9' }}>{lastBolgeLabel}</span>
+                      <span className="text-xs font-bold" style={{ color: textPrimary }}>{lastBolgeLabel}</span>
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                        style={{ background: `${lastRisk.color}18`, color: lastRisk.color, border: `1px solid ${lastRisk.color}30` }}>
+                        style={{ background: `${lastRisk.color}15`, color: lastRisk.color, border: `1px solid ${lastRisk.color}28` }}>
                         {lastRisk.label} Risk
                       </span>
                     </div>
-                    <p className="text-[10px] leading-relaxed" style={{ color: '#475569' }}>{lastRisk.note}</p>
+                    <p className="text-[10px] leading-relaxed" style={{ color: textFaint }}>{lastRisk.note}</p>
                   </div>
                 </div>
               </div>
@@ -393,65 +421,40 @@ export default function HekimIsKazasiModal({
 
             {/* Renk kılavuzu */}
             <div className="px-4 py-2.5 flex items-center gap-4 flex-shrink-0"
-              style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-              {[
-                { color: 'rgba(239,68,68,0.45)', label: 'Normal', dash: true },
-                { color: '#ef4444', label: 'Seçili', dash: false },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ background: item.color, boxShadow: !item.dash ? '0 0 6px rgba(239,68,68,0.5)' : 'none' }} />
-                  <span className="text-[9px] font-medium" style={{ color: '#334155' }}>{item.label}</span>
-                </div>
-              ))}
-              <span className="ml-auto text-[9px]" style={{ color: '#1e293b' }}>Bölgeye tıkla → işaretle</span>
+              style={{ borderTop: `1px solid ${borderSubtle}` }}>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: isDark ? 'rgba(239,68,68,0.4)' : 'rgba(239,68,68,0.3)' }} />
+                <span className="text-[9px] font-medium" style={{ color: textFaint }}>Normal</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#ef4444', boxShadow: '0 0 6px rgba(239,68,68,0.5)' }} />
+                <span className="text-[9px] font-medium" style={{ color: textFaint }}>Seçili</span>
+              </div>
+              <span className="ml-auto text-[9px]" style={{ color: textFaint }}>Bölgeye tıkla → işaretle</span>
             </div>
           </div>
 
-          {/* ═══ ORTA: İstatistik + Form ═══ */}
+          {/* ═══ SAĞ: İstatistik + Form ═══ */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
             {/* İstatistik şeridi */}
-            <div className="flex-shrink-0 grid grid-cols-4 divide-x"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', divideColor: 'rgba(255,255,255,0.06)' }}>
+            <div className="flex-shrink-0 grid grid-cols-4"
+              style={{ borderBottom: `1px solid ${borderSubtle}` }}>
               {[
-                {
-                  icon: 'ri-body-scan-line',
-                  value: form.yaraliVucutBolgeleri.length || '—',
-                  label: 'Yaralı Bölge',
-                  color: '#ef4444',
-                  bg: 'rgba(239,68,68,0.08)',
-                },
-                {
-                  icon: 'ri-calendar-event-line',
-                  value: form.kazaTarihi ? new Date(form.kazaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : '—',
-                  label: 'Kaza Tarihi',
-                  color: '#fbbf24',
-                  bg: 'rgba(251,191,36,0.08)',
-                },
-                {
-                  icon: 'ri-alert-fill',
-                  value: form.yaralanmaSiddeti || '—',
-                  label: 'Şiddet',
-                  color: siddetCfg.color,
-                  bg: siddetCfg.bg.replace('0.15', '0.08'),
-                },
-                {
-                  icon: 'ri-calendar-close-line',
-                  value: form.isGunuKaybi > 0 ? `${form.isGunuKaybi}g` : '—',
-                  label: 'İş Günü Kaybı',
-                  color: '#22d3ee',
-                  bg: 'rgba(34,211,238,0.08)',
-                },
+                { icon: 'ri-body-scan-line',     value: form.yaraliVucutBolgeleri.length || '—', label: 'Yaralı Bölge',   color: '#ef4444', bg: isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.05)' },
+                { icon: 'ri-calendar-event-line', value: form.kazaTarihi ? new Date(form.kazaTarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : '—', label: 'Kaza Tarihi', color: '#fbbf24', bg: isDark ? 'rgba(251,191,36,0.08)' : 'rgba(251,191,36,0.05)' },
+                { icon: 'ri-alert-fill',          value: form.yaralanmaSiddeti || '—',           label: 'Şiddet',          color: siddetCfg.color, bg: isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.05)' },
+                { icon: 'ri-calendar-close-line', value: form.isGunuKaybi > 0 ? `${form.isGunuKaybi}g` : '—', label: 'İş Günü Kaybı', color: '#22d3ee', bg: isDark ? 'rgba(34,211,238,0.08)' : 'rgba(34,211,238,0.05)' },
               ].map(stat => (
-                <div key={stat.label} className="flex items-center gap-3 px-4 py-3" style={{ background: stat.bg }}>
+                <div key={stat.label} className="flex items-center gap-3 px-4 py-3"
+                  style={{ background: stat.bg, borderRight: `1px solid ${borderSubtle}` }}>
                   <div className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
-                    style={{ background: `${stat.color}15`, border: `1px solid ${stat.color}25` }}>
+                    style={{ background: `${stat.color}18`, border: `1px solid ${stat.color}25` }}>
                     <i className={`${stat.icon} text-sm`} style={{ color: stat.color }} />
                   </div>
                   <div>
                     <p className="text-sm font-extrabold leading-none" style={{ color: stat.color }}>{stat.value}</p>
-                    <p className="text-[9px] mt-0.5 font-semibold" style={{ color: 'rgba(148,163,184,0.5)' }}>{stat.label}</p>
+                    <p className="text-[9px] mt-0.5 font-semibold" style={{ color: textFaint }}>{stat.label}</p>
                   </div>
                 </div>
               ))}
@@ -459,27 +462,27 @@ export default function HekimIsKazasiModal({
 
             {/* Tabs */}
             <div className="flex-shrink-0 flex items-center gap-1 px-4 py-2"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.01)' }}>
+              style={{ borderBottom: `1px solid ${borderSubtle}`, background: isDark ? 'rgba(255,255,255,0.01)' : '#f8fafc' }}>
               {([
-                { id: 'kaza', label: 'Kaza Bilgisi', icon: 'ri-alert-line', color: '#ef4444' },
-                { id: 'yaralanma', label: 'Yaralanma', icon: 'ri-first-aid-kit-line', color: '#f97316' },
-                { id: 'onceki', label: 'Geçmiş', icon: 'ri-history-line', color: '#fbbf24' },
+                { id: 'kaza',      label: 'Kaza Bilgisi', icon: 'ri-alert-line',            color: '#ef4444' },
+                { id: 'yaralanma', label: 'Yaralanma',    icon: 'ri-first-aid-kit-line',    color: '#f97316' },
+                { id: 'onceki',    label: 'Geçmiş',       icon: 'ri-history-line',           color: '#fbbf24' },
               ] as { id: 'kaza' | 'yaralanma' | 'onceki'; label: string; icon: string; color: string }[]).map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all whitespace-nowrap"
                   style={{
-                    background: activeTab === tab.id ? `${tab.color}15` : 'transparent',
-                    color: activeTab === tab.id ? tab.color : '#475569',
-                    border: activeTab === tab.id ? `1px solid ${tab.color}30` : '1px solid transparent',
+                    background: activeTab === tab.id ? `${tab.color}12` : 'transparent',
+                    color: activeTab === tab.id ? tab.color : textMuted,
+                    border: activeTab === tab.id ? `1px solid ${tab.color}28` : '1px solid transparent',
                   }}
                 >
                   <i className={`${tab.icon} text-[11px]`} />
                   {tab.label}
                   {tab.id === 'onceki' && pastKazalar.length > 0 && (
                     <span className="w-4 h-4 rounded-full text-[8px] font-extrabold flex items-center justify-center"
-                      style={{ background: '#fbbf2425', color: '#fbbf24' }}>
+                      style={{ background: 'rgba(251,191,36,0.18)', color: '#fbbf24' }}>
                       {pastKazalar.length}
                     </span>
                   )}
@@ -487,28 +490,24 @@ export default function HekimIsKazasiModal({
               ))}
             </div>
 
-            {/* Form içerik alanı */}
+            {/* Form içerik */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
 
               {/* ── TAB: KAZA BİLGİSİ ── */}
               {activeTab === 'kaza' && (
                 <>
                   {/* Kazazede */}
-                  <div className="rounded-xl p-4 space-y-3"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5" style={{ color: '#ef4444' }}>
+                  <div style={SECTION_STYLE}>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5 mb-3" style={{ color: '#ef4444' }}>
                       <i className="ri-user-line" />Kazazede
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label style={LABEL_STYLE}>Firma</label>
-                        <select
-                          value={form.firmaId}
-                          onChange={e => setForm(p => ({ ...p, firmaId: e.target.value, personelId: '' }))}
-                          style={{ ...INPUT_STYLE, colorScheme: 'dark' }}
+                        <select value={form.firmaId} onChange={e => setForm(p => ({ ...p, firmaId: e.target.value, personelId: '' }))}
+                          style={{ ...INPUT_STYLE, colorScheme }}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                        >
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }}>
                           <option value="">Tüm Firmalar</option>
                           {Object.entries(firmaAdMap).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                         </select>
@@ -521,10 +520,9 @@ export default function HekimIsKazasiModal({
                             const p = personelOptions.find(x => x.id === e.target.value);
                             setForm(prev => ({ ...prev, personelId: e.target.value, firmaId: p?.firmaId ?? prev.firmaId }));
                           }}
-                          style={{ ...INPUT_STYLE, borderColor: errors.personelId ? '#ef4444' : 'rgba(255,255,255,0.1)', colorScheme: 'dark' }}
+                          style={{ ...INPUT_STYLE, borderColor: errors.personelId ? '#ef4444' : inputBorder, colorScheme }}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = errors.personelId ? '#ef4444' : 'rgba(255,255,255,0.1)'; }}
-                        >
+                          onBlur={e => { e.currentTarget.style.borderColor = errors.personelId ? '#ef4444' : inputBorder; }}>
                           <option value="">Personel Seçin</option>
                           {filteredPersonel.map(p => <option key={p.id} value={p.id}>{p.adSoyad}{p.gorev ? ` — ${p.gorev}` : ''}</option>)}
                         </select>
@@ -533,110 +531,93 @@ export default function HekimIsKazasiModal({
                     </div>
                   </div>
 
-                  {/* Kaza detayları */}
-                  <div className="rounded-xl p-4 space-y-3"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5" style={{ color: '#fbbf24' }}>
+                  {/* Olay Detayları */}
+                  <div style={SECTION_STYLE}>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5 mb-3" style={{ color: '#fbbf24' }}>
                       <i className="ri-calendar-event-line" />Olay Detayları
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label style={LABEL_STYLE}>Tarih <span style={{ color: '#ef4444' }}>*</span></label>
-                        <input
-                          type="date" value={form.kazaTarihi}
+                        <input type="date" value={form.kazaTarihi}
                           onChange={e => setForm(p => ({ ...p, kazaTarihi: e.target.value }))}
-                          style={{ ...INPUT_STYLE, borderColor: errors.kazaTarihi ? '#ef4444' : 'rgba(255,255,255,0.1)', colorScheme: 'dark' }}
+                          style={{ ...INPUT_STYLE, borderColor: errors.kazaTarihi ? '#ef4444' : inputBorder, colorScheme }}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.5)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = errors.kazaTarihi ? '#ef4444' : 'rgba(255,255,255,0.1)'; }}
-                        />
+                          onBlur={e => { e.currentTarget.style.borderColor = errors.kazaTarihi ? '#ef4444' : inputBorder; }} />
                       </div>
                       <div>
                         <label style={LABEL_STYLE}>Saat</label>
-                        <input
-                          type="time" value={form.kazaSaati}
+                        <input type="time" value={form.kazaSaati}
                           onChange={e => setForm(p => ({ ...p, kazaSaati: e.target.value }))}
-                          style={{ ...INPUT_STYLE, colorScheme: 'dark' }}
+                          style={{ ...INPUT_STYLE, colorScheme }}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.5)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                        />
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
                       </div>
                       <div>
                         <label style={LABEL_STYLE}>Kaza Yeri</label>
-                        <input
-                          type="text" value={form.kazaYeri} placeholder="Üretim bandı, depo..."
+                        <input type="text" value={form.kazaYeri} placeholder="Üretim bandı, depo..."
                           onChange={e => setForm(p => ({ ...p, kazaYeri: e.target.value }))}
                           style={INPUT_STYLE}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.5)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                        />
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
                       </div>
                       <div>
                         <label style={LABEL_STYLE}>Kaza Türü</label>
-                        <select
-                          value={form.kazaTuru}
-                          onChange={e => setForm(p => ({ ...p, kazaTuru: e.target.value }))}
-                          style={{ ...INPUT_STYLE, colorScheme: 'dark' }}
+                        <select value={form.kazaTuru} onChange={e => setForm(p => ({ ...p, kazaTuru: e.target.value }))}
+                          style={{ ...INPUT_STYLE, colorScheme }}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.5)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                        >
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }}>
                           <option value="">Seçin</option>
                           {KAZA_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
                     </div>
-                    <div>
+                    <div className="mt-3">
                       <label style={LABEL_STYLE}>Açıklama <span style={{ color: '#ef4444' }}>*</span></label>
                       <textarea
                         value={form.kazaAciklamasi} rows={3} maxLength={500}
                         placeholder="Kazanın nasıl gerçekleştiğini ayrıntılı açıklayın..."
                         onChange={e => setForm(p => ({ ...p, kazaAciklamasi: e.target.value }))}
-                        style={{ ...INPUT_STYLE, resize: 'none', borderColor: errors.kazaAciklamasi ? '#ef4444' : 'rgba(255,255,255,0.1)' }}
+                        style={{ ...INPUT_STYLE, resize: 'none', borderColor: errors.kazaAciklamasi ? '#ef4444' : inputBorder }}
                         onFocus={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.5)'; }}
-                        onBlur={e => { e.currentTarget.style.borderColor = errors.kazaAciklamasi ? '#ef4444' : 'rgba(255,255,255,0.1)'; }}
-                      />
+                        onBlur={e => { e.currentTarget.style.borderColor = errors.kazaAciklamasi ? '#ef4444' : inputBorder; }} />
                       <div className="flex justify-between mt-1">
                         {errors.kazaAciklamasi
                           ? <p className="text-[9px]" style={{ color: '#ef4444' }}>{errors.kazaAciklamasi}</p>
                           : <span />}
-                        <p className="text-[9px]" style={{ color: '#334155' }}>{form.kazaAciklamasi.length}/500</p>
+                        <p className="text-[9px]" style={{ color: textFaint }}>{form.kazaAciklamasi.length}/500</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Tanık & Önlemler */}
-                  <div className="rounded-xl p-4 space-y-3"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5" style={{ color: '#22d3ee' }}>
-                      <i className="ri-shield-check-line" />Tanık & Önlemler
+                  <div style={SECTION_STYLE}>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5 mb-3" style={{ color: '#22d3ee' }}>
+                      <i className="ri-shield-check-line" />Tanık &amp; Önlemler
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label style={LABEL_STYLE}>Tanık Bilgileri</label>
-                        <input
-                          type="text" value={form.tanikBilgileri} placeholder="Tanıkların adı..."
+                        <input type="text" value={form.tanikBilgileri} placeholder="Tanıkların adı..."
                           onChange={e => setForm(p => ({ ...p, tanikBilgileri: e.target.value }))}
                           style={INPUT_STYLE}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                        />
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
                       </div>
                       <div>
                         <label style={LABEL_STYLE}>Durum</label>
                         <div className="flex gap-1.5">
                           {['Açık', 'Soruşturuluyor', 'Kapatıldı'].map(d => {
-                            const colors: Record<string, string> = { 'Açık': '#ef4444', 'Soruşturuluyor': '#fbbf24', 'Kapatıldı': '#10b981' };
-                            const c = colors[d];
+                            const cols: Record<string, string> = { 'Açık': '#ef4444', 'Soruşturuluyor': '#fbbf24', 'Kapatıldı': '#10b981' };
+                            const c = cols[d];
                             return (
-                              <button
-                                key={d}
-                                onClick={() => setForm(p => ({ ...p, durum: d }))}
+                              <button key={d} onClick={() => setForm(p => ({ ...p, durum: d }))}
                                 className="flex-1 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all whitespace-nowrap"
                                 style={{
-                                  background: form.durum === d ? `${c}15` : 'rgba(255,255,255,0.04)',
-                                  color: form.durum === d ? c : '#475569',
-                                  border: `1px solid ${form.durum === d ? `${c}35` : 'rgba(255,255,255,0.06)'}`,
-                                }}
-                              >
+                                  background: form.durum === d ? `${c}15` : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)'),
+                                  color: form.durum === d ? c : textMuted,
+                                  border: `1px solid ${form.durum === d ? `${c}35` : border}`,
+                                }}>
                                 {d}
                               </button>
                             );
@@ -644,16 +625,14 @@ export default function HekimIsKazasiModal({
                         </div>
                       </div>
                     </div>
-                    <div>
+                    <div className="mt-3">
                       <label style={LABEL_STYLE}>Alınan Önlemler</label>
-                      <textarea
-                        value={form.onlemler} rows={2} maxLength={500}
+                      <textarea value={form.onlemler} rows={2} maxLength={500}
                         placeholder="Alınan veya alınacak tedbirler..."
                         onChange={e => setForm(p => ({ ...p, onlemler: e.target.value }))}
                         style={{ ...INPUT_STYLE, resize: 'none' }}
                         onFocus={e => { e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)'; }}
-                        onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                      />
+                        onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
                     </div>
                   </div>
                 </>
@@ -662,22 +641,18 @@ export default function HekimIsKazasiModal({
               {/* ── TAB: YARALANMA ── */}
               {activeTab === 'yaralanma' && (
                 <>
-                  {/* Seçili bölgeler görsel özet */}
-                  <div className="rounded-xl p-4 space-y-3"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="flex items-center justify-between">
+                  {/* Seçili bölgeler */}
+                  <div style={SECTION_STYLE}>
+                    <div className="flex items-center justify-between mb-3">
                       <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5" style={{ color: '#ef4444' }}>
                         <i className="ri-body-scan-line" />Yaralı Bölgeler
-                        <span className="text-[9px] normal-case tracking-normal font-normal ml-1" style={{ color: '#475569' }}>
+                        <span className="text-[9px] normal-case tracking-normal font-normal ml-1" style={{ color: textFaint }}>
                           (3D modelden seçin)
                         </span>
                       </p>
                       {form.yaraliVucutBolgeleri.length > 0 && (
-                        <button
-                          onClick={() => setForm(p => ({ ...p, yaraliVucutBolgeleri: [] }))}
-                          className="text-[9px] font-semibold cursor-pointer"
-                          style={{ color: '#ef4444' }}
-                        >
+                        <button onClick={() => setForm(p => ({ ...p, yaraliVucutBolgeleri: [] }))}
+                          className="text-[9px] font-semibold cursor-pointer" style={{ color: '#ef4444' }}>
                           Temizle
                         </button>
                       )}
@@ -688,29 +663,21 @@ export default function HekimIsKazasiModal({
                           style={{ background: 'rgba(239,68,68,0.08)', border: '1px dashed rgba(239,68,68,0.2)' }}>
                           <i className="ri-cursor-line text-lg" style={{ color: 'rgba(239,68,68,0.4)' }} />
                         </div>
-                        <p className="text-[11px] font-semibold" style={{ color: '#475569' }}>Henüz bölge seçilmedi</p>
-                        <p className="text-[10px] mt-0.5" style={{ color: '#1e293b' }}>Sol taraftaki 3D modele tıklayın</p>
+                        <p className="text-[11px] font-semibold" style={{ color: textMuted }}>Henüz bölge seçilmedi</p>
+                        <p className="text-[10px] mt-0.5" style={{ color: textFaint }}>Sol taraftaki 3D modele tıklayın</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 gap-1.5">
                         {form.yaraliVucutBolgeleri.map(id => {
                           const info = VUCUT_BOLGELERI.find(b => b.id === id);
-                          const risk = BOLGE_RISK_MAP[id];
                           return (
-                            <button
-                              key={id}
-                              onClick={() => toggleBolge(id)}
+                            <button key={id} onClick={() => toggleBolge(id)}
                               className="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all text-left"
-                              style={{
-                                background: 'rgba(239,68,68,0.08)',
-                                border: '1px solid rgba(239,68,68,0.2)',
-                              }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}
-                            >
-                              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                style={{ background: risk?.color ?? '#ef4444', boxShadow: `0 0 4px ${risk?.color ?? '#ef4444'}` }} />
-                              <span className="text-[10px] font-semibold leading-tight" style={{ color: '#f1f5f9' }}>
+                              style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.14)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}>
+                              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#ef4444' }} />
+                              <span className="text-[10px] font-semibold leading-tight" style={{ color: textPrimary }}>
                                 {info?.label ?? id}
                               </span>
                               <i className="ri-close-line text-[9px] ml-auto" style={{ color: 'rgba(239,68,68,0.5)' }} />
@@ -721,58 +688,49 @@ export default function HekimIsKazasiModal({
                     )}
                   </div>
 
-                  {/* Yaralanma tür & şiddet */}
-                  <div className="rounded-xl p-4 space-y-3"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5" style={{ color: '#f97316' }}>
+                  {/* Yaralanma bilgi */}
+                  <div style={SECTION_STYLE}>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5 mb-3" style={{ color: '#f97316' }}>
                       <i className="ri-first-aid-kit-line" />Yaralanma Bilgisi
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label style={LABEL_STYLE}>Yaralanma Türü</label>
-                        <select
-                          value={form.yaralanmaTuru}
-                          onChange={e => setForm(p => ({ ...p, yaralanmaTuru: e.target.value }))}
-                          style={{ ...INPUT_STYLE, colorScheme: 'dark' }}
+                        <select value={form.yaralanmaTuru} onChange={e => setForm(p => ({ ...p, yaralanmaTuru: e.target.value }))}
+                          style={{ ...INPUT_STYLE, colorScheme }}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(249,115,22,0.4)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                        >
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }}>
                           <option value="">Seçin</option>
                           {YARALANMA_TURLERI.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
                       <div>
                         <label style={LABEL_STYLE}>İş Günü Kaybı</label>
-                        <input
-                          type="number" min={0} value={form.isGunuKaybi}
+                        <input type="number" min={0} value={form.isGunuKaybi}
                           onChange={e => setForm(p => ({ ...p, isGunuKaybi: parseInt(e.target.value) || 0 }))}
                           style={INPUT_STYLE}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(249,115,22,0.4)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                        />
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
                       </div>
                     </div>
 
-                    {/* Şiddet seçici */}
-                    <div>
+                    {/* Şiddet */}
+                    <div className="mt-3">
                       <label style={LABEL_STYLE}>Yaralanma Şiddeti</label>
                       <div className="grid grid-cols-4 gap-2">
                         {SIDDET_OPTIONS.map(opt => {
                           const active = form.yaralanmaSiddeti === opt.label;
                           return (
-                            <button
-                              key={opt.label}
-                              onClick={() => setForm(p => ({ ...p, yaralanmaSiddeti: opt.label }))}
+                            <button key={opt.label} onClick={() => setForm(p => ({ ...p, yaralanmaSiddeti: opt.label }))}
                               className="py-2.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all whitespace-nowrap flex flex-col items-center gap-1"
                               style={{
-                                background: active ? opt.bg : 'rgba(255,255,255,0.04)',
-                                color: active ? opt.color : '#334155',
-                                border: `1.5px solid ${active ? opt.border : 'rgba(255,255,255,0.06)'}`,
-                                boxShadow: active ? `0 0 16px ${opt.color}25` : 'none',
-                              }}
-                            >
+                                background: active ? opt.bg : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)'),
+                                color: active ? opt.color : textMuted,
+                                border: `1.5px solid ${active ? opt.border : border}`,
+                                boxShadow: active ? `0 0 12px ${opt.color}20` : 'none',
+                              }}>
                               <div className="w-2 h-2 rounded-full"
-                                style={{ background: active ? opt.color : '#1e293b', boxShadow: active ? `0 0 6px ${opt.color}` : 'none' }} />
+                                style={{ background: active ? opt.color : (isDark ? '#1e293b' : '#cbd5e1'), boxShadow: active ? `0 0 6px ${opt.color}` : 'none' }} />
                               {opt.label}
                             </button>
                           );
@@ -781,32 +739,26 @@ export default function HekimIsKazasiModal({
                     </div>
 
                     {/* Hastane */}
-                    <div>
-                      <button
-                        onClick={() => setForm(p => ({ ...p, hastaneyeKaldirildi: !p.hastaneyeKaldirildi }))}
-                        className="flex items-center gap-2.5 cursor-pointer mb-2 transition-all"
-                      >
-                        <div
-                          className="w-4 h-4 rounded flex items-center justify-center transition-all flex-shrink-0"
+                    <div className="mt-3">
+                      <button onClick={() => setForm(p => ({ ...p, hastaneyeKaldirildi: !p.hastaneyeKaldirildi }))}
+                        className="flex items-center gap-2.5 cursor-pointer mb-2 transition-all">
+                        <div className="w-4 h-4 rounded flex items-center justify-center transition-all flex-shrink-0"
                           style={{
                             background: form.hastaneyeKaldirildi ? '#ef4444' : 'transparent',
-                            border: `2px solid ${form.hastaneyeKaldirildi ? '#ef4444' : 'rgba(255,255,255,0.15)'}`,
-                          }}
-                        >
+                            border: `2px solid ${form.hastaneyeKaldirildi ? '#ef4444' : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(15,23,42,0.25)')}`,
+                          }}>
                           {form.hastaneyeKaldirildi && <i className="ri-check-line text-white text-[9px]" />}
                         </div>
-                        <span className="text-xs font-semibold" style={{ color: form.hastaneyeKaldirildi ? '#f1f5f9' : '#475569' }}>
+                        <span className="text-xs font-semibold" style={{ color: form.hastaneyeKaldirildi ? textPrimary : textMuted }}>
                           Hastaneye kaldırıldı
                         </span>
                       </button>
                       {form.hastaneyeKaldirildi && (
-                        <input
-                          type="text" value={form.hastaneAdi} placeholder="Hastane / klinik adı..."
+                        <input type="text" value={form.hastaneAdi} placeholder="Hastane / klinik adı..."
                           onChange={e => setForm(p => ({ ...p, hastaneAdi: e.target.value }))}
                           style={INPUT_STYLE}
                           onFocus={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; }}
-                          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-                        />
+                          onBlur={e => { e.currentTarget.style.borderColor = inputBorder; }} />
                       )}
                     </div>
                   </div>
@@ -818,35 +770,24 @@ export default function HekimIsKazasiModal({
                 <div className="space-y-3">
                   {!form.personelId && (
                     <div className="rounded-xl p-10 flex flex-col items-center gap-3 text-center"
-                      style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.06)' }}>
-                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                        style={{ background: 'rgba(255,255,255,0.04)' }}>
-                        <i className="ri-user-search-line text-2xl" style={{ color: '#1e293b' }} />
-                      </div>
-                      <p className="text-xs font-semibold" style={{ color: '#475569' }}>Önce personel seçin</p>
-                      <p className="text-[10px]" style={{ color: '#1e293b' }}>Kaza bilgisi sekmesinden personel seçin</p>
+                      style={{ background: bgCard, border: `1px dashed ${border}` }}>
+                      <i className="ri-user-search-line text-2xl" style={{ color: textFaint }} />
+                      <p className="text-xs font-semibold" style={{ color: textMuted }}>Önce personel seçin</p>
                     </div>
                   )}
-
                   {form.personelId && loadingPast && (
                     <div className="flex items-center justify-center py-10 gap-2">
-                      <div className="w-5 h-5 border border-yellow-400 border-t-transparent rounded-full animate-spin" style={{ borderTopColor: 'transparent' }} />
-                      <span className="text-xs" style={{ color: '#475569' }}>Yükleniyor...</span>
+                      <div className="w-5 h-5 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs" style={{ color: textMuted }}>Yükleniyor...</span>
                     </div>
                   )}
-
                   {form.personelId && !loadingPast && pastKazalar.length === 0 && (
                     <div className="rounded-xl p-10 flex flex-col items-center gap-3 text-center"
-                      style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.06)' }}>
-                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                        style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                        <i className="ri-checkbox-circle-line text-2xl" style={{ color: '#10b981' }} />
-                      </div>
-                      <p className="text-xs font-semibold" style={{ color: '#475569' }}>Geçmişte kaza yok</p>
-                      <p className="text-[10px]" style={{ color: '#1e293b' }}>Bu personel için kayıtlı kaza geçmişi bulunmuyor</p>
+                      style={{ background: bgCard, border: `1px dashed ${border}` }}>
+                      <i className="ri-checkbox-circle-line text-2xl" style={{ color: '#10b981' }} />
+                      <p className="text-xs font-semibold" style={{ color: textMuted }}>Geçmişte kaza yok</p>
                     </div>
                   )}
-
                   {form.personelId && !loadingPast && pastKazalar.length > 0 && (
                     <>
                       <div className="flex items-center gap-2 mb-1">
@@ -854,58 +795,37 @@ export default function HekimIsKazasiModal({
                           <i className="ri-history-line mr-1" />Kayıtlı Kaza Geçmişi
                         </span>
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+                          style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
                           {pastKazalar.length} kayıt
                         </span>
                       </div>
                       {pastKazalar.map(kaza => {
-                        const siddetOpt = SIDDET_OPTIONS.find(s => s.label === kaza.yaralanma_siddeti) ?? SIDDET_OPTIONS[0];
+                        const sOpt = SIDDET_OPTIONS.find(s => s.label === kaza.yaralanma_siddeti) ?? SIDDET_OPTIONS[0];
                         const durumColors: Record<string, string> = { 'Açık': '#ef4444', 'Soruşturuluyor': '#fbbf24', 'Kapatıldı': '#10b981' };
                         const dc = durumColors[kaza.durum] ?? '#ef4444';
                         return (
-                          <div
-                            key={kaza.id}
-                            className="rounded-xl p-3.5 space-y-2"
-                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-                          >
+                          <div key={kaza.id} className="rounded-xl p-3.5 space-y-2"
+                            style={{ background: bgCard, border: `1px solid ${border}` }}>
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold" style={{ color: '#f1f5f9' }}>
-                                <i className="ri-calendar-line mr-1.5" style={{ color: '#475569' }} />
+                              <span className="text-xs font-bold" style={{ color: textPrimary }}>
+                                <i className="ri-calendar-line mr-1.5" style={{ color: textFaint }} />
                                 {kaza.kaza_tarihi ? new Date(kaza.kaza_tarihi).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
                               </span>
                               <div className="flex items-center gap-2">
                                 <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                                  style={{ background: siddetOpt.bg, color: siddetOpt.color, border: `1px solid ${siddetOpt.border}` }}>
+                                  style={{ background: sOpt.bg, color: sOpt.color, border: `1px solid ${sOpt.border}` }}>
                                   {kaza.yaralanma_siddeti}
                                 </span>
-                                <span className="flex items-center gap-1 text-[9px] font-bold"
-                                  style={{ color: dc }}>
+                                <span className="flex items-center gap-1 text-[9px] font-bold" style={{ color: dc }}>
                                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: dc }} />
                                   {kaza.durum}
                                 </span>
                               </div>
                             </div>
                             {kaza.kaza_yeri && (
-                              <p className="text-[10px] flex items-center gap-1" style={{ color: '#475569' }}>
-                                <i className="ri-map-pin-line flex-shrink-0" />
-                                {kaza.kaza_yeri}
+                              <p className="text-[10px] flex items-center gap-1" style={{ color: textMuted }}>
+                                <i className="ri-map-pin-line flex-shrink-0" />{kaza.kaza_yeri}
                               </p>
-                            )}
-                            {(kaza.yarali_vucut_bolgeleri?.length ?? 0) > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {(kaza.yarali_vucut_bolgeleri ?? []).slice(0, 4).map(id => (
-                                  <span key={id} className="text-[9px] px-1.5 py-0.5 rounded-full"
-                                    style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
-                                    {VUCUT_BOLGELERI.find(b => b.id === id)?.label ?? id}
-                                  </span>
-                                ))}
-                                {(kaza.yarali_vucut_bolgeleri?.length ?? 0) > 4 && (
-                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full"
-                                    style={{ background: 'rgba(255,255,255,0.06)', color: '#475569' }}>
-                                    +{(kaza.yarali_vucut_bolgeleri?.length ?? 0) - 4}
-                                  </span>
-                                )}
-                              </div>
                             )}
                           </div>
                         );
@@ -918,33 +838,26 @@ export default function HekimIsKazasiModal({
 
             {/* Footer */}
             <div className="flex items-center justify-between px-5 py-3 flex-shrink-0"
-              style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.01)' }}>
-              <div className="flex items-center gap-2 text-[10px]" style={{ color: '#334155' }}>
+              style={{ borderTop: `1px solid ${borderSubtle}`, background: isDark ? 'rgba(255,255,255,0.01)' : '#f8fafc' }}>
+              <div className="flex items-center gap-2 text-[10px]" style={{ color: textFaint }}>
                 <i className="ri-information-line" />
                 <span>* zorunlu alanlar</span>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={onClose}
+                <button onClick={onClose}
                   className="whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all"
-                  style={{ background: 'rgba(255,255,255,0.05)', color: '#475569', border: '1px solid rgba(255,255,255,0.08)' }}
+                  style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)', color: textMuted, border: `1px solid ${border}` }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.35)'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = '#475569'; }}
-                >
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = border; (e.currentTarget as HTMLElement).style.color = textMuted; }}>
                   <i className="ri-close-line" />İptal
                 </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
+                <button onClick={handleSave} disabled={saving}
                   className="whitespace-nowrap flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold cursor-pointer text-white transition-all"
                   style={{
-                    background: saving ? 'rgba(239,68,68,0.4)' : 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)',
+                    background: saving ? 'rgba(239,68,68,0.5)' : 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)',
                     opacity: saving ? 0.7 : 1,
-                    boxShadow: saving ? 'none' : '0 0 20px rgba(239,68,68,0.3)',
-                  }}
-                  onMouseEnter={e => { if (!saving) (e.currentTarget as HTMLElement).style.boxShadow = '0 0 30px rgba(239,68,68,0.5)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = saving ? 'none' : '0 0 20px rgba(239,68,68,0.3)'; }}
-                >
+                    boxShadow: saving ? 'none' : '0 0 16px rgba(239,68,68,0.25)',
+                  }}>
                   {saving
                     ? <><i className="ri-loader-4-line animate-spin" />Kaydediliyor...</>
                     : <><i className={editData ? 'ri-save-3-line' : 'ri-add-circle-line'} />{editData ? 'Güncelle' : 'Kaydet'}</>
@@ -953,7 +866,6 @@ export default function HekimIsKazasiModal({
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>

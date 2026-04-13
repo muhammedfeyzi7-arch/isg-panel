@@ -6,6 +6,7 @@ import LoginPage from "../pages/login/page";
 import OsgbDashboardPage from "../pages/osgb-dashboard/page";
 import OsgbUzmanPage from "../pages/osgb-uzman/page";
 import HekimPage from "../pages/hekim/page";
+import UzmanPage from "../pages/uzman/page";
 import ForgotPasswordPage from "../pages/forgot-password/page";
 import ResetPasswordPage from "../pages/reset-password/page";
 import ProtectedRoute from "../components/feature/ProtectedRoute";
@@ -29,7 +30,6 @@ const MODULE_SLUGS = [
   'uygunsuzluklar',
   'ekipmanlar',
   'is-izinleri',
-  'saha',
   'raporlar',
   'dokumanlar',
   'copkutusu',
@@ -62,6 +62,14 @@ const routes: RouteObject[] = [
     element: (
       <ProtectedRoute>
         <HekimPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/uzman",
+    element: (
+      <ProtectedRoute>
+        <UzmanPage />
       </ProtectedRoute>
     ),
   },

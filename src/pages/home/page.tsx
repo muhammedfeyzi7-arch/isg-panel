@@ -21,7 +21,6 @@ import CopKutusuPage from '../trash/page';
 import SettingsPage from '../settings/page';
 import IsIzniPage from '../is-izni/page';
 import FirmaEvraklariPage from '../company-documents/page';
-import SahaPage from '../saha/page';
 import DokumanlarPage from '../dokumanlar/page';
 
 // URL path → modül adı eşlemesi
@@ -37,7 +36,6 @@ const PATH_TO_MODULE: Record<string, string> = {
   '/uygunsuzluklar':  'uygunsuzluklar',
   '/ekipmanlar':      'ekipmanlar',
   '/is-izinleri':     'is-izinleri',
-  '/saha':            'saha',
   '/raporlar':        'raporlar',
   '/dokumanlar':      'dokumanlar',
   '/copkutusu':       'copkutusu',
@@ -118,7 +116,6 @@ function AppContent() {
       case 'tutanaklar': return <TutanaklarPage />;
       case 'is-izinleri': return <IsIzniPage />;
       case 'firma-evraklari': return <FirmaEvraklariPage />;
-      case 'saha': return <SahaPage />;
       case 'raporlar': return <RaporlarPage />;
       case 'dokumanlar': return <DokumanlarPage />;
       case 'copkutusu': return <CopKutusuPage />;

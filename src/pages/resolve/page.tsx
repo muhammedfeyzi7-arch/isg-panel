@@ -32,15 +32,9 @@ export default function ResolvePage() {
       return;
     }
 
-    // Gezici Uzman → firma seçimi olmadan direkt dashboard
-    // (tüm atanmış firmalar dashboard içinde görünür)
+    // Gezici Uzman → bağımsız uzman paneline yönlendir
     if (osgbRole === 'gezici_uzman') {
-      const firmSayisi = activeFirmIds?.length ?? 0;
-      if (firmSayisi === 0) {
-        navigate('/osgb-uzman', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+      navigate('/uzman', { replace: true });
       return;
     }
 

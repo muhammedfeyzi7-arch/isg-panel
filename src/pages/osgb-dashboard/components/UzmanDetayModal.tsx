@@ -157,6 +157,46 @@ export default function UzmanDetayModal({
       const json = await res.json() as { error?: string; success?: boolean };
       if (json.error) throw new Error(json.error);
 
+      // Hekimlerin firma listesini güncelle: tüm gezici uzmanların atamalarının birleşimi
+      if (secilenFirmaIds.length > 0) {
+        const { data: uzmanRows } = await supabase
+          .from('user_organizations')
+          .select('user_id, active_firm_ids, active_firm_id')
+          .eq('organization_id', orgId)
+          .eq('osgb_role', 'gezici_uzman');
+
+        const allFirmIds: string[] = [];
+        (uzmanRows ?? []).forEach(u => {
+          // Bu uzman ise güncel seçilen IDs'i kullan, diğerleri için DB'deki değeri kullan
+          const ids = u.user_id === uzman.user_id
+            ? secilenFirmaIds
+            : Array.isArray(u.active_firm_ids) && u.active_firm_ids.length > 0
+              ? u.active_firm_ids
+              : u.active_firm_id ? [u.active_firm_id] : [];
+          ids.forEach((id: string) => { if (!allFirmIds.includes(id)) allFirmIds.push(id); });
+        });
+
+        if (allFirmIds.length > 0) {
+          const { data: hekimRows } = await supabase
+            .from('user_organizations')
+            .select('user_id, active_firm_ids')
+            .eq('organization_id', orgId)
+            .eq('osgb_role', 'isyeri_hekimi');
+
+          if (hekimRows && hekimRows.length > 0) {
+            await Promise.all(hekimRows.map(h => {
+              const mevcut: string[] = Array.isArray(h.active_firm_ids) ? h.active_firm_ids : [];
+              const birlesim = [...new Set([...mevcut, ...allFirmIds])];
+              return supabase
+                .from('user_organizations')
+                .update({ active_firm_ids: birlesim, active_firm_id: birlesim[0] })
+                .eq('user_id', h.user_id)
+                .eq('organization_id', orgId);
+            }));
+          }
+        }
+      }
+
       addToast('Uzman bilgileri güncellendi!', 'success');
       onRefresh();
       onClose();

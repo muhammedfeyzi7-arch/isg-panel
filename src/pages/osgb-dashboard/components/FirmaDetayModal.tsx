@@ -172,6 +172,45 @@ export default function FirmaDetayModal({
       const json = await res.json() as { error?: string; success?: boolean };
       if (json.error) throw new Error(json.error);
 
+      // Aynı OSGB'deki tüm hekimlerin firma listesine bu firmayı ekle
+      if (atananUzmanIds.length > 0) {
+        // Tüm gezici uzmanların güncel atamalarını çek
+        const { data: uzmanRows } = await supabase
+          .from('user_organizations')
+          .select('active_firm_ids, active_firm_id')
+          .eq('organization_id', orgId)
+          .eq('osgb_role', 'gezici_uzman');
+
+        const allFirmIds: string[] = [];
+        (uzmanRows ?? []).forEach(u => {
+          if (Array.isArray(u.active_firm_ids) && u.active_firm_ids.length > 0) {
+            u.active_firm_ids.forEach((id: string) => { if (!allFirmIds.includes(id)) allFirmIds.push(id); });
+          } else if (u.active_firm_id && !allFirmIds.includes(u.active_firm_id)) {
+            allFirmIds.push(u.active_firm_id);
+          }
+        });
+
+        if (allFirmIds.length > 0) {
+          const { data: hekimRows } = await supabase
+            .from('user_organizations')
+            .select('user_id, active_firm_ids')
+            .eq('organization_id', orgId)
+            .eq('osgb_role', 'isyeri_hekimi');
+
+          if (hekimRows && hekimRows.length > 0) {
+            await Promise.all(hekimRows.map(h => {
+              const mevcut: string[] = Array.isArray(h.active_firm_ids) ? h.active_firm_ids : [];
+              const birlesim = [...new Set([...mevcut, ...allFirmIds])];
+              return supabase
+                .from('user_organizations')
+                .update({ active_firm_ids: birlesim, active_firm_id: birlesim[0] })
+                .eq('user_id', h.user_id)
+                .eq('organization_id', orgId);
+            }));
+          }
+        }
+      }
+
       addToast(
         atananUzmanIds.length > 0
           ? `${atananUzmanIds.length} uzman bu firmaya atandı!`

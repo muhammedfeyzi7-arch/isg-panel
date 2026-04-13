@@ -58,10 +58,11 @@ export default function AppLoadingScreen({ onDone }: AppLoadingScreenProps) {
     <div
       className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
       style={{
-        background: 'var(--bg-app)',
+        background: '#f8fafc',
         opacity: fadeOut ? 0 : 1,
         transition: 'opacity 0.4s ease',
         pointerEvents: fadeOut ? 'none' : 'all',
+        fontFamily: "'Inter', sans-serif",
       }}
     >
       {/* Logo & Başlık */}
@@ -84,7 +85,7 @@ export default function AppLoadingScreen({ onDone }: AppLoadingScreenProps) {
           />
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)', letterSpacing: '-0.04em' }}>
+          <h1 className="text-2xl font-black" style={{ color: '#0f172a', letterSpacing: '-0.04em' }}>
             ISG Denetim
           </h1>
           <p className="text-sm mt-1 font-semibold" style={{ color: '#0EA5E9' }}>
@@ -95,7 +96,7 @@ export default function AppLoadingScreen({ onDone }: AppLoadingScreenProps) {
 
       {/* Progress bar */}
       <div className="w-64 mb-5">
-        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(15,23,42,0.06)' }}>
           <div
             className="h-full rounded-full transition-all duration-300"
             style={{
@@ -106,8 +107,8 @@ export default function AppLoadingScreen({ onDone }: AppLoadingScreenProps) {
           />
         </div>
         <div className="flex justify-between mt-1.5">
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{Math.round(progress)}%</span>
-          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{stepIndex + 1}/{STEPS.length}</span>
+          <span className="text-[10px]" style={{ color: '#94a3b8' }}>{Math.round(progress)}%</span>
+          <span className="text-[10px]" style={{ color: '#94a3b8' }}>{stepIndex + 1}/{STEPS.length}</span>
         </div>
       </div>
 
@@ -139,7 +140,7 @@ export default function AppLoadingScreen({ onDone }: AppLoadingScreenProps) {
                 ? '#0EA5E9'
                 : i === stepIndex
                   ? '#38BDF8'
-                  : 'rgba(14,165,233,0.15)',
+                  : 'rgba(14,165,233,0.12)',
             }}
           />
         ))}

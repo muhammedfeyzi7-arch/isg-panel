@@ -1,4 +1,4 @@
-// İş Kazası Tutanak Raporu Generator — Resmi Word/HTML Formatı
+// İş Kazası Tutanak Raporu — Profesyonel HTML/PDF
 
 function esc(v: unknown): string {
   return String(v ?? '')
@@ -12,22 +12,14 @@ function esc(v: unknown): string {
 function fmt(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return new Date(dateStr).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   } catch { return dateStr; }
 }
 
 function fmtFull(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('tr-TR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    });
+    return new Date(dateStr).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
   } catch { return dateStr; }
 }
 
@@ -40,65 +32,18 @@ const VUCUT_LABEL: Record<string, string> = {
   sag_ayak: 'Sağ Ayak', sol_ayak: 'Sol Ayak',
 };
 
-const SIDDET_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
-  'Hafif':    { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', label: 'HAFİF' },
-  'Orta':     { bg: '#FFFBEB', color: '#B45309', border: '#FDE68A', label: 'ORTA' },
-  'Ağır':     { bg: '#FEF2F2', color: '#DC2626', border: '#FECACA', label: 'AĞIR' },
-  'Çok Ağır': { bg: '#FFF7ED', color: '#C2410C', border: '#FED7AA', label: 'ÇOK AĞIR' },
+const SIDDET_CFG: Record<string, { bg: string; text: string; border: string; accent: string; icon: string }> = {
+  'Hafif':    { bg: '#EFF6FF', text: '#1E40AF', border: '#BFDBFE', accent: '#3B82F6', icon: '●' },
+  'Orta':     { bg: '#FFFBEB', text: '#92400E', border: '#FDE68A', accent: '#F59E0B', icon: '◆' },
+  'Ağır':     { bg: '#FFF1F2', text: '#9F1239', border: '#FECDD3', accent: '#F43F5E', icon: '▲' },
+  'Çok Ağır': { bg: '#FEF2F2', text: '#7F1D1D', border: '#FECACA', accent: '#EF4444', icon: '⚠' },
 };
 
-const DURUM_STYLE: Record<string, { bg: string; color: string; border: string }> = {
-  'Açık':           { bg: '#FEF2F2', color: '#DC2626', border: '#FECACA' },
-  'Soruşturuluyor': { bg: '#FFFBEB', color: '#B45309', border: '#FDE68A' },
-  'Kapatıldı':      { bg: '#F0FDF4', color: '#15803D', border: '#86EFAC' },
+const DURUM_CFG: Record<string, { bg: string; text: string; border: string }> = {
+  'Açık':           { bg: '#FFF1F2', text: '#9F1239', border: '#FECDD3' },
+  'Soruşturuluyor': { bg: '#FFFBEB', text: '#78350F', border: '#FDE68A' },
+  'Kapatıldı':      { bg: '#F0FDF4', text: '#14532D', border: '#86EFAC' },
 };
-
-function badge(text: string, bg: string, color: string, border: string): string {
-  return `<span style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:10px;font-weight:700;background:${bg};color:${color};border:1.5px solid ${border};letter-spacing:0.5px;white-space:nowrap;">${esc(text)}</span>`;
-}
-
-function infoRow(label: string, value: string, full = false): string {
-  const tdLabel = `padding:7px 10px;font-size:9.5px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.4px;background:#F8FAFC;border:1px solid #E2E8F0;white-space:nowrap;width:${full ? '20%' : '22%'};`;
-  const tdValue = `padding:7px 10px;font-size:11px;color:#1E293B;font-weight:500;background:#FFF;border:1px solid #E2E8F0;width:${full ? '80%' : '28%'};`;
-  return `<tr><td style="${tdLabel}">${esc(label)}</td><td style="${tdValue}${full ? 'colspan="3"' : ''}">${value}</td></tr>`;
-}
-
-// Basit vücut silueti çizimi (ASCII art style HTML)
-function buildBodyDiagram(bolgeleri: string[]): string {
-  const selected = new Set(bolgeleri);
-
-  const cellStyle = (id: string) => {
-    const isSelected = selected.has(id);
-    return isSelected
-      ? 'background:#EF4444;color:#fff;font-size:8px;font-weight:700;border-radius:3px;padding:2px 4px;text-align:center;display:inline-block;white-space:nowrap;'
-      : 'background:#F1F5F9;color:#94A3B8;font-size:8px;border-radius:3px;padding:2px 4px;text-align:center;display:inline-block;white-space:nowrap;';
-  };
-
-  const regions = [
-    ['bas', 'boyun'],
-    ['sag_omuz', 'gogus', 'sol_omuz'],
-    ['sag_kol', 'sirt', 'sol_kol'],
-    ['sag_el', 'karin', 'sol_el'],
-    ['sag_kalca', '', 'sol_kalca'],
-    ['sag_bacak', '', 'sol_bacak'],
-    ['sag_ayak', '', 'sol_ayak'],
-  ];
-
-  const rows = regions.map(row => {
-    const cells = row.map(id => {
-      if (!id) return '<td style="padding:2px 4px;"></td>';
-      const label = VUCUT_LABEL[id] ?? id;
-      return `<td style="padding:2px 4px;text-align:center;"><span style="${cellStyle(id)}">${esc(label)}</span></td>`;
-    });
-    return `<tr>${cells.join('')}</tr>`;
-  });
-
-  return `
-    <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
-      ${rows.join('')}
-    </table>
-  `;
-}
 
 export interface IsKazasiRaporData {
   id: string;
@@ -127,538 +72,685 @@ export interface IsKazasiRaporData {
 
 function buildHtml(kaza: IsKazasiRaporData): string {
   const printDate = fmtFull(new Date().toISOString());
-  const raporNo = kaza.raporNo ?? `IK-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-  const siddetCfg = SIDDET_STYLE[kaza.yaralanmaSiddeti] ?? SIDDET_STYLE['Hafif'];
-  const durumCfg = DURUM_STYLE[kaza.durum] ?? DURUM_STYLE['Açık'];
+  const raporNo = kaza.raporNo ?? `IK-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 90000) + 10000)}`;
+  const sCfg = SIDDET_CFG[kaza.yaralanmaSiddeti] ?? SIDDET_CFG['Hafif'];
+  const dCfg = DURUM_CFG[kaza.durum] ?? DURUM_CFG['Açık'];
 
-  const bolgeLabels = kaza.yaraliVucutBolgeleri
-    .map(id => VUCUT_LABEL[id] ?? id.replace(/_/g, ' '))
-    .join(', ') || '—';
+  const bolgeLabels = kaza.yaraliVucutBolgeleri.map(id => VUCUT_LABEL[id] ?? id).join(', ') || '—';
 
-  const bodyDiagram = buildBodyDiagram(kaza.yaraliVucutBolgeleri);
+  // SVG vücut silueti
+  const svgBody = buildBodySvg(kaza.yaraliVucutBolgeleri);
 
   return `<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>İş Kazası Tutanak Raporu — ${raporNo}</title>
+<title>İş Kazası Tutanağı — ${raporNo}</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
   *,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
   body {
-    font-family: 'Times New Roman', Times, serif;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
     font-size: 11px;
     color: #1E293B;
-    background: #fff;
+    background: #F1F5F9;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 12mm 14mm 12mm 14mm; }
-
-  /* ── TOP BORDER ── */
-  .top-stripe {
-    height: 5px;
-    background: linear-gradient(90deg, #1e3a5f 0%, #c0392b 50%, #1e3a5f 100%);
-    border-radius: 3px;
-    margin-bottom: 14px;
-  }
-
-  /* ── HEADER ── */
-  .header-outer {
-    display: flex;
-    border: 2px solid #1e3a5f;
-    border-radius: 6px;
-    overflow: hidden;
-    margin-bottom: 14px;
-  }
-  .header-logo-block {
-    width: 48mm;
-    background: #f0f4f8;
-    border-right: 2px solid #1e3a5f;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 12px;
-    gap: 3px;
-  }
-  .logo-emblem {
-    width: 38px; height: 38px;
-    background: #1e3a5f;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 4px;
-  }
-  .logo-emblem span { font-size: 18px; }
-  .header-logo-block .org-name {
-    font-size: 11px; font-weight: 800; color: #1e3a5f;
-    text-align: center; line-height: 1.3;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-  .header-logo-block .org-sub {
-    font-size: 8.5px; color: #64748b; text-align: center;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-
-  .header-center {
-    flex: 1;
-    background: #1e3a5f;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 14px;
-  }
-  .header-center .doc-type {
-    font-size: 9px; font-weight: 700; color: #93c5fd;
-    letter-spacing: 2px; text-transform: uppercase;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    margin-bottom: 3px;
-  }
-  .header-center h1 {
-    font-size: 19px; font-weight: 900; color: #fff;
-    letter-spacing: 0.5px; text-align: center;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    line-height: 1.2;
-  }
-  .header-center p {
-    font-size: 9px; color: #bfdbfe; margin-top: 3px; text-align: center;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-
-  .header-no-block {
-    width: 42mm;
-    background: #eff6ff;
-    border-left: 2px solid #1e3a5f;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 10px;
-    gap: 5px;
-  }
-  .no-label { font-size: 8.5px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Segoe UI', Arial, sans-serif; }
-  .no-value {
-    font-size: 13px; font-weight: 900; color: #1e3a5f;
-    font-family: 'Courier New', monospace;
-    text-align: center;
-  }
-  .durum-pill {
-    padding: 3px 10px; border-radius: 20px;
-    font-size: 9.5px; font-weight: 700;
-    background: ${durumCfg.bg}; color: ${durumCfg.color};
-    border: 1.5px solid ${durumCfg.border};
-    font-family: 'Segoe UI', Arial, sans-serif;
-    white-space: nowrap;
-  }
-
-  /* ── UYARI BANDI ── */
-  .uyari-band {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 14px; border-radius: 5px;
-    background: ${siddetCfg.bg};
-    border: 1.5px solid ${siddetCfg.border};
-    margin-bottom: 14px;
-  }
-  .uyari-icon { font-size: 20px; flex-shrink: 0; }
-  .uyari-text { font-size: 13px; font-weight: 900; color: ${siddetCfg.color}; font-family: 'Segoe UI', Arial, sans-serif; letter-spacing: 0.5px; }
-  .uyari-sub { font-size: 10px; color: #64748b; margin-left: auto; font-family: 'Segoe UI', Arial, sans-serif; white-space: nowrap; }
-
-  /* ── BÖLÜM BAŞLIĞI ── */
-  .sec-head {
-    display: flex; align-items: center; gap: 6px;
-    background: #1e3a5f; color: #fff;
-    padding: 6px 12px;
-    border-radius: 4px 4px 0 0;
-    font-size: 9.5px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.7px;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-  .sec-head.red { background: #991b1b; }
-  .sec-head.green { background: #14532d; }
-  .sec-head.amber { background: #78350f; }
-  .sec-head.slate { background: #334155; }
-  .sec-head.teal { background: #134e4a; }
-
-  .sec-body {
-    border: 1.5px solid #cbd5e1;
-    border-top: none;
-    border-radius: 0 0 5px 5px;
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 0 0 20mm;
     background: #fff;
   }
-  .section { margin-bottom: 12px; }
+
+  /* ── KAPAK BÖLÜM ── */
+  .cover {
+    background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 60%, #1a1a2e 100%);
+    padding: 24px 28px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(239,68,68,0.07);
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -20px; left: -20px;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: rgba(59,130,246,0.05);
+  }
+  .cover-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: rgba(239,68,68,0.2);
+    color: #FDA4AF;
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .cover-badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #F43F5E;
+  }
+  .cover-no {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.5px;
+  }
+  .cover-title {
+    font-size: 26px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+    margin-bottom: 6px;
+  }
+  .cover-sub {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.5px;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 20px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .cover-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cover-meta-label {
+    font-size: 8.5px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .cover-meta-value {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+  }
+  .cover-pills {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 9.5px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .pill-siddet {
+    background: ${sCfg.bg};
+    color: ${sCfg.text};
+    border: 1.5px solid ${sCfg.border};
+  }
+  .pill-durum {
+    background: ${dCfg.bg};
+    color: ${dCfg.text};
+    border: 1.5px solid ${dCfg.border};
+  }
+  .pill-hastane {
+    background: #FFF7ED;
+    color: #9A3412;
+    border: 1.5px solid #FED7AA;
+  }
+
+  /* ── ANA İÇERİK ── */
+  .body-wrap { padding: 0 28px; }
+
+  /* ── BÖLÜM BAŞLIĞI ── */
+  .sec {
+    margin-top: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #E2E8F0;
+  }
+  .sec-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #fff;
+  }
+  .sec-head.blue   { background: #1e3a5f; }
+  .sec-head.red    { background: #9F1239; }
+  .sec-head.amber  { background: #78350F; }
+  .sec-head.teal   { background: #134E4A; }
+  .sec-head.green  { background: #14532D; }
+  .sec-head.slate  { background: #334155; }
+  .sec-head.violet { background: #4C1D95; }
+  .sec-icon {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+  .sec-body { background: #fff; }
 
   /* ── BİLGİ TABLOSU ── */
-  .info-tbl { width: 100%; border-collapse: collapse; }
-  .info-tbl td { padding: 7px 10px; vertical-align: top; }
-  .info-tbl .lbl {
-    font-size: 9.5px; font-weight: 700; color: #64748B;
-    text-transform: uppercase; letter-spacing: 0.4px;
-    background: #F8FAFC; border: 1px solid #E2E8F0;
-    white-space: nowrap; width: 22%;
-    font-family: 'Segoe UI', Arial, sans-serif;
+  .info-grid {
+    display: grid;
+    gap: 0;
   }
-  .info-tbl .val {
-    font-size: 11px; color: #1E293B; font-weight: 500;
-    background: #FFF; border: 1px solid #E2E8F0;
-    width: 28%;
-    font-family: 'Times New Roman', Times, serif;
+  .info-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid #F1F5F9;
   }
+  .info-row:last-child { border-bottom: none; }
+  .info-row.full {
+    grid-template-columns: 1fr;
+  }
+  .info-cell-label {
+    padding: 8px 12px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #FAFAFA;
+    border-right: 1px solid #F1F5F9;
+    white-space: nowrap;
+  }
+  .info-cell-value {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #1E293B;
+    border-right: 1px solid #F1F5F9;
+  }
+  .info-cell-value.bold { font-weight: 700; }
+  .info-cell-value.big { font-size: 13px; font-weight: 800; }
 
   /* ── METİN KUTUSU ── */
   .text-box {
-    font-size: 11px; color: #1e293b; line-height: 1.7;
-    padding: 9px 12px; background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    min-height: 40px;
-    font-family: 'Times New Roman', Times, serif;
+    padding: 10px 14px;
+    font-size: 11px;
+    line-height: 1.8;
+    color: #334155;
+    background: #FAFAFA;
   }
-  .text-box.danger { background: #fff5f5; border-color: #fecaca; }
-  .text-box.success { background: #f0fdf4; border-color: #bbf7d0; }
+  .text-box.danger { background: #FFF1F2; color: #9F1239; }
+  .text-box.success { background: #F0FDF4; color: #14532D; }
+  .text-box.warning { background: #FFFBEB; color: #78350F; }
+  .text-box.empty { color: #94A3B8; font-style: italic; }
 
-  /* ── YATAY İKİ SÜTUN ── */
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  /* ── İKİ SÜTUN ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
 
-  /* ── VÜCUT DİYAGRAMI BÖLÜMÜ ── */
-  .body-diagram-wrap {
+  /* ── VÜCUT DİYAGRAMI ── */
+  .diagram-wrap {
     display: grid;
-    grid-template-columns: 1fr 2fr;
+    grid-template-columns: auto 1fr;
     gap: 0;
   }
-  .diagram-left {
-    padding: 10px;
-    border-right: 1px solid #e2e8f0;
-    background: #fafafa;
+  .diagram-svg-area {
+    padding: 14px 10px;
+    background: #FAFAFA;
+    border-right: 1px solid #F1F5F9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .diagram-right { padding: 10px; }
-  .bolge-list { display: flex; flex-wrap: wrap; gap: 5px; }
-  .bolge-tag {
-    padding: 3px 9px; border-radius: 20px;
-    background: #FEE2E2; color: #DC2626;
+  .diagram-info {
+    padding: 14px;
+  }
+  .bolge-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+  .bolge-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 9.5px;
+    font-weight: 700;
+    background: #FFF1F2;
+    color: #9F1239;
+    border: 1px solid #FECDD3;
+  }
+  .bolge-chip::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #F43F5E;
+    flex-shrink: 0;
+  }
+  .klinik-not {
+    padding: 10px 12px;
+    background: #FEF2F2;
     border: 1px solid #FECACA;
-    font-size: 9.5px; font-weight: 700;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    white-space: nowrap;
+    border-radius: 8px;
+    font-size: 10px;
+    line-height: 1.7;
+    color: #7F1D1D;
   }
-  .bolge-empty { font-size: 10px; color: #94a3b8; font-style: italic; font-family: 'Segoe UI', Arial, sans-serif; }
-
-  /* ── KKD / ÖNLEM ── */
-  .kkd-grid { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px; }
-  .kkd-item {
-    display: flex; align-items: center; gap: 5px;
-    padding: 4px 9px; border-radius: 4px;
-    background: #f0fdf4; border: 1px solid #86efac;
-    font-size: 10px; color: #14532d; font-weight: 600;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-  .kkd-check {
-    width: 14px; height: 14px; border-radius: 2px;
-    background: #16a34a; color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 9px; font-weight: 900; flex-shrink: 0;
+  .klinik-not-title {
+    font-size: 8.5px;
+    font-weight: 800;
+    color: #DC2626;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   /* ── İMZA ── */
-  .imza-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-  .imza-box { border: 1.5px solid #cbd5e1; border-radius: 5px; overflow: hidden; }
-  .imza-head {
-    background: #334155; color: #fff;
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.5px; padding: 6px 10px; text-align: center;
-    font-family: 'Segoe UI', Arial, sans-serif;
+  .imza-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .imza-box { border: 1.5px solid #E2E8F0; border-radius: 10px; overflow: hidden; }
+  .imza-head { background: #1E293B; color: #fff; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; padding: 7px 12px; }
+  .imza-body { padding: 12px; }
+  .imza-alan { height: 52px; border-bottom: 1.5px dashed #CBD5E1; margin-bottom: 8px; }
+  .imza-field { display: flex; justify-content: space-between; font-size: 9px; color: #64748B; margin-top: 4px; }
+  .imza-field span:last-child { font-weight: 600; color: #334155; }
+
+  /* ── YASAL NOT ── */
+  .yasal-box {
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
+    border: 1.5px solid #FDE68A;
+    border-radius: 8px;
+    font-size: 10px;
+    color: #713F12;
+    line-height: 1.8;
   }
-  .imza-body { padding: 10px 12px; }
-  .imza-alan {
-    height: 50px;
-    border-bottom: 1.5px dashed #94a3b8;
-    margin-bottom: 8px;
-  }
-  .imza-row {
-    display: flex; justify-content: space-between;
-    font-size: 9px; color: #64748b;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    margin-top: 3px;
-  }
-  .imza-row span:last-child { font-weight: 600; color: #334155; }
+  .yasal-title { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #92400E; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
 
   /* ── FOOTER ── */
   .footer {
-    margin-top: 12px; padding-top: 10px;
-    border-top: 1.5px solid #e2e8f0;
-    display: flex; justify-content: space-between; align-items: center;
+    margin: 18px 28px 0;
+    padding-top: 12px;
+    border-top: 2px solid #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 9.5px;
+    color: #94A3B8;
   }
-  .footer-left { display: flex; gap: 16px; font-size: 9.5px; color: #64748b; font-family: 'Segoe UI', Arial, sans-serif; }
-  .footer-right { font-size: 9px; color: #94a3b8; font-family: 'Segoe UI', Arial, sans-serif; }
+  .footer-left { display: flex; gap: 14px; }
   .footer-badge {
-    display: inline-block; padding: 2px 9px; border-radius: 10px;
-    background: #f1f5f9; border: 1px solid #e2e8f0;
-    font-size: 9px; color: #64748b; font-weight: 600;
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    font-size: 9px;
+    font-weight: 700;
+    color: #64748B;
   }
 
   /* ── PRINT ── */
   @media print {
     body { background: #fff !important; }
-    .page { padding: 8mm 12mm; }
-    @page { size: A4 portrait; margin: 0.7cm; }
-    .section { page-break-inside: avoid; }
+    .page { padding: 0; }
+    @page { size: A4 portrait; margin: 0; }
+    .sec { page-break-inside: avoid; }
     .imza-grid { page-break-inside: avoid; }
+    .body-wrap { padding: 0 20px; }
   }
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- TOP STRIPE -->
-  <div class="top-stripe"></div>
-
-  <!-- HEADER -->
-  <div class="header-outer">
-    <div class="header-logo-block">
-      <div class="logo-emblem"><span>⚕️</span></div>
-      <div class="org-name">${esc(kaza.osgbAd ?? kaza.firmaAd)}</div>
-      <div class="org-sub">İş Sağlığı ve Güvenliği</div>
+  <!-- KAPAK -->
+  <div class="cover">
+    <div class="cover-top">
+      <div class="cover-badge">
+        <span class="cover-badge-dot"></span>
+        Resmi Tutanak Belgesi
+      </div>
+      <div class="cover-no">Rapor No: ${esc(raporNo)}</div>
     </div>
-    <div class="header-center">
-      <div class="doc-type">Resmi Tutanak Belgesi</div>
-      <h1>İŞ KAZASI TUTANAĞ</h1>
-      <p>WORK ACCIDENT REPORT / RAPPORT D'ACCIDENT DU TRAVAIL</p>
-    </div>
-    <div class="header-no-block">
-      <div class="no-label">Rapor No</div>
-      <div class="no-value">${esc(raporNo)}</div>
-      <div class="no-label" style="margin-top:2px;">Şiddet</div>
-      <div class="durum-pill">${esc(kaza.durum)}</div>
-    </div>
-  </div>
 
-  <!-- UYARI BANDI -->
-  <div class="uyari-band">
-    <span class="uyari-icon">⚠️</span>
-    <span class="uyari-text">YARALANMA ŞİDDETİ: ${esc(siddetCfg.label)}</span>
-    <span class="uyari-sub">
-      ${esc(kaza.kazaTarihi ? fmt(kaza.kazaTarihi) : '')}${kaza.kazaSaati ? ' &nbsp;|&nbsp; ' + esc(kaza.kazaSaati) : ''}
-      &nbsp;&nbsp;|&nbsp;&nbsp; ${esc(kaza.firmaAd)}
-    </span>
-  </div>
+    <div class="cover-title">İŞ KAZASI TUTANAĞI</div>
+    <div class="cover-sub">WORK ACCIDENT REPORT &nbsp;·&nbsp; ISG Denetim Yönetim Sistemi</div>
 
-  <!-- BÖLÜM 1: GENEL BİLGİLER -->
-  <div class="section">
-    <div class="sec-head">📋 Bölüm 1 — Genel Bilgiler / Temel Kayıt</div>
-    <div class="sec-body">
-      <table class="info-tbl">
-        <tr>
-          <td class="lbl">Rapor No</td>
-          <td class="val" style="font-family:'Courier New',monospace;font-weight:700;color:#1e3a5f;">${esc(raporNo)}</td>
-          <td class="lbl">Rapor Tarihi</td>
-          <td class="val">${esc(printDate)}</td>
-        </tr>
-        <tr>
-          <td class="lbl">Firma / İşyeri</td>
-          <td class="val" style="font-weight:700;">${esc(kaza.firmaAd)}</td>
-          <td class="lbl">OSGB / Kurum</td>
-          <td class="val">${esc(kaza.osgbAd ?? '—')}</td>
-        </tr>
-        <tr>
-          <td class="lbl">Hazırlayan</td>
-          <td class="val">${esc(kaza.hazirlayanAd ?? 'İşyeri Hekimi')}</td>
-          <td class="lbl">Durum</td>
-          <td class="val">${badge(kaza.durum, durumCfg.bg, durumCfg.color, durumCfg.border)}</td>
-        </tr>
-      </table>
+    <div class="cover-pills">
+      <span class="pill pill-siddet">${sCfg.icon} Şiddet: ${esc(kaza.yaralanmaSiddeti)}</span>
+      <span class="pill pill-durum">Durum: ${esc(kaza.durum)}</span>
+      ${kaza.hastaneyeKaldirildi ? `<span class="pill pill-hastane">🏥 Hastaneye Kaldırıldı</span>` : ''}
+    </div>
+
+    <div class="cover-meta">
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Kazazede</span>
+        <span class="cover-meta-value">${esc(kaza.personelAd)}</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Firma</span>
+        <span class="cover-meta-value">${esc(kaza.firmaAd)}</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Kaza Tarihi</span>
+        <span class="cover-meta-value">${esc(fmtFull(kaza.kazaTarihi))}${kaza.kazaSaati ? ' &nbsp;' + esc(kaza.kazaSaati) : ''}</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">Rapor Tarihi</span>
+        <span class="cover-meta-value">${esc(printDate)}</span>
+      </div>
     </div>
   </div>
 
-  <!-- BÖLÜM 2: KAZAZEDE BİLGİLERİ -->
-  <div class="section">
-    <div class="sec-head red">👤 Bölüm 2 — Kazazede Bilgileri</div>
-    <div class="sec-body">
-      <table class="info-tbl">
-        <tr>
-          <td class="lbl">Ad Soyad</td>
-          <td class="val" style="font-weight:700;font-size:12px;">${esc(kaza.personelAd)}</td>
-          <td class="lbl">Görev / Unvan</td>
-          <td class="val">${esc(kaza.personelGorev ?? '—')}</td>
-        </tr>
-        <tr>
-          <td class="lbl">Firma</td>
-          <td class="val">${esc(kaza.firmaAd)}</td>
-          <td class="lbl">İş Günü Kaybı</td>
-          <td class="val" style="font-weight:700;color:${kaza.isGunuKaybi > 0 ? '#DC2626' : '#374151'};">
-            ${kaza.isGunuKaybi > 0 ? esc(String(kaza.isGunuKaybi)) + ' gün' : 'Yok'}
-          </td>
-        </tr>
-        <tr>
-          <td class="lbl">Hastaneye Kaldırıldı</td>
-          <td class="val" style="font-weight:600;color:${kaza.hastaneyeKaldirildi ? '#DC2626' : '#15803D'};">
-            ${kaza.hastaneyeKaldirildi ? '✓ Evet' : '✗ Hayır'}
-          </td>
-          <td class="lbl">Hastane Adı</td>
-          <td class="val">${esc(kaza.hastaneAdi || (kaza.hastaneyeKaldirildi ? 'Belirtilmemiş' : '—'))}</td>
-        </tr>
-      </table>
-    </div>
-  </div>
+  <div class="body-wrap">
 
-  <!-- BÖLÜM 3: KAZA DETAYLARI -->
-  <div class="section">
-    <div class="sec-head amber">📅 Bölüm 3 — Kaza Bilgileri</div>
-    <div class="sec-body">
-      <table class="info-tbl">
-        <tr>
-          <td class="lbl">Kaza Tarihi</td>
-          <td class="val" style="font-weight:700;">${esc(fmtFull(kaza.kazaTarihi))}</td>
-          <td class="lbl">Kaza Saati</td>
-          <td class="val">${esc(kaza.kazaSaati || '—')}</td>
-        </tr>
-        <tr>
-          <td class="lbl">Kaza Yeri</td>
-          <td class="val">${esc(kaza.kazaYeri || '—')}</td>
-          <td class="lbl">Kaza Türü</td>
-          <td class="val">${esc(kaza.kazaTuru || '—')}</td>
-        </tr>
-        <tr>
-          <td class="lbl">Yaralanma Türü</td>
-          <td class="val">${esc(kaza.yaralanmaTuru || '—')}</td>
-          <td class="lbl">Yaralanma Şiddeti</td>
-          <td class="val">${badge(kaza.yaralanmaSiddeti, siddetCfg.bg, siddetCfg.color, siddetCfg.border)}</td>
-        </tr>
-      </table>
-    </div>
-  </div>
-
-  <!-- BÖLÜM 4: KAZA AÇIKLAMASI -->
-  <div class="section">
-    <div class="sec-head">📝 Bölüm 4 — Kaza Açıklaması</div>
-    <div class="sec-body">
-      <div class="text-box">${kaza.kazaAciklamasi ? esc(kaza.kazaAciklamasi) : '<span style="color:#94a3b8;font-style:italic;">Açıklama girilmemiş</span>'}</div>
-    </div>
-  </div>
-
-  <!-- BÖLÜM 5: YARALANAN VÜCUT BÖLGELERİ -->
-  <div class="section">
-    <div class="sec-head red">🩺 Bölüm 5 — Yaralanan Vücut Bölgeleri</div>
-    <div class="sec-body">
-      <div class="body-diagram-wrap">
-        <div class="diagram-left">
-          <p style="font-size:9px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-family:'Segoe UI',Arial,sans-serif;">Vücut Haritası</p>
-          ${bodyDiagram}
-        </div>
-        <div class="diagram-right">
-          <p style="font-size:9px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-family:'Segoe UI',Arial,sans-serif;">Etkilenen Bölgeler (${kaza.yaraliVucutBolgeleri.length})</p>
-          <div class="bolge-list">
-            ${kaza.yaraliVucutBolgeleri.length > 0
-              ? kaza.yaraliVucutBolgeleri.map(id => `<span class="bolge-tag">${esc(VUCUT_LABEL[id] ?? id)}</span>`).join('')
-              : '<span class="bolge-empty">Vücut bölgesi belirtilmemiş</span>'
-            }
+    <!-- BÖLÜM 1: GENEL BİLGİLER -->
+    <div class="sec">
+      <div class="sec-head blue">
+        <div class="sec-icon">📋</div>Bölüm 1 — Genel Kayıt Bilgileri
+      </div>
+      <div class="sec-body">
+        <div class="info-grid">
+          <div class="info-row">
+            <div class="info-cell-label">Rapor No</div>
+            <div class="info-cell-value bold" style="font-family:monospace;color:#1E3A5F;">${esc(raporNo)}</div>
+            <div class="info-cell-label">Rapor Tarihi</div>
+            <div class="info-cell-value">${esc(printDate)}</div>
           </div>
-          ${kaza.yaraliVucutBolgeleri.length > 0 ? `
-          <div style="margin-top:12px;padding:8px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;">
-            <p style="font-size:9px;font-weight:700;color:#DC2626;margin-bottom:3px;font-family:'Segoe UI',Arial,sans-serif;">KLİNİK NOT</p>
-            <p style="font-size:10px;color:#7F1D1D;line-height:1.5;font-family:'Times New Roman',serif;">
-              Kazazede; <strong>${esc(bolgeLabels)}</strong> bölgesinde
-              <strong>${esc(kaza.yaralanmaTuru || 'belirtilmemiş türde')}</strong> yaralanma
-              meydana geldiği tespit edilmiştir.
+          <div class="info-row">
+            <div class="info-cell-label">OSGB / Kurum</div>
+            <div class="info-cell-value">${esc(kaza.osgbAd ?? '—')}</div>
+            <div class="info-cell-label">Hazırlayan</div>
+            <div class="info-cell-value">${esc(kaza.hazirlayanAd ?? 'İşyeri Hekimi')}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-cell-label">Yaralanma Şiddeti</div>
+            <div class="info-cell-value">
+              <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;background:${sCfg.bg};color:${sCfg.text};border:1.5px solid ${sCfg.border};">${esc(kaza.yaralanmaSiddeti)}</span>
+            </div>
+            <div class="info-cell-label">Kayıt Durumu</div>
+            <div class="info-cell-value">
+              <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;background:${dCfg.bg};color:${dCfg.text};border:1.5px solid ${dCfg.border};">${esc(kaza.durum)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BÖLÜM 2: KAZAZEDE -->
+    <div class="sec">
+      <div class="sec-head red">
+        <div class="sec-icon">👤</div>Bölüm 2 — Kazazede Bilgileri
+      </div>
+      <div class="sec-body">
+        <div class="info-grid">
+          <div class="info-row">
+            <div class="info-cell-label">Ad Soyad</div>
+            <div class="info-cell-value big">${esc(kaza.personelAd)}</div>
+            <div class="info-cell-label">Görev / Unvan</div>
+            <div class="info-cell-value">${esc(kaza.personelGorev ?? '—')}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-cell-label">Çalıştığı Firma</div>
+            <div class="info-cell-value bold">${esc(kaza.firmaAd)}</div>
+            <div class="info-cell-label">İş Günü Kaybı</div>
+            <div class="info-cell-value bold" style="color:${kaza.isGunuKaybi > 0 ? '#DC2626' : '#16A34A'}">
+              ${kaza.isGunuKaybi > 0 ? esc(String(kaza.isGunuKaybi)) + ' gün' : 'Yok'}
+            </div>
+          </div>
+          <div class="info-row">
+            <div class="info-cell-label">Hastaneye Kaldırıldı</div>
+            <div class="info-cell-value bold" style="color:${kaza.hastaneyeKaldirildi ? '#DC2626' : '#16A34A'}">
+              ${kaza.hastaneyeKaldirildi ? '✓ Evet' : '✗ Hayır'}
+            </div>
+            <div class="info-cell-label">Hastane Adı</div>
+            <div class="info-cell-value">${esc(kaza.hastaneAdi || (kaza.hastaneyeKaldirildi ? 'Belirtilmemiş' : '—'))}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BÖLÜM 3: KAZA BİLGİLERİ -->
+    <div class="sec">
+      <div class="sec-head amber">
+        <div class="sec-icon">📅</div>Bölüm 3 — Kaza Bilgileri
+      </div>
+      <div class="sec-body">
+        <div class="info-grid">
+          <div class="info-row">
+            <div class="info-cell-label">Kaza Tarihi</div>
+            <div class="info-cell-value bold">${esc(fmtFull(kaza.kazaTarihi))}</div>
+            <div class="info-cell-label">Kaza Saati</div>
+            <div class="info-cell-value">${esc(kaza.kazaSaati || '—')}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-cell-label">Kaza Yeri</div>
+            <div class="info-cell-value">${esc(kaza.kazaYeri || '—')}</div>
+            <div class="info-cell-label">Kaza Türü</div>
+            <div class="info-cell-value">${esc(kaza.kazaTuru || '—')}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-cell-label">Yaralanma Türü</div>
+            <div class="info-cell-value">${esc(kaza.yaralanmaTuru || '—')}</div>
+            <div class="info-cell-label">Yaralanma Şiddeti</div>
+            <div class="info-cell-value">
+              <span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;background:${sCfg.bg};color:${sCfg.text};border:1.5px solid ${sCfg.border};">${esc(kaza.yaralanmaSiddeti)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BÖLÜM 4: AÇIKLAMA -->
+    <div class="sec">
+      <div class="sec-head blue">
+        <div class="sec-icon">📝</div>Bölüm 4 — Kaza Açıklaması
+      </div>
+      <div class="sec-body">
+        <div class="text-box ${kaza.kazaAciklamasi ? 'danger' : 'empty'}">
+          ${kaza.kazaAciklamasi ? esc(kaza.kazaAciklamasi) : 'Açıklama girilmemiş'}
+        </div>
+      </div>
+    </div>
+
+    <!-- BÖLÜM 5: VÜCUT -->
+    <div class="sec">
+      <div class="sec-head red">
+        <div class="sec-icon">🩺</div>Bölüm 5 — Yaralanan Vücut Bölgeleri
+      </div>
+      <div class="sec-body">
+        <div class="diagram-wrap">
+          <div class="diagram-svg-area">
+            ${svgBody}
+          </div>
+          <div class="diagram-info">
+            <div style="font-size:9px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">
+              Etkilenen Bölgeler — ${kaza.yaraliVucutBolgeleri.length} bölge
+            </div>
+            <div class="bolge-chips">
+              ${kaza.yaraliVucutBolgeleri.length > 0
+                ? kaza.yaraliVucutBolgeleri.map(id => `<span class="bolge-chip">${esc(VUCUT_LABEL[id] ?? id)}</span>`).join('')
+                : '<span style="font-size:10px;color:#94A3B8;font-style:italic;">Vücut bölgesi belirtilmemiş</span>'
+              }
+            </div>
+            ${kaza.yaraliVucutBolgeleri.length > 0 ? `
+            <div class="klinik-not">
+              <div class="klinik-not-title">⚕ Klinik Not</div>
+              Kazazede <strong>${esc(kaza.personelAd)}</strong>; <strong>${esc(bolgeLabels)}</strong> bölgesinde
+              <strong>${esc(kaza.yaralanmaTuru || 'belirtilmemiş türde')}</strong> yaralanma meydana gelmiştir.
               Yaralanma şiddeti <strong>${esc(kaza.yaralanmaSiddeti)}</strong> olarak değerlendirilmiştir.
-            </p>
-          </div>` : ''}
+              ${kaza.isGunuKaybi > 0 ? `Toplam <strong>${kaza.isGunuKaybi} iş günü kaybı</strong> rapor edilmiştir.` : ''}
+            </div>
+            ` : ''}
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- BÖLÜM 6: TANIK VE ÖNLEMLER -->
-  <div class="two-col">
-    <div class="section" style="margin-bottom:0">
-      <div class="sec-head teal">👁️ Bölüm 6a — Tanık Bilgileri</div>
+    <!-- BÖLÜM 6a + 6b YAN YANA -->
+    <div class="two-col">
+      <div class="sec" style="margin-top:0;">
+        <div class="sec-head teal">
+          <div class="sec-icon">👁</div>Bölüm 6a — Tanık Bilgileri
+        </div>
+        <div class="sec-body">
+          <div class="text-box ${kaza.tanikBilgileri ? '' : 'empty'}">
+            ${kaza.tanikBilgileri ? esc(kaza.tanikBilgileri) : 'Tanık bilgisi girilmemiş'}
+          </div>
+        </div>
+      </div>
+      <div class="sec" style="margin-top:0;">
+        <div class="sec-head green">
+          <div class="sec-icon">🛡</div>Bölüm 6b — Alınan Önlemler
+        </div>
+        <div class="sec-body">
+          <div class="text-box ${kaza.onlemler ? 'success' : 'empty'}">
+            ${kaza.onlemler ? esc(kaza.onlemler) : 'Önlem bilgisi girilmemiş'}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BÖLÜM 7: YASAL -->
+    <div class="sec">
+      <div class="sec-head violet">
+        <div class="sec-icon">⚖</div>Bölüm 7 — Yasal Yükümlülükler
+      </div>
       <div class="sec-body">
-        <div class="text-box">${kaza.tanikBilgileri ? esc(kaza.tanikBilgileri) : '<span style="color:#94a3b8;font-style:italic;">Tanık bilgisi girilmemiş</span>'}</div>
+        <div class="yasal-box">
+          <div class="yasal-title">⚠ 6331 Sayılı İSG Kanunu Uyarınca</div>
+          İş kazaları, kazanın olduğu günden itibaren en geç <strong>3 iş günü</strong> içinde işveren tarafından Sosyal Güvenlik Kurumu'na bildirilmelidir.
+          Bu tutanak, yasal bildirim yükümlülüğünün yerine getirilmesine yönelik resmi kayıt belgesidir.
+          Ağır yaralanma veya ölüm halinde yetkili Çalışma ve İş Kurumu İl Müdürlüğü'ne derhal bilgi verilmesi zorunludur.
+        </div>
       </div>
     </div>
-    <div class="section" style="margin-bottom:0">
-      <div class="sec-head green">🛡️ Bölüm 6b — Alınan / Alınacak Önlemler</div>
-      <div class="sec-body">
-        <div class="text-box success">${kaza.onlemler ? esc(kaza.onlemler) : '<span style="color:#94a3b8;font-style:italic;">Önlem bilgisi girilmemiş</span>'}</div>
-      </div>
-    </div>
-  </div>
 
-  <!-- BÖLÜM 7: YASAL ZORUNLULUKLAR NOTU -->
-  <div class="section">
-    <div class="sec-head slate">⚖️ Bölüm 7 — Yasal Yükümlülükler</div>
-    <div class="sec-body">
-      <div class="text-box" style="background:#FEFCE8;border-color:#FDE68A;font-family:'Segoe UI',Arial,sans-serif;font-size:10px;line-height:1.7;color:#713F12;">
-        <strong>6331 sayılı İş Sağlığı ve Güvenliği Kanunu</strong> uyarınca, iş kazaları;
-        kazanın olduğu günden itibaren <strong>en geç 3 iş günü</strong> içinde işveren tarafından Sosyal Güvenlik Kurumu'na bildirilerek kayıt altına alınmalıdır.
-        Bu tutanak, yasal bildirim yükümlülüğünün yerine getirilmesine yönelik resmi bir kayıt belgesidir.
-        <br><br>
-        Kazanın ağır yaralanma veya ölümle sonuçlanması halinde yetkili Çalışma ve İş Kurumu İl Müdürlüğü'ne derhal bilgi verilmesi zorunludur.
+    <!-- İMZA ALANLARI -->
+    <div class="imza-grid">
+      <div class="imza-box">
+        <div class="imza-head">Kazazede / Çalışan</div>
+        <div class="imza-body">
+          <div class="imza-alan"></div>
+          <div class="imza-field"><span>Ad Soyad:</span><span>${esc(kaza.personelAd)}</span></div>
+          <div class="imza-field"><span>Tarih:</span><span>${fmt(kaza.kazaTarihi)}</span></div>
+        </div>
+      </div>
+      <div class="imza-box">
+        <div class="imza-head">İşveren Vekili</div>
+        <div class="imza-body">
+          <div class="imza-alan"></div>
+          <div class="imza-field"><span>Ad Soyad:</span><span>___________________</span></div>
+          <div class="imza-field"><span>Ünvan:</span><span>___________________</span></div>
+        </div>
+      </div>
+      <div class="imza-box">
+        <div class="imza-head">İşyeri Hekimi / ISG Uzmanı</div>
+        <div class="imza-body">
+          <div class="imza-alan"></div>
+          <div class="imza-field"><span>Ad Soyad:</span><span>${esc(kaza.hazirlayanAd ?? 'İşyeri Hekimi')}</span></div>
+          <div class="imza-field"><span>Tarih:</span><span>${esc(printDate)}</span></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- İMZA ALANLARI -->
-  <div class="imza-grid">
-    <div class="imza-box">
-      <div class="imza-head">Kazazede / Çalışan</div>
-      <div class="imza-body">
-        <div class="imza-alan"></div>
-        <div class="imza-row">
-          <span>Ad Soyad:</span>
-          <span>${esc(kaza.personelAd)}</span>
-        </div>
-        <div class="imza-row">
-          <span>Tarih:</span>
-          <span>${fmt(kaza.kazaTarihi)}</span>
-        </div>
-      </div>
-    </div>
-    <div class="imza-box">
-      <div class="imza-head">İşveren Vekili</div>
-      <div class="imza-body">
-        <div class="imza-alan"></div>
-        <div class="imza-row">
-          <span>Ad Soyad:</span>
-          <span>________________________</span>
-        </div>
-        <div class="imza-row">
-          <span>Ünvan:</span>
-          <span>________________________</span>
-        </div>
-      </div>
-    </div>
-    <div class="imza-box">
-      <div class="imza-head">İşyeri Hekimi / ISG Uzmanı</div>
-      <div class="imza-body">
-        <div class="imza-alan"></div>
-        <div class="imza-row">
-          <span>Ad Soyad:</span>
-          <span>${esc(kaza.hazirlayanAd ?? 'İşyeri Hekimi')}</span>
-        </div>
-        <div class="imza-row">
-          <span>Tarih:</span>
-          <span>${esc(printDate)}</span>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- FOOTER -->
   <div class="footer">
     <div class="footer-left">
-      <span>Rapor No: <strong>${esc(raporNo)}</strong></span>
-      <span>Kazazede: <strong>${esc(kaza.personelAd)}</strong></span>
-      <span>Firma: <strong>${esc(kaza.firmaAd)}</strong></span>
+      <span>Rapor No: <strong style="color:#334155;">${esc(raporNo)}</strong></span>
+      <span>Kazazede: <strong style="color:#334155;">${esc(kaza.personelAd)}</strong></span>
+      <span>Firma: <strong style="color:#334155;">${esc(kaza.firmaAd)}</strong></span>
     </div>
-    <div class="footer-right">
+    <div>
       <span class="footer-badge">ISG Denetim Yönetim Sistemi</span>
-      &nbsp;
-      <span style="color:#cbd5e1;">Bu belge resmi iş kazası tutanağıdır.</span>
     </div>
   </div>
 
 </div>
 </body>
 </html>`;
+}
+
+function buildBodySvg(selected: string[]): string {
+  const sel = new Set(selected);
+  const fill = (id: string) => sel.has(id) ? '#EF4444' : '#CBD5E1';
+  const opacity = (id: string) => sel.has(id) ? '1' : '0.45';
+  const glow = (id: string) => sel.has(id) ? `filter:drop-shadow(0 0 3px #EF4444);` : '';
+
+  // SVG inline vücut silueti - ön görünüm
+  return `<svg width="100" height="220" viewBox="0 0 100 220" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+    <!-- Baş -->
+    <ellipse cx="50" cy="18" rx="13" ry="15" fill="${fill('bas')}" opacity="${opacity('bas')}" style="${glow('bas')}"/>
+    <!-- Boyun -->
+    <rect x="44" y="31" width="12" height="10" rx="3" fill="${fill('boyun')}" opacity="${opacity('boyun')}" style="${glow('boyun')}"/>
+    <!-- Gövde - Göğüs -->
+    <rect x="28" y="40" width="44" height="38" rx="6" fill="${fill('gogus')}" opacity="${opacity('gogus')}" style="${glow('gogus')}"/>
+    <!-- Gövde - Sırt (üst üste, biraz farklı renk) -->
+    <rect x="32" y="42" width="36" height="30" rx="4" fill="${fill('sirt')}" opacity="${sel.has('sirt') ? '0.55' : '0'}"/>
+    <!-- Karın/Bel -->
+    <rect x="30" y="77" width="40" height="30" rx="5" fill="${fill('karin')}" opacity="${opacity('karin')}" style="${glow('karin')}"/>
+    <!-- Sağ Omuz -->
+    <ellipse cx="22" cy="46" rx="9" ry="8" fill="${fill('sag_omuz')}" opacity="${opacity('sag_omuz')}" style="${glow('sag_omuz')}"/>
+    <!-- Sol Omuz -->
+    <ellipse cx="78" cy="46" rx="9" ry="8" fill="${fill('sol_omuz')}" opacity="${opacity('sol_omuz')}" style="${glow('sol_omuz')}"/>
+    <!-- Sağ Kol -->
+    <rect x="8" y="52" width="13" height="36" rx="6" fill="${fill('sag_kol')}" opacity="${opacity('sag_kol')}" style="${glow('sag_kol')}"/>
+    <!-- Sol Kol -->
+    <rect x="79" y="52" width="13" height="36" rx="6" fill="${fill('sol_kol')}" opacity="${opacity('sol_kol')}" style="${glow('sol_kol')}"/>
+    <!-- Sağ El -->
+    <ellipse cx="14" cy="97" rx="8" ry="6" fill="${fill('sag_el')}" opacity="${opacity('sag_el')}" style="${glow('sag_el')}"/>
+    <!-- Sol El -->
+    <ellipse cx="86" cy="97" rx="8" ry="6" fill="${fill('sol_el')}" opacity="${opacity('sol_el')}" style="${glow('sol_el')}"/>
+    <!-- Sağ Kalça -->
+    <ellipse cx="36" cy="113" rx="12" ry="9" fill="${fill('sag_kalca')}" opacity="${opacity('sag_kalca')}" style="${glow('sag_kalca')}"/>
+    <!-- Sol Kalça -->
+    <ellipse cx="64" cy="113" rx="12" ry="9" fill="${fill('sol_kalca')}" opacity="${opacity('sol_kalca')}" style="${glow('sol_kalca')}"/>
+    <!-- Sağ Bacak -->
+    <rect x="27" y="120" width="18" height="56" rx="8" fill="${fill('sag_bacak')}" opacity="${opacity('sag_bacak')}" style="${glow('sag_bacak')}"/>
+    <!-- Sol Bacak -->
+    <rect x="55" y="120" width="18" height="56" rx="8" fill="${fill('sol_bacak')}" opacity="${opacity('sol_bacak')}" style="${glow('sol_bacak')}"/>
+    <!-- Sağ Ayak -->
+    <ellipse cx="36" cy="183" rx="11" ry="7" fill="${fill('sag_ayak')}" opacity="${opacity('sag_ayak')}" style="${glow('sag_ayak')}"/>
+    <!-- Sol Ayak -->
+    <ellipse cx="64" cy="183" rx="11" ry="7" fill="${fill('sol_ayak')}" opacity="${opacity('sol_ayak')}" style="${glow('sol_ayak')}"/>
+    <!-- Merkez çizgisi (dekoratif) -->
+    <line x1="50" y1="40" x2="50" y2="105" stroke="rgba(148,163,184,0.25)" stroke-width="1" stroke-dasharray="2,2"/>
+  </svg>`;
 }
 
 export function printIsKazasiTutanagi(kaza: IsKazasiRaporData): void {
@@ -668,7 +760,7 @@ export function printIsKazasiTutanagi(kaza: IsKazasiRaporData): void {
   win.document.write(html);
   win.document.close();
   win.focus();
-  setTimeout(() => { win.print(); }, 800);
+  setTimeout(() => { win.print(); }, 900);
 }
 
 export function downloadIsKazasiHtml(kaza: IsKazasiRaporData): void {
