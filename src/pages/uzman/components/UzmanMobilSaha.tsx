@@ -15,7 +15,7 @@ import {
   FirmaOzeti,
 } from '@/pages/saha/components/EkipmanKontrol';
 import { STATUS_CONFIG, SEV_CONFIG } from '@/pages/nonconformity/utils/statusHelper';
-import { useOfflineQueue, type OfflineQueueItem } from '@/hooks/useOfflineQueue';
+import { useQueue } from '@/store/OfflineQueueContext';
 import { uploadFileToStorage } from '@/utils/fileUpload';
 import type { Ekipman, EkipmanStatus, Uygunsuzluk } from '@/types';
 
@@ -635,61 +635,112 @@ export default function UzmanMobilSaha({ isDark }: Props) {
 
   useEffect(() => { void loadJsQR(); }, []);
 
-  const applyQueueItem = useCallback(async (item: OfflineQueueItem) => {
-    if (item.type === 'ekipman_kontrol') {
-      const { ekipmanId, sonKontrolTarihi, sonrakiKontrolTarihi, durum } = item.payload as { ekipmanId: string; sonKontrolTarihi: string; sonrakiKontrolTarihi: string; durum: EkipmanStatus };
-      updateEkipman(ekipmanId, { sonKontrolTarihi, sonrakiKontrolTarihi, durum });
-    } else if (item.type === 'ekipman_durum') {
-      const { ekipmanId, durum } = item.payload as { ekipmanId: string; durum: EkipmanStatus };
-      updateEkipman(ekipmanId, { durum });
-    }
-  }, [updateEkipman]);
-
-  const { isOnline, isSyncing, pendingCount, pendingItems, lastSyncAt, syncError, addToQueue, syncNow, clearQueue } = useOfflineQueue(applyQueueItem);
+  // Global queue context — tek instance, SahaPage ile paylaşılan
+  const { isOnline, isSyncing, pendingCount, pendingItems, lastSyncAt, syncError, sessionId, addToQueue, syncNow, forceSyncAll, clearQueue } = useQueue();
 
   const prevSyncingRef = useRef(false);
+  const prevPendingRef = useRef(pendingCount);
   useEffect(() => {
-    if (prevSyncingRef.current && !isSyncing && pendingCount === 0 && isOnline) {
-      addToast('Çevrimdışı işlemler senkronize edildi!', 'success');
+    if (prevSyncingRef.current && !isSyncing && isOnline) {
+      const synced = prevPendingRef.current;
+      if (synced > 0) {
+        if (syncError) {
+          addToast(`Bazı işlemler gönderilemedi — ${syncError}`, 'error');
+        } else {
+          addToast(`${synced} işlem senkronize edildi`, 'success');
+        }
+      }
     }
+    if (!isSyncing) prevPendingRef.current = pendingCount;
     prevSyncingRef.current = isSyncing;
-  }, [isSyncing, pendingCount, isOnline, addToast]);
+  }, [isSyncing, pendingCount, isOnline, addToast, syncError]);
 
   const handleKontrolYapildi = useCallback(async (ekipmanId: string) => {
     const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
-    if (!ekipman) return;
+    if (!ekipman || !org?.id) return;
     const now = new Date().toISOString();
+    const today = now.split('T')[0];
     const sonraki = new Date(); sonraki.setMonth(sonraki.getMonth() + 1);
     const sonrakiStr = sonraki.toISOString().split('T')[0];
     const gecikmisDi = ekipman.sonrakiKontrolTarihi ? new Date(ekipman.sonrakiKontrolTarihi) < new Date() : false;
-    addEkipmanKontrolKaydi(ekipmanId, { tarih: now, kontrolEden: currentUser?.ad || 'Uzman', kontrolEdenId: currentUser?.id || '', durum: 'Uygun', kaynak: 'qr' });
+
+    const yeniKayitId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    const yeniKayit = {
+      id:            yeniKayitId,
+      tarih:         now,
+      kontrolEden:   currentUser?.ad || 'Uzman',
+      kontrolEdenId: currentUser?.id || '',
+      durum:         'Uygun' as const,
+      kaynak:        'qr' as const,
+    };
+
+    addEkipmanKontrolKaydi(ekipmanId, yeniKayit);
     updateEkipman(ekipmanId, { sonrakiKontrolTarihi: sonrakiStr });
     ekipmanKontrolBildirimi(ekipman.ad, ekipmanId, 'Uygun', gecikmisDi);
+
+    await addToQueue({
+      type:  'ekipman_kontrol',
+      label: `${ekipman.ad} — Kontrol kaydı`,
+      payload: {
+        ekipmanId,
+        organizationId:       org.id,
+        sonKontrolTarihi:     today,
+        sonrakiKontrolTarihi: sonrakiStr,
+        durum:                'Uygun',
+        yeniKayit,
+      } as unknown as Record<string, unknown>,
+    });
+
     if (!isOnline) {
-      await addToQueue({ type: 'ekipman_kontrol', label: `${ekipman.ad} — Kontrol`, payload: { ekipmanId, sonKontrolTarihi: now.split('T')[0], sonrakiKontrolTarihi: sonrakiStr, durum: 'Uygun' } });
-      addToast('Kontrol kaydedildi! Bağlantı gelince gönderilecek.', 'success');
+      addToast('Kontrol kaydedildi (çevrimdışı) — bağlantı gelince sunucuya gönderilecek.', 'success');
     } else {
-      addToast('Kontrol kaydedildi!', 'success');
+      void syncNow();
+      addToast('Kontrol başarıyla kaydedildi — durum "Uygun" olarak güncellendi.', 'success');
     }
-  }, [ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, currentUser, ekipmanKontrolBildirimi, isOnline, addToQueue, addToast]);
+  }, [ekipmanlar, updateEkipman, addEkipmanKontrolKaydi, currentUser, ekipmanKontrolBildirimi, isOnline, addToQueue, syncNow, addToast, org]);
 
   const handleDurumDegistir = useCallback(async (ekipmanId: string, yeniDurum: EkipmanStatus, aciklama?: string, foto?: File | null) => {
     const ekipman = ekipmanlar.find(e => e.id === ekipmanId);
-    if (!ekipman || ekipman.durum === yeniDurum) return;
+    if (!ekipman || ekipman.durum === yeniDurum || !org?.id) return;
     const now = new Date().toISOString();
-    const orgId = org?.id ?? 'unknown';
+    const orgId = org.id;
     let fotoUrl: string | undefined;
-    if (foto && orgId !== 'unknown') {
+    if (foto) {
       try { const u = await uploadFileToStorage(foto, orgId, 'ekipman-kontrol', `${ekipmanId}-${Date.now()}`); if (u) fotoUrl = u; } catch { /* ignore */ }
     }
-    addEkipmanKontrolKaydi(ekipmanId, { tarih: now, kontrolEden: currentUser?.ad || 'Uzman', kontrolEdenId: currentUser?.id || '', durum: yeniDurum, notlar: aciklama || undefined, fotoUrl, kaynak: 'qr' });
+
+    const yeniKayitId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    const yeniKayit = {
+      id:            yeniKayitId,
+      tarih:         now,
+      kontrolEden:   currentUser?.ad || 'Uzman',
+      kontrolEdenId: currentUser?.id || '',
+      durum:         yeniDurum,
+      notlar:        aciklama || undefined,
+      fotoUrl,
+      kaynak:        'qr' as const,
+    };
+
+    addEkipmanKontrolKaydi(ekipmanId, yeniKayit);
+
+    await addToQueue({
+      type:  'ekipman_durum',
+      label: `${ekipman.ad} — Durum: ${yeniDurum}`,
+      payload: {
+        ekipmanId,
+        organizationId: orgId,
+        durum:          yeniDurum,
+        yeniKayit,
+      } as unknown as Record<string, unknown>,
+    });
+
     if (!isOnline) {
-      await addToQueue({ type: 'ekipman_durum', label: `${ekipman.ad} — ${yeniDurum}`, payload: { ekipmanId, durum: yeniDurum } });
-      addToast(`Durum "${yeniDurum}" kaydedildi.`, 'success');
+      addToast(`İşlem kaydedildi (çevrimdışı) — bağlantı gelince sunucuya gönderilecek.`, 'success');
     } else {
-      addToast(`Durum "${yeniDurum}" güncellendi.`, 'success');
+      void syncNow();
+      addToast(`İşlem başarıyla kaydedildi — durum "${yeniDurum}" olarak güncellendi.`, 'success');
     }
-  }, [ekipmanlar, addEkipmanKontrolKaydi, currentUser, org, isOnline, addToQueue, addToast]);
+  }, [ekipmanlar, addEkipmanKontrolKaydi, currentUser, org, isOnline, addToQueue, syncNow, addToast]);
 
   const { uygunsuzlukBadge, izinBadge, ekipmanBadge } = useMemo(() => ({
     uygunsuzlukBadge: uygunsuzluklar.filter(u => !u.silinmis && !u.cascadeSilindi && u.durum !== 'Kapandı').length,
@@ -749,7 +800,7 @@ export default function UzmanMobilSaha({ isDark }: Props) {
 
       {/* Offline bant */}
       <div className="mb-4">
-        <OfflineBand isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} lastSyncAt={lastSyncAt} syncError={syncError} onSyncNow={syncNow} onShowDetails={() => setShowPendingModal(true)} />
+        <OfflineBand isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} lastSyncAt={lastSyncAt} syncError={syncError} onSyncNow={() => void syncNow()} onForceSyncAll={() => void forceSyncAll()} onShowDetails={() => setShowPendingModal(true)} />
       </div>
 
       {/* Sekme navigasyonu */}
@@ -787,7 +838,7 @@ export default function UzmanMobilSaha({ isDark }: Props) {
         {activeTab === 'uygunsuzluk' && <UygunsuzlukTab />}
       </div>
 
-      <PendingModal open={showPendingModal} onClose={() => setShowPendingModal(false)} items={pendingItems} isOnline={isOnline} isSyncing={isSyncing} onSyncNow={syncNow} onClear={clearQueue} />
+      <PendingModal open={showPendingModal} onClose={() => setShowPendingModal(false)} items={pendingItems} isOnline={isOnline} isSyncing={isSyncing} onSyncNow={() => void syncNow()} onForceSyncAll={() => void forceSyncAll()} onClear={() => void clearQueue()} onShowHistory={() => setShowPendingModal(false)} onShowInspector={() => setShowPendingModal(false)} sessionId={sessionId} />
     </div>
   );
 }

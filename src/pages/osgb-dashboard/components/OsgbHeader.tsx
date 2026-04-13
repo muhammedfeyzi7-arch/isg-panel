@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 import SupportModal from '@/components/feature/SupportModal';
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'copkutusu' | 'ayarlar';
 
 interface OsgbHeaderProps {
   activeTab: Tab;
@@ -20,12 +20,13 @@ interface OsgbHeaderProps {
 }
 
 const tabMeta: Record<Tab, { label: string; icon: string }> = {
-  dashboard:  { label: 'Genel Bakış', icon: 'ri-layout-grid-line' },
-  firmalar:   { label: 'Firmalar', icon: 'ri-building-3-line' },
-  uzmanlar:   { label: 'Uzmanlar', icon: 'ri-shield-user-line' },
-  ziyaretler: { label: 'Ziyaretler', icon: 'ri-map-pin-2-line' },
-  raporlar:   { label: 'Raporlar', icon: 'ri-bar-chart-grouped-line' },
-  ayarlar:    { label: 'Ayarlar', icon: 'ri-settings-3-line' },
+  dashboard:  { label: 'Genel Bakış',    icon: 'ri-layout-grid-line' },
+  firmalar:   { label: 'Firmalar',       icon: 'ri-building-3-line' },
+  uzmanlar:   { label: 'Uzmanlar',       icon: 'ri-shield-user-line' },
+  ziyaretler: { label: 'Ziyaretler',     icon: 'ri-map-pin-2-line' },
+  raporlar:   { label: 'Raporlar',       icon: 'ri-bar-chart-grouped-line' },
+  copkutusu:  { label: 'Çöp Kutusu',    icon: 'ri-delete-bin-2-line' },
+  ayarlar:    { label: 'Ayarlar',        icon: 'ri-settings-3-line' },
 };
 
 interface SupportNotification {

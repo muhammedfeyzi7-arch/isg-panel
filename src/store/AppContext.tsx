@@ -8,19 +8,10 @@ import { useOrganization } from '../hooks/useOrganization';
 import { logActivity } from '../utils/activityLog';
 import { supabase } from '../lib/supabase';
 import type { Toast, Firma } from '../types';
+import { useNotificationStore } from './useNotificationStore';
+import { useGorevStore } from './useGorevStore';
 
-export interface Bildirim {
-  id: string;
-  tip: 'evrak_surecek' | 'evrak_dolmus' | 'ekipman_kontrol' | 'egitim_surecek' | 'saglik_surecek' | 'ekipman_kontrol_yapildi' | 'is_izni_onaylandi' | 'is_izni_reddedildi';
-  mesaj: string;
-  detay: string;
-  tarih: string;
-  okundu: boolean;
-  kalanGun: number;
-  module: string;
-  recordId?: string;
-}
-
+export type { Bildirim } from './useNotificationStore';
 export type Theme = 'dark' | 'light';
 
 export interface OrgInfo {
@@ -34,9 +25,10 @@ export interface OrgInfo {
   email?: string;
   orgType: 'firma' | 'osgb';
   osgbRole?: 'osgb_admin' | 'gezici_uzman' | 'isyeri_hekimi' | null;
-  /** Gezici uzman için atanmış tüm firma ID'leri */
   activeFirmIds?: string[];
 }
+
+import type { Bildirim } from './useNotificationStore';
 
 interface AppContextType extends StoreType {
   fetchTable: (table: string) => Promise<void>;
@@ -71,11 +63,8 @@ interface AppContextType extends StoreType {
   refetchOrg: () => Promise<void>;
   logAction: (actionType: string, module: string, recordId: string, recordName?: string, description?: string) => void;
   refreshData: () => Promise<void>;
-  /** Gezici uzman firma değişimi devam ediyor mu — true iken write ops bloke */
   isSwitching: boolean;
-  /** Aktif firmayı değiştir (ref-first, isSwitching guard ile) */
   switchActiveFirma: (firmaId: string) => Promise<{ error: string | null }>;
-  /** Gezici uzman: atanmış firma ID'lerinin isimlerini çek */
   fetchActiveFirmNames: () => Promise<{ id: string; name: string }[]>;
 }
 
@@ -179,7 +168,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recordId: user.id,
       description: 'Sisteme giriş yapıldı.',
     });
-  }, [user?.id, org?.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addToastRef = useRef(addToast);
   useEffect(() => { addToastRef.current = addToast; }, [addToast]);
@@ -206,10 +195,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     orgIdRef,
   );
 
-  // Gezici uzman için atanmış tüm firmaları Supabase'den çekip firmalar listesine inject et
+  // ── Gezici uzman: extra firma verileri ──────────────────────────────────
   const [geziciFirmalar, setGeziciFirmalar] = useState<Firma[]>([]);
-  // Gezici uzman için ek firma ID'lerinin verilerini (primary firma dışındaki) store verisine merge et
-  // firmaId → tablo → kayıtlar şeklinde normalize yapı — realtime patch için
+
   type ExtraFirmaVeriMap = Record<string, {
     personeller: import('../types').Personel[];
     evraklar: import('../types').Evrak[];
@@ -222,7 +210,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }>;
   const [extraFirmaVeriMap, setExtraFirmaVeriMap] = useState<ExtraFirmaVeriMap>({});
 
-  // Flatten helper — tüm ek firmaların verilerini birleştir
   const flattenExtraVeriler = useCallback((map: ExtraFirmaVeriMap) => {
     const result = {
       personeller: [] as import('../types').Personel[],
@@ -256,93 +243,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setExtraFirmaVeriler(flattenExtraVeriler({}));
       return;
     }
-
     const allFirmIds = org.activeFirmIds && org.activeFirmIds.length > 0
       ? org.activeFirmIds
       : org.id ? [org.id] : [];
+    if (allFirmIds.length === 0) { setGeziciFirmalar([]); return; }
 
-    if (allFirmIds.length === 0) {
-      setGeziciFirmalar([]);
-      return;
-    }
+    supabase.from('organizations').select('id, name').in('id', allFirmIds).then(async ({ data: orgData }) => {
+      if (!orgData || orgData.length === 0) return;
+      const tehlikeMap: Record<string, string> = {};
+      try {
+        const { data: profiles } = await supabase
+          .from('firma_profiles')
+          .select('organization_id, tehlike_sinifi')
+          .in('organization_id', allFirmIds);
+        if (profiles) profiles.forEach((p: Record<string, string>) => {
+          if (p.tehlike_sinifi) tehlikeMap[p.organization_id] = p.tehlike_sinifi;
+        });
+      } catch { /* ignore */ }
+      setGeziciFirmalar(orgData.map(d => ({
+        id: d.id, ad: d.name, yetkiliKisi: '', telefon: '', email: '', adres: '',
+        sektor: '', notlar: '',
+        tehlikeSinifi: (tehlikeMap[d.id] as import('../types').TehlikeSinifi) || 'Az Tehlikeli',
+        durum: 'Aktif' as import('../types').FirmaStatus,
+        silinmis: false,
+        olusturmaTarihi: new Date().toISOString(),
+        guncellemeTarihi: new Date().toISOString(),
+      } as Firma)));
+    });
 
-    // Supabase'den firma adlarını ve profil verilerini çek
-    supabase
-      .from('organizations')
-      .select('id, name')
-      .in('id', allFirmIds)
-      .then(async ({ data: orgData }) => {
-        if (!orgData || orgData.length === 0) return;
-
-        // Her firma için personeller tablosundaki data'dan tehlikeSinifi çek
-        // personeller tablosunun data JSONB'sinde organization_id eşleşmesiyle firma profili alınabilir
-        // Alternatif: evraklar tablosundan da çekilebilir ama en güvenli yol
-        // useStore'dan gelen firmalar array'ini kontrol et — orada tehlikeSinifi dolu olabilir
-        // Eğer primary firma (org.id) store.firmalar'da varsa oradan al
-        const tehlikeMap: Record<string, string> = {};
-        
-        // Önce firma_profiles tablosunu dene (varsa)
-        try {
-          const { data: profiles } = await supabase
-            .from('firma_profiles')
-            .select('organization_id, tehlike_sinifi, yetkili_kisi, telefon, email, adres, durum, sozlesme_bas, sozlesme_bit')
-            .in('organization_id', allFirmIds);
-          
-          if (profiles && profiles.length > 0) {
-            profiles.forEach((p: Record<string, string>) => {
-              if (p.tehlike_sinifi) tehlikeMap[p.organization_id] = p.tehlike_sinifi;
-            });
-          }
-        } catch { /* firma_profiles tablosu yoksa sessizce geç */ }
-
-        setGeziciFirmalar(
-          orgData.map(d => ({
-            id: d.id,
-            ad: d.name,
-            yetkiliKisi: '',
-            telefon: '',
-            email: '',
-            adres: '',
-            sektor: '',
-            notlar: '',
-            tehlikeSinifi: (tehlikeMap[d.id] as import('../types').TehlikeSinifi) || 'Az Tehlikeli',
-            durum: 'Aktif' as import('../types').FirmaStatus,
-            silinmis: false,
-            olusturmaTarihi: new Date().toISOString(),
-            guncellemeTarihi: new Date().toISOString(),
-          } as Firma))
-        );
-      });
-
-    // Primary firma (org.id) zaten useStore tarafından yükleniyor
-    // Ek firmalar için ayrıca veri çek ve merge et
     const extraIds = allFirmIds.filter(id => id !== org.id);
     if (extraIds.length === 0) return;
 
     const fetchTableForOrg = async (table: string, orgId: string): Promise<unknown[]> => {
-      const { data } = await supabase
-        .from(table)
-        .select('id, data')
-        .eq('organization_id', orgId)
-        .is('deleted_at', null);
+      const { data } = await supabase.from(table).select('id, data').eq('organization_id', orgId).is('deleted_at', null);
       return (data ?? []).map(r => r.data as unknown);
     };
 
-    Promise.all(
-      extraIds.map(async (firmId) => {
-        const [personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri] = await Promise.all([
-          fetchTableForOrg('personeller', firmId),
-          fetchTableForOrg('evraklar', firmId),
-          fetchTableForOrg('egitimler', firmId),
-          fetchTableForOrg('muayeneler', firmId),
-          fetchTableForOrg('uygunsuzluklar', firmId),
-          fetchTableForOrg('ekipmanlar', firmId),
-          fetchTableForOrg('tutanaklar', firmId),
-          fetchTableForOrg('is_izinleri', firmId),
-        ]);
-        return { firmId, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri };
-      })
-    ).then(results => {
+    Promise.all(extraIds.map(async (firmId) => {
+      const [personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri] = await Promise.all([
+        fetchTableForOrg('personeller', firmId),
+        fetchTableForOrg('evraklar', firmId),
+        fetchTableForOrg('egitimler', firmId),
+        fetchTableForOrg('muayeneler', firmId),
+        fetchTableForOrg('uygunsuzluklar', firmId),
+        fetchTableForOrg('ekipmanlar', firmId),
+        fetchTableForOrg('tutanaklar', firmId),
+        fetchTableForOrg('is_izinleri', firmId),
+      ]);
+      return { firmId, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri };
+    })).then(results => {
       const newMap: ExtraFirmaVeriMap = {};
       results.forEach(r => {
         newMap[r.firmId] = {
@@ -361,33 +310,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [org?.osgbRole, org?.id, org?.activeFirmIds, flattenExtraVeriler]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Gezici uzman: ek firmalar için realtime subscription ──
+  // ── Gezici uzman: realtime subscription ────────────────────────────────
   useEffect(() => {
     if (org?.osgbRole !== 'gezici_uzman') return;
     const extraIds = (org.activeFirmIds ?? []).filter(id => id !== org.id);
     if (extraIds.length === 0) return;
 
-    const TABLES = [
-      'personeller', 'evraklar', 'egitimler', 'muayeneler',
-      'uygunsuzluklar', 'ekipmanlar', 'tutanaklar', 'is_izinleri',
-    ];
-
+    const TABLES = ['personeller', 'evraklar', 'egitimler', 'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'tutanaklar', 'is_izinleri'];
     type TableKey = 'personeller' | 'evraklar' | 'egitimler' | 'muayeneler' | 'uygunsuzluklar' | 'ekipmanlar' | 'tutanaklar' | 'isIzinleri';
     const TABLE_KEY_MAP: Record<string, TableKey> = {
-      personeller: 'personeller',
-      evraklar: 'evraklar',
-      egitimler: 'egitimler',
-      muayeneler: 'muayeneler',
-      uygunsuzluklar: 'uygunsuzluklar',
-      ekipmanlar: 'ekipmanlar',
-      tutanaklar: 'tutanaklar',
-      is_izinleri: 'isIzinleri',
+      personeller: 'personeller', evraklar: 'evraklar', egitimler: 'egitimler',
+      muayeneler: 'muayeneler', uygunsuzluklar: 'uygunsuzluklar', ekipmanlar: 'ekipmanlar',
+      tutanaklar: 'tutanaklar', is_izinleri: 'isIzinleri',
     };
 
     const channels = extraIds.map(firmId => {
       const channelName = `gezici_extra_${firmId}_${Date.now()}`;
       let ch = supabase.channel(channelName);
-
       TABLES.forEach(table => {
         ch = ch.on(
           'postgres_changes' as Parameters<typeof ch.on>[0],
@@ -395,80 +334,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
           (payload: { eventType: string; new: Record<string, unknown>; old?: Record<string, unknown> }) => {
             const recordId = (payload.new?.id ?? payload.old?.id) as string | undefined;
             if (!recordId) return;
-
             const tableKey = TABLE_KEY_MAP[table];
             if (!tableKey) return;
-
             const newData = payload.new?.data as Record<string, unknown> | undefined;
             const deletedAt = payload.new?.deleted_at;
             const isDeletion = payload.eventType === 'DELETE' || !!deletedAt;
-
             setExtraFirmaVeriMap(prev => {
               const firmData = prev[firmId] ?? {
                 personeller: [], evraklar: [], egitimler: [], muayeneler: [],
                 uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [],
               };
-
               type AnyRecord = { id: string };
               const currentList = (firmData[tableKey] as AnyRecord[]);
-
               let updatedList: AnyRecord[];
               if (isDeletion) {
                 updatedList = currentList.filter(r => r.id !== recordId);
               } else if (newData) {
                 const record = { ...newData, id: recordId } as AnyRecord;
                 const idx = currentList.findIndex(r => r.id === recordId);
-                if (idx === -1) {
-                  updatedList = [record, ...currentList];
-                } else {
-                  updatedList = [...currentList];
-                  updatedList[idx] = record;
-                }
+                updatedList = idx === -1 ? [record, ...currentList] : currentList.map((r, i) => i === idx ? record : r);
               } else {
-                return prev; // No change
+                return prev;
               }
-
               const updatedFirmData = { ...firmData, [tableKey]: updatedList };
               const newMap = { ...prev, [firmId]: updatedFirmData };
-              // Flatten'ı side effect olarak çalıştır
-              setTimeout(() => {
-                setExtraFirmaVeriler(flattenExtraVeriler(newMap));
-              }, 0);
+              setExtraFirmaVeriler(flattenExtraVeriler(newMap));
               return newMap;
             });
           }
         ) as typeof ch;
       });
-
       ch.subscribe();
       return ch;
     });
 
-    return () => {
-      channels.forEach(ch => supabase.removeChannel(ch));
-    };
+    return () => { channels.forEach(ch => supabase.removeChannel(ch)); };
   }, [org?.osgbRole, org?.id, org?.activeFirmIds, flattenExtraVeriler]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── fetchTable ──────────────────────────────────────────────────────────
   const fetchTable = useCallback(async (table: string) => {
     const orgId = org?.id;
     if (!orgId) return;
     const map: Record<string, (id: string) => Promise<void>> = {
-      firmalar:       store.fetchFirmalar,
-      personeller:    store.fetchPersoneller,
-      evraklar:       store.fetchEvraklar,
-      egitimler:      store.fetchEgitimler,
-      muayeneler:     store.fetchMuayeneler,
-      uygunsuzluklar: store.fetchUygunsuzluklar,
-      ekipmanlar:     store.fetchEkipmanlar,
-      gorevler:       store.fetchGorevler,
-      tutanaklar:     store.fetchTutanaklar,
-      is_izinleri:    store.fetchIsIzinleri,
+      firmalar: store.fetchFirmalar, personeller: store.fetchPersoneller,
+      evraklar: store.fetchEvraklar, egitimler: store.fetchEgitimler,
+      muayeneler: store.fetchMuayeneler, uygunsuzluklar: store.fetchUygunsuzluklar,
+      ekipmanlar: store.fetchEkipmanlar, gorevler: store.fetchGorevler,
+      tutanaklar: store.fetchTutanaklar, is_izinleri: store.fetchIsIzinleri,
     };
     const fn = map[table];
     if (fn) await fn(orgId);
     else console.warn(`[ISG] fetchTable: unknown table "${table}"`);
   }, [org?.id, store.fetchFirmalar, store.fetchPersoneller, store.fetchEvraklar, store.fetchEgitimler, store.fetchMuayeneler, store.fetchUygunsuzluklar, store.fetchEkipmanlar, store.fetchGorevler, store.fetchTutanaklar, store.fetchIsIzinleri]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Module / UI state ───────────────────────────────────────────────────
   const [activeModule, setActiveModuleState] = useState<string>(() => {
     try { return localStorage.getItem('isg_active_module') || 'dashboard'; } catch { return 'dashboard'; }
   });
@@ -481,60 +400,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [quickCreate, setQuickCreate] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
-  const [kontrolBildirimleri, setKontrolBildirimleri] = useState<Bildirim[]>([]);
-
-  const isIzniBildirimi = useCallback((
-    izinNo: string, izinId: string, tip: 'onaylandi' | 'reddedildi', sahaNotu?: string,
-  ) => {
-    const id = `is_izni_${tip}_${izinId}_${Date.now()}`;
-    const now = new Date().toISOString().split('T')[0];
-    const yeniBildirim: Bildirim = {
-      id,
-      tip: tip === 'onaylandi' ? 'is_izni_onaylandi' : 'is_izni_reddedildi',
-      mesaj: tip === 'onaylandi' ? `İş izni onaylandı — ${izinNo}` : `İş izni reddedildi — ${izinNo}`,
-      detay: sahaNotu ? `Saha notu: ${sahaNotu}` : tip === 'onaylandi' ? 'Sahada uygundur' : 'Uygun değil',
-      tarih: now,
-      okundu: false,
-      kalanGun: 0,
-      module: 'is-izinleri',
-      recordId: izinId,
-    };
-    setKontrolBildirimleri(prev => [yeniBildirim, ...prev].slice(0, 30));
-    setTimeout(() => {
-      setKontrolBildirimleri(prev => prev.map(b => b.id === id ? { ...b, okundu: true } : b));
-    }, 60000);
-  }, []);
-
-  const ekipmanKontrolBildirimi = useCallback((
-    ekipmanAd: string, ekipmanId: string, durum: string, gecikmisDi: boolean,
-  ) => {
-    const id = `kontrol_yapildi_${ekipmanId}_${Date.now()}`;
-    const now = new Date().toISOString().split('T')[0];
-    const yeniBildirim: Bildirim = {
-      id,
-      tip: 'ekipman_kontrol_yapildi',
-      mesaj: gecikmisDi ? `${ekipmanAd} — Gecikmiş kontrol tamamlandı` : `${ekipmanAd} — Kontrol tamamlandı`,
-      detay: `Durum: ${durum} · ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`,
-      tarih: now,
-      okundu: false,
-      kalanGun: 0,
-      module: 'ekipmanlar',
-      recordId: ekipmanId,
-    };
-    setKontrolBildirimleri(prev => [yeniBildirim, ...prev].slice(0, 20));
-    setTimeout(() => {
-      setKontrolBildirimleri(prev => prev.map(b => b.id === id ? { ...b, okundu: true } : b));
-    }, 30000);
-  }, []);
-
-  const [okunanlar, setOkunanlar] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem('isg_okunan_bildirimler');
-      return saved ? new Set<string>(JSON.parse(saved) as string[]) : new Set<string>();
-    } catch {
-      return new Set<string>();
-    }
-  });
 
   useEffect(() => {
     if (!user) return;
@@ -546,22 +411,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       (resolvedName && store.currentUser.ad !== resolvedName) ||
       (metaRole && store.currentUser.rol !== metaRole);
     if (needsUpdate) {
-      store.updateCurrentUser({
-        email: user.email,
-        ad: resolvedName,
-        ...(metaRole ? { rol: metaRole } : {}),
-      });
+      store.updateCurrentUser({ email: user.email, ad: resolvedName, ...(metaRole ? { rol: metaRole } : {}) });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.email, user?.user_metadata?.full_name, user?.user_metadata?.role]);
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'light') {
-      root.classList.add('light-mode');
-    } else {
-      root.classList.remove('light-mode');
-    }
+    if (theme === 'light') root.classList.add('light-mode');
+    else root.classList.remove('light-mode');
     localStorage.setItem('isg_theme', theme);
   }, [theme]);
 
@@ -569,129 +427,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
-  const bildirimler = useMemo<Bildirim[]>(() => {
-    const kontrolMerged = kontrolBildirimleri.map(b => ({
-      ...b,
-      okundu: b.okundu || okunanlar.has(b.id),
-    }));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const in30 = new Date(today.getTime() + 30 * 86400000);
-    const result: Bildirim[] = [];
-
-    const parseDate = (dateStr: string | null | undefined): Date | null => {
-      if (!dateStr || !dateStr.trim()) return null;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return null;
-      d.setHours(0, 0, 0, 0);
-      return d;
-    };
-
-    const getDaysRemaining = (dateStr: string | null | undefined): number | null => {
-      const d = parseDate(dateStr);
-      if (!d) return null;
-      return Math.ceil((d.getTime() - today.getTime()) / 86400000);
-    };
-
-    store.evraklar.forEach(e => {
-      if (e.silinmis) return;
-      const personel = e.personelId ? store.personeller.find(p => p.id === e.personelId) : null;
-      const firma = store.firmalar.find(f => f.id === e.firmaId);
-      const detayBase = `${personel ? personel.adSoyad + ' — ' : ''}${firma?.ad || ''}`;
-
-      if (e.durum === 'Süre Dolmuş') {
-        const d = parseDate(e.gecerlilikTarihi);
-        const tarihBilgi = d ? `${d.toLocaleDateString('tr-TR')} tarihinde doldu` : 'Süresi dolmuş';
-        result.push({ id: `evrak_dolmus_${e.id}`, tip: 'evrak_dolmus', mesaj: `${e.ad} evrakının süresi dolmuş`, detay: `${detayBase}${detayBase ? ' — ' : ''}${tarihBilgi}`, tarih: e.gecerlilikTarihi || new Date().toISOString().split('T')[0], okundu: okunanlar.has(`evrak_dolmus_${e.id}`), kalanGun: -1, module: 'evraklar', recordId: e.id });
-        return;
-      }
-      if (e.durum === 'Eksik') {
-        result.push({ id: `evrak_eksik_${e.id}`, tip: 'evrak_dolmus', mesaj: `${e.ad} evrakı eksik`, detay: `${detayBase}${detayBase ? ' — ' : ''}Evrak henüz yüklenmemiş`, tarih: new Date().toISOString().split('T')[0], okundu: okunanlar.has(`evrak_eksik_${e.id}`), kalanGun: -1, module: 'evraklar', recordId: e.id });
-        return;
-      }
-      const d = parseDate(e.gecerlilikTarihi);
-      if (!d) return;
-      const kalanGun = getDaysRemaining(e.gecerlilikTarihi)!;
-      if (d >= today && d <= in30) {
-        result.push({ id: `evrak_surecek_${e.id}`, tip: 'evrak_surecek', mesaj: `${e.ad} evrakının süresi yaklaşıyor`, detay: `${detayBase}${detayBase ? ' — ' : ''}${kalanGun === 0 ? 'Bugün dolacak!' : `${kalanGun} gün kaldı`}`, tarih: e.gecerlilikTarihi!, okundu: okunanlar.has(`evrak_surecek_${e.id}`), kalanGun, module: 'evraklar', recordId: e.id });
-      } else if (d < today) {
-        result.push({ id: `evrak_dolmus_${e.id}`, tip: 'evrak_dolmus', mesaj: `${e.ad} evrakının süresi dolmuş`, detay: `${detayBase}${detayBase ? ' — ' : ''}${d.toLocaleDateString('tr-TR')} tarihinde doldu`, tarih: e.gecerlilikTarihi!, okundu: okunanlar.has(`evrak_dolmus_${e.id}`), kalanGun, module: 'evraklar', recordId: e.id });
-      }
-    });
-
-    store.ekipmanlar.forEach(ek => {
-      if (ek.silinmis) return;
-      const firma = store.firmalar.find(f => f.id === ek.firmaId);
-      if (ek.durum === 'Uygun Değil') {
-        result.push({ id: `ekipman_uygunsuz_${ek.id}`, tip: 'ekipman_kontrol', mesaj: `${ek.ad} — KRİTİK: Uygun Değil`, detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman uygunsuz olarak işaretlendi`, tarih: new Date().toISOString().split('T')[0], okundu: okunanlar.has(`ekipman_uygunsuz_${ek.id}`), kalanGun: -999, module: 'ekipmanlar', recordId: ek.id });
-        return;
-      }
-      if (ek.durum === 'Bakımda') {
-        result.push({ id: `ekipman_bakimda_${ek.id}`, tip: 'ekipman_kontrol', mesaj: `${ek.ad} bakımda`, detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman bakım sürecinde`, tarih: new Date().toISOString().split('T')[0], okundu: okunanlar.has(`ekipman_bakimda_${ek.id}`), kalanGun: -1, module: 'ekipmanlar', recordId: ek.id });
-        return;
-      }
-      const d = parseDate(ek.sonrakiKontrolTarihi);
-      if (!d) return;
-      const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi)!;
-      if (kalanGun < 0) {
-        result.push({ id: `ekipman_gecikti_${ek.id}`, tip: 'ekipman_kontrol', mesaj: `${ek.ad} kontrolü gecikti`, detay: `${firma?.ad ? firma.ad + ' — ' : ''}${Math.abs(kalanGun)} gün gecikti`, tarih: ek.sonrakiKontrolTarihi, okundu: okunanlar.has(`ekipman_gecikti_${ek.id}`), kalanGun, module: 'ekipmanlar', recordId: ek.id });
-        return;
-      }
-      if (kalanGun > 60) return;
-      result.push({ id: `ekipman_${ek.id}`, tip: 'ekipman_kontrol', mesaj: `${ek.ad} kontrolü yaklaşıyor`, detay: `${firma?.ad ? firma.ad + ' — ' : ''}${kalanGun === 0 ? 'Bugün kontrol edilmeli!' : `${kalanGun} gün kaldı`}`, tarih: ek.sonrakiKontrolTarihi, okundu: okunanlar.has(`ekipman_${ek.id}`), kalanGun, module: 'ekipmanlar', recordId: ek.id });
-    });
-
-    store.muayeneler.forEach(m => {
-      if (m.silinmis) return;
-      const tarihStr = m.sonrakiTarih || m.muayeneTarihi;
-      const d = parseDate(tarihStr);
-      if (!d) return;
-      const kalanGun = getDaysRemaining(tarihStr)!;
-      if (kalanGun < 0 || kalanGun > 60) return;
-      const personel = store.personeller.find(p => p.id === m.personelId);
-      result.push({ id: `saglik_${m.id}`, tip: 'saglik_surecek', mesaj: `${personel?.adSoyad || 'Personel'} muayene tarihi yaklaşıyor`, detay: `Periyodik Muayene — ${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`, tarih: tarihStr!, okundu: okunanlar.has(`saglik_${m.id}`), kalanGun, module: 'muayeneler', recordId: m.id });
-    });
-
-    const sorted = result.sort((a, b) => a.kalanGun - b.kalanGun);
-    return [...kontrolMerged, ...sorted];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.evraklar, store.ekipmanlar, store.egitimler, store.muayeneler, store.personeller, store.firmalar, okunanlar, kontrolBildirimleri]);
-
-  const okunmamisBildirimSayisi = useMemo(
-    () => bildirimler.filter(b => !b.okundu).length,
-    [bildirimler],
-  );
-
-  const MAX_OKUNAN_IDS = 500;
-  const persistOkunanlar = useCallback((ids: Set<string>) => {
-    try {
-      const arr = [...ids].slice(-MAX_OKUNAN_IDS);
-      localStorage.setItem('isg_okunan_bildirimler', JSON.stringify(arr));
-    } catch { /* ignore */ }
-  }, []);
-
-  const bildirimOku = useCallback((id: string) => {
-    setOkunanlar(prev => {
-      const next = new Set([...prev, id]);
-      persistOkunanlar(next);
-      return next;
-    });
-  }, [persistOkunanlar]);
-
-  const tumunuOku = useCallback(() => {
-    const ids = bildirimler.map(b => b.id);
-    setOkunanlar(prev => {
-      const next = new Set([...prev, ...ids]);
-      persistOkunanlar(next);
-      return next;
-    });
-  }, [bildirimler, persistOkunanlar]);
-
-  const clearMustChangePassword = useCallback(async () => {
-    await clearMustChangePw();
-  }, [clearMustChangePw]);
-
-  // Gezici uzman için firmalar listesini atanmış tüm firmalarla doldur
+  // ── Merged data (gezici uzman: all firms merged) ────────────────────────
   const mergedFirmalar = useMemo<Firma[]>(() => {
     if (org?.osgbRole !== 'gezici_uzman') return store.firmalar;
     if (geziciFirmalar.length === 0) return store.firmalar;
@@ -700,8 +436,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return [...yeniFirmalar, ...store.firmalar];
   }, [org?.osgbRole, geziciFirmalar, store.firmalar]);
 
-  // Gezici uzman için tüm firmaların verilerini merge et
   const isGezici = org?.osgbRole === 'gezici_uzman';
+
   const mergedPersoneller = useMemo(() =>
     isGezici && extraFirmaVeriler.personeller.length > 0
       ? [...store.personeller, ...extraFirmaVeriler.personeller.filter(e => !store.personeller.some(s => s.id === e.id))]
@@ -750,9 +486,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
       : store.isIzinleri,
   [isGezici, store.isIzinleri, extraFirmaVeriler.isIzinleri]);
 
+  // ── Gorev store (isolated) ──────────────────────────────────────────────
+  const gorevStore = useGorevStore({
+    organizationId: org?.id ?? null,
+    userId: user?.id,
+    orgLoading,
+    isSwitching,
+    onSaveError: onSaveErrorCb,
+    logFn: logAction,
+  });
+
+  // ── Notification store (isolated) — MUST be after merged arrays ─────────
+  const {
+    bildirimler,
+    okunmamisBildirimSayisi,
+    bildirimOku,
+    tumunuOku,
+    ekipmanKontrolBildirimi,
+    isIzniBildirimi,
+  } = useNotificationStore({
+    evraklar: mergedEvraklar,
+    ekipmanlar: mergedEkipmanlar,
+    egitimler: mergedEgitimler,
+    muayeneler: mergedMuayeneler,
+    personeller: mergedPersoneller,
+    firmalar: mergedFirmalar,
+  });
+
+  const clearMustChangePassword = useCallback(async () => {
+    await clearMustChangePw();
+  }, [clearMustChangePw]);
+
   return (
     <AppContext.Provider value={{
       ...store,
+      // ── Gorev store override ──
+      gorevler: gorevStore.gorevler,
+      addGorev: gorevStore.addGorev,
+      updateGorev: gorevStore.updateGorev,
+      deleteGorev: gorevStore.deleteGorev,
+      fetchGorevler: gorevStore.fetchGorevler,
       firmalar: mergedFirmalar,
       personeller: mergedPersoneller,
       evraklar: mergedEvraklar,
@@ -771,19 +544,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       org, orgLoading, orgError: loadError,
       mustChangePassword: org?.mustChangePassword ?? false,
       clearMustChangePassword,
-      createOrg,
-      joinOrg,
-      regenerateInviteCode,
-      refetchOrg,
-      logAction,
-      fetchTable,
+      createOrg, joinOrg, regenerateInviteCode, refetchOrg,
+      logAction, fetchTable,
       refreshData: store.refreshAllData,
       pageLoading: store.pageLoading,
       partialLoading: store.partialLoading,
       realtimeStatus: store.realtimeStatus,
-      isSwitching,
-      switchActiveFirma,
-      fetchActiveFirmNames,
+      isSwitching, switchActiveFirma, fetchActiveFirmNames,
     }}>
       {children}
     </AppContext.Provider>

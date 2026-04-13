@@ -4,6 +4,7 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
 import { AuthProvider } from './store/AuthContext';
 import { AppProvider } from './store/AppContext';
+import { OfflineQueueProvider } from './store/OfflineQueueContext';
 import { ErrorBoundary } from './components/base/ErrorBoundary';
 
 function App() {
@@ -13,7 +14,9 @@ function App() {
         <AuthProvider>
           <BrowserRouter basename={__BASE_PATH__}>
             <AppProvider>
-              <AppRoutes />
+              <OfflineQueueProvider>
+                <AppRoutes />
+              </OfflineQueueProvider>
             </AppProvider>
           </BrowserRouter>
         </AuthProvider>

@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/store/AuthContext';
+import { supabase } from '@/lib/supabase';
 import SupportModal from '@/components/feature/SupportModal';
+import { useSupportStore } from '@/store/useSupportStore';
+
+interface SupportNotif {
+  id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  ticket_id: string | null;
+}
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -41,8 +52,47 @@ export default function HekimSidebar({
   onMobileClose,
 }: HekimSidebarProps) {
   const { logout, user } = useAuth();
+  const { supportOpen, viewTicketId, openSupport, closeSupport, openTicket } = useSupportStore();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [supportOpen, setSupportOpen] = useState(false);
+  const [notifs, setNotifs] = useState<SupportNotif[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const unreadCount = notifs.filter(n => !n.is_read).length;
+
+  const fetchNotifs = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from('notifications')
+      .select('id, title, message, is_read, created_at, ticket_id')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (data) setNotifs(data as SupportNotif[]);
+  };
+
+  useEffect(() => { fetchNotifs(); }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const markRead = async (id: string) => {
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  };
+
+  const markAllRead = async () => {
+    setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
+    const ids = notifs.filter(n => !n.is_read).map(n => n.id);
+    if (ids.length > 0) await supabase.from('notifications').update({ is_read: true }).in('id', ids);
+  };
 
   const userInitial = (user?.email ?? 'H').charAt(0).toUpperCase();
   const userName = user?.email?.split('@')[0] ?? 'İşyeri Hekimi';
@@ -219,10 +269,109 @@ export default function HekimSidebar({
           })}
         </nav>
 
-        {/* ── Support ── */}
-        <div className={`px-2.5 pb-2 ${collapsed ? 'flex justify-center' : ''}`}>
+        {/* ── Support + Bildirim ── */}
+        <div className={`px-2.5 pb-2 space-y-1.5 ${collapsed ? 'flex flex-col items-center' : ''}`}>
+          {/* Bildirim butonu */}
+          <div className={`relative ${collapsed ? '' : 'w-full'}`} ref={notifRef}>
+            <button
+              onClick={() => { setNotifOpen(v => !v); fetchNotifs(); }}
+              title={collapsed ? 'Bildirimler' : undefined}
+              className={`cursor-pointer rounded-xl transition-all duration-150 relative ${collapsed ? 'w-10 h-10 flex items-center justify-center' : 'w-full flex items-center gap-2.5 px-3 py-2'}`}
+              style={{ background: `rgba(14,165,233,0.06)`, border: `1px solid rgba(14,165,233,0.14)` }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `rgba(14,165,233,0.12)`; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `rgba(14,165,233,0.06)`; }}
+            >
+              <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 relative">
+                <i className="ri-notification-3-line text-xs" style={{ color: ACCENT }} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] flex items-center justify-center text-[8px] font-bold text-white rounded-full px-0.5"
+                    style={{ background: '#EF4444' }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </div>
+              {!collapsed && (
+                <>
+                  <span className="text-[11.5px] font-semibold flex-1 text-left" style={{ color: ACCENT }}>Bildirimler</span>
+                  {unreadCount > 0 && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>
+                      {unreadCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+
+            {/* Bildirim dropdown */}
+            {notifOpen && (
+              <div
+                className="absolute bottom-full mb-2 left-0 w-[280px] overflow-hidden z-50"
+                style={{
+                  background: 'var(--bg-card-solid, #fff)',
+                  border: '1px solid var(--border-subtle, rgba(15,23,42,0.09))',
+                  borderRadius: '16px',
+                  boxShadow: '0 20px 50px rgba(15,23,42,0.15)',
+                }}
+              >
+                <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-subtle, rgba(15,23,42,0.07))' }}>
+                  <p className="text-[12px] font-bold" style={{ color: 'var(--text-primary)' }}>Bildirimler</p>
+                  {unreadCount > 0 && (
+                    <button onClick={markAllRead} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg cursor-pointer" style={{ color: ACCENT, background: 'rgba(14,165,233,0.08)' }}>
+                      Tümünü oku
+                    </button>
+                  )}
+                </div>
+
+                {notifs.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <i className="ri-check-double-line text-xl mb-2 block" style={{ color: ACCENT }} />
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Yeni bildirim yok</p>
+                  </div>
+                ) : (
+                  <div className="max-h-60 overflow-y-auto">
+                    {notifs.map((n, idx) => (
+                      <div
+                        key={n.id}
+                        onClick={() => {
+                          markRead(n.id);
+                          setNotifOpen(false);
+                          if (n.ticket_id) {
+                            openTicket(n.ticket_id);
+                          }
+                        }}
+                        className="px-4 py-3 cursor-pointer transition-all"
+                        style={{
+                          borderBottom: idx < notifs.length - 1 ? '1px solid var(--border-subtle, rgba(15,23,42,0.07))' : 'none',
+                          opacity: n.is_read ? 0.55 : 1,
+                          background: !n.is_read ? 'rgba(14,165,233,0.03)' : 'transparent',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,0.06)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = !n.is_read ? 'rgba(14,165,233,0.03)' : 'transparent'; }}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0 mt-0.5" style={{ background: 'rgba(14,165,233,0.1)' }}>
+                            <i className="ri-reply-line text-[10px]" style={{ color: ACCENT }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1">
+                              <p className="text-[11px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>{n.title}</p>
+                              {!n.is_read && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: ACCENT }} />}
+                            </div>
+                            <p className="text-[10px] mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>{n.message}</p>
+                            <p className="text-[9px] mt-1" style={{ color: 'var(--text-faint)' }}>{new Date(n.created_at).toLocaleString('tr-TR')}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Destek butonu */}
           <button
-            onClick={() => setSupportOpen(true)}
+            onClick={openSupport}
             title={collapsed ? 'Destek' : undefined}
             className={`cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'w-10 h-10 flex items-center justify-center' : 'w-full flex items-center gap-2.5 px-3 py-2'}`}
             style={{ background: `rgba(14,165,233,0.06)`, border: `1px solid rgba(14,165,233,0.14)` }}
@@ -291,7 +440,11 @@ export default function HekimSidebar({
         </div>
       </aside>
 
-      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+      <SupportModal
+        open={supportOpen}
+        onClose={closeSupport}
+        viewTicketId={viewTicketId}
+      />
     </>
   );
 }

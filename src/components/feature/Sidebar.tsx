@@ -2,6 +2,7 @@ import { useEffect, Fragment, useState } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
 import SupportModal from './SupportModal';
+import { useSupportStore } from '@/store/useSupportStore';
 
 const ROLE_MODULES: Record<string, string[]> = {
   admin: [
@@ -89,7 +90,7 @@ interface SidebarProps {
 export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = false }: SidebarProps) {
   const { activeModule, setActiveModule, sidebarCollapsed, setSidebarCollapsed, currentUser, firmalar, personeller, evraklar, org, orgLoading } = useApp();
   const { logout, user } = useAuth();
-  const [supportOpen, setSupportOpen] = useState(false);
+  const { supportOpen, viewTicketId, openSupport, closeSupport } = useSupportStore();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   const userRole = org?.role ?? 'member';
@@ -375,7 +376,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         {/* ── Support Button ── */}
         <div className={`px-2.5 pb-2 ${collapsed ? 'flex justify-center' : ''}`}>
           <button
-            onClick={() => setSupportOpen(true)}
+            onClick={openSupport}
             title={collapsed ? 'Destek / Sorun Bildir' : ''}
             className={`cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'w-10 h-10 flex items-center justify-center' : 'w-full flex items-center gap-2.5 px-3 py-2'}`}
             style={{
@@ -446,7 +447,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         </div>
       </aside>
 
-      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+      <SupportModal open={supportOpen} onClose={closeSupport} viewTicketId={viewTicketId} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/store/AuthContext';
 import SupportModal from '@/components/feature/SupportModal';
+import { useSupportStore } from '@/store/useSupportStore';
 
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
@@ -58,8 +59,8 @@ export default function OsgbSidebar({
   uzmanCount = 0,
 }: OsgbSidebarProps) {
   const { logout, user } = useAuth();
+  const { supportOpen, viewTicketId, openSupport, closeSupport } = useSupportStore();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [supportOpen, setSupportOpen] = useState(false);
 
   const handleNav = (tab: Tab) => {
     setActiveTab(tab);
@@ -262,7 +263,7 @@ export default function OsgbSidebar({
         {/* ── Support ── */}
         <div className={`px-2.5 pb-2 ${collapsed ? 'flex justify-center' : ''}`}>
           <button
-            onClick={() => setSupportOpen(true)}
+            onClick={openSupport}
             title={collapsed ? 'Destek' : undefined}
             className={`cursor-pointer rounded-xl transition-all duration-150 ${collapsed ? 'w-10 h-10 flex items-center justify-center' : 'w-full flex items-center gap-2.5 px-3 py-2'}`}
             style={{ background: `rgba(14,165,233,0.06)`, border: `1px solid rgba(14,165,233,0.14)` }}
@@ -329,7 +330,11 @@ export default function OsgbSidebar({
         </div>
       </aside>
 
-      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+      <SupportModal
+        open={supportOpen}
+        onClose={closeSupport}
+        viewTicketId={viewTicketId}
+      />
     </>
   );
 }
