@@ -33,24 +33,18 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // ── Gezici Uzman yönlendirme ──
   if (osgbRole === 'gezici_uzman') {
-    // Sadece /uzman ve /osgb-uzman sayfalarına erişebilir
-    const allowedPaths = ['/uzman', '/osgb-uzman'];
+    // Sadece /uzman ve /saha sayfalarına erişebilir
+    const allowedPaths = ['/uzman', '/saha', '/osgb-uzman'];
     if (!allowedPaths.includes(location.pathname)) {
-      // Firma atanmamış → bekleme ekranı
-      const hasActiveFirm = (org.activeFirmIds?.length ?? 0) > 0;
-      return <Navigate to={hasActiveFirm ? '/uzman' : '/osgb-uzman'} replace />;
+      // Her durumda /uzman'a yönlendir — AtamaBekleyenEkran orada gösterilir
+      return <Navigate to="/uzman" replace />;
     }
     return <>{children}</>;
   }
 
   // ── İşyeri Hekimi yönlendirme ──
   if (osgbRole === 'isyeri_hekimi') {
-    const hasActiveFirm = (org.activeFirmIds?.length ?? 0) > 0;
-    if (!hasActiveFirm) {
-      if (location.pathname !== '/osgb-uzman') return <Navigate to="/osgb-uzman" replace />;
-      return <>{children}</>;
-    }
-    // Hekim SADECE /hekim'de çalışır
+    // Hekim SADECE /hekim'de çalışır — firma yoksa da AtamaBekleyenEkran orada gösterilir
     if (location.pathname !== '/hekim') return <Navigate to="/hekim" replace />;
     return <>{children}</>;
   }

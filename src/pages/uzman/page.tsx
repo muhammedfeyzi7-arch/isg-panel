@@ -160,6 +160,88 @@ export default function UzmanPage() {
     fetchFirmalar();
   }, [user?.id, org?.id]);
 
+  // Realtime: user_organizations değişince firma listesini yenile
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`uzman_user_orgs_${user.id}`)
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: '*', schema: 'public', table: 'user_organizations', filter: `user_id=eq.${user.id}` } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        async () => {
+          // user_organizations değişti → organizations listesini yeniden çek
+          setLoading(true);
+          try {
+            const { data } = await supabase
+              .from('user_organizations')
+              .select('organization_id, active_firm_ids')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .maybeSingle();
+
+            if (data) {
+              const rawFirmIds: string[] =
+                Array.isArray(data.active_firm_ids) && data.active_firm_ids.length > 0
+                  ? data.active_firm_ids
+                  : [data.organization_id];
+
+              const { data: orgs } = await supabase
+                .from('organizations')
+                .select('id, name')
+                .in('id', rawFirmIds)
+                .is('deleted_at', null);
+
+              const options: FirmaOption[] = (orgs ?? []).map(o => ({ id: o.id, name: o.name }));
+              const firmIds = options.map(o => o.id);
+              setAtanmisFirmaIds(firmIds);
+              setFirmaOptions(options);
+              // Aktif firma silinmişse seçimi temizle
+              setAktiveFirmaId(prev => (prev && firmIds.includes(prev) ? prev : options.length === 1 ? options[0].id : null));
+            } else {
+              setAtanmisFirmaIds([]);
+              setFirmaOptions([]);
+              setAktiveFirmaId(null);
+            }
+          } catch (err) {
+            console.error('[UzmanPage] realtime refetch error:', err);
+          } finally {
+            setLoading(false);
+          }
+        }
+      )
+      .subscribe();
+
+    // organizations tablosunu da dinle (firma silindiğinde deleted_at set olur)
+    const orgChannel = supabase
+      .channel(`uzman_orgs_watch_${user.id}`)
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: 'UPDATE', schema: 'public', table: 'organizations' } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        async (payload: { new: Record<string, unknown> }) => {
+          // Eğer güncellenen firma mevcut listemizdeyse ve silinmişse listeden çıkar
+          const updatedId = payload.new?.id as string | undefined;
+          const deletedAt = payload.new?.deleted_at;
+          if (updatedId && deletedAt) {
+            setAtanmisFirmaIds(prev => {
+              const next = prev.filter(id => id !== updatedId);
+              return next;
+            });
+            setFirmaOptions(prev => {
+              const next = prev.filter(f => f.id !== updatedId);
+              return next;
+            });
+            setAktiveFirmaId(prev => (prev === updatedId ? null : prev));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(orgChannel);
+    };
+  }, [user?.id]);
+
   const goruntulenenFirmaIds = aktiveFirmaId ? [aktiveFirmaId] : atanmisFirmaIds;
 
   // Her iki loading de tamamlanana kadar yükleme ekranını göster

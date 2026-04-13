@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '@/store/AppContext';
 import { useAuth } from '@/store/AuthContext';
 import OnboardingTour from '@/components/feature/OnboardingTour';
@@ -106,44 +106,90 @@ export default function HekimPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const fetchFirmalar = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from('user_organizations')
+        .select('organization_id, active_firm_ids')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (data) {
+        const baseOrgId = data.organization_id;
+        setOrgId(baseOrgId);
+        const rawFirmIds: string[] =
+          Array.isArray(data.active_firm_ids) && data.active_firm_ids.length > 0
+            ? data.active_firm_ids
+            : [baseOrgId];
+
+        // Silinmemiş firmaları filtrele
+        const { data: orgs } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .in('id', rawFirmIds)
+          .is('deleted_at', null);
+
+        const options: FirmaOption[] = (orgs ?? []).map(o => ({ id: o.id, name: o.name }));
+        const firmIds = options.map(o => o.id);
+        setAtanmisFirmaIds(firmIds);
+        setFirmaOptions(options);
+        if (options.length === 1) setAktiveFirmaId(options[0].id);
+        else setAktiveFirmaId(prev => (prev && firmIds.includes(prev) ? prev : null));
+      } else {
+        setAtanmisFirmaIds([]);
+        setFirmaOptions([]);
+        setAktiveFirmaId(null);
+      }
+    } catch (err) {
+      console.error('[HekimPage] fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!user || !org) return;
-    const fetchFirmalar = async () => {
-      setLoading(true);
-      try {
-        const { data } = await supabase
-          .from('user_organizations')
-          .select('organization_id, active_firm_ids')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (data) {
-          const baseOrgId = data.organization_id;
-          setOrgId(baseOrgId);
-          const firmIds: string[] =
-            Array.isArray(data.active_firm_ids) && data.active_firm_ids.length > 0
-              ? data.active_firm_ids
-              : [baseOrgId];
-          setAtanmisFirmaIds(firmIds);
-
-          const { data: orgs } = await supabase
-            .from('organizations')
-            .select('id, name')
-            .in('id', firmIds);
-
-          const options: FirmaOption[] = (orgs ?? []).map(o => ({ id: o.id, name: o.name }));
-          setFirmaOptions(options);
-          if (options.length === 1) setAktiveFirmaId(options[0].id);
-        }
-      } catch (err) {
-        console.error('[HekimPage] fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchFirmalar();
-  }, [user?.id, org?.id]);
+  }, [user?.id, org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime: user_organizations ve organizations değişince firma listesini yenile
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`hekim_user_orgs_${user.id}`)
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: '*', schema: 'public', table: 'user_organizations', filter: `user_id=eq.${user.id}` } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        () => { fetchFirmalar(); }
+      )
+      .subscribe();
+
+    const orgChannel = supabase
+      .channel(`hekim_orgs_watch_${user.id}`)
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: 'UPDATE', schema: 'public', table: 'organizations' } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        (payload: { new: Record<string, unknown> }) => {
+          const updatedId = payload.new?.id as string | undefined;
+          const deletedAt = payload.new?.deleted_at;
+          if (updatedId && deletedAt) {
+            setAtanmisFirmaIds(prev => prev.filter(id => id !== updatedId));
+            setFirmaOptions(prev => prev.filter(f => f.id !== updatedId));
+            setAktiveFirmaId(prev => (prev === updatedId ? null : prev));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(orgChannel);
+    };
+  }, [user?.id, fetchFirmalar]);
 
   const goruntulenenFirmaIds = aktiveFirmaId ? [aktiveFirmaId] : atanmisFirmaIds;
   const aktifFirmaAd = aktiveFirmaId
