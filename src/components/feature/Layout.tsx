@@ -157,10 +157,17 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { sidebarCollapsed, theme, activeModule, orgLoading, org } = useApp();
   const navigate = useNavigate();
 
-  // ── İşyeri Hekimi Guard: Normal layout'ta olmamalı ──
+  // ── Özel Rol Guard: Normal layout'ta olmamalı ──
   useEffect(() => {
-    if (!orgLoading && org?.osgbRole === 'isyeri_hekimi') {
+    if (orgLoading) return;
+    if (org?.osgbRole === 'isyeri_hekimi') {
       navigate('/hekim', { replace: true });
+    }
+    if (org?.osgbRole === 'gezici_uzman') {
+      navigate('/uzman', { replace: true });
+    }
+    if (org?.osgbRole === 'osgb_admin') {
+      navigate('/osgb-dashboard', { replace: true });
     }
   }, [org?.osgbRole, orgLoading, navigate]);
 

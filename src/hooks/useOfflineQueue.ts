@@ -1,23 +1,18 @@
 /**
  * useOfflineQueue — Saha sayfası için offline işlem kuyruğu
  *
- * Çalışma mantığı:
- * 1. İnternet varsa → işlemi direkt uygula (normal akış)
- * 2. İnternet yoksa → işlemi IndexedDB kuyruğuna ekle, UI'ya anında yansıt
- * 3. İnternet gelince → kuyruktaki tüm işlemleri sırayla uygula
- *
  * Desteklenen işlemler:
- * - ekipman_kontrol: Ekipman kontrol durumu güncelleme
- * - ekipman_durum: Ekipman durum değiştirme
- * - uygunsuzluk_ekle: Yeni uygunsuzluk ekleme
+ * - ekipman_kontrol     : Ekipman kontrol durumu güncelleme
+ * - ekipman_durum       : Ekipman durum değiştirme
+ * - ziyaret_checkin     : Ziyaret başlatma (check-in)
+ * - ziyaret_checkout    : Ziyaret bitirme (check-out)
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { EkipmanStatus } from '@/types';
 
-// ─── IndexedDB helpers ───────────────────────────────────────────────────────
-const DB_NAME = 'isg_offline_queue';
-const DB_VERSION = 1;
+// ─── IndexedDB helpers ────────────────────────────────────────────────────────
+const DB_NAME    = 'isg_offline_queue';
+const DB_VERSION = 2;  // v2: ziyaret tipleri eklendi
 const STORE_NAME = 'queue';
 
 function openDB(): Promise<IDBDatabase> {
@@ -31,7 +26,7 @@ function openDB(): Promise<IDBDatabase> {
       }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror  = () => reject(req.error);
   });
 }
 
@@ -39,10 +34,10 @@ async function dbGetAll(): Promise<OfflineQueueItem[]> {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
+      const tx  = db.transaction(STORE_NAME, 'readonly');
       const req = tx.objectStore(STORE_NAME).index('createdAt').getAll();
       req.onsuccess = () => resolve(req.result as OfflineQueueItem[]);
-      req.onerror = () => reject(req.error);
+      req.onerror   = () => reject(req.error);
     });
   } catch {
     return [];
@@ -53,10 +48,10 @@ async function dbAdd(item: OfflineQueueItem): Promise<void> {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const tx  = db.transaction(STORE_NAME, 'readwrite');
       const req = tx.objectStore(STORE_NAME).put(item);
       req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      req.onerror   = () => reject(req.error);
     });
   } catch {
     // IndexedDB kullanılamıyorsa sessizce geç
@@ -67,10 +62,10 @@ async function dbDelete(id: string): Promise<void> {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const tx  = db.transaction(STORE_NAME, 'readwrite');
       const req = tx.objectStore(STORE_NAME).delete(id);
       req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      req.onerror   = () => reject(req.error);
     });
   } catch {
     // sessizce geç
@@ -81,20 +76,48 @@ async function dbClear(): Promise<void> {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const tx  = db.transaction(STORE_NAME, 'readwrite');
       const req = tx.objectStore(STORE_NAME).clear();
       req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      req.onerror   = () => reject(req.error);
     });
   } catch {
     // sessizce geç
   }
 }
 
-// ─── Tipler ──────────────────────────────────────────────────────────────────
+// ─── Tipler ───────────────────────────────────────────────────────────────────
 export type OfflineActionType =
   | 'ekipman_kontrol'
-  | 'ekipman_durum';
+  | 'ekipman_durum'
+  | 'ziyaret_checkin'
+  | 'ziyaret_checkout';
+
+export interface ZiyaretCheckinPayload {
+  tempId: string;              // Offline oluşturulan geçici ID (localStorage'da saklı)
+  osgbOrgId: string;
+  firmaOrgId: string;
+  firmaAd: string;
+  uzmanUserId: string;
+  uzmanAd: string;
+  uzmanEmail: string | null;
+  girisAt: string;             // ISO timestamp
+  qrIleGiris: boolean;
+  checkInLat: number | null;
+  checkInLng: number | null;
+  gpsStatus: 'ok' | 'too_far' | 'no_permission' | null;
+  checkInDistanceM: number | null;
+}
+
+export interface ZiyaretCheckoutPayload {
+  tempId: string | null;       // Offline oluşturulanın geçici ID'si (gerçek id yoksa)
+  realId: string | null;       // Gerçek DB id (online oluşturulmuşsa)
+  uzmanUserId: string;
+  cikisAt: string;             // ISO timestamp
+  sureDakika: number | null;
+  checkOutLat: number | null;
+  checkOutLng: number | null;
+}
 
 export interface OfflineQueueItem {
   id: string;
@@ -102,7 +125,7 @@ export interface OfflineQueueItem {
   payload: Record<string, unknown>;
   createdAt: number;
   retryCount: number;
-  label: string; // Kullanıcıya gösterilecek açıklama
+  label: string;
 }
 
 export interface OfflineQueueState {
@@ -120,48 +143,40 @@ export interface UseOfflineQueueReturn extends OfflineQueueState {
   clearQueue: () => Promise<void>;
 }
 
-// ─── Hook ────────────────────────────────────────────────────────────────────
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useOfflineQueue(
   onApply: (item: OfflineQueueItem) => Promise<void>,
 ): UseOfflineQueueReturn {
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline]       = useState(() => navigator.onLine);
+  const [isSyncing, setIsSyncing]     = useState(false);
   const [pendingItems, setPendingItems] = useState<OfflineQueueItem[]>([]);
-  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
-  const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt]   = useState<Date | null>(null);
+  const [syncError, setSyncError]     = useState<string | null>(null);
 
-  const onApplyRef = useRef(onApply);
+  const onApplyRef   = useRef(onApply);
+  const isSyncingRef = useRef(false);
   useEffect(() => { onApplyRef.current = onApply; }, [onApply]);
 
-  const isSyncingRef = useRef(false);
-
-  // IndexedDB'den kuyruğu yükle
   const loadQueue = useCallback(async () => {
     const items = await dbGetAll();
     setPendingItems(items);
   }, []);
 
-  useEffect(() => {
-    void loadQueue();
-  }, [loadQueue]);
+  useEffect(() => { void loadQueue(); }, [loadQueue]);
 
-  // Kuyruğu uygula
   const syncNow = useCallback(async () => {
     if (isSyncingRef.current) return;
     if (!navigator.onLine) return;
 
     const items = await dbGetAll();
-    if (items.length === 0) {
-      setPendingItems([]);
-      return;
-    }
+    if (items.length === 0) { setPendingItems([]); return; }
 
     isSyncingRef.current = true;
     setIsSyncing(true);
     setSyncError(null);
 
     let successCount = 0;
-    let failCount = 0;
+    let failCount    = 0;
 
     for (const item of items) {
       try {
@@ -170,14 +185,13 @@ export function useOfflineQueue(
         successCount++;
       } catch (err) {
         failCount++;
-        // Retry sayısını artır
         const updated: OfflineQueueItem = { ...item, retryCount: item.retryCount + 1 };
         await dbAdd(updated);
         console.warn(`[OfflineQueue] Sync failed for ${item.id}:`, err);
-        // 3 denemeden sonra kuyruğu temizle (bozuk kayıt)
+        // 3 denemeden sonra bırak
         if (updated.retryCount >= 3) {
           await dbDelete(item.id);
-          console.error(`[OfflineQueue] Dropped item after 3 retries: ${item.id}`);
+          console.error(`[OfflineQueue] Dropped after 3 retries: ${item.id}`);
         }
       }
     }
@@ -190,30 +204,22 @@ export function useOfflineQueue(
 
     if (failCount > 0) {
       setSyncError(`${failCount} işlem uygulanamadı, ${successCount} işlem başarılı.`);
-    } else if (successCount > 0) {
+    } else {
       setSyncError(null);
     }
   }, []);
 
-  // Online/offline event listener
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       setSyncError(null);
-      // Kısa gecikme ile sync — bağlantı tam kurulsun
       setTimeout(() => { void syncNow(); }, 1500);
     };
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
+    const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    // Sayfa açılışında online ise ve kuyruk varsa sync et
-    if (navigator.onLine) {
-      setTimeout(() => { void syncNow(); }, 500);
-    }
+    if (navigator.onLine) setTimeout(() => { void syncNow(); }, 500);
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -221,7 +227,6 @@ export function useOfflineQueue(
     };
   }, [syncNow]);
 
-  // Kuyruğa işlem ekle
   const addToQueue = useCallback(async (
     item: Omit<OfflineQueueItem, 'id' | 'createdAt' | 'retryCount'>,
   ) => {
@@ -235,7 +240,6 @@ export function useOfflineQueue(
     setPendingItems(prev => [...prev, newItem]);
   }, []);
 
-  // Kuyruğu temizle
   const clearQueue = useCallback(async () => {
     await dbClear();
     setPendingItems([]);

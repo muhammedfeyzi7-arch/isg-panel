@@ -19,9 +19,13 @@ export default function CopKutusuPage() {
     restoreTutanak, permanentDeleteTutanak,
     restoreIsIzni, permanentDeleteIsIzni,
     addToast,
+    org,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<Tab>('firmalar');
+  // Gezici uzman firma silme/restore yapamaz
+  const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
+
+  const [activeTab, setActiveTab] = useState<Tab>(() => isGeziciUzman ? 'personeller' : 'firmalar');
   const [permDeleteItem, setPermDeleteItem] = useState<{ id: string; tip: Tab; ad: string } | null>(null);
 
   // Toplu seçim
@@ -68,7 +72,8 @@ export default function CopKutusuPage() {
   };
 
   const totalDeleted =
-    deletedFirmalar.length + deletedPersoneller.length +
+    (isGeziciUzman ? 0 : deletedFirmalar.length) +
+    deletedPersoneller.length +
     deletedEvraklar.length + deletedEgitimler.length + deletedMuayeneler.length +
     deletedEkipmanlar.length + deletedUygunsuzluklar.length +
     deletedTutanaklar.length + deletedIsIzinleri.length;
@@ -175,7 +180,7 @@ export default function CopKutusuPage() {
   const canRestore = (tip: Tab) => ['firmalar', 'personeller', 'evraklar', 'egitimler', 'muayeneler', 'ekipmanlar', 'tutanaklar', 'is_izinleri'].includes(tip);
 
   const tabs: { id: Tab; label: string; icon: string; count: number; color: string }[] = [
-    { id: 'firmalar',       label: 'Firmalar',       icon: 'ri-building-2-line',      count: deletedFirmalar.length,       color: '#3B82F6' },
+    ...(!isGeziciUzman ? [{ id: 'firmalar' as Tab, label: 'Firmalar', icon: 'ri-building-2-line', count: deletedFirmalar.length, color: '#3B82F6' }] : []),
     { id: 'personeller',    label: 'Personeller',    icon: 'ri-team-line',             count: deletedPersoneller.length,    color: '#10B981' },
     { id: 'evraklar',       label: 'Evraklar',       icon: 'ri-file-list-3-line',      count: deletedEvraklar.length,       color: '#F59E0B' },
     { id: 'egitimler',      label: 'Eğitimler',      icon: 'ri-graduation-cap-line',   count: deletedEgitimler.length,      color: '#60A5FA' },

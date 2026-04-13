@@ -266,27 +266,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Supabase'den firma adlarını çek
+    // Supabase'den firma adlarını ve profil verilerini çek
     supabase
       .from('organizations')
       .select('id, name')
       .in('id', allFirmIds)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setGeziciFirmalar(
-            data.map(d => ({
-              id: d.id,
-              ad: d.name,
-              yetkiliKisi: '',
-              telefon: '',
-              email: '',
-              adres: '',
-              sektor: '',
-              notlar: '',
-              silinmis: false,
-            } as Firma))
-          );
-        }
+      .then(async ({ data: orgData }) => {
+        if (!orgData || orgData.length === 0) return;
+
+        // Her firma için personeller tablosundaki data'dan tehlikeSinifi çek
+        // personeller tablosunun data JSONB'sinde organization_id eşleşmesiyle firma profili alınabilir
+        // Alternatif: evraklar tablosundan da çekilebilir ama en güvenli yol
+        // useStore'dan gelen firmalar array'ini kontrol et — orada tehlikeSinifi dolu olabilir
+        // Eğer primary firma (org.id) store.firmalar'da varsa oradan al
+        const tehlikeMap: Record<string, string> = {};
+        
+        // Önce firma_profiles tablosunu dene (varsa)
+        try {
+          const { data: profiles } = await supabase
+            .from('firma_profiles')
+            .select('organization_id, tehlike_sinifi, yetkili_kisi, telefon, email, adres, durum, sozlesme_bas, sozlesme_bit')
+            .in('organization_id', allFirmIds);
+          
+          if (profiles && profiles.length > 0) {
+            profiles.forEach((p: Record<string, string>) => {
+              if (p.tehlike_sinifi) tehlikeMap[p.organization_id] = p.tehlike_sinifi;
+            });
+          }
+        } catch { /* firma_profiles tablosu yoksa sessizce geç */ }
+
+        setGeziciFirmalar(
+          orgData.map(d => ({
+            id: d.id,
+            ad: d.name,
+            yetkiliKisi: '',
+            telefon: '',
+            email: '',
+            adres: '',
+            sektor: '',
+            notlar: '',
+            tehlikeSinifi: (tehlikeMap[d.id] as import('../types').TehlikeSinifi) || 'Az Tehlikeli',
+            durum: 'Aktif' as import('../types').FirmaStatus,
+            silinmis: false,
+            olusturmaTarihi: new Date().toISOString(),
+            guncellemeTarihi: new Date().toISOString(),
+          } as Firma))
+        );
       });
 
     // Primary firma (org.id) zaten useStore tarafından yükleniyor

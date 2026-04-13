@@ -46,19 +46,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   // ── İşyeri Hekimi yönlendirme ──
   if (osgbRole === 'isyeri_hekimi') {
     const hasActiveFirm = (org.activeFirmIds?.length ?? 0) > 0;
-
     if (!hasActiveFirm) {
-      // Firma atanmamış → hekim bekleme ekranı (osgb-uzman ile aynı sayfa)
-      if (location.pathname !== '/osgb-uzman') {
-        return <Navigate to="/osgb-uzman" replace />;
-      }
+      if (location.pathname !== '/osgb-uzman') return <Navigate to="/osgb-uzman" replace />;
       return <>{children}</>;
     }
-
-    // Hekim sadece /hekim panelinde çalışsın
-    if (location.pathname !== '/hekim') {
-      return <Navigate to="/hekim" replace />;
-    }
+    // Hekim SADECE /hekim'de çalışır
+    if (location.pathname !== '/hekim') return <Navigate to="/hekim" replace />;
     return <>{children}</>;
   }
 

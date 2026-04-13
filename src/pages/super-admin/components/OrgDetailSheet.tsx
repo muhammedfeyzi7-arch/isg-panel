@@ -15,18 +15,20 @@ function formatDate(d: string | null | undefined) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
-function isExpired(d: string | null | undefined) { return d ? new Date(d) < new Date() : false; }
+
 function daysLeft(d: string | null | undefined) {
   if (!d) return null;
-  return Math.ceil((new Date(d).getTime() - new Date().getTime()) / 86400000);
+  return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
 }
 
 function orgInitials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
+type TabType = 'users' | 'activity' | 'system';
+
 export default function OrgDetailSheet({ org, superAdminUserId, onClose, onUpdate, onDelete }: Props) {
-  const [tab, setTab] = useState<'info' | 'members'>('info');
+  const [tab, setTab] = useState<TabType>('users');
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -34,11 +36,18 @@ export default function OrgDetailSheet({ org, superAdminUserId, onClose, onUpdat
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 
   useEffect(() => {
-    if (org) { setEndDate(org.subscription_end || ''); setConfirmDelete(false); setTab('info'); }
+    if (org) {
+      setEndDate(org.subscription_end || '');
+      setConfirmDelete(false);
+      setTab('users');
+    }
   }, [org]);
 
   useEffect(() => {
-    if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); }
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 2500);
+      return () => clearTimeout(t);
+    }
   }, [toast]);
 
   const handleToggleActive = async () => {
@@ -70,190 +79,247 @@ export default function OrgDetailSheet({ org, superAdminUserId, onClose, onUpdat
 
   if (!org) return null;
 
-  const expired = isExpired(org.subscription_end);
   const days = daysLeft(org.subscription_end);
+  const isExpired = org.subscription_end ? new Date(org.subscription_end) < new Date() : false;
   const initials = orgInitials(org.name);
 
   return createPortal(
     <>
-      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full md:max-w-md bg-white border-l border-slate-200 z-50 flex flex-col">
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-[100]" onClick={onClose} />
+      
+      {/* Sidebar */}
+      <div className="fixed right-0 top-0 h-full w-full md:max-w-md bg-white border-l border-slate-200 z-[100] flex flex-col shadow-2xl animate-in slide-in-from-right">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
-          <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
-            <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-900 text-white text-xs font-semibold flex-shrink-0">
-              {initials}
+        {/* Header - Üst Alan (Summary) */}
+        <div className="bg-slate-50 border-b border-slate-100 flex-shrink-0">
+          <div className="flex items-start justify-between px-5 pt-5 pb-4">
+            <div className="flex gap-4">
+              <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-900 text-white font-bold text-lg flex-shrink-0 shadow-sm">
+                {initials}
+              </div>
+              <div className="min-w-0 pt-0.5">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-slate-800 font-bold text-base leading-tight truncate">{org.name}</h2>
+                  {org.org_type === 'osgb' ? (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-teal-100 text-teal-700">OSGB</span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-600">Firma</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span className="font-mono">{org.invite_code}</span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span className="flex items-center gap-1">
+                    <i className="ri-team-line"></i> {org.member_count || 0} üye
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h2 className="text-slate-800 font-semibold text-sm leading-tight truncate">{org.name}</h2>
-              <p className="text-slate-400 text-xs font-mono mt-0.5">{org.invite_code}</p>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer flex-shrink-0">
+              <i className="ri-close-line text-xl"></i>
+            </button>
+          </div>
+
+          {/* Durum / Abonelik Özeti */}
+          <div className="px-5 pb-5">
+            <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+              {/* Aktif/Pasif */}
+              <div className="flex flex-col flex-1 border-r border-slate-100">
+                <span className="text-[10px] font-bold uppercase text-slate-400 mb-1">Durum</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${org.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                  <span className={`text-sm font-semibold ${org.is_active ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {org.is_active ? 'Aktif' : 'Pasif'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Kalan Gün */}
+              <div className="flex flex-col flex-1 pl-3">
+                <span className="text-[10px] font-bold uppercase text-slate-400 mb-1">Abonelik</span>
+                <div className="flex items-center gap-1.5">
+                  {!org.is_active ? (
+                    <span className="text-sm font-semibold text-slate-400">—</span>
+                  ) : isExpired ? (
+                    <span className="text-sm font-semibold text-red-600">Doldu</span>
+                  ) : days !== null && days <= 14 ? (
+                    <span className="text-sm font-semibold text-amber-600">{days} gün kaldı</span>
+                  ) : days !== null ? (
+                    <span className="text-sm font-semibold text-slate-700">{days} gün kaldı</span>
+                  ) : (
+                    <span className="text-sm font-semibold text-slate-700">Sınırsız</span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer flex-shrink-0">
-            <i className="ri-close-line text-lg"></i>
-          </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 px-5 flex-shrink-0">
-          {(['info', 'members'] as const).map(t => (
+        <div className="flex border-b border-slate-100 px-5 flex-shrink-0 bg-white">
+          {([
+            { id: 'users', icon: 'ri-user-settings-line', label: 'Kullanıcılar' },
+            { id: 'activity', icon: 'ri-history-line', label: 'Aktivite' },
+            { id: 'system', icon: 'ri-settings-4-line', label: 'Sistem Bilgisi' },
+          ] as const).map(t => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-3 py-3 text-xs font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                tab === t ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-1.5 px-3 py-3.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                tab === t.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
-              {t === 'info' ? 'Bilgiler' : 'Üyeler'}
+              <i className={t.icon}></i>
+              {t.label}
             </button>
           ))}
         </div>
 
-        {/* İçerik */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4 bg-[#f8fafc]">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto bg-white">
+          <div className="p-5">
+            {tab === 'users' && <OrgMembersTab orgId={org.id} />}
 
-          {tab === 'members' && <OrgMembersTab orgId={org.id} />}
-
-          {tab === 'info' && (
-            <>
-              {/* Durum */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
-                  org.is_active ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${org.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                  {org.is_active ? 'Aktif' : 'Pasif'}
-                </span>
-                {expired && org.is_active && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-600">
-                    Süresi doldu
-                  </span>
-                )}
-                {!expired && days !== null && days <= 14 && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-700">
-                    {days} gün kaldı
-                  </span>
-                )}
-              </div>
-
-              {/* Bilgiler */}
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                {[
-                  { label: 'Oluşturulma', value: formatDate(org.created_at), cls: '' },
-                  { label: 'Üye Sayısı', value: `${org.member_count || 0} üye`, cls: '' },
-                  { label: 'Abonelik Başlangıç', value: formatDate(org.subscription_start), cls: '' },
-                  { label: 'Abonelik Bitiş', value: formatDate(org.subscription_end), cls: expired ? 'text-red-500' : '' },
-                ].map((row, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-slate-100 last:border-0">
-                    <span className="text-slate-500 text-xs">{row.label}</span>
-                    <span className={`text-sm font-medium ${row.cls || 'text-slate-700'}`}>{row.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Abonelik tarihi güncelle */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-                <p className="text-slate-600 text-xs font-medium">Abonelik Bitiş Tarihini Güncelle</p>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={e => setEndDate(e.target.value)}
-                    className="flex-1 bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-slate-400 transition-colors"
-                  />
-                  <button
-                    onClick={handleSaveDate}
-                    disabled={saving || !endDate}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-medium text-xs rounded-lg transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5"
-                  >
-                    {saving ? <i className="ri-loader-4-line animate-spin text-sm"></i> : null}
-                    Kaydet
-                  </button>
+            {tab === 'activity' && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mb-4">
+                  <i className="ri-history-line text-2xl text-slate-300"></i>
                 </div>
+                <h3 className="text-slate-800 font-semibold text-sm mb-1">Son Aktiviteler Yakında</h3>
+                <p className="text-slate-500 text-xs max-w-[250px]">
+                  Bu organizasyonun son giriş ve işlem geçmişi yakında burada görüntülenebilecek.
+                </p>
               </div>
+            )}
 
-              {/* Aktif/Pasif */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <p className="text-slate-600 text-xs font-medium mb-3">Organizasyon Durumu</p>
-                <button
-                  onClick={handleToggleActive}
-                  disabled={saving}
-                  className={`w-full py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 border ${
-                    org.is_active
-                      ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
-                      : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                  }`}
-                >
-                  {saving
-                    ? <><i className="ri-loader-4-line animate-spin text-sm"></i> İşleniyor...</>
-                    : org.is_active ? 'Pasife Al' : 'Aktif Et'
-                  }
-                </button>
-              </div>
-
-              {/* Tehlikeli alan — sadece super admin'in oluşturduğu org'larda göster */}
-              {superAdminUserId && org.created_by === superAdminUserId ? (
-                <div className="bg-white rounded-xl border border-red-200 p-4">
-                  <p className="text-red-500 text-xs font-medium mb-1">Tehlikeli Alan</p>
-                  <p className="text-slate-400 text-xs mb-3">
-                    Organizasyonu silmek; tüm verileri, üyeleri ve kullanıcı hesaplarını kalıcı olarak siler.
-                  </p>
-                  {!confirmDelete ? (
-                    <button
-                      onClick={() => setConfirmDelete(true)}
-                      className="w-full py-2 rounded-lg text-sm font-medium bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      Organizasyonu Sil
-                    </button>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-red-500 text-xs text-center font-medium">Emin misiniz? Geri alınamaz.</p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setConfirmDelete(false)}
-                          className="flex-1 py-2 rounded-lg text-sm font-medium bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          onClick={handleDelete}
-                          disabled={deleting}
-                          className="flex-1 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          {deleting ? <i className="ri-loader-4-line animate-spin text-sm"></i> : null}
-                          Evet, Sil
-                        </button>
-                      </div>
+            {tab === 'system' && (
+              <div className="space-y-6">
+                
+                {/* Sistem Bilgileri */}
+                <div className="space-y-3">
+                  <h3 className="text-slate-800 font-bold text-sm">Kayıt Bilgileri</h3>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                      <span className="text-slate-500 text-xs font-medium">Oluşturulma Tarihi</span>
+                      <span className="text-sm font-semibold text-slate-700">{formatDate(org.created_at)}</span>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex items-start gap-3">
-                  <div className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-200 flex-shrink-0 mt-0.5">
-                    <i className="ri-lock-line text-slate-500 text-xs"></i>
-                  </div>
-                  <div>
-                    <p className="text-slate-600 text-xs font-semibold mb-0.5">Silme Korumalı</p>
-                    <p className="text-slate-400 text-xs leading-relaxed">
-                      Bu organizasyon super admin tarafından oluşturulmadığı için silinemez. Yalnızca abonelik ve durum yönetimi yapılabilir.
-                    </p>
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-white">
+                      <span className="text-slate-500 text-xs font-medium">Başlangıç Tarihi</span>
+                      <span className="text-sm font-semibold text-slate-700">{formatDate(org.subscription_start)}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50">
+                      <span className="text-slate-500 text-xs font-medium">Mevcut Bitiş Tarihi</span>
+                      <span className={`text-sm font-semibold ${isExpired ? 'text-red-600' : 'text-slate-700'}`}>
+                        {formatDate(org.subscription_end)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              )}
-            </>
-          )}
+
+                <hr className="border-slate-100" />
+
+                {/* Abonelik Yönetimi */}
+                <div className="space-y-3">
+                  <h3 className="text-slate-800 font-bold text-sm">Süre Uzat / Güncelle</h3>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={e => setEndDate(e.target.value)}
+                      className="flex-1 bg-white border border-slate-200 text-slate-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-all"
+                    />
+                    <button
+                      onClick={handleSaveDate}
+                      disabled={saving || !endDate || endDate === org.subscription_end}
+                      className="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-slate-900 text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2"
+                    >
+                      {saving ? <i className="ri-loader-4-line animate-spin text-sm"></i> : <i className="ri-save-line text-sm"></i>}
+                      Kaydet
+                    </button>
+                  </div>
+                </div>
+
+                <hr className="border-slate-100" />
+
+                {/* Kritik İşlemler */}
+                <div className="space-y-3">
+                  <h3 className="text-slate-800 font-bold text-sm">Hesap Durumu</h3>
+                  
+                  {/* Aktif/Pasif Button */}
+                  <button
+                    onClick={handleToggleActive}
+                    disabled={saving}
+                    className={`w-full py-3 rounded-xl text-sm font-bold transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 border ${
+                      org.is_active
+                        ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
+                        : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {saving
+                      ? <><i className="ri-loader-4-line animate-spin text-sm"></i> İşleniyor...</>
+                      : org.is_active ? <><i className="ri-pause-circle-line"></i> Hesabı Pasife Al</> : <><i className="ri-play-circle-line"></i> Hesabı Aktif Et</>
+                    }
+                  </button>
+
+                  {/* Silme Alanı */}
+                  {superAdminUserId && org.created_by === superAdminUserId ? (
+                    <div className="mt-6 p-4 rounded-xl border border-red-100 bg-red-50/50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <i className="ri-error-warning-fill text-red-500"></i>
+                        <h4 className="text-red-700 font-bold text-sm">Kalıcı Silme</h4>
+                      </div>
+                      <p className="text-red-600/80 text-xs mb-4">
+                        Bu işlem hesabı tamamen kaldırır. Veriler soft delete ile gizlense de sistemden silinmiş sayılır.
+                      </p>
+                      
+                      {!confirmDelete ? (
+                        <button
+                          onClick={() => setConfirmDelete(true)}
+                          className="w-full py-2.5 rounded-xl text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors cursor-pointer shadow-sm"
+                        >
+                          Hesabı Sil...
+                        </button>
+                      ) : (
+                        <div className="space-y-3">
+                          <p className="text-red-600 text-xs font-bold text-center">Emin misiniz? Geri alınamaz.</p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setConfirmDelete(false)}
+                              className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                            >
+                              İptal
+                            </button>
+                            <button
+                              onClick={handleDelete}
+                              disabled={deleting}
+                              className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                              {deleting ? <i className="ri-loader-4-line animate-spin text-sm"></i> : <i className="ri-delete-bin-line"></i>}
+                              Evet, Sil
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Toast */}
         {toast && (
-          <div className={`mx-5 mb-4 flex items-center gap-2 text-sm rounded-lg px-4 py-2.5 border flex-shrink-0 ${
-            toast.type === 'ok'
-              ? 'bg-green-50 border-green-200 text-green-700'
-              : 'bg-red-50 border-red-200 text-red-600'
-          }`}>
-            <i className={`text-sm ${toast.type === 'ok' ? 'ri-checkbox-circle-line' : 'ri-error-warning-line'}`}></i>
-            {toast.msg}
+          <div className="absolute bottom-5 left-5 right-5">
+            <div className={`flex items-center gap-2 text-sm font-medium rounded-xl px-4 py-3 shadow-lg border animate-in slide-in-from-bottom-2 ${
+              toast.type === 'ok'
+                ? 'bg-emerald-500 border-emerald-600 text-white'
+                : 'bg-red-500 border-red-600 text-white'
+            }`}>
+              <i className={`text-base ${toast.type === 'ok' ? 'ri-checkbox-circle-fill' : 'ri-error-warning-fill'}`}></i>
+              {toast.msg}
+            </div>
           </div>
         )}
       </div>

@@ -36,7 +36,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'GENEL',
     items: [
       { id: 'genel_bakis', label: 'Genel Bakış', icon: 'ri-dashboard-3-line' },
-      { id: 'firmalar', label: 'Atanmış Firmalar', icon: 'ri-building-3-line' },
+      { id: 'firmalar', label: 'Firmalar', icon: 'ri-building-3-line' },
       { id: 'personeller', label: 'Personel', icon: 'ri-group-line' },
     ],
   },

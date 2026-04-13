@@ -27,12 +27,9 @@ const ROLE_MODULES: Record<string, string[]> = {
   ],
 };
 
-const GEZICI_UZMAN_MODULES = [
-  'dashboard', 'firmalar', 'personeller',
-  'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
-  'uygunsuzluklar', 'ekipmanlar', 'is-izinleri',
-  'saha', 'raporlar', 'dokumanlar', 'copkutusu',
-];
+// Gezici uzman artık /uzman bağımsız paneline yönlendiriliyor
+// Ana sidebar'da gösterilmemeli — bu liste sadece fallback guard için
+const GEZICI_UZMAN_MODULES: string[] = [];
 
 function getAllowedModules(role: string): string[] {
   return ROLE_MODULES[role] ?? ROLE_MODULES.member;

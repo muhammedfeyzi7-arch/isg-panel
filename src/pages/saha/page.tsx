@@ -552,6 +552,7 @@ export default function SahaPage() {
       const { ekipmanId, durum } = item.payload as { ekipmanId: string; durum: EkipmanStatus };
       updateEkipman(ekipmanId, { durum });
     }
+    // ziyaret_checkin / ziyaret_checkout — ZiyaretCheckIn bileşeni kendi queue'sunda yönetir
   }, [updateEkipman]);
 
   const { isOnline, isSyncing, pendingCount, pendingItems, lastSyncAt, syncError, addToQueue, syncNow, clearQueue } = useOfflineQueue(applyQueueItem);
