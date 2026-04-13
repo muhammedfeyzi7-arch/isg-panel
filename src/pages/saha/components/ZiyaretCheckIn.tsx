@@ -174,70 +174,71 @@ export default function ZiyaretCheckIn() {
       return;
     }
 
-    // 3) GPS kontrolü — sadece gps_required = true firmalar için
+    // 3) GPS kontrolü
     let coords: GpsCoords | null = null;
     let checkInGpsStatus: 'ok' | 'too_far' | 'no_permission' = 'ok';
     let checkInDistanceM: number | null = null;
 
-    if (firmaData.gps_required) {
+    // Firma koordinatı tanımlıysa HER DURUMDA GPS kontrolü yap
+    const firmaHasCoords = firmaData.firma_lat !== null && firmaData.firma_lng !== null;
+
+    if (firmaData.gps_required || firmaHasCoords) {
       setGpsStatus('loading');
       coords = await getGpsCoords();
 
       if (!coords) {
         checkInGpsStatus = 'no_permission';
-        // gps_strict = true → engelle; false → uyar ama devam et
-        const strict = firmaData.gps_strict !== false; // default true
-        if (strict) {
+        const strict = firmaData.gps_strict !== false;
+
+        if (firmaData.gps_required && strict) {
           setGpsStatus('denied');
           setGpsError('Konum izni gerekli. Tarayıcı ayarlarından konum iznini etkinleştirin ve tekrar deneyin.');
           setActionLoading(false);
           return;
         }
-        // gps_strict = false → sadece uyarı, check-in devam edecek (coords = null kalır)
+        // Strict değil → uyarıyla devam
         setGpsStatus('denied');
       }
 
-      // Firma koordinatları tanımlı mı?
-      if (coords && firmaData.firma_lat !== null && firmaData.firma_lng !== null) {
+      if (coords && firmaHasCoords) {
         setGpsStatus('checking');
-        const distance = haversineMetres(coords.lat, coords.lng, firmaData.firma_lat, firmaData.firma_lng);
+        const distance = haversineMetres(coords.lat, coords.lng, firmaData.firma_lat!, firmaData.firma_lng!);
         const radius = firmaData.gps_radius ?? 1000;
 
         if (distance > radius) {
-          // Mesafe dışında → ENGELLENDİ
           checkInGpsStatus = 'too_far';
           checkInDistanceM = Math.round(distance);
           const distStr = distance >= 1000
             ? `${(distance / 1000).toFixed(1)} km`
             : `${Math.round(distance)} m`;
-          setGpsStatus('blocked');
-          setGpsError(`Firma konumunda değilsiniz. Mesafeniz: ${distStr} — İzin verilen: ${radius} m`);
-          setActionLoading(false);
-          return;
+
+          // gps_required veya gps_strict ise engelle
+          const shouldBlock = firmaData.gps_required || firmaData.gps_strict !== false;
+          if (shouldBlock) {
+            setGpsStatus('blocked');
+            setGpsError(`Firma konumunda değilsiniz. Mesafeniz: ${distStr} — İzin verilen: ${radius} m`);
+            setActionLoading(false);
+            return;
+          }
+          // Koordinat tanımlı ama gps_required=false ve strict=false → uyarı ver ama devam et
+          setGpsStatus('denied');
+          setGpsError(`Firma konumundan uzaktasınız: ${distStr}. Ziyaret yine de başlatılıyor.`);
+        } else {
+          checkInDistanceM = Math.round(distance);
+          checkInGpsStatus = 'ok';
+          setGpsStatus('ok');
         }
-        checkInDistanceM = Math.round(distance);
-        // Mesafe içinde → devam
-        checkInGpsStatus = 'ok';
-        setGpsStatus('ok');
-      } else if (!coords) {
-        // coords yok, gps_strict = false ile devam
-        checkInGpsStatus = 'no_permission';
-      } else {
-        // Firma koordinatı tanımlı değil → GPS al ama engelleme
+      } else if (coords && !firmaHasCoords) {
+        // Koordinat yok, GPS al ama engelleme yok
         checkInGpsStatus = 'ok';
         setGpsStatus('ok');
       }
     } else {
-      // gps_required = false → GPS al ama engelleme yok
+      // GPS gerekmez, koordinat da yok → yine de GPS almaya çalış (kayıt amaçlı)
       setGpsStatus('loading');
       coords = await getGpsCoords();
-      if (coords) {
-        checkInGpsStatus = 'ok';
-        setGpsStatus('ok');
-      } else {
-        checkInGpsStatus = 'no_permission';
-        setGpsStatus('denied');
-      }
+      checkInGpsStatus = coords ? 'ok' : 'no_permission';
+      setGpsStatus(coords ? 'ok' : 'idle');
     }
 
     // 4) Check-in kaydı oluştur
@@ -308,19 +309,20 @@ export default function ZiyaretCheckIn() {
           check_out_lng: coords?.lng ?? null,
         })
         .eq('id', aktifZiyaret.id)
-        .eq('uzman_user_id', user.id);
+        .eq('uzman_user_id', user.id)
+        .eq('durum', 'aktif'); // sadece aktif ziyareti kapat — çift update önlemi
 
       if (error) throw new Error(error.message || 'Güncelleme başarısız');
 
       addToast(`Ziyaret tamamlandı! Süre: ${sureDakika} dakika`, 'success');
-      setAktifZiyaret(null);
       setShowQr(false);
-      void fetchZiyaret();
+      // DB'den taze veri çek — state'i manuel set etme
+      await fetchZiyaret();
     } catch (err) {
       console.error('[CheckOut] err:', err);
       addToast(`Check-out yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
-      // Hata olsa bile listeyi yenile
-      void fetchZiyaret();
+      // Hata olsa bile listeyi yenile — tutarsız state'i temizle
+      await fetchZiyaret();
     } finally {
       setActionLoading(false);
       setTimeout(() => { setGpsStatus('idle'); setGpsError(null); }, 3000);

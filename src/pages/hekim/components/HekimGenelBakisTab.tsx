@@ -63,7 +63,7 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
         const { data: orgs } = await supabase.from('organizations').select('id, name').in('id', safeIds);
 
         const [muayeneAll, kazaAll] = await Promise.all([
-          supabase.from('muayeneler').select('organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
+          supabase.from('muayeneler').select('organization_id, data').in('organization_id', safeIds),
           supabase.from('is_kazalari').select('organization_id, durum, yaralanma_siddeti, is_gunu_kaybi').in('organization_id', safeIds).is('deleted_at', null),
         ]);
 
@@ -87,7 +87,7 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
 
         const { count: toplamPersonelCount } = await supabase
           .from('personeller').select('id', { count: 'exact', head: true })
-          .in('organization_id', safeIds).is('deleted_at', null);
+          .in('organization_id', safeIds);
 
         const toplamPersonel = toplamPersonelCount ?? 0;
         const muayeneliPersonelIds = new Set(
@@ -297,7 +297,7 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
             />
           </div>
           <p className="text-[11px] font-medium" style={{ color: textSecondary }}>
-            {stats.toplamPersonel} personelden muayene kaydı var
+            {stats.toplamPersonel} personelden {stats.toplamMuayene} muayene kaydı
           </p>
         </div>
 

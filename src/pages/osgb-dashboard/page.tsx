@@ -158,13 +158,13 @@ export default function OsgbDashboardPage() {
             { count: tutanakCount },
             { count: egitimCount },
           ] = await Promise.all([
-            supabase.from('personeller').select('id', { count: 'exact', head: true }).eq('organization_id', f.id),
+            supabase.from('personeller').select('id', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
             supabase.from('uygunsuzluklar').select('id', { count: 'exact', head: true })
-              .eq('organization_id', f.id).neq('durum', 'Kapatıldı'),
+              .eq('organization_id', f.id).neq('durum', 'Kapatıldı').is('deleted_at', null),
             supabase.from('uygunsuzluklar').select('id', { count: 'exact', head: true })
-              .eq('organization_id', f.id).eq('durum', 'Kapatıldı'),
-            supabase.from('tutanaklar').select('id', { count: 'exact', head: true }).eq('organization_id', f.id),
-            supabase.from('egitimler').select('id', { count: 'exact', head: true }).eq('organization_id', f.id),
+              .eq('organization_id', f.id).eq('durum', 'Kapatıldı').is('deleted_at', null),
+            supabase.from('tutanaklar').select('id', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
+            supabase.from('egitimler').select('id', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
           ]);
 
           // Bu firmaya atanmış uzmanı bul (active_firm_id veya active_firm_ids içinde)
