@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
+// PageSkeleton & DashboardSkeleton still used for orgLoading state
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -179,21 +180,15 @@ export default function Layout({ children }: { children: ReactNode }) {
   const isDark = theme === 'dark';
   const [animKey, setAnimKey] = useState(0);
   const prevModule = useRef(activeModule);
-  const [moduleLoading, setModuleLoading] = useState(false);
-  const loadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (prevModule.current !== activeModule) {
       prevModule.current = activeModule;
       setAnimKey(k => k + 1);
-      // Modül değişince kısa bir loading hissi ver
-      setModuleLoading(true);
-      if (loadingTimer.current) clearTimeout(loadingTimer.current);
-      loadingTimer.current = setTimeout(() => setModuleLoading(false), 420);
+      // NOT: Yapay 420ms moduleLoading skeleton KALDIRILDI.
+      // Veriler zaten hafızada mevcut — skeleton gereksiz gecikme yaratıyordu.
+      // Lazy load sayfalar için Suspense fallback (home/page.tsx) yeterli.
     }
-    return () => {
-      if (loadingTimer.current) clearTimeout(loadingTimer.current);
-    };
   }, [activeModule]);
 
   useEffect(() => {
@@ -214,10 +209,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, [mobileOpen]);
 
   const renderContent = () => {
+    // Sadece org yüklenirken skeleton göster — modül geçişinde skeleton YOK
+    // (lazy load sayfalar için Suspense fallback home/page.tsx'te tanımlı)
     if (orgLoading) {
-      return activeModule === 'dashboard' ? <DashboardSkeleton /> : <PageSkeleton />;
-    }
-    if (moduleLoading) {
       return activeModule === 'dashboard' ? <DashboardSkeleton /> : <PageSkeleton />;
     }
     return children;

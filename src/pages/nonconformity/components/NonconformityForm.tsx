@@ -33,7 +33,14 @@ const defaultForm: FormState = {
 };
 
 export default function NonconformityForm({ isOpen, onClose, editRecord }: Props) {
-  const { firmalar, personeller, addUygunsuzluk, updateUygunsuzluk, setUygunsuzlukPhoto, getUygunsuzlukPhoto, addToast, logAction } = useApp();
+  const { firmalar, personeller, addUygunsuzluk, updateUygunsuzluk, setUygunsuzlukPhoto, getUygunsuzlukPhoto, addToast, logAction, fetchTable } = useApp();
+
+  // Firmalar listesi boşsa (OSGB panelinden açılmış olabilir) force-fetch yap
+  useEffect(() => {
+    if (isOpen && firmalar.length === 0) {
+      void fetchTable('firmalar');
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const [form, setForm] = useState<FormState>(defaultForm);
   const [saving, setSaving] = useState(false);
   const [aiOnlemLoading, setAiOnlemLoading] = useState(false);

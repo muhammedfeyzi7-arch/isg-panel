@@ -150,6 +150,10 @@ export default function FirmalarTab({
 
   const handleSil = async (firmaId: string) => {
     setSilLoading(true);
+    // Optimistic: hemen UI'dan kaldır
+    if (onFirmaDeleted) onFirmaDeleted(firmaId);
+    setSilOnayId(null);
+    setSilAdi('');
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
@@ -160,13 +164,10 @@ export default function FirmalarTab({
         body: JSON.stringify({ action: 'delete_firm', organization_id: orgId, firma_id: firmaId }),
       });
       const json = await res.json() as { error?: string; success?: boolean };
-      console.log('DELETE RESULT', json);
       if (json.error) throw new Error(json.error);
-      setSilOnayId(null);
-      setSilAdi('');
-      if (onFirmaDeleted) onFirmaDeleted(firmaId);
     } catch (err) {
-      console.error('[Sil] err:', err);
+      // Hata durumunda liste yeniden yüklenecek (parent fetchData tetikler)
+      if (onFirmaDeleted) onFirmaDeleted(firmaId);
     } finally {
       setSilLoading(false);
     }

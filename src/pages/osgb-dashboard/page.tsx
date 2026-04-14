@@ -15,6 +15,7 @@ import OsgbSidebar from './components/OsgbSidebar';
 import OsgbHeader from './components/OsgbHeader';
 import OsgbSettings from './components/OsgbSettings';
 import ZiyaretlerTab from './components/ZiyaretlerTab';
+import OsgbRaporlarPage from './components/OsgbRaporlarPage';
 import CopKutusuTab from './components/CopKutusuTab';
 import OsgbLoadingScreen from './components/OsgbLoadingScreen';
 import OsgbOnboarding from './components/OsgbOnboarding';
@@ -860,7 +861,7 @@ export default function OsgbDashboardPage() {
 
               {/* ── ÇÖP KUTUSU TAB ── */}
               {activeTab === 'copkutusu' && org?.id && (
-                <CopKutusuTab orgId={org.id} isDark={isDark} onFirmaRestored={fetchData} />
+                <CopKutusuTab orgId={org.id} isDark={isDark} onFirmaRestored={() => void fetchData()} onGoToFirmalar={() => setActiveTab('firmalar')} />
               )}
 
               {/* ── AYARLAR TAB ── */}
@@ -875,6 +876,11 @@ export default function OsgbDashboardPage() {
 
               {/* ── RAPORLAR TAB ── */}
               {activeTab === 'raporlar' && (
+                <OsgbRaporlarPage isDark={isDark} />
+              )}
+
+              {/* ── ESKİ RAPORLAR (KULLANILMIYOR) ── */}
+              {activeTab === '__disabled_raporlar__' && (
                 <div className="space-y-5 page-enter">
                   {/* Filtre bar */}
                   <div className="rounded-2xl p-5" style={cardStyle}>

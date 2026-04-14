@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AppLoadingScreen from '../../components/feature/AppLoadingScreen';
 import { useApp } from '../../store/AppContext';
@@ -6,23 +6,27 @@ import Layout from '../../components/feature/Layout';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import OnboardingTour from '../../components/feature/OnboardingTour';
 import ToastContainer from '../../components/base/ToastContainer';
+import { PageSkeleton, DashboardSkeleton } from '../../components/base/Skeleton';
 
-import DashboardPage from '../dashboard/page';
-import FirmalarPage from '../companies/page';
-import PersonellerPage from '../personnel/page';
-import EvraklarPage from '../documents/page';
-import EgitimlerPage from '../training/page';
-import RaporlarPage from '../reports/page';
-import EkipmanlarPage from '../equipment/page';
-import MuayenelerPage from '../health/page';
-import UygunsuzluklarPage from '../nonconformity/page';
-import TutanaklarPage from '../tutanaklar/page';
-import CopKutusuPage from '../trash/page';
-import SettingsPage from '../settings/page';
-import IsIzniPage from '../is-izni/page';
-import FirmaEvraklariPage from '../company-documents/page';
-import DokumanlarPage from '../dokumanlar/page';
-import SahaPage from '../saha/page';
+// ── Lazy imports — her sayfa sadece ilk açıldığında yüklenir ──────────────
+// Bu sayede uygulama ilk açılışında tüm sayfa kodları inmez, sadece
+// aktif sayfa kodu yüklenir. Sonraki açılışlarda tarayıcı cache'den gelir.
+const DashboardPage      = lazy(() => import('../dashboard/page'));
+const FirmalarPage       = lazy(() => import('../companies/page'));
+const PersonellerPage    = lazy(() => import('../personnel/page'));
+const EvraklarPage       = lazy(() => import('../documents/page'));
+const EgitimlerPage      = lazy(() => import('../training/page'));
+const RaporlarPage       = lazy(() => import('../reports/page'));
+const EkipmanlarPage     = lazy(() => import('../equipment/page'));
+const MuayenelerPage     = lazy(() => import('../health/page'));
+const UygunsuzluklarPage = lazy(() => import('../nonconformity/page'));
+const TutanaklarPage     = lazy(() => import('../tutanaklar/page'));
+const CopKutusuPage      = lazy(() => import('../trash/page'));
+const SettingsPage       = lazy(() => import('../settings/page'));
+const IsIzniPage         = lazy(() => import('../is-izni/page'));
+const FirmaEvraklariPage = lazy(() => import('../company-documents/page'));
+const DokumanlarPage     = lazy(() => import('../dokumanlar/page'));
+const SahaPage           = lazy(() => import('../saha/page'));
 
 // URL path → modül adı eşlemesi
 const PATH_TO_MODULE: Record<string, string> = {
@@ -43,6 +47,12 @@ const PATH_TO_MODULE: Record<string, string> = {
   '/ayarlar':         'ayarlar',
 };
 
+// Modüle göre uygun skeleton seç
+function ModuleFallback({ module }: { module: string }) {
+  if (module === 'dashboard') return <DashboardSkeleton />;
+  return <PageSkeleton />;
+}
+
 function AppContent() {
   const { activeModule, orgError, org, mustChangePassword, setActiveModule, pageLoading } = useApp();
   const location = useLocation();
@@ -57,16 +67,26 @@ function AppContent() {
     }
   }, [pageLoading]);
 
-  // URL değişince activeModule'ü güncelle
+  // ── URL ↔ activeModule senkronizasyonu ─────────────────────────────────
+  // Çift useEffect döngüsü yerine: URL değişimini tek ref ile takip ediyoruz.
+  // URL → module: her zaman çalışır (dış link, geri tuşu, direkt URL girişi)
+  // module → URL: sadece sidebar/kod tetiklediğinde çalışır (loop önlemi)
+  const isUrlChangeRef = useRef(false);
+
   useEffect(() => {
     const module = PATH_TO_MODULE[location.pathname];
     if (module && module !== activeModule) {
+      isUrlChangeRef.current = true;
       setActiveModule(module);
     }
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // activeModule değişince URL'yi güncelle (sidebar tıklamaları için)
   useEffect(() => {
+    // URL değişimi tetiklediyse navigate çağırma — sonsuz döngü önlemi
+    if (isUrlChangeRef.current) {
+      isUrlChangeRef.current = false;
+      return;
+    }
     const expectedPath = `/${activeModule}`;
     if (location.pathname !== expectedPath && PATH_TO_MODULE[expectedPath] !== undefined) {
       navigate(expectedPath, { replace: true });
@@ -107,22 +127,22 @@ function AppContent() {
     }
 
     switch (activeModule) {
-      case 'firmalar': return <FirmalarPage />;
-      case 'personeller': return <PersonellerPage />;
-      case 'evraklar': return <EvraklarPage />;
-      case 'egitimler': return <EgitimlerPage />;
-      case 'muayeneler': return <MuayenelerPage />;
-      case 'uygunsuzluklar': return <UygunsuzluklarPage />;
-      case 'ekipmanlar': return <EkipmanlarPage />;
-      case 'tutanaklar': return <TutanaklarPage />;
-      case 'is-izinleri': return <IsIzniPage />;
+      case 'firmalar':        return <FirmalarPage />;
+      case 'personeller':     return <PersonellerPage />;
+      case 'evraklar':        return <EvraklarPage />;
+      case 'egitimler':       return <EgitimlerPage />;
+      case 'muayeneler':      return <MuayenelerPage />;
+      case 'uygunsuzluklar':  return <UygunsuzluklarPage />;
+      case 'ekipmanlar':      return <EkipmanlarPage />;
+      case 'tutanaklar':      return <TutanaklarPage />;
+      case 'is-izinleri':     return <IsIzniPage />;
       case 'firma-evraklari': return <FirmaEvraklariPage />;
-      case 'raporlar': return <RaporlarPage />;
-      case 'dokumanlar': return <DokumanlarPage />;
-      case 'copkutusu': return <CopKutusuPage />;
-      case 'ayarlar': return isFirmaUser ? <DashboardPage /> : <SettingsPage />;
-      case 'saha': return <SahaPage />;
-      default: return <DashboardPage />;
+      case 'raporlar':        return <RaporlarPage />;
+      case 'dokumanlar':      return <DokumanlarPage />;
+      case 'copkutusu':       return <CopKutusuPage />;
+      case 'ayarlar':         return isFirmaUser ? <DashboardPage /> : <SettingsPage />;
+      case 'saha':            return <SahaPage />;
+      default:                return <DashboardPage />;
     }
   };
 
@@ -131,7 +151,10 @@ function AppContent() {
       <Layout>
         <ToastContainer />
         <OnboardingTour />
-        {renderPage()}
+        {/* Suspense: sayfa lazy yüklenirken modüle uygun skeleton göster */}
+        <Suspense fallback={<ModuleFallback module={activeModule} />}>
+          {renderPage()}
+        </Suspense>
       </Layout>
     </div>
   );

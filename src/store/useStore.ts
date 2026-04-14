@@ -146,10 +146,10 @@ export function useStore(
     if (!orgId || !uid || pendingSavesRef.current.length === 0) return;
     const pending = [...pendingSavesRef.current];
     pendingSavesRef.current = [];
-    console.log(`[ISG] Flushing ${pending.length} pending saves for org=${orgId}`);
+    if (import.meta.env.DEV) console.log(`[ISG] Flushing ${pending.length} pending saves for org=${orgId}`);
     pending.forEach(({ table, item }) => {
       dbUpsert(table, item as { id: string; silinmis?: boolean; silinmeTarihi?: string } & Record<string, unknown>, uid, orgId)
-        .then(() => console.log(`[ISG] Pending save OK ${table}/${item.id} ✓`))
+        .then(() => { if (import.meta.env.DEV) console.log(`[ISG] Pending save OK ${table}/${item.id} ✓`); })
         .catch(err => {
           pendingSavesRef.current.push({ table, item });
           onSaveErrorRef.current?.(`Bekleyen kayıt hatası (${table}): ${err instanceof Error ? err.message : String(err)}`);
@@ -311,36 +311,103 @@ export function useStore(
     await fetchTable<IsIzni>('is_izinleri', orgId, setIsIzinleri);
   }, [fetchTable, setIsIzinleri]);
 
-  // ── Initial load — fetch firmalar + personeller, rest loaded lazily ──
+  // ── Which tables have been fetched at least once ──
+  const fetchedTablesRef = useRef<Set<string>>(new Set());
+
+  // Reset on org change
+  useEffect(() => {
+    fetchedTablesRef.current = new Set();
+  }, [organizationId]);
+
+  // ── Initial load — fetch firmalar + personeller only ──
   const loadAllData = useCallback(async (orgId: string) => {
+    fetchedTablesRef.current.add('firmalar');
+    fetchedTablesRef.current.add('personeller');
     await Promise.allSettled([
       fetchFirmalar(orgId),
       fetchPersoneller(orgId),
     ]);
   }, [fetchFirmalar, fetchPersoneller]);
 
-  // ── Full refresh (all tables) ──
-  const refreshAllData = useCallback(async () => {
+  // ── Lazy fetch: modüle ilk girilince ilgili tabloyu çek ──
+  // Modül → tablo eşlemesi
+  const MODULE_TABLES: Record<string, string[]> = {
+    firmalar:        ['firmalar'],
+    personeller:     ['personeller'],
+    evraklar:        ['evraklar', 'personeller', 'firmalar'],
+    'firma-evraklari': ['firmalar'],
+    egitimler:       ['egitimler', 'personeller', 'firmalar'],
+    muayeneler:      ['muayeneler', 'personeller', 'firmalar'],
+    uygunsuzluklar:  ['uygunsuzluklar', 'personeller', 'firmalar'],
+    ekipmanlar:      ['ekipmanlar', 'firmalar'],
+    tutanaklar:      ['tutanaklar', 'personeller', 'firmalar'],
+    'is-izinleri':   ['is_izinleri', 'personeller', 'firmalar'],
+    raporlar:        ['evraklar', 'egitimler', 'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'tutanaklar', 'is_izinleri', 'personeller', 'firmalar'],
+    dokumanlar:      ['personeller', 'firmalar'],
+    copkutusu:       ['firmalar', 'personeller', 'evraklar', 'egitimler', 'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'tutanaklar', 'is_izinleri'],
+    ayarlar:         [],
+    dashboard:       ['firmalar', 'personeller'],
+    saha:            ['personeller', 'firmalar', 'uygunsuzluklar', 'ekipmanlar', 'is_izinleri'],
+  };
+
+  // Populated after fetcher functions are defined — see useEffect below
+  const fetcherMapRef = useRef<Record<string, (orgId: string) => Promise<void>>>({});
+
+  const fetchModuleTables = useCallback(async (module: string) => {
+    const orgId = orgIdRef.current;
+    if (!orgId) return;
+    const tables = MODULE_TABLES[module] ?? [];
+    const toFetch = tables.filter(t => !fetchedTablesRef.current.has(t));
+    if (toFetch.length === 0) return;
+    // Mark immediately to prevent duplicate parallel calls
+    toFetch.forEach(t => fetchedTablesRef.current.add(t));
+    const fetchers = fetcherMapRef.current;
+    await Promise.allSettled(
+      toFetch
+        .filter(t => fetchers[t])
+        .map(t => fetchers[t](orgId))
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Full refresh (module-aware) ──
+  // refreshAllData artık sadece o anda yüklenmiş tabloları yeniler
+  // + aktif modülün tablolarını ekler (eğer daha önce yüklenmediyse yükler)
+  const refreshAllData = useCallback(async (activeModule?: string) => {
     const orgId = orgIdRef.current;
     if (!orgId) return;
     setDataLoading(true);
     setPartialLoading(true);
     try {
-      await Promise.allSettled([
-        fetchFirmalar(orgId),
-        fetchPersoneller(orgId),
-        fetchEvraklar(orgId),
-        fetchEgitimler(orgId),
-        fetchMuayeneler(orgId),
-        fetchUygunsuzluklar(orgId),
-        fetchEkipmanlar(orgId),
-        fetchTutanaklar(orgId),
-        fetchIsIzinleri(orgId),
-      ]);
+      // Aktif modülün tablolarını da kümemize ekle
+      const moduleTables = activeModule ? (MODULE_TABLES[activeModule] ?? []) : [];
+      moduleTables.forEach(t => fetchedTablesRef.current.add(t));
+
+      const tablesToRefresh = Array.from(fetchedTablesRef.current);
+      const fetchers = fetcherMapRef.current;
+      await Promise.allSettled(
+        tablesToRefresh
+          .filter(t => fetchers[t])
+          .map(t => fetchers[t](orgId))
+      );
     } finally {
       setDataLoading(false);
       setPartialLoading(false);
     }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Populate fetcherMapRef after all fetchers are defined ──
+  useEffect(() => {
+    fetcherMapRef.current = {
+      firmalar:      fetchFirmalar,
+      personeller:   fetchPersoneller,
+      evraklar:      fetchEvraklar,
+      egitimler:     fetchEgitimler,
+      muayeneler:    fetchMuayeneler,
+      uygunsuzluklar: fetchUygunsuzluklar,
+      ekipmanlar:    fetchEkipmanlar,
+      tutanaklar:    fetchTutanaklar,
+      is_izinleri:   fetchIsIzinleri,
+    };
   }, [fetchFirmalar, fetchPersoneller, fetchEvraklar, fetchEgitimler, fetchMuayeneler, fetchUygunsuzluklar, fetchEkipmanlar, fetchTutanaklar, fetchIsIzinleri]);
 
   // ── Load on mount / org change ──
@@ -490,8 +557,12 @@ export function useStore(
       ekipmanlar: 'Ekipmanlar', tutanaklar: 'Tutanaklar', is_izinleri: 'İş İzinleri',
     };
 
-    const channelName = `isg_rt_${activeOrgId}_${userId}_${Date.now()}`;
-    let channel = supabase.channel(channelName);
+    // Sabit kanal adı — Date.now() KALDIRILDI.
+    // Date.now() kullanılırsa her re-mount yeni kanal açar, eski kanallar hemen kapanmaz,
+    // zamanla onlarca zombie kanal birikir ve realtime yavaşlar / kopar.
+    // Sabit ad ile Supabase aynı kanalı yeniden kullanır.
+    const channelName = `isg_rt_${activeOrgId}_${userId}`;
+    let channel = supabase.channel(channelName, { config: { presence: { key: '' } } });
 
     TABLES.forEach(table => {
       channel = channel.on(
@@ -1153,6 +1224,7 @@ export function useStore(
     tutanaklar, isIzinleri, currentUser,
     dataLoading, pageLoading, partialLoading, realtimeStatus, isSaving: false,
     refreshAllData,
+    fetchModuleTables,
     fetchFirmalar, fetchPersoneller, fetchEvraklar, fetchEgitimler,
     fetchMuayeneler, fetchUygunsuzluklar, fetchEkipmanlar,
     fetchGorevler, fetchTutanaklar, fetchIsIzinleri,

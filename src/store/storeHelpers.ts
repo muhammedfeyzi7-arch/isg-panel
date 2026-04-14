@@ -5,6 +5,11 @@
  */
 import { supabase } from '@/lib/supabase';
 
+// ── Dev-only logger — production'da tüm [ISG] logları kapalı ──────────────
+const IS_DEV = import.meta.env.DEV;
+const log = IS_DEV ? console.log.bind(console) : () => {};
+const logError = console.error.bind(console); // hata logları her zaman açık
+
 // ── Device ID — unique per browser tab (session storage) ──
 export function getDeviceId(): string {
   let id = sessionStorage.getItem('isg_device_id');
@@ -43,66 +48,53 @@ export async function dbUpsert(
     device_id: getDeviceId(),
     data: item,
     updated_at: now,
-    // deleted_at is always set correctly — fetchAllRows uses .is('deleted_at', null) filter
     deleted_at: deletedAt,
   };
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from(table)
-    .upsert(payload, { onConflict: 'id' })
-    .select('id');
+    .upsert(payload, { onConflict: 'id' });
 
+  // B: .select('id') + maybeSingle() ikinci sorgu KALDIRILDI.
+  // Supabase upsert hata vermezse kayıt yazılmıştır — ekstra doğrulama sorgusuna gerek yok.
+  // Sadece hata varsa fırlat.
   if (error) {
     const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
-    console.error(`[ISG] SAVE ERROR ${table}/${item.id}:`, errMsg);
+    logError(`[ISG] SAVE ERROR ${table}/${item.id}:`, errMsg);
     if (errMsg.includes('row-level security') || errMsg.includes('RLS') || errMsg.includes('policy')) {
       throw new Error(`Yetki hatası: Bu işlem için yetkiniz yok. (${errMsg})`);
     }
     throw new Error(errMsg);
   }
 
-  if (!data || data.length === 0) {
-    const { data: existing } = await supabase
-      .from(table)
-      .select('id')
-      .eq('id', item.id)
-      .maybeSingle();
-    if (!existing) {
-      throw new Error(`Kayıt veritabanına yazılamadı (${table}). RLS politikası engelliyor olabilir.`);
-    }
-  }
-  console.log(`[ISG] SAVE OK ${table}/${item.id} deleted_at=${deletedAt ?? 'null'} ✓`);
+  log(`[ISG] SAVE OK ${table}/${item.id} deleted_at=${deletedAt ?? 'null'} ✓`);
 }
 
 // ── Hard delete (permanent) ──
+// C: device_id ön güncellemesi KALDIRILDI — gereksiz ekstra istek.
+// Realtime handler zaten kendi deviceId'sini payload'dan okur.
 export async function dbDelete(table: string, id: string): Promise<void> {
-  try {
-    await supabase.from(table).update({ device_id: getDeviceId() }).eq('id', id);
-  } catch { /* ignore */ }
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) {
-    console.error(`[ISG] DELETE ERROR ${table}/${id}:`, error);
+    logError(`[ISG] DELETE ERROR ${table}/${id}:`, error);
     throw error;
   }
-  console.log(`[ISG] DELETE OK ${table}/${id} ✓`);
+  log(`[ISG] DELETE OK ${table}/${id} ✓`);
 }
 
 // ── Hard delete many ──
+// C: device_id ön güncellemesi KALDIRILDI
 export async function dbDeleteMany(table: string, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  try {
-    await supabase.from(table).update({ device_id: getDeviceId() }).in('id', ids);
-  } catch { /* ignore */ }
   const { error } = await supabase.from(table).delete().in('id', ids);
   if (error) {
-    console.error(`[ISG] DELETE_MANY ERROR ${table}:`, error);
+    logError(`[ISG] DELETE_MANY ERROR ${table}:`, error);
     throw error;
   }
-  console.log(`[ISG] DELETE_MANY OK ${table} (${ids.length} rows) ✓`);
+  log(`[ISG] DELETE_MANY OK ${table} (${ids.length} rows) ✓`);
 }
 
 // ── Direct column update (deleted_at, device_id, etc.) ──
-// organization_id is NOT written to payload — prevents RLS bypass.
 export async function dbUpdateDirect(
   table: string,
   id: string,
@@ -118,11 +110,11 @@ export async function dbUpdateDirect(
 
   if (error) {
     const errMsg = error.message || error.details || JSON.stringify(error);
-    console.error(`[ISG] UPDATE_DIRECT ERROR ${table}/${id}:`, errMsg);
+    logError(`[ISG] UPDATE_DIRECT ERROR ${table}/${id}:`, errMsg);
     return { rows: 0, error: errMsg };
   }
   const rowCount = data?.length ?? 0;
-  console.log(`[ISG] UPDATE_DIRECT OK ${table}/${id} (${rowCount} rows) ✓`);
+  log(`[ISG] UPDATE_DIRECT OK ${table}/${id} (${rowCount} rows) ✓`);
   return { rows: rowCount, error: null };
 }
 
@@ -149,7 +141,7 @@ export async function fetchAllRows(
       .range(from, from + PAGE_SIZE - 1);
 
     if (error) {
-      console.error(`[ISG] fetchAllRows error (${table}) page=${pageNum}:`, error);
+      logError(`[ISG] fetchAllRows error (${table}) page=${pageNum}:`, error);
       return { data: allRows.length > 0 ? allRows : null, error };
     }
 
@@ -161,7 +153,7 @@ export async function fetchAllRows(
     if (pageNum >= 20) { hasMore = false; }
   }
 
-  console.log(`[ISG] fetchAllRows DONE: ${table} total=${allRows.length} pages=${pageNum}`);
+  log(`[ISG] fetchAllRows DONE: ${table} total=${allRows.length} pages=${pageNum}`);
   return { data: allRows as { data: unknown }[], error: null };
 }
 
@@ -171,10 +163,10 @@ export async function generateRecordNoFromDB(
 ): Promise<string | null> {
   try {
     const { data, error } = await supabase.rpc('generate_record_no', { record_type: type });
-    if (error) { console.error(`[ISG] generateRecordNo RPC error (${type}):`, error); return null; }
+    if (error) { logError(`[ISG] generateRecordNo RPC error (${type}):`, error); return null; }
     return data as string;
   } catch (err) {
-    console.error(`[ISG] generateRecordNo unexpected error (${type}):`, err);
+    logError(`[ISG] generateRecordNo unexpected error (${type}):`, err);
     return null;
   }
 }

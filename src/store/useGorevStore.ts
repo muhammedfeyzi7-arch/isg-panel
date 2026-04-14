@@ -123,7 +123,8 @@ export function useGorevStore({
     if (!organizationId || !userId || orgLoading) return;
     const activeOrgId = organizationId;
     const deviceId = getDeviceId();
-    const channelName = `gorev_rt_${activeOrgId}_${userId}_${Date.now()}`;
+    // Sabit kanal adı — Date.now() KALDIRILDI (zombie kanal önlemi)
+    const channelName = `gorev_rt_${activeOrgId}_${userId}`;
 
     const channel = supabase.channel(channelName).on(
       'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],

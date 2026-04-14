@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
 interface SearchResult {
   id: string;
@@ -39,9 +39,25 @@ export default function SearchBox({
   onNavigate,
 }: SearchBoxProps) {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [searchFocus, setSearchFocus] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce: kullanıcı yazmayı bıraktıktan 150ms sonra ara
+  // Her tuş basışında arama yapmak yerine yazma durduğunda çalış
+  const handleSearchChange = useCallback((val: string) => {
+    setSearch(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(val), 150);
+  }, []);
+
+  // firmaId → ad lookup map — her aramada find() döngüsü yerine O(1) erişim
+  const firmaMap = useMemo(
+    () => new Map(data.firmalar.map(f => [f.id, f.ad])),
+    [data.firmalar],
+  );
 
   const runSearch = useCallback((q: string) => {
     if (!q.trim()) { setSearchResults([]); return; }
@@ -59,30 +75,33 @@ export default function SearchBox({
       .filter(p => p.adSoyad.toLowerCase().includes(query) || p.gorev.toLowerCase().includes(query))
       .slice(0, 3)
       .forEach(p => {
-        const firma = data.firmalar.find(f => f.id === p.firmaId);
-        results.push({ id: p.id, type: 'Personel', label: p.adSoyad, sub: `${p.gorev || '—'} · ${firma?.ad || '—'}`, icon: 'ri-user-line', color: '#10B981', module: 'personeller' });
+        const firmaAd = firmaMap.get(p.firmaId) || '—';
+        results.push({ id: p.id, type: 'Personel', label: p.adSoyad, sub: `${p.gorev || '—'} · ${firmaAd}`, icon: 'ri-user-line', color: '#10B981', module: 'personeller' });
       });
 
     data.evraklar
       .filter(e => e.ad.toLowerCase().includes(query) || e.tur.toLowerCase().includes(query))
       .slice(0, 2)
       .forEach(e => {
-        const firma = data.firmalar.find(f => f.id === e.firmaId);
-        results.push({ id: e.id, type: 'Evrak', label: e.ad, sub: `${e.tur} · ${firma?.ad || '—'}`, icon: 'ri-file-text-line', color: '#F59E0B', module: 'evraklar' });
+        const firmaAd = firmaMap.get(e.firmaId) || '—';
+        results.push({ id: e.id, type: 'Evrak', label: e.ad, sub: `${e.tur} · ${firmaAd}`, icon: 'ri-file-text-line', color: '#F59E0B', module: 'evraklar' });
       });
 
     data.tutanaklar
       .filter(t => t.baslik.toLowerCase().includes(query) || t.tutanakNo.toLowerCase().includes(query))
       .slice(0, 2)
       .forEach(t => {
-        const firma = data.firmalar.find(f => f.id === t.firmaId);
-        results.push({ id: t.id, type: 'Tutanak', label: t.baslik, sub: `${t.tutanakNo} · ${firma?.ad || '—'}`, icon: 'ri-article-line', color: '#14B8A6', module: 'tutanaklar' });
+        const firmaAd = firmaMap.get(t.firmaId) || '—';
+        results.push({ id: t.id, type: 'Tutanak', label: t.baslik, sub: `${t.tutanakNo} · ${firmaAd}`, icon: 'ri-article-line', color: '#14B8A6', module: 'tutanaklar' });
       });
 
     setSearchResults(results.slice(0, 8));
-  }, [data]);
+  }, [data, firmaMap]);
 
-  useEffect(() => { runSearch(search); }, [search, runSearch]);
+  useEffect(() => { runSearch(debouncedSearch); }, [debouncedSearch, runSearch]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -101,7 +120,7 @@ export default function SearchBox({
       <i className="ri-search-line absolute left-2.5 text-[11px] z-10" style={{ color: '#475569' }} />
       <input
         value={search}
-        onChange={e => setSearch(e.target.value)}
+        onChange={e => handleSearchChange(e.target.value)}
         onFocus={e => {
           setSearchFocus(true);
           e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(59,130,246,0.04)';

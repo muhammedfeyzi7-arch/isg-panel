@@ -22,9 +22,10 @@ interface CopKutusuTabProps {
   orgId: string;
   isDark: boolean;
   onFirmaRestored: () => void;
+  onGoToFirmalar?: () => void;
 }
 
-export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutusuTabProps) {
+export default function CopKutusuTab({ orgId, isDark, onFirmaRestored, onGoToFirmalar }: CopKutusuTabProps) {
   const [firmalar, setFirmalar] = useState<SilinmisFirma[]>([]);
   const [loading, setLoading] = useState(true);
   const [kaliciSilOnayId, setKaliciSilOnayId] = useState<string | null>(null);
@@ -92,7 +93,11 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutu
       if (error) throw error;
       setFirmalar(prev => prev.filter(f => f.id !== firmaId));
       showMesaj('success', `"${temizAd}" başarıyla geri alındı ve aktif edildi.`);
+      // DB yazmasının tamamlanması için kısa bekleme, sonra parent listeyi yenile
+      await new Promise<void>(resolve => setTimeout(resolve, 700));
       onFirmaRestored();
+      // Firmalar tabına geç
+      if (onGoToFirmalar) onGoToFirmalar();
     } catch {
       showMesaj('error', 'Geri alma başarısız oldu.');
     } finally {

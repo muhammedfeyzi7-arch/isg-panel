@@ -49,7 +49,7 @@ function saveOkunanlar(ids: Set<string>): void {
 export interface NotificationStoreParams {
   evraklar: StoreType['evraklar'];
   ekipmanlar: StoreType['ekipmanlar'];
-  egitimler: StoreType['egitimler'];
+  // egitimler: hook içinde kullanılmıyor — kaldırıldı (gereksiz re-render engeli)
   muayeneler: StoreType['muayeneler'];
   personeller: StoreType['personeller'];
   firmalar: StoreType['firmalar'];
@@ -64,10 +64,27 @@ export interface NotificationStore {
   isIzniBildirimi: (izinNo: string, izinId: string, tip: 'onaylandi' | 'reddedildi', sahaNotu?: string) => void;
 }
 
+// ── Shared date helpers (defined outside hook to avoid re-creation) ────────
+
+function parseDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr || !dateStr.trim()) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function getDaysRemaining(dateStr: string | null | undefined, today: Date): number | null {
+  const d = parseDate(dateStr);
+  if (!d) return null;
+  return Math.ceil((d.getTime() - today.getTime()) / 86400000);
+}
+
 // ── Hook ───────────────────────────────────────────────────────────────────
 
 export function useNotificationStore(params: NotificationStoreParams): NotificationStore {
-  const { evraklar, ekipmanlar, egitimler, muayeneler, personeller, firmalar } = params;
+  const { evraklar, ekipmanlar, muayeneler, personeller, firmalar } = params;
+  // egitimler intentionally not destructured — not used in any notification calculation
 
   const [kontrolBildirimleri, setKontrolBildirimleri] = useState<Bildirim[]>([]);
   const [okunanlar, setOkunanlar] = useState<Set<string>>(loadOkunanlar);
@@ -149,33 +166,13 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
     }, 60000);
   }, []);
 
-  // ── Computed bildirimler (derived from store data) ──
-  const bildirimler = useMemo<Bildirim[]>(() => {
-    const kontrolMerged = kontrolBildirimleri.map(b => ({
-      ...b,
-      okundu: b.okundu || okunanlar.has(b.id),
-    }));
-
+  // ── EVRAK bildirimleri (sadece evraklar / personeller / firmalar değişince çalışır) ──
+  const evrakBildirimleri = useMemo<Bildirim[]>(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const in30 = new Date(today.getTime() + 30 * 86400000);
     const result: Bildirim[] = [];
 
-    const parseDate = (dateStr: string | null | undefined): Date | null => {
-      if (!dateStr || !dateStr.trim()) return null;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return null;
-      d.setHours(0, 0, 0, 0);
-      return d;
-    };
-
-    const getDaysRemaining = (dateStr: string | null | undefined): number | null => {
-      const d = parseDate(dateStr);
-      if (!d) return null;
-      return Math.ceil((d.getTime() - today.getTime()) / 86400000);
-    };
-
-    // Evraklar
     evraklar.forEach(e => {
       if (e.silinmis) return;
       const personel = e.personelId ? personeller.find(p => p.id === e.personelId) : null;
@@ -193,7 +190,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
           mesaj: `${e.ad} evrakının süresi dolmuş`,
           detay: `${detayBase}${detayBase ? ' — ' : ''}${tarihBilgi}`,
           tarih: e.gecerlilikTarihi || new Date().toISOString().split('T')[0],
-          okundu: okunanlar.has(`evrak_dolmus_${e.id}`),
+          okundu: false,
           kalanGun: -1,
           module: 'evraklar',
           recordId: e.id,
@@ -208,7 +205,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
           mesaj: `${e.ad} evrakı eksik`,
           detay: `${detayBase}${detayBase ? ' — ' : ''}Evrak henüz yüklenmemiş`,
           tarih: new Date().toISOString().split('T')[0],
-          okundu: okunanlar.has(`evrak_eksik_${e.id}`),
+          okundu: false,
           kalanGun: -1,
           module: 'evraklar',
           recordId: e.id,
@@ -218,7 +215,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
 
       const d = parseDate(e.gecerlilikTarihi);
       if (!d) return;
-      const kalanGun = getDaysRemaining(e.gecerlilikTarihi)!;
+      const kalanGun = getDaysRemaining(e.gecerlilikTarihi, today)!;
 
       if (d >= today && d <= in30) {
         result.push({
@@ -227,7 +224,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
           mesaj: `${e.ad} evrakının süresi yaklaşıyor`,
           detay: `${detayBase}${detayBase ? ' — ' : ''}${kalanGun === 0 ? 'Bugün dolacak!' : `${kalanGun} gün kaldı`}`,
           tarih: e.gecerlilikTarihi!,
-          okundu: okunanlar.has(`evrak_surecek_${e.id}`),
+          okundu: false,
           kalanGun,
           module: 'evraklar',
           recordId: e.id,
@@ -239,7 +236,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
           mesaj: `${e.ad} evrakının süresi dolmuş`,
           detay: `${detayBase}${detayBase ? ' — ' : ''}${d.toLocaleDateString('tr-TR')} tarihinde doldu`,
           tarih: e.gecerlilikTarihi!,
-          okundu: okunanlar.has(`evrak_dolmus_${e.id}`),
+          okundu: false,
           kalanGun,
           module: 'evraklar',
           recordId: e.id,
@@ -247,7 +244,16 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
       }
     });
 
-    // Ekipmanlar
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evraklar, personeller, firmalar]);
+
+  // ── EKİPMAN bildirimleri (sadece ekipmanlar / firmalar değişince çalışır) ──
+  const ekipmanBildirimleri = useMemo<Bildirim[]>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const result: Bildirim[] = [];
+
     ekipmanlar.forEach(ek => {
       if (ek.silinmis) return;
       const firma = firmalar.find(f => f.id === ek.firmaId);
@@ -259,7 +265,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
           mesaj: `${ek.ad} — KRİTİK: Uygun Değil`,
           detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman uygunsuz olarak işaretlendi`,
           tarih: new Date().toISOString().split('T')[0],
-          okundu: okunanlar.has(`ekipman_uygunsuz_${ek.id}`),
+          okundu: false,
           kalanGun: -999,
           module: 'ekipmanlar',
           recordId: ek.id,
@@ -274,7 +280,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
           mesaj: `${ek.ad} bakımda`,
           detay: `${firma?.ad ? firma.ad + ' — ' : ''}Ekipman bakım sürecinde`,
           tarih: new Date().toISOString().split('T')[0],
-          okundu: okunanlar.has(`ekipman_bakimda_${ek.id}`),
+          okundu: false,
           kalanGun: -1,
           module: 'ekipmanlar',
           recordId: ek.id,
@@ -284,7 +290,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
 
       const d = parseDate(ek.sonrakiKontrolTarihi);
       if (!d) return;
-      const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi)!;
+      const kalanGun = getDaysRemaining(ek.sonrakiKontrolTarihi, today)!;
 
       if (kalanGun < 0) {
         result.push({
@@ -293,7 +299,7 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
           mesaj: `${ek.ad} kontrolü gecikti`,
           detay: `${firma?.ad ? firma.ad + ' — ' : ''}${Math.abs(kalanGun)} gün gecikti`,
           tarih: ek.sonrakiKontrolTarihi,
-          okundu: okunanlar.has(`ekipman_gecikti_${ek.id}`),
+          okundu: false,
           kalanGun,
           module: 'ekipmanlar',
           recordId: ek.id,
@@ -309,20 +315,29 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
         mesaj: `${ek.ad} kontrolü yaklaşıyor`,
         detay: `${firma?.ad ? firma.ad + ' — ' : ''}${kalanGun === 0 ? 'Bugün kontrol edilmeli!' : `${kalanGun} gün kaldı`}`,
         tarih: ek.sonrakiKontrolTarihi,
-        okundu: okunanlar.has(`ekipman_${ek.id}`),
+        okundu: false,
         kalanGun,
         module: 'ekipmanlar',
         recordId: ek.id,
       });
     });
 
-    // Muayeneler
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ekipmanlar, firmalar]);
+
+  // ── MUAYENE bildirimleri (sadece muayeneler / personeller değişince çalışır) ──
+  const muayeneBildirimleri = useMemo<Bildirim[]>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const result: Bildirim[] = [];
+
     muayeneler.forEach(m => {
       if (m.silinmis) return;
       const tarihStr = m.sonrakiTarih || m.muayeneTarihi;
       const d = parseDate(tarihStr);
       if (!d) return;
-      const kalanGun = getDaysRemaining(tarihStr)!;
+      const kalanGun = getDaysRemaining(tarihStr, today)!;
       if (kalanGun < 0 || kalanGun > 60) return;
       const personel = personeller.find(p => p.id === m.personelId);
       result.push({
@@ -331,17 +346,36 @@ export function useNotificationStore(params: NotificationStoreParams): Notificat
         mesaj: `${personel?.adSoyad || 'Personel'} muayene tarihi yaklaşıyor`,
         detay: `Periyodik Muayene — ${kalanGun === 0 ? 'Bugün!' : `${kalanGun} gün kaldı`}`,
         tarih: tarihStr!,
-        okundu: okunanlar.has(`saglik_${m.id}`),
+        okundu: false,
         kalanGun,
         module: 'muayeneler',
         recordId: m.id,
       });
     });
 
-    const sorted = result.sort((a, b) => a.kalanGun - b.kalanGun);
-    return [...kontrolMerged, ...sorted];
+    return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evraklar, ekipmanlar, egitimler, muayeneler, personeller, firmalar, okunanlar, kontrolBildirimleri]);
+  }, [muayeneler, personeller]);
+
+  // ── Tüm bildirimleri birleştir + okundu durumunu uygula ──
+  // Bu memo sadece parça memo'lardan biri veya okunanlar değişince çalışır
+  const bildirimler = useMemo<Bildirim[]>(() => {
+    const kontrolMerged = kontrolBildirimleri.map(b => ({
+      ...b,
+      okundu: b.okundu || okunanlar.has(b.id),
+    }));
+
+    const withOkundu = (list: Bildirim[]) =>
+      list.map(b => ({ ...b, okundu: okunanlar.has(b.id) }));
+
+    const sorted = [
+      ...withOkundu(evrakBildirimleri),
+      ...withOkundu(ekipmanBildirimleri),
+      ...withOkundu(muayeneBildirimleri),
+    ].sort((a, b) => a.kalanGun - b.kalanGun);
+
+    return [...kontrolMerged, ...sorted];
+  }, [kontrolBildirimleri, evrakBildirimleri, ekipmanBildirimleri, muayeneBildirimleri, okunanlar]);
 
   const tumunuOku = useCallback(() => {
     const ids = bildirimler.map(b => b.id);

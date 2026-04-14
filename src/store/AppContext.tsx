@@ -32,6 +32,7 @@ import type { Bildirim } from './useNotificationStore';
 
 interface AppContextType extends StoreType {
   fetchTable: (table: string) => Promise<void>;
+  fetchModuleTables: (module: string) => Promise<void>;
   pageLoading: boolean;
   partialLoading: boolean;
   realtimeStatus: 'connected' | 'connecting' | 'disconnected';
@@ -328,7 +329,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const channels = extraIds.map(firmId => {
-      const channelName = `gezici_extra_${firmId}_${Date.now()}`;
+      // Sabit kanal adı — Date.now() KALDIRILDI (zombie kanal önlemi)
+      const channelName = `gezici_extra_${firmId}`;
       let ch = supabase.channel(channelName);
       TABLES.forEach(table => {
         ch = ch.on(
@@ -375,29 +377,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [org?.osgbRole, org?.id, org?.activeFirmIds, flattenExtraVeriler]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── fetchTable ──────────────────────────────────────────────────────────
+  // ── fetchTable: store referanslarını ref ile tutarak bağımlılık döngüsü önlenir ──
+  // store.fetchXxx fonksiyonları useCallback ile stabilize edilmiş ama
+  // bağımlılık dizisi çok uzunsa her store yenilenmesinde fetchTable yeniden yaratılır.
+  // Ref pattern ile store'u okurken stale closure riski olmadan bağımlılık sayısı azaltılır.
+  const storeRef = useRef(store);
+  useEffect(() => { storeRef.current = store; }, [store]);
+
   const fetchTable = useCallback(async (table: string) => {
     const orgId = org?.id;
     if (!orgId) return;
+    const s = storeRef.current;
     const map: Record<string, (id: string) => Promise<void>> = {
-      firmalar: store.fetchFirmalar, personeller: store.fetchPersoneller,
-      evraklar: store.fetchEvraklar, egitimler: store.fetchEgitimler,
-      muayeneler: store.fetchMuayeneler, uygunsuzluklar: store.fetchUygunsuzluklar,
-      ekipmanlar: store.fetchEkipmanlar, gorevler: store.fetchGorevler,
-      tutanaklar: store.fetchTutanaklar, is_izinleri: store.fetchIsIzinleri,
+      firmalar: s.fetchFirmalar, personeller: s.fetchPersoneller,
+      evraklar: s.fetchEvraklar, egitimler: s.fetchEgitimler,
+      muayeneler: s.fetchMuayeneler, uygunsuzluklar: s.fetchUygunsuzluklar,
+      ekipmanlar: s.fetchEkipmanlar, gorevler: s.fetchGorevler,
+      tutanaklar: s.fetchTutanaklar, is_izinleri: s.fetchIsIzinleri,
     };
     const fn = map[table];
     if (fn) await fn(orgId);
     else console.warn(`[ISG] fetchTable: unknown table "${table}"`);
-  }, [org?.id, store.fetchFirmalar, store.fetchPersoneller, store.fetchEvraklar, store.fetchEgitimler, store.fetchMuayeneler, store.fetchUygunsuzluklar, store.fetchEkipmanlar, store.fetchGorevler, store.fetchTutanaklar, store.fetchIsIzinleri]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Module / UI state ───────────────────────────────────────────────────
   const [activeModule, setActiveModuleState] = useState<string>(() => {
     try { return localStorage.getItem('isg_active_module') || 'dashboard'; } catch { return 'dashboard'; }
   });
+  const fetchModuleTablesRef = useRef(store.fetchModuleTables);
+  useEffect(() => { fetchModuleTablesRef.current = store.fetchModuleTables; }, [store.fetchModuleTables]);
+
   const setActiveModule = useCallback((m: string) => {
     setActiveModuleState(m);
     try { localStorage.setItem('isg_active_module', m); } catch { /* ignore */ }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Modül değişiminde direkt lazy fetch — useEffect gecikmesi yok
+    void fetchModuleTablesRef.current(m);
   }, []);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -431,63 +446,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Merged data (gezici uzman: all firms merged) ────────────────────────
-  const mergedFirmalar = useMemo<Firma[]>(() => {
-    if (org?.osgbRole !== 'gezici_uzman') return store.firmalar;
-    if (geziciFirmalar.length === 0) return store.firmalar;
-    const mevcutIds = new Set(store.firmalar.map(f => f.id));
-    const yeniFirmalar = geziciFirmalar.filter(f => !mevcutIds.has(f.id));
-    return [...yeniFirmalar, ...store.firmalar];
-  }, [org?.osgbRole, geziciFirmalar, store.firmalar]);
-
+  // Tüm merge işlemleri tek useMemo'da — 8 ayrı memo yerine 1 memo
+  // Sadece ilgili veriler değişince yeniden hesaplar
   const isGezici = org?.osgbRole === 'gezici_uzman';
 
-  const mergedPersoneller = useMemo(() =>
-    isGezici && extraFirmaVeriler.personeller.length > 0
-      ? [...store.personeller, ...extraFirmaVeriler.personeller.filter(e => !store.personeller.some(s => s.id === e.id))]
-      : store.personeller,
-  [isGezici, store.personeller, extraFirmaVeriler.personeller]);
+  // Yardımcı: iki liste merge et (dedup by id)
+  function mergeList<T extends { id: string }>(base: T[], extra: T[]): T[] {
+    if (extra.length === 0) return base;
+    const baseIds = new Set(base.map(r => r.id));
+    return [...base, ...extra.filter(r => !baseIds.has(r.id))];
+  }
 
-  const mergedEvraklar = useMemo(() =>
-    isGezici && extraFirmaVeriler.evraklar.length > 0
-      ? [...store.evraklar, ...extraFirmaVeriler.evraklar.filter(e => !store.evraklar.some(s => s.id === e.id))]
-      : store.evraklar,
-  [isGezici, store.evraklar, extraFirmaVeriler.evraklar]);
+  // Gezici uzman merge — sadece isGezici=true iken çalışır
+  const geziciMergedData = useMemo(() => {
+    if (!isGezici) return null;
+    const mevcutIds = new Set(store.firmalar.map(f => f.id));
+    const yeniFirmalar = geziciFirmalar.filter(f => !mevcutIds.has(f.id));
+    return {
+      firmalar: [...yeniFirmalar, ...store.firmalar],
+      personeller: mergeList(store.personeller, extraFirmaVeriler.personeller),
+      evraklar: mergeList(store.evraklar, extraFirmaVeriler.evraklar),
+      egitimler: mergeList(store.egitimler, extraFirmaVeriler.egitimler),
+      muayeneler: mergeList(store.muayeneler, extraFirmaVeriler.muayeneler),
+      uygunsuzluklar: mergeList(store.uygunsuzluklar, extraFirmaVeriler.uygunsuzluklar),
+      ekipmanlar: mergeList(store.ekipmanlar, extraFirmaVeriler.ekipmanlar),
+      tutanaklar: mergeList(store.tutanaklar, extraFirmaVeriler.tutanaklar),
+      isIzinleri: mergeList(store.isIzinleri, extraFirmaVeriler.isIzinleri),
+    };
+  }, [
+    isGezici,
+    geziciFirmalar,
+    extraFirmaVeriler,
+    store.firmalar, store.personeller, store.evraklar, store.egitimler,
+    store.muayeneler, store.uygunsuzluklar, store.ekipmanlar,
+    store.tutanaklar, store.isIzinleri,
+  ]);
 
-  const mergedEgitimler = useMemo(() =>
-    isGezici && extraFirmaVeriler.egitimler.length > 0
-      ? [...store.egitimler, ...extraFirmaVeriler.egitimler.filter(e => !store.egitimler.some(s => s.id === e.id))]
-      : store.egitimler,
-  [isGezici, store.egitimler, extraFirmaVeriler.egitimler]);
+  // Normal kullanıcı için doğrudan store referansları — hesaplama yok
+  const mergedData = isGezici
+    ? geziciMergedData!
+    : {
+        firmalar: store.firmalar,
+        personeller: store.personeller,
+        evraklar: store.evraklar,
+        egitimler: store.egitimler,
+        muayeneler: store.muayeneler,
+        uygunsuzluklar: store.uygunsuzluklar,
+        ekipmanlar: store.ekipmanlar,
+        tutanaklar: store.tutanaklar,
+        isIzinleri: store.isIzinleri,
+      };
 
-  const mergedMuayeneler = useMemo(() =>
-    isGezici && extraFirmaVeriler.muayeneler.length > 0
-      ? [...store.muayeneler, ...extraFirmaVeriler.muayeneler.filter(e => !store.muayeneler.some(s => s.id === e.id))]
-      : store.muayeneler,
-  [isGezici, store.muayeneler, extraFirmaVeriler.muayeneler]);
-
-  const mergedUygunsuzluklar = useMemo(() =>
-    isGezici && extraFirmaVeriler.uygunsuzluklar.length > 0
-      ? [...store.uygunsuzluklar, ...extraFirmaVeriler.uygunsuzluklar.filter(e => !store.uygunsuzluklar.some(s => s.id === e.id))]
-      : store.uygunsuzluklar,
-  [isGezici, store.uygunsuzluklar, extraFirmaVeriler.uygunsuzluklar]);
-
-  const mergedEkipmanlar = useMemo(() =>
-    isGezici && extraFirmaVeriler.ekipmanlar.length > 0
-      ? [...store.ekipmanlar, ...extraFirmaVeriler.ekipmanlar.filter(e => !store.ekipmanlar.some(s => s.id === e.id))]
-      : store.ekipmanlar,
-  [isGezici, store.ekipmanlar, extraFirmaVeriler.ekipmanlar]);
-
-  const mergedTutanaklar = useMemo(() =>
-    isGezici && extraFirmaVeriler.tutanaklar.length > 0
-      ? [...store.tutanaklar, ...extraFirmaVeriler.tutanaklar.filter(e => !store.tutanaklar.some(s => s.id === e.id))]
-      : store.tutanaklar,
-  [isGezici, store.tutanaklar, extraFirmaVeriler.tutanaklar]);
-
-  const mergedIsIzinleri = useMemo(() =>
-    isGezici && extraFirmaVeriler.isIzinleri.length > 0
-      ? [...store.isIzinleri, ...extraFirmaVeriler.isIzinleri.filter(e => !store.isIzinleri.some(s => s.id === e.id))]
-      : store.isIzinleri,
-  [isGezici, store.isIzinleri, extraFirmaVeriler.isIzinleri]);
+  const {
+    firmalar: mergedFirmalar,
+    personeller: mergedPersoneller,
+    evraklar: mergedEvraklar,
+    egitimler: mergedEgitimler,
+    muayeneler: mergedMuayeneler,
+    uygunsuzluklar: mergedUygunsuzluklar,
+    ekipmanlar: mergedEkipmanlar,
+    tutanaklar: mergedTutanaklar,
+    isIzinleri: mergedIsIzinleri,
+  } = mergedData;
 
   // ── Gorev store (isolated) ──────────────────────────────────────────────
   const gorevStore = useGorevStore({
@@ -510,7 +530,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   } = useNotificationStore({
     evraklar: mergedEvraklar,
     ekipmanlar: mergedEkipmanlar,
-    egitimler: mergedEgitimler,
+    // egitimler kaldırıldı — hook içinde kullanılmıyor, gereksiz re-render engeli
     muayeneler: mergedMuayeneler,
     personeller: mergedPersoneller,
     firmalar: mergedFirmalar,
@@ -551,6 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearMustChangePassword,
       createOrg, joinOrg, regenerateInviteCode, refetchOrg,
       logAction, fetchTable,
+      fetchModuleTables: store.fetchModuleTables,
       refreshData: store.refreshAllData,
       pageLoading: store.pageLoading,
       partialLoading: store.partialLoading,

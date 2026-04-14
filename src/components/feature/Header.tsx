@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useApp } from '../../store/AppContext';
 import { useAuth } from '../../store/AuthContext';
 import FirmaSwitcher from './FirmaSwitcher';
@@ -76,13 +76,13 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const dropdownBorder = isDark ? 'var(--border-main)'    : 'rgba(15,23,42,0.09)';
   const dropdownItemHover = isDark ? 'var(--bg-hover)'    : 'rgba(15,23,42,0.038)';
 
-  // ── Status badge ──
-  const statusInfo = (() => {
+  // ── Status badge — useMemo: sadece okunmamisBildirimSayisi değişince hesapla ──
+  const statusInfo = useMemo(() => {
     const total = okunmamisBildirimSayisi;
-    if (total === 0) return { text: 'Sistem sağlıklı',    color: '#34D399', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.2)',  icon: 'ri-checkbox-circle-line' };
+    if (total === 0) return { text: 'Sistem sağlıklı',        color: '#34D399', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.2)',  icon: 'ri-checkbox-circle-line' };
     if (total <= 3)  return { text: `${total} yaklaşan işlem`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  border: 'rgba(245,158,11,0.2)',  icon: 'ri-timer-line' };
-    return           { text: `${total} uyarı var`,        color: '#F87171', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.2)',   icon: 'ri-alarm-warning-line' };
-  })();
+    return                  { text: `${total} uyarı var`,      color: '#F87171', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.2)',   icon: 'ri-alarm-warning-line' };
+  }, [okunmamisBildirimSayisi]);
 
   // ── Refresh ──
   const handleRefresh = useCallback(async () => {
@@ -121,8 +121,12 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
   const greeting = hour >= 6 && hour < 12 ? 'Günaydın' : hour >= 12 && hour < 17 ? 'İyi Günler' : 'İyi Akşamlar';
   const firstName = (currentUser.ad || '').split(' ')[0] || 'Kullanıcı';
 
-  // ── Search data ──
-  const searchData = { firmalar, personeller, evraklar, tutanaklar };
+  // ── Search data — useMemo: SearchBox'a her render'da yeni obje gitmesin ──
+  // Yeni obje referansı SearchBox'u gereksiz re-render'a zorluyor
+  const searchData = useMemo(
+    () => ({ firmalar, personeller, evraklar, tutanaklar }),
+    [firmalar, personeller, evraklar, tutanaklar],
+  );
 
   return (
     <>
