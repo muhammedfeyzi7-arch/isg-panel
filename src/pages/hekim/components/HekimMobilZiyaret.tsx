@@ -145,23 +145,39 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
     return () => clearInterval(id);
   }, [aktifZiyaret]);
 
+  const resolveOsgbOrgId = useCallback(async (orgId: string): Promise<string> => {
+    // org_type kontrolü: eğer osgb ise direkt, firma ise parent_org_id al
+    const { data } = await supabase
+      .from('organizations')
+      .select('id, org_type, parent_org_id')
+      .eq('id', orgId)
+      .maybeSingle();
+    if (!data) return orgId;
+    if (data.org_type === 'osgb') return data.id;
+    if (data.parent_org_id) return data.parent_org_id;
+    return orgId;
+  }, []);
+
   const fetchOrgInfo = useCallback(async () => {
     if (!user?.id || osgbOrgId) return;
     if (org?.id) {
-      setOsgbOrgId(org.id);
+      // org.id osgb mi kontrol et
+      const realOsgbId = await resolveOsgbOrgId(org.id);
+      setOsgbOrgId(realOsgbId);
       const ad = user.user_metadata?.display_name ?? user.email ?? 'Hekim';
       setHekimAd(ad);
-      localStorage.setItem(LS_HEKIM_ORG, JSON.stringify({ orgId: org.id, uzmanAd: ad }));
+      localStorage.setItem(LS_HEKIM_ORG, JSON.stringify({ orgId: realOsgbId, uzmanAd: ad }));
       return;
     }
     const { data } = await supabase.from('user_organizations').select('organization_id, display_name').eq('user_id', user.id).eq('is_active', true).maybeSingle();
     if (data) {
-      setOsgbOrgId(data.organization_id);
+      const realOsgbId = await resolveOsgbOrgId(data.organization_id);
+      setOsgbOrgId(realOsgbId);
       const ad = data.display_name ?? user.email ?? 'Hekim';
       setHekimAd(ad);
-      localStorage.setItem(LS_HEKIM_ORG, JSON.stringify({ orgId: data.organization_id, uzmanAd: ad }));
+      localStorage.setItem(LS_HEKIM_ORG, JSON.stringify({ orgId: realOsgbId, uzmanAd: ad }));
     }
-  }, [user?.id, user?.email, user?.user_metadata, org?.id, osgbOrgId]);
+  }, [user?.id, user?.email, user?.user_metadata, org?.id, osgbOrgId, resolveOsgbOrgId]);
 
   const fetchZiyaret = useCallback(async () => {
     if (!user?.id) return;
@@ -188,6 +204,25 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
     } finally { setLoading(false); }
   }, [user?.id, setAktifZiyaret]);
 
+  // localStorage cache'teki orgId'nin gerçekten OSGB olduğunu doğrula (eski hatalı cache temizle)
+  useEffect(() => {
+    const validateCache = async () => {
+      try {
+        const cached = JSON.parse(localStorage.getItem(LS_HEKIM_ORG) ?? 'null') as { orgId: string; uzmanAd: string } | null;
+        if (!cached?.orgId) return;
+        const { data } = await supabase.from('organizations').select('org_type, parent_org_id').eq('id', cached.orgId).maybeSingle();
+        if (data && data.org_type !== 'osgb') {
+          // Cache yanlış — temizle, yeniden resolve edilecek
+          localStorage.removeItem(LS_HEKIM_ORG);
+          setOsgbOrgId(null);
+          setHekimAd('');
+        }
+      } catch { /* ignore */ }
+    };
+    void validateCache();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => { void fetchZiyaret(); void fetchOrgInfo(); }, [fetchZiyaret, fetchOrgInfo]);
   useEffect(() => { if (isOnline) void fetchZiyaret(); }, [isOnline, fetchZiyaret]);
 
@@ -197,10 +232,13 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
     if (!user?.id) return null;
     const { data } = await supabase.from('user_organizations').select('organization_id, display_name').eq('user_id', user.id).eq('is_active', true).maybeSingle();
     if (!data) return null;
-    setOsgbOrgId(data.organization_id); setHekimAd(data.display_name ?? user.email ?? 'Hekim');
-    localStorage.setItem(LS_HEKIM_ORG, JSON.stringify({ orgId: data.organization_id, uzmanAd: data.display_name ?? user.email ?? 'Hekim' }));
-    return { orgId: data.organization_id, uzman: data.display_name ?? user.email ?? 'Hekim' };
-  }, [osgbOrgId, hekimAd, user]);
+    // OSGB org ID'sini doğru çöz: firma ise parent_org_id al
+    const realOsgbId = await resolveOsgbOrgId(data.organization_id);
+    const ad = data.display_name ?? user.email ?? 'Hekim';
+    setOsgbOrgId(realOsgbId); setHekimAd(ad);
+    localStorage.setItem(LS_HEKIM_ORG, JSON.stringify({ orgId: realOsgbId, uzmanAd: ad }));
+    return { orgId: realOsgbId, uzman: ad };
+  }, [osgbOrgId, hekimAd, user, resolveOsgbOrgId]);
 
   const handleCheckIn = useCallback(async (firmaId: string) => {
     if (!user?.id) { addToast('Oturum bulunamadı.', 'error'); return; }

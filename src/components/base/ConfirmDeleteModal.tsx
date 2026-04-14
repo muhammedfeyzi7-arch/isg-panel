@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ConfirmDeleteModalProps {
   open: boolean;
@@ -47,7 +48,7 @@ export default function ConfirmDeleteModal({
   const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
   const textMuted = isDark ? '#94a3b8' : '#64748b';
 
-  return (
+  const modalContent = (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
@@ -133,4 +134,6 @@ export default function ConfirmDeleteModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
