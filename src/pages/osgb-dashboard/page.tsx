@@ -299,24 +299,39 @@ export default function OsgbDashboardPage() {
     if (!org?.id) return;
     setDataLoading(true);
     try {
-      // Alt firmalar (parent_org_id = bu OSGB'nin org id'si) — silinmemişler
-      const { data: firmData } = await supabase
-        .from('organizations')
-        .select('id, name, invite_code, created_at')
-        .eq('parent_org_id', org.id)
-        .eq('org_type', 'firma')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+      // ── ADIM 1: Firmalar + Uzmanlar paralel çek — temel liste hemen gelir ──
+      const [{ data: firmData }, { data: uzmanData }] = await Promise.all([
+        supabase
+          .from('organizations')
+          .select('id, name, invite_code, created_at')
+          .eq('parent_org_id', org.id)
+          .eq('org_type', 'firma')
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('user_organizations')
+          .select('user_id, display_name, email, is_active, active_firm_id, active_firm_ids, osgb_role')
+          .eq('organization_id', org.id)
+          .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi']),
+      ]);
 
-      // Tüm personel (gezici_uzman + isyeri_hekimi)
-      const { data: uzmanData } = await supabase
-        .from('user_organizations')
-        .select('user_id, display_name, email, is_active, active_firm_id, active_firm_ids, osgb_role')
-        .eq('organization_id', org.id)
-        .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi']);
-
-      // ── N+1 FIX: Her tablo için tek GROUP BY sorgusu ──
       const firmaIds = (firmData ?? []).map(f => f.id);
+
+      // ── ADIM 2: Temel firma listesini hemen göster (sayılar sonra gelecek) ──
+      if (firmData && firmData.length > 0) {
+        const temelFirmalar: AltFirma[] = firmData.map(f => ({
+          id: f.id, name: f.name, invite_code: f.invite_code,
+          created_at: f.created_at, personelSayisi: 0, uzmanAd: null, uygunsuzluk: 0,
+        }));
+        const temelUzmanlar: Uzman[] = (uzmanData ?? []).map(u => ({
+          ...u, active_firm_ids: u.active_firm_ids ?? null, active_firm_name: null,
+        }));
+        setAltFirmalar(temelFirmalar);
+        setUzmanlar(temelUzmanlar);
+        setDataLoading(false); // ← İlk render burada, kullanıcı beklemez
+      }
+
+      // ── ADIM 3: Detay sayıları arka planda çek ──
       const enrichedFirmalar: AltFirma[] = [];
       const detaylar: FirmaDetay[] = [];
 
@@ -425,32 +440,26 @@ export default function OsgbDashboardPage() {
       enrichedFirmalar.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       detaylar.sort((a, b) => enrichedFirmalar.findIndex(x => x.id === a.id) - enrichedFirmalar.findIndex(x => x.id === b.id));
 
-      // Uzmanlar için aktif firma adını/adlarını çek
-      const enrichedUzmanlar: Uzman[] = await Promise.all(
-        (uzmanData ?? []).map(async (u) => {
-          // active_firm_ids varsa tüm firma adlarını çek
-          const firmIds: string[] = (u.active_firm_ids && u.active_firm_ids.length > 0)
-            ? u.active_firm_ids
-            : u.active_firm_id ? [u.active_firm_id] : [];
+      // ── Uzmanlar için firma adı — DB sorgusu YOK, zaten çektiğimiz firmData'dan oku ──
+      // firmData zaten var, ayrıca organizations sorgusu atmıyoruz (N+1 fix)
+      const allFirmaNameMap: Record<string, string> = {};
+      (firmData ?? []).forEach(f => { allFirmaNameMap[f.id] = f.name; });
 
-          let active_firm_name: string | null = null;
-          if (firmIds.length > 0) {
-            const { data: firmRows } = await supabase
-              .from('organizations')
-              .select('id, name')
-              .in('id', firmIds);
-            if (firmRows && firmRows.length > 0) {
-              // Birden fazla firma varsa isimlerini virgülle birleştir
-              active_firm_name = firmRows.map(r => r.name).join(', ');
-            }
-          }
-          return {
-            ...u,
-            active_firm_ids: u.active_firm_ids ?? null,
-            active_firm_name,
-          };
-        })
-      );
+      const enrichedUzmanlar: Uzman[] = (uzmanData ?? []).map((u) => {
+        const firmIds: string[] = (u.active_firm_ids && u.active_firm_ids.length > 0)
+          ? u.active_firm_ids
+          : u.active_firm_id ? [u.active_firm_id] : [];
+
+        const active_firm_name = firmIds.length > 0
+          ? firmIds.map(id => allFirmaNameMap[id]).filter(Boolean).join(', ') || null
+          : null;
+
+        return {
+          ...u,
+          active_firm_ids: u.active_firm_ids ?? null,
+          active_firm_name,
+        };
+      });
 
       setAltFirmalar(enrichedFirmalar);
       setFirmaDetaylar(detaylar);
@@ -465,6 +474,97 @@ export default function OsgbDashboardPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ── OSGB Realtime — tüm kritik tablolar ──
+  useEffect(() => {
+    if (!org?.id) return;
+
+    // Firma sayısı değişince sadece o firmanın state'ini güncelle
+    const handlePersonelChange = (payload: { new?: Record<string, unknown>; old?: Record<string, unknown>; eventType: string }) => {
+      const orgId = (payload.new?.organization_id ?? payload.old?.organization_id) as string | undefined;
+      if (!orgId) return;
+      // İlgili firmanın personel sayısını DB'den çek (sadece o firma)
+      supabase
+        .from('personeller')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .is('deleted_at', null)
+        .then(({ count }) => {
+          updateFirmaInState(orgId, { personelSayisi: count ?? 0 });
+        });
+    };
+
+    const handleUygunsuzlukChange = (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
+      const orgId = (payload.new?.organization_id ?? payload.old?.organization_id) as string | undefined;
+      if (!orgId) return;
+      // İlgili firmanın açık uygunsuzluk sayısını güncelle
+      supabase
+        .from('uygunsuzluklar')
+        .select('data')
+        .eq('organization_id', orgId)
+        .is('deleted_at', null)
+        .then(({ data }) => {
+          const acik = (data ?? []).filter(r => {
+            const durum = (r.data as Record<string, unknown>)?.durum as string ?? '';
+            return durum !== 'Kapandı' && durum !== 'Kapatıldı';
+          }).length;
+          updateFirmaInState(orgId, { uygunsuzluk: acik });
+        });
+    };
+
+    const handleUserOrgChange = () => {
+      // Uzman atama değişince fetchData — firma adı eşleştirmesi için
+      void fetchData();
+    };
+
+    const handleFirmaChange = (payload: { new?: Record<string, unknown>; old?: Record<string, unknown>; eventType: string }) => {
+      // Yeni firma eklendi veya silindi
+      if (payload.eventType === 'INSERT' && payload.new) {
+        const f = payload.new;
+        if (f.parent_org_id === org.id && f.org_type === 'firma' && !f.deleted_at) {
+          // Yeni firma state'e ekle
+          const yeniFirma: AltFirma = {
+            id: f.id as string,
+            name: f.name as string,
+            invite_code: f.invite_code as string ?? '',
+            created_at: f.created_at as string,
+            personelSayisi: 0,
+            uzmanAd: null,
+            uygunsuzluk: 0,
+          };
+          setAltFirmalar(prev => {
+            if (prev.some(x => x.id === yeniFirma.id)) return prev;
+            return [yeniFirma, ...prev];
+          });
+        }
+      } else if (payload.eventType === 'UPDATE' && payload.new?.deleted_at) {
+        // Firma silindi (soft delete)
+        removeFirmaFromState(payload.new.id as string);
+      }
+    };
+
+    const channel = supabase
+      .channel(`osgb_realtime_${org.id}`)
+      // Personel değişimi
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'personeller' },
+        (p) => handlePersonelChange({ ...p, eventType: p.eventType }))
+      // Uygunsuzluk değişimi
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uygunsuzluklar' },
+        (p) => handleUygunsuzlukChange(p))
+      // Uzman atama değişimi
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'user_organizations', filter: `organization_id=eq.${org.id}` },
+        () => handleUserOrgChange())
+      // Firma değişimi (yeni firma eklendi / silindi)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'organizations', filter: `parent_org_id=eq.${org.id}` },
+        (p) => handleFirmaChange({ ...p, eventType: p.eventType }))
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [org?.id, fetchData, updateFirmaInState, removeFirmaFromState]);
 
   // RLS fix effect REMOVED — artık her açılışta çalışmıyor
 

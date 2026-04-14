@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/store/AppContext';
 import { useAuth } from '@/store/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -121,95 +121,66 @@ export default function UzmanPage() {
     return () => clearTimeout(t);
   }, []);
 
+  // ── Tek fetchFirmalar fonksiyonu — hem ilk yükleme hem realtime kullanır ──
+  const fetchFirmalar = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from('user_organizations')
+        .select('organization_id, active_firm_ids')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (data) {
+        const rawFirmIds: string[] =
+          Array.isArray(data.active_firm_ids) && data.active_firm_ids.length > 0
+            ? data.active_firm_ids
+            : [data.organization_id];
+
+        const { data: orgs } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .in('id', rawFirmIds)
+          .is('deleted_at', null);
+
+        const options: FirmaOption[] = (orgs ?? []).map(o => ({ id: o.id, name: o.name }));
+        const firmIds = options.map(o => o.id);
+        setAtanmisFirmaIds(firmIds);
+        setFirmaOptions(options);
+        setAktiveFirmaId(prev => {
+          if (prev && firmIds.includes(prev)) return prev;
+          return options.length === 1 ? options[0].id : null;
+        });
+      } else {
+        setAtanmisFirmaIds([]);
+        setFirmaOptions([]);
+        setAktiveFirmaId(null);
+      }
+    } catch (err) {
+      console.error('[UzmanPage] fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // İlk yükleme
   useEffect(() => {
     if (!user || !org) return;
-    const fetchFirmalar = async () => {
-      setLoading(true);
-      try {
-        const { data } = await supabase
-          .from('user_organizations')
-          .select('organization_id, active_firm_ids')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (data) {
-          const rawFirmIds: string[] =
-            Array.isArray(data.active_firm_ids) && data.active_firm_ids.length > 0
-              ? data.active_firm_ids
-              : [data.organization_id];
-
-          // Silinmemiş firmaları filtrele (deleted_at IS NULL)
-          const { data: orgs } = await supabase
-            .from('organizations')
-            .select('id, name')
-            .in('id', rawFirmIds)
-            .is('deleted_at', null);
-
-          const options: FirmaOption[] = (orgs ?? []).map(o => ({ id: o.id, name: o.name }));
-          const firmIds = options.map(o => o.id);
-
-          setAtanmisFirmaIds(firmIds);
-          setFirmaOptions(options);
-          if (options.length === 1) setAktiveFirmaId(options[0].id);
-        }
-      } catch (err) {
-        console.error('[UzmanPage] fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchFirmalar();
-  }, [user?.id, org?.id]);
+  }, [user?.id, org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime: user_organizations değişince firma listesini yenile
   useEffect(() => {
     if (!user?.id) return;
+
     const channel = supabase
       .channel(`uzman_user_orgs_${user.id}`)
       .on(
         'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
         { event: '*', schema: 'public', table: 'user_organizations', filter: `user_id=eq.${user.id}` } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
-        async () => {
-          // user_organizations değişti → organizations listesini yeniden çek
-          setLoading(true);
-          try {
-            const { data } = await supabase
-              .from('user_organizations')
-              .select('organization_id, active_firm_ids')
-              .eq('user_id', user.id)
-              .eq('is_active', true)
-              .maybeSingle();
-
-            if (data) {
-              const rawFirmIds: string[] =
-                Array.isArray(data.active_firm_ids) && data.active_firm_ids.length > 0
-                  ? data.active_firm_ids
-                  : [data.organization_id];
-
-              const { data: orgs } = await supabase
-                .from('organizations')
-                .select('id, name')
-                .in('id', rawFirmIds)
-                .is('deleted_at', null);
-
-              const options: FirmaOption[] = (orgs ?? []).map(o => ({ id: o.id, name: o.name }));
-              const firmIds = options.map(o => o.id);
-              setAtanmisFirmaIds(firmIds);
-              setFirmaOptions(options);
-              // Aktif firma silinmişse seçimi temizle
-              setAktiveFirmaId(prev => (prev && firmIds.includes(prev) ? prev : options.length === 1 ? options[0].id : null));
-            } else {
-              setAtanmisFirmaIds([]);
-              setFirmaOptions([]);
-              setAktiveFirmaId(null);
-            }
-          } catch (err) {
-            console.error('[UzmanPage] realtime refetch error:', err);
-          } finally {
-            setLoading(false);
-          }
-        }
+        () => { fetchFirmalar(); }
       )
       .subscribe();
 
@@ -219,19 +190,12 @@ export default function UzmanPage() {
       .on(
         'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
         { event: 'UPDATE', schema: 'public', table: 'organizations' } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
-        async (payload: { new: Record<string, unknown> }) => {
-          // Eğer güncellenen firma mevcut listemizdeyse ve silinmişse listeden çıkar
+        (payload: { new: Record<string, unknown> }) => {
           const updatedId = payload.new?.id as string | undefined;
           const deletedAt = payload.new?.deleted_at;
           if (updatedId && deletedAt) {
-            setAtanmisFirmaIds(prev => {
-              const next = prev.filter(id => id !== updatedId);
-              return next;
-            });
-            setFirmaOptions(prev => {
-              const next = prev.filter(f => f.id !== updatedId);
-              return next;
-            });
+            setAtanmisFirmaIds(prev => prev.filter(id => id !== updatedId));
+            setFirmaOptions(prev => prev.filter(f => f.id !== updatedId));
             setAktiveFirmaId(prev => (prev === updatedId ? null : prev));
           }
         }
@@ -242,7 +206,7 @@ export default function UzmanPage() {
       supabase.removeChannel(channel);
       supabase.removeChannel(orgChannel);
     };
-  }, [user?.id]);
+  }, [user?.id, fetchFirmalar]);
 
   const goruntulenenFirmaIds = aktiveFirmaId ? [aktiveFirmaId] : atanmisFirmaIds;
 

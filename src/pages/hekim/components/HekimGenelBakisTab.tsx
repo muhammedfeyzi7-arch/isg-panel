@@ -85,11 +85,21 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
           sonMuayeneGunu = Math.floor((Date.now() - new Date(muayeneTarihler[0]).getTime()) / (1000 * 60 * 60 * 24));
         }
 
-        const { count: toplamPersonelCount } = await supabase
-          .from('personeller').select('id', { count: 'exact', head: true })
-          .in('organization_id', safeIds);
+        // Tüm personelleri tek sorguda çek — hem toplam sayı hem firma bazlı dağılım için
+        const { data: tumPersoneller } = await supabase
+          .from('personeller')
+          .select('organization_id')
+          .in('organization_id', safeIds)
+          .is('deleted_at', null);
 
-        const toplamPersonel = toplamPersonelCount ?? 0;
+        const toplamPersonel = tumPersoneller?.length ?? 0;
+
+        // Firma bazlı personel sayısını map'e al (N+1 sorgu önlemi)
+        const personelByFirma = new Map<string, number>();
+        (tumPersoneller ?? []).forEach(p => {
+          personelByFirma.set(p.organization_id, (personelByFirma.get(p.organization_id) ?? 0) + 1);
+        });
+
         const muayeneliPersonelIds = new Set(
           allMuayeneler.map(m => (m.data as Record<string, unknown>)?.personelId as string).filter(Boolean)
         );
@@ -106,22 +116,17 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
           periyodikUyum,
         });
 
-        const firmaRows: FirmaRow[] = await Promise.all(
-          (orgs ?? []).map(async (org) => {
-            const { count: personelCount } = await supabase
-              .from('personeller').select('id', { count: 'exact', head: true })
-              .eq('organization_id', org.id).is('deleted_at', null);
-            const orgMuayeneler = allMuayeneler.filter(m => m.organization_id === org.id);
-            const orgKazalar = allKazalar.filter(k => k.organization_id === org.id);
-            return {
-              id: org.id,
-              name: org.name,
-              personelSayisi: personelCount ?? 0,
-              muayeneSayisi: orgMuayeneler.length,
-              kazaSayisi: orgKazalar.length,
-            };
-          })
-        );
+        const firmaRows: FirmaRow[] = (orgs ?? []).map((org) => {
+          const orgMuayeneler = allMuayeneler.filter(m => m.organization_id === org.id);
+          const orgKazalar = allKazalar.filter(k => k.organization_id === org.id);
+          return {
+            id: org.id,
+            name: org.name,
+            personelSayisi: personelByFirma.get(org.id) ?? 0,
+            muayeneSayisi: orgMuayeneler.length,
+            kazaSayisi: orgKazalar.length,
+          };
+        });
         setFirmalar(firmaRows);
       } catch (err) {
         console.error('[HekimGenelBakisTab] load error:', err);
