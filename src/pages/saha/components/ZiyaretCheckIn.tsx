@@ -557,13 +557,13 @@ export default function ZiyaretCheckIn() {
 
           // ── UPDATE — sadece id + cikis_saati null filtresi
           // .eq('uzman_user_id') KALDIRILDI — user mismatch bypass
+          // sure_dakika GENERATED ALWAYS — DB otomatik hesaplar, gönderilmez
           const { data: updateData, error, count } = await supabase
             .from('osgb_ziyaretler')
             .update({
               cikis_saati:   now,
               durum:         'tamamlandi',
               updated_at:    now,
-              sure_dakika:   sureDakika,
               check_out_lat: coords?.lat ?? null,
               check_out_lng: coords?.lng ?? null,
             })

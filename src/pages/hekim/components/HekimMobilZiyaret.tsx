@@ -17,6 +17,10 @@ interface AktifZiyaret {
   firma_org_id: string;
   firma_ad: string | null;
   giris_saati: string;
+  cikis_saati?: string | null;
+  sure_dakika?: number | null;
+  gps_status?: 'ok' | 'too_far' | 'no_permission' | null;
+  check_in_distance_m?: number | null;
   qr_ile_giris: boolean;
   isOffline: boolean;
 }
@@ -179,8 +183,8 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
         if (local && !local.isOffline) setAktifZiyaret(null);
       }
 
-      const { data: gecmisData } = await supabase.from('osgb_ziyaretler').select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris').eq('uzman_user_id', user.id).not('cikis_saati', 'is', null).order('giris_saati', { ascending: false }).limit(5);
-      setGecmis((gecmisData ?? []).map(z => ({ id: z.id, tempId: z.id, firma_org_id: z.firma_org_id, firma_ad: z.firma_ad, giris_saati: z.giris_saati, qr_ile_giris: z.qr_ile_giris, isOffline: false })));
+      const { data: gecmisData } = await supabase.from('osgb_ziyaretler').select('id, firma_org_id, firma_ad, giris_saati, cikis_saati, sure_dakika, gps_status, check_in_distance_m, qr_ile_giris').eq('uzman_user_id', user.id).not('cikis_saati', 'is', null).order('giris_saati', { ascending: false }).limit(10);
+      setGecmis((gecmisData ?? []).map(z => ({ id: z.id, tempId: z.id, firma_org_id: z.firma_org_id, firma_ad: z.firma_ad, giris_saati: z.giris_saati, cikis_saati: z.cikis_saati, sure_dakika: z.sure_dakika, gps_status: z.gps_status, check_in_distance_m: z.check_in_distance_m, qr_ile_giris: z.qr_ile_giris, isOffline: false })));
     } finally { setLoading(false); }
   }, [user?.id, setAktifZiyaret]);
 
@@ -266,7 +270,7 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
     const sureDakika = Math.round((Date.now() - new Date(aktifZiyaret.giris_saati).getTime()) / 60000);
     try {
       if (isOnline && aktifZiyaret.id && !aktifZiyaret.isOffline) {
-        // sure_dakika GENERATED ALWAYS — DB'ye gönderilmez, cikis_saati'nden otomatik hesaplanır
+        // sure_dakika GENERATED ALWAYS — DB otomatik hesaplar, gönderilmez
         const { error } = await supabase.from('osgb_ziyaretler').update({ cikis_saati: now, durum: 'tamamlandi', updated_at: now, check_out_lat: coords?.lat ?? null, check_out_lng: coords?.lng ?? null }).eq('id', aktifZiyaret.id).is('cikis_saati', null);
         if (error) throw new Error(error.message);
         addToast(`İşlem başarıyla kaydedildi — ziyaret tamamlandı (${sureDakika} dk)`, 'success');
@@ -294,6 +298,8 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
       else addToast(`Farklı firmada aktif ziyaret var (${aktifZiyaret.firma_ad ?? 'Firma'}). Önce bitirin.`, 'error');
     } else void handleCheckIn(firmaId);
   }, [aktifZiyaret, handleCheckIn, handleCheckOut, addToast]);
+
+  const [detayZiyaret, setDetayZiyaret] = useState<AktifZiyaret | null>(null);
 
   const bg = isDark ? '#0a0f1a' : '#f0f9ff';
   const cardBg = isDark ? 'rgba(17,24,39,0.85)' : '#ffffff';
@@ -467,20 +473,74 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
           <div className="rounded-2xl overflow-hidden" style={{ background: cardBg, border: `1px solid ${border}` }}>
             <div className="px-4 pt-4 pb-2 flex items-center gap-2"><div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,.1)' }}><i className="ri-history-line text-xs" style={{ color: ACCENT }} /></div><p className="text-xs font-bold uppercase tracking-[.12em]" style={{ color: textMuted }}>Son Ziyaretler</p></div>
             <div className="px-3 pb-3 space-y-1.5">
-              {gecmis.map(z => (
-                <div key={z.id ?? z.tempId} className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: isDark ? 'rgba(255,255,255,.025)' : 'rgba(15,23,42,.025)', border: `1px solid ${border}` }}>
+              {gecmis.map(z => {
+                const sureDk = z.sure_dakika;
+                const sureStr = sureDk ? (sureDk >= 60 ? `${Math.floor(sureDk/60)}s ${sureDk%60}dk` : `${sureDk}dk`) : null;
+                return (
+                <button key={z.id ?? z.tempId} onClick={() => setDetayZiyaret(z)} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left cursor-pointer transition-all" style={{ background: isDark ? 'rgba(255,255,255,.025)' : 'rgba(15,23,42,.025)', border: `1px solid ${border}` }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,.3)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = border; }}>
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isDark ? 'rgba(255,255,255,.04)' : 'rgba(15,23,42,.04)' }}><i className="ri-building-2-line text-sm" style={{ color: textMuted }} /></div>
                   <div className="flex-1 min-w-0"><p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{z.firma_ad ?? '—'}</p><p className="text-[10px] mt-0.5" style={{ color: textMuted }}>{formatDate(z.giris_saati)} · {formatTime(z.giris_saati)}</p></div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {sureStr && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,.2)' }}>{sureStr}</span>}
                     {z.qr_ile_giris && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,.1)', color: ACCENT, border: '1px solid rgba(14,165,233,.2)' }}>QR</span>}
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: isDark ? 'rgba(255,255,255,.06)' : 'rgba(15,23,42,.06)', color: textMuted }}><i className="ri-check-line mr-0.5" />Bitti</span>
+                    <i className="ri-arrow-right-s-line text-xs" style={{ color: textMuted }} />
                   </div>
-                </div>
-              ))}
+                </button>
+                );
+              })}
             </div>
           </div>
         )}
       </div>
+      {/* Geçmiş ziyaret detay popup */}
+      {detayZiyaret && (
+        <div className="fixed inset-0 flex items-end justify-center z-50" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={() => setDetayZiyaret(null)}>
+          <div className="w-full max-w-md rounded-t-3xl p-5 space-y-3" style={{ background: cardBg, border: `1px solid ${border}` }} onClick={e => e.stopPropagation()}>
+            <div className="flex justify-center mb-1"><div className="w-10 h-1 rounded-full" style={{ background: border }} /></div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold" style={{ color: textPrimary }}>Ziyaret Detayı</p>
+              <button onClick={() => setDetayZiyaret(null)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,.1)', color: '#EF4444' }}><i className="ri-close-line text-sm" /></button>
+            </div>
+            <div className="rounded-xl p-4 space-y-2.5" style={{ background: isDark ? 'rgba(255,255,255,.04)' : 'rgba(15,23,42,.03)', border: `1px solid ${border}` }}>
+              <div className="flex items-center gap-2"><i className="ri-building-2-line text-sm" style={{ color: ACCENT }} /><p className="text-sm font-bold" style={{ color: textPrimary }}>{detayZiyaret.firma_ad ?? '—'}</p></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg p-2.5" style={{ background: isDark ? 'rgba(14,165,233,.08)' : 'rgba(14,165,233,.05)' }}>
+                  <p className="text-[10px]" style={{ color: textMuted }}>Giriş</p>
+                  <p className="text-xs font-bold" style={{ color: textPrimary }}>{new Date(detayZiyaret.giris_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="text-[10px]" style={{ color: textMuted }}>{new Date(detayZiyaret.giris_saati).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}</p>
+                </div>
+                <div className="rounded-lg p-2.5" style={{ background: isDark ? 'rgba(148,163,184,.08)' : 'rgba(148,163,184,.05)' }}>
+                  <p className="text-[10px]" style={{ color: textMuted }}>Çıkış</p>
+                  <p className="text-xs font-bold" style={{ color: textPrimary }}>{detayZiyaret.cikis_saati ? new Date(detayZiyaret.cikis_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+                  <p className="text-[10px]" style={{ color: textMuted }}>{detayZiyaret.cikis_saati ? new Date(detayZiyaret.cikis_saati).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : ''}</p>
+                </div>
+              </div>
+              {detayZiyaret.sure_dakika != null && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(99,102,241,.08)' }}>
+                  <i className="ri-timer-line text-sm" style={{ color: '#6366F1' }} />
+                  <span className="text-xs font-bold" style={{ color: '#6366F1' }}>
+                    {detayZiyaret.sure_dakika >= 60 ? `${Math.floor(detayZiyaret.sure_dakika/60)} saat ${detayZiyaret.sure_dakika%60} dakika` : `${detayZiyaret.sure_dakika} dakika`}
+                  </span>
+                </div>
+              )}
+              {detayZiyaret.gps_status && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: detayZiyaret.gps_status === 'ok' ? 'rgba(34,197,94,.08)' : detayZiyaret.gps_status === 'too_far' ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)' }}>
+                  <i className="ri-map-pin-2-line text-sm" style={{ color: detayZiyaret.gps_status === 'ok' ? '#22C55E' : detayZiyaret.gps_status === 'too_far' ? '#EF4444' : '#F59E0B' }} />
+                  <span className="text-xs font-semibold" style={{ color: detayZiyaret.gps_status === 'ok' ? '#16A34A' : detayZiyaret.gps_status === 'too_far' ? '#DC2626' : '#D97706' }}>
+                    {detayZiyaret.gps_status === 'ok' ? 'Konum doğrulandı' : detayZiyaret.gps_status === 'too_far' ? `Kapsam dışı${detayZiyaret.check_in_distance_m ? ` (${detayZiyaret.check_in_distance_m}m)` : ''}` : 'GPS alınamadı'}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                {detayZiyaret.qr_ile_giris && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,.1)', color: ACCENT, border: '1px solid rgba(14,165,233,.2)' }}><i className="ri-qr-code-line mr-0.5" />QR Girişi</span>}
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(148,163,184,.1)', color: '#94A3B8', border: '1px solid rgba(148,163,184,.2)' }}>Tamamlandı</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

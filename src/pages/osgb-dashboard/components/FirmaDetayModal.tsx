@@ -345,7 +345,7 @@ export default function FirmaDetayModal({
 
   const modal = createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center p-4"
+      className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
       style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)', zIndex: 99999 }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >

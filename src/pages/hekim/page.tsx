@@ -278,14 +278,7 @@ export default function HekimPage() {
     }
   };
 
-  const MOBILE_TABS: { id: HekimTab; label: string; icon: string }[] = [
-    { id: 'genel_bakis', label: 'Genel', icon: 'ri-dashboard-3-line' },
-    { id: 'firmalar', label: 'Firmalar', icon: 'ri-building-3-line' },
-    { id: 'personeller', label: 'Personel', icon: 'ri-group-line' },
-    { id: 'saglik', label: 'Sağlık', icon: 'ri-heart-pulse-line' },
-    { id: 'is_kazasi', label: 'Kazalar', icon: 'ri-alert-line' },
-    { id: 'ziyaret', label: 'Ziyaret', icon: 'ri-map-pin-user-line' },
-  ];
+
 
   return (
     <div
@@ -532,72 +525,13 @@ export default function HekimPage() {
 
         {/* ── İçerik ── */}
         <div
-          className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'} ${activeTab === 'ziyaret' ? 'pb-24 lg:pb-4' : ''}`}
+          className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'}`}
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
         >
           {renderContent()}
         </div>
 
-        {/* ── Mobil Alt Tab Bar ── */}
-        <nav
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-40"
-          style={{
-            background: isDark ? 'rgba(17,24,39,0.97)' : 'rgba(255,255,255,0.97)',
-            backdropFilter: 'blur(16px)',
-            borderTop: `1px solid ${borderColor}`,
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          }}
-        >
-          <div className="flex items-stretch">
-            {MOBILE_TABS.map(tab => {
-              const isActive = activeTab === tab.id;
-              const isZiyaret = tab.id === 'ziyaret';
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 cursor-pointer transition-all duration-200 relative whitespace-nowrap"
-                  style={{
-                    background: isActive && isZiyaret ? `rgba(14,165,233,0.12)` : 'transparent',
-                    borderTop: isActive ? `2px solid ${ACCENT}` : '2px solid transparent',
-                  }}
-                >
-                  {isZiyaret ? (
-                    <>
-                      <div className="relative">
-                        <div
-                          className="w-10 h-10 flex items-center justify-center rounded-2xl relative z-10"
-                          style={{
-                            background: isActive
-                              ? `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})`
-                              : `rgba(14,165,233,0.1)`,
-                            border: `1.5px solid ${isActive ? ACCENT : 'rgba(14,165,233,0.3)'}`,
-                            boxShadow: isActive ? `0 0 12px rgba(14,165,233,0.4)` : 'none',
-                          }}>
-                          <i className={`${tab.icon} text-base`} style={{ color: isActive ? '#fff' : ACCENT }} />
-                        </div>
-                        {isActive && (
-                          <div className="absolute inset-0 rounded-2xl z-0 animate-ping"
-                            style={{ background: `rgba(14,165,233,0.2)` }} />
-                        )}
-                      </div>
-                      <span className="text-[9px] font-extrabold" style={{ color: ACCENT }}>{tab.label}</span>
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-5 h-5 flex items-center justify-center">
-                        <i className={`${tab.icon} text-sm`} style={{ color: isActive ? ACCENT : (isDark ? '#475569' : '#94a3b8') }} />
-                      </div>
-                      <span className="text-[9px] font-semibold" style={{ color: isActive ? ACCENT : (isDark ? '#475569' : '#94a3b8') }}>
-                        {tab.label}
-                      </span>
-                    </>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
+
       </main>
     </div>
   );
