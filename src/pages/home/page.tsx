@@ -22,6 +22,7 @@ import SettingsPage from '../settings/page';
 import IsIzniPage from '../is-izni/page';
 import FirmaEvraklariPage from '../company-documents/page';
 import DokumanlarPage from '../dokumanlar/page';
+import SahaPage from '../saha/page';
 
 // URL path → modül adı eşlemesi
 const PATH_TO_MODULE: Record<string, string> = {
@@ -120,6 +121,7 @@ function AppContent() {
       case 'dokumanlar': return <DokumanlarPage />;
       case 'copkutusu': return <CopKutusuPage />;
       case 'ayarlar': return isFirmaUser ? <DashboardPage /> : <SettingsPage />;
+      case 'saha': return <SahaPage />;
       default: return <DashboardPage />;
     }
   };

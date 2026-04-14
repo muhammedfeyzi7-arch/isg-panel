@@ -9,17 +9,17 @@ const ROLE_MODULES: Record<string, string[]> = {
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
     'uygunsuzluklar', 'ekipmanlar', 'is-izinleri',
-    'raporlar', 'dokumanlar', 'copkutusu', 'ayarlar',
+    'saha', 'raporlar', 'dokumanlar', 'copkutusu', 'ayarlar',
   ],
   denetci: [
     'dashboard', 'firmalar', 'personeller',
-    'ekipmanlar', 'uygunsuzluklar',
+    'ekipmanlar', 'uygunsuzluklar', 'saha',
   ],
   member: [
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
     'uygunsuzluklar', 'ekipmanlar', 'is-izinleri',
-    'raporlar', 'dokumanlar', 'copkutusu',
+    'saha', 'raporlar', 'dokumanlar', 'copkutusu',
   ],
   firma_user: [
     'dashboard', 'personeller',
@@ -40,6 +40,7 @@ interface MenuItem {
   id: string;
   label: string;
   icon: string;
+  mobileOnly?: boolean;
 }
 
 const menuGroups: { label: string; items: MenuItem[] }[] = [
@@ -67,7 +68,7 @@ const menuGroups: { label: string; items: MenuItem[] }[] = [
   {
     label: 'SİSTEM',
     items: [
-
+      { id: 'saha',       label: 'Saha Denetimleri', icon: 'ri-map-pin-user-line', mobileOnly: true },
       { id: 'raporlar',   label: 'Raporlar',          icon: 'ri-bar-chart-2-line' },
       { id: 'dokumanlar', label: 'Dökümanlar',        icon: 'ri-file-text-line' },
       { id: 'copkutusu',  label: 'Çöp Kutusu',        icon: 'ri-delete-bin-2-line' },
@@ -241,6 +242,8 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                   const isActive = activeModule === item.id;
                   const isHovered = hoveredItem === item.id;
                   const badge = badges[item.id];
+                  if (item.mobileOnly && !mobileOpen) return null;
+
                   return (
                     <li key={item.id}>
                       <button
