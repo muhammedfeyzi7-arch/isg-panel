@@ -698,7 +698,15 @@ export function useStore(
     collect<Uygunsuzluk>(setUygunsuzluklar, 'uygunsuzluklar', u => u.cascadeFirmaId === id && !!u.cascadeSilindi);
     collect<Ekipman>(setEkipmanlar, 'ekipmanlar', e => e.cascadeFirmaId === id && !!e.cascadeSilindi);
 
-    void Promise.allSettled(updatedItems.map(({ table, item }) => saveToDb(table, item)));
+    void Promise.allSettled(
+      updatedItems.map(({ table, item }) => saveToDb(table, item, true))
+    ).then(results => {
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length > 0) {
+        console.error('[ISG] restoreFirma: some saves failed', failed);
+        onSaveErrorRef.current?.(`Firma geri yükleme sırasında ${failed.length} kayıt yazılamadı. Lütfen tekrar deneyin.`);
+      }
+    });
   }, [setFirmalar, setPersoneller, setEvraklar, setEgitimler, setMuayeneler, setUygunsuzluklar, setEkipmanlar, saveToDb]);
 
   const permanentDeleteFirma = useCallback(async (id: string) => {
@@ -764,7 +772,7 @@ export function useStore(
   const restorePersonel = useCallback((id: string) => {
     let updated: Personel | null = null;
     setPersoneller(prev => prev.map(p => { if (p.id !== id) return p; updated = { ...p, silinmis: false as const, silinmeTarihi: undefined }; return updated; }));
-    if (updated) void saveToDb('personeller', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) void saveToDb('personeller', updated as unknown as { id: string } & Record<string, unknown>, true).catch(err => onSaveErrorRef.current?.(`Personel geri yükleme hatası: ${err instanceof Error ? err.message : String(err)}`));
   }, [setPersoneller, saveToDb]);
 
   const personellerRef = useRef<Personel[]>([]);
@@ -805,7 +813,7 @@ export function useStore(
   const restoreEvrak = useCallback((id: string) => {
     let updated: Evrak | null = null;
     setEvraklar(prev => prev.map(e => { if (e.id !== id) return e; updated = { ...e, silinmis: false as const, silinmeTarihi: undefined }; return updated; }));
-    if (updated) void saveToDb('evraklar', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) void saveToDb('evraklar', updated as unknown as { id: string } & Record<string, unknown>, true).catch(err => onSaveErrorRef.current?.(`Evrak geri yükleme hatası: ${err instanceof Error ? err.message : String(err)}`));
   }, [setEvraklar, saveToDb]);
 
   const evraklarRef = useRef<Evrak[]>([]);
@@ -845,7 +853,7 @@ export function useStore(
   const restoreEgitim = useCallback((id: string) => {
     let updated: Egitim | null = null;
     setEgitimler(prev => prev.map(e => { if (e.id !== id) return e; updated = { ...e, silinmis: false as const, silinmeTarihi: undefined }; return updated; }));
-    if (updated) void saveToDb('egitimler', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) void saveToDb('egitimler', updated as unknown as { id: string } & Record<string, unknown>, true).catch(err => onSaveErrorRef.current?.(`Eğitim geri yükleme hatası: ${err instanceof Error ? err.message : String(err)}`));
   }, [setEgitimler, saveToDb]);
 
   const egitimlerRef = useRef<Egitim[]>([]);
@@ -885,10 +893,7 @@ export function useStore(
   const restoreMuayene = useCallback((id: string) => {
     let updated: Muayene | null = null;
     setMuayeneler(prev => prev.map(m => { if (m.id !== id) return m; updated = { ...m, silinmis: false as const, silinmeTarihi: undefined }; return updated; }));
-    if (updated) {
-      // saveToDb sets deleted_at=null because silinmis=false
-      void saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>);
-    }
+    if (updated) void saveToDb('muayeneler', updated as unknown as { id: string } & Record<string, unknown>, true).catch(err => onSaveErrorRef.current?.(`Sağlık kaydı geri yükleme hatası: ${err instanceof Error ? err.message : String(err)}`));
   }, [setMuayeneler, saveToDb]);
 
   const muayenelerRef = useRef<Muayene[]>([]);
@@ -932,7 +937,7 @@ export function useStore(
   const restoreUygunsuzluk = useCallback((id: string) => {
     let updated: Uygunsuzluk | null = null;
     setUygunsuzluklar(prev => prev.map(u => { if (u.id !== id) return u; updated = { ...u, silinmis: false as const, silinmeTarihi: undefined }; return updated; }));
-    if (updated) void saveToDb('uygunsuzluklar', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) void saveToDb('uygunsuzluklar', updated as unknown as { id: string } & Record<string, unknown>, true).catch(err => onSaveErrorRef.current?.(`Saha denetim geri yükleme hatası: ${err instanceof Error ? err.message : String(err)}`));
   }, [setUygunsuzluklar, saveToDb]);
 
   const uygunsuzluklarRef = useRef<Uygunsuzluk[]>([]);
@@ -1030,7 +1035,7 @@ export function useStore(
   const restoreEkipman = useCallback((id: string) => {
     let updated: Ekipman | null = null;
     setEkipmanlar(prev => prev.map(e => { if (e.id !== id) return e; updated = { ...e, silinmis: false as const, silinmeTarihi: undefined }; return updated; }));
-    if (updated) void saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) void saveToDb('ekipmanlar', updated as unknown as { id: string } & Record<string, unknown>, true).catch(err => onSaveErrorRef.current?.(`Ekipman geri yükleme hatası: ${err instanceof Error ? err.message : String(err)}`));
   }, [setEkipmanlar, saveToDb]);
 
   const ekipmanlarRef = useRef<Ekipman[]>([]);
@@ -1113,7 +1118,7 @@ export function useStore(
   const restoreTutanak = useCallback((id: string) => {
     let updated: Tutanak | null = null;
     setTutanaklar(prev => prev.map(t => { if (t.id !== id) return t; updated = { ...t, silinmis: false as const, silinmeTarihi: undefined }; return updated; }));
-    if (updated) void saveToDb('tutanaklar', updated as unknown as { id: string } & Record<string, unknown>);
+    if (updated) void saveToDb('tutanaklar', updated as unknown as { id: string } & Record<string, unknown>, true).catch(err => onSaveErrorRef.current?.(`Tutanak geri yükleme hatası: ${err instanceof Error ? err.message : String(err)}`));
   }, [setTutanaklar, saveToDb]);
 
   const tutanaklarRef = useRef<Tutanak[]>([]);
@@ -1174,8 +1179,9 @@ export function useStore(
     if (!current) return;
     const updated: IsIzni = { ...current, silinmis: false as const, silinmeTarihi: undefined };
     setIsIzinleri(prev => prev.map(iz => iz.id === id ? updated : iz));
-    void saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>).catch(() => {
+    void saveToDb('is_izinleri', updated as unknown as { id: string } & Record<string, unknown>, true).catch(err => {
       setIsIzinleri(prev => prev.map(iz => iz.id === id ? current : iz));
+      onSaveErrorRef.current?.(`İş izni geri yükleme hatası: ${err instanceof Error ? err.message : String(err)}`);
     });
   }, [setIsIzinleri, saveToDb]);
 

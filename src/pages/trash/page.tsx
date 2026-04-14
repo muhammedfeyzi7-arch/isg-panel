@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import Modal from '../../components/base/Modal';
 import Badge, { getFirmaStatusColor, getPersonelStatusColor, getEvrakStatusColor } from '../../components/base/Badge';
@@ -39,6 +39,92 @@ export default function CopKutusuPage() {
   const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
 
   const [activeTab, setActiveTab] = useState<Tab>(() => isGeziciUzman ? 'personeller' : 'firmalar');
+
+  // ── Sayfa açılınca DB'den silinmiş kayıtları inject et ──────────────────
+  // fetchAllRows sadece deleted_at IS NULL çekiyor; sayfa yenilenince
+  // çöp kutusu boş görünüyor. Burada deleted_at IS NOT NULL kayıtları
+  // ayrı local state'te tutup store ile merge ediyoruz.
+  type LocalDeleted = {
+    firmalar: import('../../types').Firma[];
+    personeller: import('../../types').Personel[];
+    evraklar: import('../../types').Evrak[];
+    egitimler: import('../../types').Egitim[];
+    muayeneler: import('../../types').Muayene[];
+    ekipmanlar: import('../../types').Ekipman[];
+    uygunsuzluklar: import('../../types').Uygunsuzluk[];
+    tutanaklar: import('../../types').Tutanak[];
+    isIzinleri: import('../../types').IsIzni[];
+    gorevler: import('../../types').Gorev[];
+  };
+  const emptyLocal: LocalDeleted = {
+    firmalar: [], personeller: [], evraklar: [], egitimler: [], muayeneler: [],
+    ekipmanlar: [], uygunsuzluklar: [], tutanaklar: [], isIzinleri: [], gorevler: [],
+  };
+  const [localDeleted, setLocalDeleted] = useState<LocalDeleted>(emptyLocal);
+  const fetchedRef = useRef(false);
+
+  const fetchDeletedFromDB = useCallback(async (orgId: string) => {
+    const TABLES: Array<{ table: string; key: keyof LocalDeleted }> = [
+      { table: 'firmalar', key: 'firmalar' },
+      { table: 'personeller', key: 'personeller' },
+      { table: 'evraklar', key: 'evraklar' },
+      { table: 'egitimler', key: 'egitimler' },
+      { table: 'muayeneler', key: 'muayeneler' },
+      { table: 'ekipmanlar', key: 'ekipmanlar' },
+      { table: 'uygunsuzluklar', key: 'uygunsuzluklar' },
+      { table: 'tutanaklar', key: 'tutanaklar' },
+      { table: 'is_izinleri', key: 'isIzinleri' },
+      { table: 'gorevler', key: 'gorevler' },
+    ];
+    try {
+      const results = await Promise.allSettled(
+        TABLES.map(({ table }) =>
+          supabase
+            .from(table)
+            .select('id, data, deleted_at')
+            .eq('organization_id', orgId)
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false })
+            .limit(500)
+        )
+      );
+      setLocalDeleted(prev => {
+        const next = { ...prev };
+        results.forEach((res, idx) => {
+          if (res.status === 'fulfilled' && res.value.data) {
+            const key = TABLES[idx].key;
+            (next[key] as unknown[]) = res.value.data.map(r => ({
+              ...(r.data as Record<string, unknown>),
+              id: r.id,
+              silinmis: true as const,
+              silinmeTarihi: r.deleted_at ?? undefined,
+            }));
+          }
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error('[Trash] fetchDeletedFromDB error:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!org?.id || fetchedRef.current) return;
+    fetchedRef.current = true;
+    void fetchDeletedFromDB(org.id);
+  }, [org?.id, fetchDeletedFromDB]);
+
+  // org değişince yeniden fetch
+  useEffect(() => {
+    fetchedRef.current = false;
+    setLocalDeleted(emptyLocal);
+  }, [org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Store + localDeleted merge (store kazanır çakışmada — store realtime güncel)
+  function mergeDeleted<T extends { id: string }>(storeItems: T[], dbItems: T[]): T[] {
+    const storeIds = new Set(storeItems.map(r => r.id));
+    return [...storeItems, ...dbItems.filter(r => !storeIds.has(r.id))];
+  }
 
   // İş kazaları — AppContext'te yok, DB'den çekiyoruz
   const [deletedKazalar, setDeletedKazalar] = useState<DeletedKaza[]>([]);
@@ -124,16 +210,29 @@ export default function CopKutusuPage() {
   const [bulkPermDeleteConfirm, setBulkPermDeleteConfirm] = useState(false);
   const [bulkRestoreConfirm, setBulkRestoreConfirm] = useState(false);
 
-  const deletedGorevler    = useMemo(() => gorevler.filter(g => g.silinmis), [gorevler]);
-  const deletedFirmalar    = useMemo(() => firmalar.filter(f => f.silinmis), [firmalar]);
-  const deletedPersoneller = useMemo(() => personeller.filter(p => p.silinmis), [personeller]);
-  const deletedEvraklar    = useMemo(() => evraklar.filter(e => e.silinmis), [evraklar]);
-  const deletedEgitimler   = useMemo(() => egitimler.filter(e => e.silinmis), [egitimler]);
-  const deletedMuayeneler  = useMemo(() => muayeneler.filter(m => m.silinmis), [muayeneler]);
-  const deletedEkipmanlar      = useMemo(() => ekipmanlar.filter(e => e.silinmis || e.cascadeSilindi), [ekipmanlar]);
-  const deletedUygunsuzluklar  = useMemo(() => uygunsuzluklar.filter(u => u.silinmis || u.cascadeSilindi), [uygunsuzluklar]);
-  const deletedTutanaklar  = useMemo(() => tutanaklar.filter(t => t.silinmis), [tutanaklar]);
-  const deletedIsIzinleri  = useMemo(() => isIzinleri.filter(iz => iz.silinmis), [isIzinleri]);
+  // Store'daki silinmiş kayıtlar (realtime ile güncelleniyor)
+  const storeDeletedFirmalar    = useMemo(() => firmalar.filter(f => f.silinmis), [firmalar]);
+  const storeDeletedPersoneller = useMemo(() => personeller.filter(p => p.silinmis), [personeller]);
+  const storeDeletedEvraklar    = useMemo(() => evraklar.filter(e => e.silinmis), [evraklar]);
+  const storeDeletedEgitimler   = useMemo(() => egitimler.filter(e => e.silinmis), [egitimler]);
+  const storeDeletedMuayeneler  = useMemo(() => muayeneler.filter(m => m.silinmis), [muayeneler]);
+  const storeDeletedEkipmanlar  = useMemo(() => ekipmanlar.filter(e => e.silinmis || e.cascadeSilindi), [ekipmanlar]);
+  const storeDeletedUyg         = useMemo(() => uygunsuzluklar.filter(u => u.silinmis || u.cascadeSilindi), [uygunsuzluklar]);
+  const storeDeletedTutanaklar  = useMemo(() => tutanaklar.filter(t => t.silinmis), [tutanaklar]);
+  const storeDeletedIsIzinleri  = useMemo(() => isIzinleri.filter(iz => iz.silinmis), [isIzinleri]);
+  const storeDeletedGorevler    = useMemo(() => gorevler.filter(g => g.silinmis), [gorevler]);
+
+  // Merge: store + DB fetch (store wins on id conflict)
+  const deletedFirmalar    = useMemo(() => mergeDeleted(storeDeletedFirmalar, localDeleted.firmalar), [storeDeletedFirmalar, localDeleted.firmalar]);
+  const deletedPersoneller = useMemo(() => mergeDeleted(storeDeletedPersoneller, localDeleted.personeller), [storeDeletedPersoneller, localDeleted.personeller]);
+  const deletedEvraklar    = useMemo(() => mergeDeleted(storeDeletedEvraklar, localDeleted.evraklar), [storeDeletedEvraklar, localDeleted.evraklar]);
+  const deletedEgitimler   = useMemo(() => mergeDeleted(storeDeletedEgitimler, localDeleted.egitimler), [storeDeletedEgitimler, localDeleted.egitimler]);
+  const deletedMuayeneler  = useMemo(() => mergeDeleted(storeDeletedMuayeneler, localDeleted.muayeneler), [storeDeletedMuayeneler, localDeleted.muayeneler]);
+  const deletedEkipmanlar  = useMemo(() => mergeDeleted(storeDeletedEkipmanlar, localDeleted.ekipmanlar), [storeDeletedEkipmanlar, localDeleted.ekipmanlar]);
+  const deletedUygunsuzluklar = useMemo(() => mergeDeleted(storeDeletedUyg, localDeleted.uygunsuzluklar), [storeDeletedUyg, localDeleted.uygunsuzluklar]);
+  const deletedTutanaklar  = useMemo(() => mergeDeleted(storeDeletedTutanaklar, localDeleted.tutanaklar), [storeDeletedTutanaklar, localDeleted.tutanaklar]);
+  const deletedIsIzinleri  = useMemo(() => mergeDeleted(storeDeletedIsIzinleri, localDeleted.isIzinleri), [storeDeletedIsIzinleri, localDeleted.isIzinleri]);
+  const deletedGorevler    = useMemo(() => mergeDeleted(storeDeletedGorevler, localDeleted.gorevler), [storeDeletedGorevler, localDeleted.gorevler]);
 
   // Aktif tab'daki silinen kayıtlar
   const activeItems = useMemo(() => {
@@ -193,24 +292,41 @@ export default function CopKutusuPage() {
     return { personelSayisi: tumPersonelIds.length, evrakSayisi };
   }, [permDeleteItem, personeller, evraklar]);
 
+  // Restore sonrası localDeleted'dan da kaldır
+  const removeFromLocal = useCallback((id: string, tip: Tab) => {
+    const keyMap: Partial<Record<Tab, keyof LocalDeleted>> = {
+      firmalar: 'firmalar', personeller: 'personeller', evraklar: 'evraklar',
+      egitimler: 'egitimler', muayeneler: 'muayeneler', ekipmanlar: 'ekipmanlar',
+      uygunsuzluklar: 'uygunsuzluklar', gorevler: 'gorevler',
+      tutanaklar: 'tutanaklar', is_izinleri: 'isIzinleri',
+    };
+    const key = keyMap[tip];
+    if (!key) return;
+    setLocalDeleted(prev => ({
+      ...prev,
+      [key]: (prev[key] as { id: string }[]).filter(r => r.id !== id),
+    }));
+  }, []);
+
   const handleRestore = (id: string, tip: Tab) => {
     if (tip === 'firmalar') {
       const sayilar = firmaCascadeSayilari[id];
       restoreFirma(id);
+      removeFromLocal(id, tip);
       const ekBilgi = sayilar && (sayilar.personel > 0 || sayilar.evrak > 0)
         ? ` (${sayilar.personel > 0 ? `${sayilar.personel} personel` : ''}${sayilar.personel > 0 && sayilar.evrak > 0 ? ', ' : ''}${sayilar.evrak > 0 ? `${sayilar.evrak} evrak` : ''} da geri yüklendi)`
         : '';
       addToast(`Firma geri yüklendi.${ekBilgi}`, 'success');
     }
-    if (tip === 'personeller')    { restorePersonel(id);  addToast('Personel geri yüklendi.', 'success'); }
-    if (tip === 'evraklar')       { restoreEvrak(id);     addToast('Evrak geri yüklendi.', 'success'); }
-    if (tip === 'egitimler')      { restoreEgitim(id);    addToast('Eğitim geri yüklendi.', 'success'); }
-    if (tip === 'muayeneler')     { restoreMuayene(id);   addToast('Sağlık evrakı geri yüklendi.', 'success'); }
-    if (tip === 'ekipmanlar')     { restoreEkipman(id);   addToast('Ekipman geri yüklendi.', 'success'); }
-    if (tip === 'tutanaklar')     { restoreTutanak(id);   addToast('Tutanak geri yüklendi.', 'success'); }
-    if (tip === 'is_izinleri')    { restoreIsIzni(id);    addToast('İş izni geri yüklendi.', 'success'); }
-    if (tip === 'uygunsuzluklar') { restoreUygunsuzluk(id); addToast('Saha denetim kaydı geri yüklendi.', 'success'); }
-    if (tip === 'gorevler')       { restoreGorev(id);     addToast('Görev geri yüklendi.', 'success'); }
+    if (tip === 'personeller')    { restorePersonel(id);    removeFromLocal(id, tip); addToast('Personel geri yüklendi.', 'success'); }
+    if (tip === 'evraklar')       { restoreEvrak(id);       removeFromLocal(id, tip); addToast('Evrak geri yüklendi.', 'success'); }
+    if (tip === 'egitimler')      { restoreEgitim(id);      removeFromLocal(id, tip); addToast('Eğitim geri yüklendi.', 'success'); }
+    if (tip === 'muayeneler')     { restoreMuayene(id);     removeFromLocal(id, tip); addToast('Sağlık evrakı geri yüklendi.', 'success'); }
+    if (tip === 'ekipmanlar')     { restoreEkipman(id);     removeFromLocal(id, tip); addToast('Ekipman geri yüklendi.', 'success'); }
+    if (tip === 'tutanaklar')     { restoreTutanak(id);     removeFromLocal(id, tip); addToast('Tutanak geri yüklendi.', 'success'); }
+    if (tip === 'is_izinleri')    { restoreIsIzni(id);      removeFromLocal(id, tip); addToast('İş izni geri yüklendi.', 'success'); }
+    if (tip === 'uygunsuzluklar') { restoreUygunsuzluk(id); removeFromLocal(id, tip); addToast('Saha denetim kaydı geri yüklendi.', 'success'); }
+    if (tip === 'gorevler')       { restoreGorev(id);       removeFromLocal(id, tip); addToast('Görev geri yüklendi.', 'success'); }
   };
 
   const handlePermanentDelete = async () => {
@@ -231,6 +347,8 @@ export default function CopKutusuPage() {
       if (tip === 'tutanaklar')     await permanentDeleteTutanak(id);
       if (tip === 'is_izinleri')    await permanentDeleteIsIzni(id);
       if (tip === 'is_kazalari')    await handlePermDeleteKaza(id);
+      // localDeleted'dan da kaldır
+      removeFromLocal(id, tip);
       addToast('Kayıt kalıcı olarak silindi.', 'info');
     } catch {
       addToast('Silme işlemi başarısız oldu. Lütfen tekrar deneyin.', 'error');

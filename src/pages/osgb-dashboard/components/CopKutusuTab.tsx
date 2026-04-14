@@ -6,7 +6,7 @@ interface SilinmisFirma {
   name: string;
   invite_code: string;
   created_at: string;
-  deleted_at: string;
+  deleted_at: string | null;  // null olabilir (is_active:false ama deleted_at yok)
 }
 
 interface FirmaVeriOzet {
@@ -131,34 +131,51 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored, onGoToFir
   const handleKaliciSil = async (firmaId: string, firmaAdi: string) => {
     setIslemLoading(firmaId);
     try {
-      // İlişkili kayıtları temizle (uygunsuzluklar, ziyaretler vb. organization_id ile bağlı)
-      // Önce firmayı sil — cascaded foreign key varsa otomatik siler
+      // organizations tablosunda DELETE sadece super_admin RLS'ine açık.
+      // OSGB admin için: firmayı "kalıcı silinmiş" olarak işaretle (is_active:false + özel prefix).
+      // Hard DELETE, super admin panelinden veya scheduled job ile yapılabilir.
       const { error } = await supabase
         .from('organizations')
-        .update({ name: `[KALICI_SİLİNDİ_${Date.now()}]`, deleted_at: new Date().toISOString() })
+        .update({
+          name: `[SİLİNDİ] ${firmaAdi.replace(/^\[SİLİNDİ\]\s*/i, '')}`,
+          is_active: false,
+          deleted_at: new Date().toISOString(),
+        })
         .eq('id', firmaId);
-      // Gerçek silme — RLS'e göre değişebilir, önce soft approach
-      if (!error) {
-        // Hardcode delete attempt
-        await supabase.from('organizations').delete().eq('id', firmaId);
+
+      if (error) {
+        // RLS engeli
+        if (error.message?.includes('row-level security') || error.code === '42501') {
+          showMesaj('error', 'Yetki hatası: Bu firmayı silme yetkiniz yok.');
+        } else {
+          showMesaj('error', `Silme başarısız: ${error.message}`);
+        }
+        return;
       }
+
       setFirmalar(prev => prev.filter(f => f.id !== firmaId));
       setKaliciSilOnayId(null);
-      showMesaj('success', `"${firmaAdi}" kalıcı olarak silindi.`);
-    } catch {
-      showMesaj('error', 'Kalıcı silme başarısız oldu.');
+      showMesaj('success', `"${firmaAdi}" kalıcı olarak işaretlendi ve devre dışı bırakıldı.`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      showMesaj('error', `Kalıcı silme başarısız: ${msg}`);
     } finally {
       setIslemLoading(null);
     }
   };
 
-  const formatDate = (iso: string) => {
+  const formatDate = (iso: string | null | undefined) => {
+    if (!iso) return '—';
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const getDaysSinceDeleted = (deletedAt: string) => {
-    return Math.floor((Date.now() - new Date(deletedAt).getTime()) / (1000 * 60 * 60 * 24));
+  const getDaysSinceDeleted = (deletedAt: string | null | undefined) => {
+    if (!deletedAt) return null;
+    const d = new Date(deletedAt);
+    if (isNaN(d.getTime())) return null;
+    return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   return (
@@ -245,7 +262,7 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored, onGoToFir
                   <div className="min-w-0">
                     <p className="text-xs font-bold truncate" style={{ color: textPrimary }}>{f.name}</p>
                     <span className="text-[9px]" style={{ color: textMuted }}>
-                      {daysSince === 0 ? 'Bugün silindi' : `${daysSince} gün önce silindi`}
+                      {daysSince === null ? 'Pasif firma' : daysSince === 0 ? 'Bugün silindi' : `${daysSince} gün önce silindi`}
                     </span>
                   </div>
                 </div>
