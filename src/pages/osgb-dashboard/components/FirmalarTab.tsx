@@ -236,9 +236,9 @@ export default function FirmalarTab({
       {/* Liste */}
       {filtered.length > 0 && (
         <div className="space-y-1">
-          <div className="hidden md:grid grid-cols-[2.5fr_1.5fr_1fr_1.2fr_140px] items-center px-4 py-2"
+          <div className="hidden md:grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-2"
             style={{ borderBottom: `1px solid ${borderColor}` }}>
-            {['FİRMA', 'UZMAN', 'PERSONEL', 'SON ZİYARET', 'İŞLEM'].map(h => (
+            {['FİRMA', 'PERSONEL', 'SON ZİYARET', 'İŞLEM'].map(h => (
               <span key={h} className="text-[10px] font-bold tracking-wider uppercase" style={{ color: textSecondary }}>{h}</span>
             ))}
           </div>
@@ -306,7 +306,7 @@ export default function FirmalarTab({
 
               return (
                 <div key={f.id}
-                  className="grid grid-cols-[2.5fr_1.5fr_1fr_1.2fr_140px] items-center px-4 py-3 rounded-xl transition-all"
+                  className="grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3 rounded-xl transition-all"
                   style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff', border: `1px solid ${borderColor}` }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
@@ -329,35 +329,6 @@ export default function FirmalarTab({
                         {isAktif ? '● Ziyaret devam ediyor' : 'Firma'}
                       </span>
                     </div>
-                  </div>
-
-                  {/* Uzman */}
-                  <div className="min-w-0 pr-2 cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
-                    {hasUzman ? (
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {firmaUzmanlar.slice(0, 2).map(u => (
-                          <span key={u.user_id} className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                            style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.2)' }}>
-                            <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0"
-                              style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
-                              {u.display_name.charAt(0).toUpperCase()}
-                            </span>
-                            {u.display_name.split(' ')[0]}
-                          </span>
-                        ))}
-                        {firmaUzmanlar.length > 2 && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{ background: 'rgba(14,165,233,0.08)', color: '#0284C7' }}>
-                            +{firmaUzmanlar.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ background: 'rgba(245,158,11,0.1)', color: '#D97706', border: '1px solid rgba(245,158,11,0.2)' }}>
-                        Atanmadı
-                      </span>
-                    )}
                   </div>
 
                   {/* Personel */}
