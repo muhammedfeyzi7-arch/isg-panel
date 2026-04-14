@@ -138,12 +138,13 @@ export default function HekimPage() {
           return;
         }
 
-        // Silinmemiş firmaları filtrele
+        // Silinmemiş ve aktif firmaları filtrele
         const { data: orgs } = await supabase
           .from('organizations')
           .select('id, name')
           .in('id', rawFirmIds)
-          .is('deleted_at', null);
+          .is('deleted_at', null)
+          .eq('is_active', true);
 
         const options: FirmaOption[] = (orgs ?? []).map(o => ({ id: o.id, name: o.name }));
         const firmIds = options.map(o => o.id);
@@ -282,9 +283,29 @@ export default function HekimPage() {
         return <HekimCopTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
       case 'ziyaret':
         return (
-          <div className="lg:hidden -mx-3 sm:-mx-5 md:-mx-6 -my-4">
-            <HekimMobilZiyaret isDark={isDark} />
-          </div>
+          <>
+            {/* Mobilde gerçek ziyaret, masaüstünde premium ekranı */}
+            <div className="lg:hidden -mx-3 sm:-mx-5 md:-mx-6 -my-4">
+              <HekimMobilZiyaret isDark={isDark} />
+            </div>
+            <div className="hidden lg:flex flex-col items-center justify-center py-20 px-4">
+              <div className="w-full max-w-sm rounded-3xl overflow-hidden text-center" style={{ background: isDark ? 'rgba(17,24,39,0.9)' : '#ffffff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}>
+                <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #F59E0B, #EF4444)' }} />
+                <div className="p-10">
+                  <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(245,158,11,0.1)', border: '2px solid rgba(245,158,11,0.25)' }}>
+                    <i className="ri-smartphone-line text-4xl" style={{ color: '#F59E0B' }} />
+                  </div>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <i className="ri-lock-2-line text-lg" style={{ color: '#EF4444' }} />
+                  </div>
+                  <h2 className="text-lg font-extrabold mb-2" style={{ color: isDark ? '#f1f5f9' : '#0f172a', letterSpacing: '-0.02em' }}>Mobil Cihaz Gerekli</h2>
+                  <p className="text-sm leading-relaxed" style={{ color: '#64748b' }}>
+                    Saha ziyareti modülü yalnızca mobil cihazlarda kullanılabilir. Telefon veya tabletinizden giriş yaparak QR okutabilirsiniz.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
         );
       default:
         return null;

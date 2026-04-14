@@ -25,6 +25,42 @@ import DokumanlarPage from '@/pages/dokumanlar/page';
 import CopKutusuPage from '@/pages/trash/page';
 import UzmanMobilSaha from './components/UzmanMobilSaha';
 
+// Premium kilitli mobil saha ekranı
+function MobilSahaPremium({ isDark }: { isDark: boolean }) {
+  const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
+  const textMuted = isDark ? '#64748b' : '#64748b';
+  const cardBg = isDark ? 'rgba(17,24,39,0.9)' : '#ffffff';
+  const border = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
+  return (
+    <div className="flex flex-col items-center justify-center py-20 px-4">
+      <div className="w-full max-w-sm rounded-3xl overflow-hidden text-center" style={{ background: cardBg, border: `1px solid ${border}` }}>
+        <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #F59E0B, #EF4444)' }} />
+        <div className="p-10">
+          <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(245,158,11,0.1)', border: '2px solid rgba(245,158,11,0.25)' }}>
+            <i className="ri-smartphone-line text-4xl" style={{ color: '#F59E0B' }} />
+          </div>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <i className="ri-lock-2-line text-lg" style={{ color: '#EF4444' }} />
+          </div>
+          <h2 className="text-lg font-extrabold mb-2" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>Premium Özellik</h2>
+          <p className="text-sm leading-relaxed mb-6" style={{ color: textMuted }}>
+            Mobil saha modülü premium plana dahildir. Bu özellik mobil cihazlarda QR okutarak firma ziyareti başlatmanıza olanak tanır.
+          </p>
+          <div className="rounded-xl p-4 text-left space-y-2.5 mb-6" style={{ background: isDark ? 'rgba(245,158,11,0.06)' : 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.18)' }}>
+            {['QR kod ile anlık check-in/check-out', 'Çevrimdışı ziyaret kaydı', 'GPS konum doğrulama', 'Otomatik süre takibi'].map(f => (
+              <div key={f} className="flex items-center gap-2.5">
+                <i className="ri-check-line text-sm flex-shrink-0" style={{ color: '#F59E0B' }} />
+                <span className="text-xs font-medium" style={{ color: textMuted }}>{f}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs" style={{ color: textMuted }}>Premium'a geçmek için OSGB admininizle iletişime geçin.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const ACCENT = '#0EA5E9';
 const ACCENT_DARK = '#0284C7';
 
@@ -267,7 +303,7 @@ export default function UzmanPage() {
       case 'is_izinleri':      return <IsIzniPage />;
       case 'raporlar':         return <RaporlarPage />;
       case 'dokumanlar':       return <DokumanlarPage />;
-      case 'mobil_saha':       return <UzmanMobilSaha isDark={isDark} />;
+      case 'mobil_saha':       return <MobilSahaPremium isDark={isDark} />;
       case 'cop':              return <CopKutusuPage />;
       default:                 return null;
     }

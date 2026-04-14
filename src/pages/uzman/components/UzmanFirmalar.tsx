@@ -81,7 +81,9 @@ export default function UzmanFirmalar({ atanmisFirmaIds, isDark }: Props) {
       const { data: firmData } = await supabase
         .from('organizations')
         .select('id, name, created_at, is_active')
-        .in('id', atanmisFirmaIds);
+        .in('id', atanmisFirmaIds)
+        .is('deleted_at', null)
+        .eq('is_active', true);
       const list: Firma[] = (firmData ?? []).map(o => ({ id: o.id, name: o.name, is_active: o.is_active, created_at: o.created_at }));
       setFirmalar(list);
 

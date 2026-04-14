@@ -428,38 +428,51 @@ export default function OsgbDashboardPage() {
     setAtamaLoading(true);
     setAtamaError(null);
     try {
-      // 1. Seçilen uzmanın atamasını güncelle
+      // 1. Uzmanın mevcut atamalarını çek (merge için)
+      const { data: mevcutRow } = await supabase
+        .from('user_organizations')
+        .select('active_firm_ids, active_firm_id, osgb_role')
+        .eq('user_id', atamaUzmanId)
+        .eq('organization_id', org?.id ?? '')
+        .maybeSingle();
+
+      // Mevcut firmalar + yeni seçilenler → birleştir (tekrarlar olmadan)
+      const mevcutFirmIds: string[] = Array.isArray(mevcutRow?.active_firm_ids)
+        ? mevcutRow.active_firm_ids
+        : mevcutRow?.active_firm_id ? [mevcutRow.active_firm_id] : [];
+
+      const birlesimFirmIds = [...new Set([...mevcutFirmIds, ...atamaFirmaIds])];
+
+      // 2. Uzmanın atamasını güncelle
       const { error } = await supabase
         .from('user_organizations')
         .update({
-          active_firm_id: atamaFirmaIds[0],
-          active_firm_ids: atamaFirmaIds,
+          active_firm_id: birlesimFirmIds[0],
+          active_firm_ids: birlesimFirmIds,
         })
         .eq('user_id', atamaUzmanId)
         .eq('organization_id', org?.id ?? '');
       if (error) { setAtamaError(error.message); return; }
 
-      // 2. Aynı OSGB'deki tüm hekimlerin active_firm_ids'ini yeniden hesapla ve güncelle
-      //    Hekim; OSGB'ye bağlı tüm uzmanların atandığı firmaların birleşimini görmelidir.
-      if (org?.id) {
-        // Tüm gezici uzmanların güncel atamalarını çek (yeni atama dahil)
+      // 3. Eğer uzman gezici_uzman ise, tüm hekimlerin atamalarını da güncelle
+      if (org?.id && mevcutRow?.osgb_role === 'gezici_uzman') {
+        // Tüm gezici uzmanların güncel atamalarını çek
         const { data: uzmanRows } = await supabase
           .from('user_organizations')
           .select('active_firm_ids, active_firm_id')
           .eq('organization_id', org.id)
           .eq('osgb_role', 'gezici_uzman');
 
-        // Tüm uzmanların firmalarının birleşimi
         const allFirmIds: string[] = [];
         (uzmanRows ?? []).forEach(u => {
-          if (Array.isArray(u.active_firm_ids) && u.active_firm_ids.length > 0) {
-            u.active_firm_ids.forEach((id: string) => { if (!allFirmIds.includes(id)) allFirmIds.push(id); });
-          } else if (u.active_firm_id && !allFirmIds.includes(u.active_firm_id)) {
-            allFirmIds.push(u.active_firm_id);
-          }
+          const ids = Array.isArray(u.active_firm_ids) && u.active_firm_ids.length > 0
+            ? u.active_firm_ids
+            : u.active_firm_id ? [u.active_firm_id] : [];
+          ids.forEach((id: string) => { if (!allFirmIds.includes(id)) allFirmIds.push(id); });
         });
+        // Yeni eklenen firmalar da dahil
+        birlesimFirmIds.forEach(id => { if (!allFirmIds.includes(id)) allFirmIds.push(id); });
 
-        // Hekimleri bul ve güncelle (sadece active_firm_ids boşsa veya eskiyse)
         if (allFirmIds.length > 0) {
           const { data: hekimRows } = await supabase
             .from('user_organizations')
@@ -469,12 +482,11 @@ export default function OsgbDashboardPage() {
 
           if (hekimRows && hekimRows.length > 0) {
             await Promise.all(hekimRows.map(h => {
-              // Hekimin mevcut atamalarını koru + yeni firmaları ekle
-              const mevcut: string[] = Array.isArray(h.active_firm_ids) ? h.active_firm_ids : [];
-              const birlesim = [...new Set([...mevcut, ...allFirmIds])];
+              const hMevcut: string[] = Array.isArray(h.active_firm_ids) ? h.active_firm_ids : [];
+              const hBirlesim = [...new Set([...hMevcut, ...allFirmIds])];
               return supabase
                 .from('user_organizations')
-                .update({ active_firm_ids: birlesim, active_firm_id: birlesim[0] })
+                .update({ active_firm_ids: hBirlesim, active_firm_id: hBirlesim[0] })
                 .eq('user_id', h.user_id)
                 .eq('organization_id', org.id);
             }));

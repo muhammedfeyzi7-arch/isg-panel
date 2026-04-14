@@ -503,20 +503,10 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
   const handleBitir = async (ziyaretId: string) => {
     try {
       const cikis = new Date().toISOString();
-      const ziyaret = ziyaretler.find(z => z.id === ziyaretId);
-      const sureDakika = ziyaret
-        ? Math.max(1, Math.round((new Date(cikis).getTime() - new Date(ziyaret.giris_saati).getTime()) / 60000))
-        : null;
-      // sure_dakika'yı da yazıyoruz — DB'de computed column yoksa burada set edilmeli
-      const updatePayload: { durum: string; cikis_saati: string; sure_dakika?: number } = {
-        durum: 'tamamlandi',
-        cikis_saati: cikis,
-      };
-      if (sureDakika !== null) updatePayload.sure_dakika = sureDakika;
-
+      // sure_dakika GENERATED ALWAYS — DB otomatik hesaplar, göndermiyoruz
       const { error } = await supabase
         .from('osgb_ziyaretler')
-        .update(updatePayload)
+        .update({ durum: 'tamamlandi', cikis_saati: cikis, updated_at: cikis })
         .eq('id', ziyaretId);
       if (error) throw error;
       addToast('Ziyaret tamamlandı!', 'success');
