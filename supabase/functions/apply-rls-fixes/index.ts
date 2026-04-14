@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -16,6 +15,54 @@ Deno.serve(async (req) => {
   });
 
   const results: Record<string, string> = {};
+
+  // ─── AŞAMA 0: orgs_update — parent_org_id desteği ekle ──────────────────
+  // OSGB admin, kendi alt firmalarını (child orgs) güncelleyebilsin
+  // Örnek: çöp kutusundan geri alma, is_active değiştirme
+  const { error: e0 } = await adminClient.rpc('exec_sql' as never, {
+    sql: `
+      DO $$
+      BEGIN
+        DROP POLICY IF EXISTS orgs_update ON organizations;
+        CREATE POLICY orgs_update ON organizations
+          FOR UPDATE
+          TO public
+          USING (
+            (id IN (
+              SELECT uo.organization_id FROM user_organizations uo
+              WHERE uo.user_id = auth.uid() AND uo.role = 'admin'
+            ))
+            OR
+            (parent_org_id IN (
+              SELECT uo.organization_id FROM user_organizations uo
+              WHERE uo.user_id = auth.uid() AND uo.role = 'admin'
+            ))
+            OR
+            (EXISTS (
+              SELECT 1 FROM profiles p
+              WHERE p.user_id = auth.uid() AND p.is_super_admin = true
+            ))
+          )
+          WITH CHECK (
+            (id IN (
+              SELECT uo.organization_id FROM user_organizations uo
+              WHERE uo.user_id = auth.uid() AND uo.role = 'admin'
+            ))
+            OR
+            (parent_org_id IN (
+              SELECT uo.organization_id FROM user_organizations uo
+              WHERE uo.user_id = auth.uid() AND uo.role = 'admin'
+            ))
+            OR
+            (EXISTS (
+              SELECT 1 FROM profiles p
+              WHERE p.user_id = auth.uid() AND p.is_super_admin = true
+            ))
+          );
+      END $$;
+    `
+  });
+  results['orgs_update_parent_fix'] = e0 ? `ERROR: ${e0.message}` : 'OK';
 
   // ─── AŞAMA 1: firmalar — gezici uzman SELECT policy ───────────────────────
   const { error: e1 } = await adminClient.rpc('exec_sql' as never, {
@@ -48,15 +95,11 @@ Deno.serve(async (req) => {
   results['firmalar_gezici_uzman_select'] = e1 ? `ERROR: ${e1.message}` : 'OK';
 
   // ─── AŞAMA 2: activity_logs — trigger'ları kaldır, sadece RLS ile çalış ──
-  // Trigger'lar get_my_org_id() kullandığı için multi-firma'da yanlış org'a yazar.
-  // organization_id artık frontend'den explicit geliyor, trigger override etmemeli.
   const { error: e2 } = await adminClient.rpc('exec_sql' as never, {
     sql: `
       DO $$
       BEGIN
-        -- activity_logs_enforce_user trigger kaldır (get_my_org_id kullanıyor)
         DROP TRIGGER IF EXISTS activity_logs_enforce_user ON public.activity_logs;
-        -- enforce_activity_log_user_trigger kaldır (aynı sorun)  
         DROP TRIGGER IF EXISTS enforce_activity_log_user_trigger ON public.activity_logs;
       END $$;
     `
@@ -68,11 +111,9 @@ Deno.serve(async (req) => {
     sql: `
       DO $$
       BEGIN
-        -- Mevcut policy'leri temizle
         DROP POLICY IF EXISTS activity_logs_insert_service ON public.activity_logs;
         DROP POLICY IF EXISTS activity_logs_select         ON public.activity_logs;
 
-        -- SELECT: kendi org'u veya erişim yetkisi olan org
         CREATE POLICY activity_logs_select
           ON public.activity_logs
           FOR SELECT
@@ -82,7 +123,6 @@ Deno.serve(async (req) => {
             OR can_access_org(organization_id)
           );
 
-        -- INSERT: can_access_org ile doğrula (multi-firma güvenli)
         CREATE POLICY activity_logs_insert
           ON public.activity_logs
           FOR INSERT

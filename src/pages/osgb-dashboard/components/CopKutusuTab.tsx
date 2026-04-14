@@ -84,22 +84,54 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored, onGoToFir
   const handleGeriAl = async (firmaId: string, firmaAdi: string) => {
     setIslemLoading(firmaId);
     try {
-      // [SİLİNDİ] prefix'ini temizle, is_active'i geri aç
       const temizAd = firmaAdi.replace(/^\[SİLİNDİ\]\s*/i, '').trim();
-      const { error } = await supabase
+
+      // Önce güncellemeyi yap
+      const { error, count } = await supabase
         .from('organizations')
         .update({ deleted_at: null, is_active: true, name: temizAd })
-        .eq('id', firmaId);
-      if (error) throw error;
+        .eq('id', firmaId)
+        .select('id', { count: 'exact', head: true });
+
+      if (error) {
+        // RLS veya başka bir hata
+        if (error.message?.includes('row-level security') || error.code === '42501') {
+          showMesaj('error', 'Yetki hatası: Bu firmayı geri alma yetkiniz yok.');
+        } else {
+          showMesaj('error', `Geri alma başarısız: ${error.message}`);
+        }
+        return;
+      }
+
+      // count 0 ise RLS sessizce engelledi demektir
+      if (count === 0) {
+        // count null da olabilir — doğrulama için firmayı tekrar çek
+        const { data: check } = await supabase
+          .from('organizations')
+          .select('id, deleted_at, is_active')
+          .eq('id', firmaId)
+          .maybeSingle();
+
+        if (check && check.deleted_at !== null) {
+          showMesaj('error', 'Güncelleme yapılamadı. Sayfayı yenileyip tekrar deneyin.');
+          return;
+        }
+      }
+
+      // Yerel listeden kaldır
       setFirmalar(prev => prev.filter(f => f.id !== firmaId));
       showMesaj('success', `"${temizAd}" başarıyla geri alındı ve aktif edildi.`);
-      // DB yazmasının tamamlanması için kısa bekleme, sonra parent listeyi yenile
-      await new Promise<void>(resolve => setTimeout(resolve, 700));
+
+      // DB yazmasının yayılması için bekle, sonra parent'ı yenile
+      await new Promise<void>(resolve => setTimeout(resolve, 800));
       onFirmaRestored();
+
       // Firmalar tabına geç
+      await new Promise<void>(resolve => setTimeout(resolve, 200));
       if (onGoToFirmalar) onGoToFirmalar();
-    } catch {
-      showMesaj('error', 'Geri alma başarısız oldu.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      showMesaj('error', `Geri alma başarısız: ${msg}`);
     } finally {
       setIslemLoading(null);
     }

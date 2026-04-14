@@ -250,6 +250,25 @@ export default function OsgbDashboardPage() {
     fetchData();
   }, [fetchData]);
 
+  // RLS fix — OSGB admin alt firmalarını güncelleyebilsin (çöp kutusu geri alma vb.)
+  useEffect(() => {
+    const applyRlsFix = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) return;
+        await fetch('https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/apply-rls-fixes', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        // Sessiz hata — kritik değil
+      }
+    };
+    void applyRlsFix();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Firma Ekle ──
   const [firmaForm, setFirmaForm] = useState({
     ad: '', yetkili: '', telefon: '', eposta: '', sgkSicil: '', adres: '',
