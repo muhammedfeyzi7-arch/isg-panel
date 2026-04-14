@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../store/AuthContext';
 import { useApp } from '../../store/AppContext';
@@ -475,6 +475,35 @@ export default function OsgbDashboardPage() {
     fetchData();
   }, [fetchData]);
 
+  // ── State yardımcıları — Realtime effect'ten ÖNCE tanımlanmalı ──
+  const addFirmaToState = useCallback((firma: AltFirma) => {
+    setAltFirmalar(prev => [firma, ...prev]);
+    setFirmaDetaylar(prev => [{
+      id: firma.id,
+      name: firma.name,
+      personelSayisi: 0,
+      uzmanAd: null,
+      uygunsuzluk: 0,
+      kapatilan: 0,
+      tutanakSayisi: 0,
+      egitimSayisi: 0,
+    }, ...prev]);
+  }, []);
+
+  const removeFirmaFromState = useCallback((firmaId: string) => {
+    setAltFirmalar(prev => prev.filter(f => f.id !== firmaId));
+    setFirmaDetaylar(prev => prev.filter(f => f.id !== firmaId));
+  }, []);
+
+  const updateFirmaInState = useCallback((firmaId: string, partial: Partial<AltFirma>) => {
+    setAltFirmalar(prev => prev.map(f => f.id === firmaId ? { ...f, ...partial } : f));
+    setFirmaDetaylar(prev => prev.map(f => f.id === firmaId ? { ...f, ...partial } : f));
+  }, []);
+
+  const updateUzmanInState = useCallback((userId: string, partial: Partial<Uzman>) => {
+    setUzmanlar(prev => prev.map(u => u.user_id === userId ? { ...u, ...partial } : u));
+  }, []);
+
   // ── OSGB Realtime — tüm kritik tablolar ──
   useEffect(() => {
     if (!org?.id) return;
@@ -568,34 +597,7 @@ export default function OsgbDashboardPage() {
 
   // RLS fix effect REMOVED — artık her açılışta çalışmıyor
 
-  // ── State yardımcıları ──
-  const addFirmaToState = useCallback((firma: AltFirma) => {
-    setAltFirmalar(prev => [firma, ...prev]);
-    setFirmaDetaylar(prev => [{
-      id: firma.id,
-      name: firma.name,
-      personelSayisi: 0,
-      uzmanAd: null,
-      uygunsuzluk: 0,
-      kapatilan: 0,
-      tutanakSayisi: 0,
-      egitimSayisi: 0,
-    }, ...prev]);
-  }, []);
 
-  const removeFirmaFromState = useCallback((firmaId: string) => {
-    setAltFirmalar(prev => prev.filter(f => f.id !== firmaId));
-    setFirmaDetaylar(prev => prev.filter(f => f.id !== firmaId));
-  }, []);
-
-  const updateFirmaInState = useCallback((firmaId: string, partial: Partial<AltFirma>) => {
-    setAltFirmalar(prev => prev.map(f => f.id === firmaId ? { ...f, ...partial } : f));
-    setFirmaDetaylar(prev => prev.map(f => f.id === firmaId ? { ...f, ...partial } : f));
-  }, []);
-
-  const updateUzmanInState = useCallback((userId: string, partial: Partial<Uzman>) => {
-    setUzmanlar(prev => prev.map(u => u.user_id === userId ? { ...u, ...partial } : u));
-  }, []);
 
   // ── Firma/Uzman ekleme artık modal component'lerinde ──
 
