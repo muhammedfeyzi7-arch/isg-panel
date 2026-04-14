@@ -115,7 +115,7 @@ export default function SuperAdminPage() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0">
               <i className="ri-shield-keyhole-fill text-white text-sm"></i>
             </div>
             <span className="text-slate-800 font-bold text-sm">Super Admin</span>
@@ -126,7 +126,7 @@ export default function SuperAdminPage() {
             {activeTab === 'orgs' && (
               <button
                 onClick={() => setCreateOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors"
               >
                 <i className="ri-add-line text-sm"></i>
                 Yeni Hesap
@@ -153,7 +153,7 @@ export default function SuperAdminPage() {
           ]).map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === t.key ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-700'
+                activeTab === t.key ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-700'
               }`}>
               <i className={`${t.icon} text-sm`}></i>
               {t.label}
@@ -216,11 +216,10 @@ export default function SuperAdminPage() {
                 {([
                   { key: 'all' as const, label: 'Tümü' },
                   { key: 'osgb' as const, label: 'OSGB' },
-                  { key: 'firma' as const, label: 'Firma' },
                 ]).map(f => (
                   <button key={f.key} onClick={() => setTypeFilter(f.key)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                      typeFilter === f.key ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-700'
+                      typeFilter === f.key ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-700'
                     }`}>
                     {f.label}
                   </button>
@@ -274,7 +273,7 @@ export default function SuperAdminPage() {
                     <i className="ri-error-warning-line text-xl text-red-400"></i>
                   </div>
                   <p className="text-slate-500 text-sm">{error}</p>
-                  <button onClick={fetchOrgs} className="px-5 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold cursor-pointer">Tekrar Dene</button>
+                  <button onClick={fetchOrgs} className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold cursor-pointer transition-colors">Tekrar Dene</button>
                 </div>
               ) : filteredOrgs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -292,7 +291,7 @@ export default function SuperAdminPage() {
                   ) : (
                     <button
                       onClick={() => setCreateOpen(true)}
-                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold cursor-pointer whitespace-nowrap"
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold cursor-pointer whitespace-nowrap transition-colors"
                     >
                       <i className="ri-add-line"></i> Yeni Hesap Oluştur
                     </button>

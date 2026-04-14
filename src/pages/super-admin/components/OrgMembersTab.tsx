@@ -34,23 +34,16 @@ export default function OrgMembersTab({ orgId }: { orgId: string }) {
       setLoading(true);
       setError('');
       try {
-        // profiles inner join ile sadece gerçek Supabase auth kullanıcılarını getir
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/user_organizations?organization_id=eq.${encodeURIComponent(orgId)}&select=user_id,display_name,email,role,is_active,joined_at,profiles!inner(id)&order=joined_at.asc`,
-          {
-            headers: {
-              ...saHeaders(),
-            },
-          }
+          `${SUPABASE_URL}/rest/v1/user_organizations?organization_id=eq.${encodeURIComponent(orgId)}&select=user_id,display_name,email,role,is_active,joined_at&order=joined_at.asc`,
+          { headers: saHeaders() }
         );
         if (!res.ok) {
           const errText = await res.text();
           throw new Error(`HTTP ${res.status}: ${errText}`);
         }
         const data = await res.json();
-        // profiles inner join sayesinde sadece gerçek kullanıcılar gelir, profiles alanını temizle
-        const cleaned = (Array.isArray(data) ? data : []).map(({ profiles: _p, ...rest }: Member & { profiles?: unknown }) => rest);
-        setMembers(cleaned);
+        setMembers(Array.isArray(data) ? data : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Hata oluştu');
       } finally {

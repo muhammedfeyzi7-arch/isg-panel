@@ -1,7 +1,146 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { OrgAdmin } from '../hooks/useOrganizationAdmin';
 import OrgMembersTab from './OrgMembersTab';
+
+const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
+
+function saHeaders() {
+  const token = sessionStorage.getItem('sa_access_token') ?? '';
+  return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` };
+}
+
+interface ActivityLog {
+  id: string;
+  user_name: string | null;
+  user_email: string | null;
+  user_role: string | null;
+  action_type: string | null;
+  module: string | null;
+  description: string | null;
+  created_at: string;
+  severity: string | null;
+}
+
+const ACTION_ICON: Record<string, { icon: string; cls: string }> = {
+  create:  { icon: 'ri-add-circle-line',       cls: 'text-emerald-600 bg-emerald-50' },
+  update:  { icon: 'ri-edit-line',             cls: 'text-sky-600 bg-sky-50' },
+  delete:  { icon: 'ri-delete-bin-line',       cls: 'text-red-500 bg-red-50' },
+  login:   { icon: 'ri-login-circle-line',     cls: 'text-slate-600 bg-slate-100' },
+  logout:  { icon: 'ri-logout-circle-line',    cls: 'text-slate-500 bg-slate-100' },
+  view:    { icon: 'ri-eye-line',              cls: 'text-slate-500 bg-slate-100' },
+  export:  { icon: 'ri-download-line',         cls: 'text-amber-600 bg-amber-50' },
+  import:  { icon: 'ri-upload-line',           cls: 'text-amber-600 bg-amber-50' },
+  approve: { icon: 'ri-checkbox-circle-line',  cls: 'text-emerald-600 bg-emerald-50' },
+  reject:  { icon: 'ri-close-circle-line',     cls: 'text-red-500 bg-red-50' },
+};
+
+function getActionCfg(type: string | null) {
+  return ACTION_ICON[type?.toLowerCase() ?? ''] ?? { icon: 'ri-file-text-line', cls: 'text-slate-500 bg-slate-100' };
+}
+
+function timeAgo(dateStr: string) {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return `${diff}sn önce`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}dk önce`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}sa önce`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}g önce`;
+  return new Date(dateStr).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+}
+
+function ActivityTab({ orgId }: { orgId: string }) {
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/activity_logs?organization_id=eq.${encodeURIComponent(orgId)}&select=id,user_name,user_email,user_role,action_type,module,description,created_at,severity&order=created_at.desc&limit=50`,
+        { headers: saHeaders() }
+      );
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`HTTP ${res.status}: ${txt}`);
+      }
+      const data = await res.json();
+      setLogs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  }, [orgId]);
+
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-12 text-slate-400">
+      <i className="ri-loader-4-line animate-spin text-xl mr-2"></i>
+      <span className="text-sm font-medium">Yükleniyor...</span>
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center py-10 gap-3">
+      <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+        <i className="ri-error-warning-line text-red-400 text-lg"></i>
+      </div>
+      <p className="text-red-500 text-xs text-center max-w-[240px]">{error}</p>
+      <button onClick={fetchLogs} className="text-xs text-slate-500 underline cursor-pointer">Tekrar Dene</button>
+    </div>
+  );
+
+  if (logs.length === 0) return (
+    <div className="flex flex-col items-center justify-center py-14 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-3">
+        <i className="ri-history-line text-2xl text-slate-300"></i>
+      </div>
+      <p className="text-slate-500 text-sm font-medium mb-1">Aktivite Kaydı Yok</p>
+      <p className="text-slate-400 text-xs max-w-[220px]">Bu organizasyona ait henüz bir aktivite kaydı bulunmuyor.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-slate-500 text-xs font-medium">Son {logs.length} aktivite</p>
+        <button onClick={fetchLogs} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer transition-colors">
+          <i className="ri-refresh-line text-xs"></i>
+        </button>
+      </div>
+      {logs.map(log => {
+        const cfg = getActionCfg(log.action_type);
+        const initials = (log.user_name || log.user_email || '?').charAt(0).toUpperCase();
+        return (
+          <div key={log.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+            <div className={`w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-sm ${cfg.cls}`}>
+              <i className={cfg.icon}></i>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                <span className="text-slate-800 text-xs font-semibold">{log.user_name || log.user_email || 'Sistem'}</span>
+                {log.module && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500">{log.module}</span>
+                )}
+              </div>
+              <p className="text-slate-500 text-xs leading-relaxed">{log.description || log.action_type || '—'}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-slate-400 text-[10px] whitespace-nowrap">{timeAgo(log.created_at)}</span>
+              {log.severity === 'high' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0"></span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 interface Props {
   org: OrgAdmin | null;
@@ -167,7 +306,7 @@ export default function OrgDetailSheet({ org, superAdminUserId, onClose, onUpdat
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-1.5 px-3 py-3.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                tab === t.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'
+                tab === t.id ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
               <i className={t.icon}></i>
@@ -181,17 +320,7 @@ export default function OrgDetailSheet({ org, superAdminUserId, onClose, onUpdat
           <div className="p-5">
             {tab === 'users' && <OrgMembersTab orgId={org.id} />}
 
-            {tab === 'activity' && (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mb-4">
-                  <i className="ri-history-line text-2xl text-slate-300"></i>
-                </div>
-                <h3 className="text-slate-800 font-semibold text-sm mb-1">Son Aktiviteler Yakında</h3>
-                <p className="text-slate-500 text-xs max-w-[250px]">
-                  Bu organizasyonun son giriş ve işlem geçmişi yakında burada görüntülenebilecek.
-                </p>
-              </div>
-            )}
+            {tab === 'activity' && <ActivityTab orgId={org.id} />}
 
             {tab === 'system' && (
               <div className="space-y-6">
@@ -232,7 +361,7 @@ export default function OrgDetailSheet({ org, superAdminUserId, onClose, onUpdat
                     <button
                       onClick={handleSaveDate}
                       disabled={saving || !endDate || endDate === org.subscription_end}
-                      className="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-slate-900 text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2"
+                      className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:hover:bg-emerald-500 text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer whitespace-nowrap flex items-center gap-2"
                     >
                       {saving ? <i className="ri-loader-4-line animate-spin text-sm"></i> : <i className="ri-save-line text-sm"></i>}
                       Kaydet
