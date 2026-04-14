@@ -62,6 +62,8 @@ interface AppContextType extends StoreType {
   regenerateInviteCode: () => Promise<{ error: string | null; newCode?: string }>;
   refetchOrg: () => Promise<void>;
   logAction: (actionType: string, module: string, recordId: string, recordName?: string, description?: string) => void;
+  restoreGorev: (id: string) => void;
+  permanentDeleteGorev: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
   isSwitching: boolean;
   switchActiveFirma: (firmaId: string) => Promise<{ error: string | null }>;
@@ -274,8 +276,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const extraIds = allFirmIds.filter(id => id !== org.id);
     if (extraIds.length === 0) return;
 
+    // Paginated fetch for gezici uzman extra firms — uses fetchAllRows to bypass Supabase 1000-row limit
     const fetchTableForOrg = async (table: string, orgId: string): Promise<unknown[]> => {
-      const { data } = await supabase.from(table).select('id, data').eq('organization_id', orgId).is('deleted_at', null);
+      const { data } = await (await import('./storeHelpers')).fetchAllRows(table, orgId);
       return (data ?? []).map(r => r.data as unknown);
     };
 
@@ -525,6 +528,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addGorev: gorevStore.addGorev,
       updateGorev: gorevStore.updateGorev,
       deleteGorev: gorevStore.deleteGorev,
+      restoreGorev: gorevStore.restoreGorev,
+      permanentDeleteGorev: gorevStore.permanentDeleteGorev,
       fetchGorevler: gorevStore.fetchGorevler,
       firmalar: mergedFirmalar,
       personeller: mergedPersoneller,

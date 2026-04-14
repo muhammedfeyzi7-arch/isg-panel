@@ -26,11 +26,10 @@ export default function DashboardPage() {
     setActiveModule, fetchTable, org,
   } = useApp();
 
-  // Dashboard açılınca eksik tabloları lazy fetch et
-  const fetchedRef = useRef<string | null>(null);
+  // Dashboard açılınca tüm tabloları fetch et
+  // fetchedRef kaldırıldı — org değişiminde her seferinde taze veri çekilmeli
   useEffect(() => {
-    if (!org?.id || fetchedRef.current === org.id) return;
-    fetchedRef.current = org.id;
+    if (!org?.id) return;
     const DASHBOARD_TABLES = [
       'evraklar', 'egitimler', 'muayeneler',
       'uygunsuzluklar', 'ekipmanlar', 'is_izinleri',

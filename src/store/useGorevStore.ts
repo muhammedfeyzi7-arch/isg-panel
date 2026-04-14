@@ -1,87 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Gorev } from '@/types';
 import { supabase } from '@/lib/supabase';
-
-// ── Helpers (duplicated locally to avoid coupling with useStore internals) ──
-function genId(): string {
-  return crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
-}
-
-function getDeviceId(): string {
-  let id = sessionStorage.getItem('isg_device_id');
-  if (!id) {
-    id = `dev_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
-    sessionStorage.setItem('isg_device_id', id);
-  }
-  return id;
-}
-
-const DB_NAME = 'isg_cache';
-const DB_VERSION = 1;
-const STORE_NAME = 'tables';
-const CACHE_TTL_MS = 30 * 1000;
-
-function openCacheDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function readCache<T>(key: string): Promise<{ data: T; ts: number } | null> {
-  try {
-    const db = await openCacheDB();
-    return new Promise(resolve => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const req = tx.objectStore(STORE_NAME).get(key);
-      req.onsuccess = () => resolve(req.result ?? null);
-      req.onerror = () => resolve(null);
-    });
-  } catch { return null; }
-}
-
-async function writeCache<T>(key: string, data: T): Promise<void> {
-  try {
-    const db = await openCacheDB();
-    return new Promise(resolve => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).put({ data, ts: Date.now() }, key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-    });
-  } catch { /* ignore */ }
-}
-
-async function dbUpsertGorev(
-  item: Gorev & Record<string, unknown>,
-  userId: string,
-  organizationId: string,
-): Promise<void> {
-  const now = new Date().toISOString();
-  const payload = {
-    id: item.id,
-    user_id: userId,
-    organization_id: organizationId,
-    device_id: getDeviceId(),
-    data: item,
-    updated_at: now,
-    deleted_at: null,
-  };
-  const { error } = await supabase.from('gorevler').upsert(payload, { onConflict: 'id' });
-  if (error) throw new Error(error.message || JSON.stringify(error));
-}
-
-async function dbDeleteGorev(id: string): Promise<void> {
-  try {
-    await supabase.from('gorevler').update({ device_id: getDeviceId() }).eq('id', id);
-  } catch { /* ignore */ }
-  const { error } = await supabase.from('gorevler').delete().eq('id', id);
-  if (error) throw error;
-}
+import {
+  genId, getDeviceId, dbUpsert, dbDelete, fetchAllRows,
+} from './storeHelpers';
 
 // ── Hook ──
 export interface GorevStoreOptions {
@@ -121,9 +43,10 @@ export function useGorevStore({
   }, []);
 
   // ── Save to DB ──
+  // deleted_at is correctly set by dbUpsert from item.silinmis
   const saveGorevToDb = useCallback(async (item: Gorev): Promise<void> => {
     if (isSwitchingRef.current) {
-      onSaveErrorRef.current?.(`Firma değişimi devam ediyor. Lütfen bekleyin. (gorevler)`);
+      onSaveErrorRef.current?.('Firma değişimi devam ediyor. Lütfen bekleyin. (gorevler)');
       return;
     }
     const orgId = orgIdRef.current;
@@ -133,7 +56,12 @@ export function useGorevStore({
       return;
     }
     try {
-      await dbUpsertGorev(item as Gorev & Record<string, unknown>, uid, orgId);
+      await dbUpsert(
+        'gorevler',
+        item as Gorev & { silinmis?: boolean; silinmeTarihi?: string } & Record<string, unknown>,
+        uid,
+        orgId,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       onSaveErrorRef.current?.(`Kayıt hatası (gorevler): ${msg}`);
@@ -148,7 +76,12 @@ export function useGorevStore({
     const pending = [...pendingSavesRef.current];
     pendingSavesRef.current = [];
     pending.forEach(item => {
-      dbUpsertGorev(item as Gorev & Record<string, unknown>, uid, orgId).catch(err => {
+      dbUpsert(
+        'gorevler',
+        item as Gorev & { silinmis?: boolean; silinmeTarihi?: string } & Record<string, unknown>,
+        uid,
+        orgId,
+      ).catch(err => {
         pendingSavesRef.current.push(item);
         onSaveErrorRef.current?.(`Bekleyen kayıt hatası (gorevler): ${err instanceof Error ? err.message : String(err)}`);
       });
@@ -161,32 +94,17 @@ export function useGorevStore({
   }, [organizationId, userId, orgLoading, flushPending]);
 
   useEffect(() => {
-    const handleOnline = () => flushPending();
-    window.addEventListener('online', handleOnline);
+    window.addEventListener('online', flushPending);
     if (navigator.onLine) flushPending();
-    return () => window.removeEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', flushPending);
   }, [flushPending]);
 
-  // ── Fetch ──
+  // ── Fetch — always from DB (no cache), paginated ──
   const fetchGorevler = useCallback(async (orgId: string): Promise<void> => {
-    const cacheKey = `gorevler_${orgId}`;
-    const cached = await readCache<Gorev[]>(cacheKey);
-    if (cached) {
-      setGorevler(cached.data);
-      if ((Date.now() - cached.ts) < CACHE_TTL_MS) return;
-    }
-
-    const { data, error } = await supabase
-      .from('gorevler')
-      .select('id, data, created_at')
-      .eq('organization_id', orgId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
-
-    if (error) { console.error('[GorevStore] fetchGorevler error:', error); return; }
-    const rows = (data ?? []).map(r => r.data as Gorev);
+    const { data, error } = await fetchAllRows('gorevler', orgId);
+    if (error || !data) { console.error('[GorevStore] fetchGorevler error:', error); return; }
+    const rows = data.map(r => r.data as Gorev);
     setGorevler(rows);
-    void writeCache(cacheKey, rows);
   }, [setGorevler]);
 
   // ── Load on mount / org change ──
@@ -199,6 +117,8 @@ export function useGorevStore({
   }, [organizationId, userId, orgLoading, fetchGorevler, setGorevler]);
 
   // ── Realtime ──
+  // Soft delete: when deleted_at arrives, mark silinmis:true (keep in Trash view)
+  // Hard DELETE: remove from state
   useEffect(() => {
     if (!organizationId || !userId || orgLoading) return;
     const activeOrgId = organizationId;
@@ -215,25 +135,36 @@ export function useGorevStore({
         const recordId = (payload.new?.id ?? payload.old?.id) as string | undefined;
         if (!recordId) return;
 
+        // Hard DELETE
         if (payload.eventType === 'DELETE') {
-          _setGorevler(prev => {
-            const next = prev.filter(g => g.id !== recordId);
-            void writeCache(`gorevler_${activeOrgId}`, next);
-            return next;
-          });
+          _setGorevler(prev => prev.filter(g => g.id !== recordId));
           return;
         }
 
         const newData = payload.new?.data as Gorev | undefined;
+        const deletedAt = payload.new?.deleted_at;
+
+        // Soft delete from another device — mark silinmis:true instead of removing
+        if (deletedAt && recordId) {
+          const now = new Date().toISOString();
+          if (newData) {
+            const record = { ...newData, id: recordId } as Gorev;
+            _setGorevler(prev => {
+              const idx = prev.findIndex(g => g.id === recordId);
+              return idx === -1 ? [record, ...prev] : prev.map((g, i) => i === idx ? record : g);
+            });
+          } else {
+            _setGorevler(prev => prev.map(g => g.id === recordId ? { ...g, silinmis: true as const, silinmeTarihi: g.silinmeTarihi ?? now } : g));
+          }
+          return;
+        }
+
+        // INSERT / UPDATE
         if (newData) {
           const record = { ...newData, id: recordId } as Gorev;
           _setGorevler(prev => {
             const idx = prev.findIndex(g => g.id === recordId);
-            const next = idx === -1
-              ? [record, ...prev]
-              : prev.map((g, i) => i === idx ? record : g);
-            void writeCache(`gorevler_${activeOrgId}`, next);
-            return next;
+            return idx === -1 ? [record, ...prev] : prev.map((g, i) => i === idx ? record : g);
           });
         } else {
           void fetchGorevler(activeOrgId);
@@ -242,6 +173,7 @@ export function useGorevStore({
     ).subscribe();
 
     return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, userId, orgLoading, fetchGorevler]);
 
   // ── CRUD ──
@@ -255,22 +187,38 @@ export function useGorevStore({
 
   const updateGorev = useCallback((id: string, updates: Partial<Gorev>): void => {
     let updated: Gorev | null = null;
-    setGorevler(prev => prev.map(g => {
-      if (g.id !== id) return g;
-      updated = { ...g, ...updates };
-      return updated;
-    }));
+    setGorevler(prev => prev.map(g => { if (g.id !== id) return g; updated = { ...g, ...updates }; return updated; }));
     if (updated) void saveGorevToDb(updated);
   }, [setGorevler, saveGorevToDb]);
 
   const deleteGorev = useCallback((id: string): void => {
+    let updated: Gorev | null = null;
+    setGorevler(prev => prev.map(g => { if (g.id !== id) return g; updated = { ...g, silinmis: true as const, silinmeTarihi: new Date().toISOString() }; return updated; }));
+    if (updated) void saveGorevToDb(updated);
+    logFnRef.current?.('gorev_deleted', 'Görevler', id, undefined, 'Görev silindi.');
+  }, [setGorevler, saveGorevToDb]);
+
+  const restoreGorev = useCallback((id: string): void => {
+    let updated: Gorev | null = null;
+    setGorevler(prev => prev.map(g => { if (g.id !== id) return g; updated = { ...g, silinmis: false as const, silinmeTarihi: undefined }; return updated; }));
+    if (updated) void saveGorevToDb(updated);
+  }, [setGorevler, saveGorevToDb]);
+
+  const gorevlerSnapshotRef = useRef<Gorev[]>([]);
+  useEffect(() => { gorevlerSnapshotRef.current = gorevler; }, [gorevler]);
+
+  const permanentDeleteGorev = useCallback(async (id: string): Promise<void> => {
+    const snapshot = gorevlerSnapshotRef.current;
     _setGorevler(prev => prev.filter(g => g.id !== id));
-    dbDeleteGorev(id).catch(err => {
-      console.error('[GorevStore] deleteGorev error:', err);
-    });
+    try {
+      await dbDelete('gorevler', id);
+    } catch (err) {
+      _setGorevler(snapshot);
+      onSaveErrorRef.current?.(`Kalıcı silme hatası (gorevler): ${err instanceof Error ? err.message : String(err)}`);
+      throw err;
+    }
   }, []);
 
-  // ── Cascade delete (called from firma delete) ──
   const cascadeDeleteFirmaGorevler = useCallback((firmaId: string, now: string): Gorev[] => {
     const cascadeFields = { silinmis: true as const, silinmeTarihi: now, cascadeSilindi: true as const, cascadeFirmaId: firmaId };
     const updatedItems: Gorev[] = [];
@@ -298,10 +246,7 @@ export function useGorevStore({
   return {
     gorevler,
     fetchGorevler,
-    addGorev,
-    updateGorev,
-    deleteGorev,
-    cascadeDeleteFirmaGorevler,
-    cascadeRestoreFirmaGorevler,
+    addGorev, updateGorev, deleteGorev, restoreGorev, permanentDeleteGorev,
+    cascadeDeleteFirmaGorevler, cascadeRestoreFirmaGorevler,
   };
 }

@@ -4,7 +4,7 @@ import Modal from '../../components/base/Modal';
 import Badge, { getFirmaStatusColor, getPersonelStatusColor, getEvrakStatusColor } from '../../components/base/Badge';
 import { supabase } from '../../lib/supabase';
 
-type Tab = 'firmalar' | 'personeller' | 'evraklar' | 'egitimler' | 'muayeneler' | 'ekipmanlar' | 'uygunsuzluklar' | 'tutanaklar' | 'is_izinleri' | 'is_kazalari';
+type Tab = 'firmalar' | 'personeller' | 'evraklar' | 'egitimler' | 'muayeneler' | 'ekipmanlar' | 'uygunsuzluklar' | 'gorevler' | 'tutanaklar' | 'is_izinleri' | 'is_kazalari';
 
 interface DeletedKaza {
   id: string;
@@ -20,14 +20,15 @@ interface DeletedKaza {
 export default function CopKutusuPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
-    ekipmanlar, uygunsuzluklar, tutanaklar, isIzinleri,
+    ekipmanlar, uygunsuzluklar, gorevler, tutanaklar, isIzinleri,
     restoreFirma, permanentDeleteFirma,
     restorePersonel, permanentDeletePersonel,
     restoreEvrak, permanentDeleteEvrak,
     restoreEgitim, permanentDeleteEgitim,
     restoreMuayene, permanentDeleteMuayene,
     restoreEkipman, permanentDeleteEkipman, permanentDeleteEkipmanMany,
-    deleteUygunsuzluk, permanentDeleteUygunsuzluk,
+    deleteUygunsuzluk, restoreUygunsuzluk, permanentDeleteUygunsuzluk,
+    restoreGorev, permanentDeleteGorev,
     restoreTutanak, permanentDeleteTutanak,
     restoreIsIzni, permanentDeleteIsIzni,
     addToast,
@@ -123,6 +124,7 @@ export default function CopKutusuPage() {
   const [bulkPermDeleteConfirm, setBulkPermDeleteConfirm] = useState(false);
   const [bulkRestoreConfirm, setBulkRestoreConfirm] = useState(false);
 
+  const deletedGorevler    = useMemo(() => gorevler.filter(g => g.silinmis), [gorevler]);
   const deletedFirmalar    = useMemo(() => firmalar.filter(f => f.silinmis), [firmalar]);
   const deletedPersoneller = useMemo(() => personeller.filter(p => p.silinmis), [personeller]);
   const deletedEvraklar    = useMemo(() => evraklar.filter(e => e.silinmis), [evraklar]);
@@ -142,10 +144,11 @@ export default function CopKutusuPage() {
     if (activeTab === 'muayeneler') return deletedMuayeneler;
     if (activeTab === 'ekipmanlar') return deletedEkipmanlar;
     if (activeTab === 'uygunsuzluklar') return deletedUygunsuzluklar;
+    if (activeTab === 'gorevler') return deletedGorevler;
     if (activeTab === 'tutanaklar') return deletedTutanaklar;
     if (activeTab === 'is_izinleri') return deletedIsIzinleri;
     return [];
-  }, [activeTab, deletedFirmalar, deletedPersoneller, deletedEvraklar, deletedEgitimler, deletedMuayeneler, deletedEkipmanlar, deletedUygunsuzluklar, deletedTutanaklar, deletedIsIzinleri]);
+  }, [activeTab, deletedFirmalar, deletedPersoneller, deletedEvraklar, deletedEgitimler, deletedMuayeneler, deletedEkipmanlar, deletedUygunsuzluklar, deletedGorevler, deletedTutanaklar, deletedIsIzinleri]);
 
   const allSelected = activeItems.length > 0 && activeItems.every(item => selected.has(item.id));
   const toggleAll = () => allSelected ? setSelected(new Set()) : setSelected(new Set(activeItems.map(item => item.id)));
@@ -165,7 +168,7 @@ export default function CopKutusuPage() {
     (isGeziciUzman ? 0 : deletedFirmalar.length) +
     deletedPersoneller.length +
     deletedEvraklar.length + deletedEgitimler.length + deletedMuayeneler.length +
-    deletedEkipmanlar.length + deletedUygunsuzluklar.length +
+    deletedEkipmanlar.length + deletedUygunsuzluklar.length + deletedGorevler.length +
     deletedTutanaklar.length + deletedIsIzinleri.length + deletedKazalar.length;
 
   const firmaCascadeSayilari = useMemo(() => {
@@ -206,6 +209,8 @@ export default function CopKutusuPage() {
     if (tip === 'ekipmanlar')     { restoreEkipman(id);   addToast('Ekipman geri yüklendi.', 'success'); }
     if (tip === 'tutanaklar')     { restoreTutanak(id);   addToast('Tutanak geri yüklendi.', 'success'); }
     if (tip === 'is_izinleri')    { restoreIsIzni(id);    addToast('İş izni geri yüklendi.', 'success'); }
+    if (tip === 'uygunsuzluklar') { restoreUygunsuzluk(id); addToast('Saha denetim kaydı geri yüklendi.', 'success'); }
+    if (tip === 'gorevler')       { restoreGorev(id);     addToast('Görev geri yüklendi.', 'success'); }
   };
 
   const handlePermanentDelete = async () => {
@@ -222,6 +227,7 @@ export default function CopKutusuPage() {
       if (tip === 'muayeneler')     await permanentDeleteMuayene(id);
       if (tip === 'ekipmanlar')     await permanentDeleteEkipmanMany([id]);
       if (tip === 'uygunsuzluklar') await permanentDeleteUygunsuzluk(id);
+      if (tip === 'gorevler')       await permanentDeleteGorev(id);
       if (tip === 'tutanaklar')     await permanentDeleteTutanak(id);
       if (tip === 'is_izinleri')    await permanentDeleteIsIzni(id);
       if (tip === 'is_kazalari')    await handlePermDeleteKaza(id);
@@ -257,6 +263,7 @@ export default function CopKutusuPage() {
           if (activeTab === 'egitimler')      return permanentDeleteEgitim(id);
           if (activeTab === 'muayeneler')     return permanentDeleteMuayene(id);
           if (activeTab === 'uygunsuzluklar') return permanentDeleteUygunsuzluk(id);
+          if (activeTab === 'gorevler')       return permanentDeleteGorev(id);
           if (activeTab === 'tutanaklar')     return permanentDeleteTutanak(id);
           if (activeTab === 'is_izinleri')    return permanentDeleteIsIzni(id);
           return Promise.resolve();
@@ -268,7 +275,7 @@ export default function CopKutusuPage() {
     }
   };
 
-  const canRestore = (tip: Tab) => ['firmalar', 'personeller', 'evraklar', 'egitimler', 'muayeneler', 'ekipmanlar', 'tutanaklar', 'is_izinleri'].includes(tip);
+  const canRestore = (tip: Tab) => ['firmalar', 'personeller', 'evraklar', 'egitimler', 'muayeneler', 'ekipmanlar', 'uygunsuzluklar', 'gorevler', 'tutanaklar', 'is_izinleri'].includes(tip);
 
   const tabs: { id: Tab; label: string; icon: string; count: number; color: string }[] = [
     ...(!isGeziciUzman ? [{ id: 'firmalar' as Tab, label: 'Firmalar', icon: 'ri-building-2-line', count: deletedFirmalar.length, color: '#3B82F6' }] : []),
@@ -278,6 +285,7 @@ export default function CopKutusuPage() {
     { id: 'muayeneler',     label: 'Sağlık',         icon: 'ri-heart-pulse-line',      count: deletedMuayeneler.length,     color: '#F43F5E' },
     { id: 'ekipmanlar',     label: 'Ekipmanlar',     icon: 'ri-tools-line',            count: deletedEkipmanlar.length,     color: '#FB923C' },
     { id: 'uygunsuzluklar', label: 'Saha Denetim',  icon: 'ri-map-pin-user-line',     count: deletedUygunsuzluklar.length, color: '#F97316' },
+    { id: 'gorevler',       label: 'Görevler',       icon: 'ri-task-line',             count: deletedGorevler.length,       color: '#8B5CF6' },
     { id: 'tutanaklar',     label: 'Tutanaklar',     icon: 'ri-article-line',          count: deletedTutanaklar.length,     color: '#14B8A6' },
     { id: 'is_izinleri',    label: 'İş İzinleri',   icon: 'ri-shield-check-line',     count: deletedIsIzinleri.length,     color: '#8B5CF6' },
     { id: 'is_kazalari',    label: 'İş Kazaları',   icon: 'ri-alert-line',            count: deletedKazalar.length,        color: '#EF4444' },
@@ -358,7 +366,6 @@ export default function CopKutusuPage() {
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
           Silinen kayıtlar buradan <strong style={{ color: 'var(--text-primary)' }}>geri yüklenebilir</strong>.
           Kalıcı silme işlemi <strong className="text-red-400">geri alınamaz</strong> — dikkatli kullanın.
-          Saha denetim kayıtları için yalnızca <strong style={{ color: 'var(--text-primary)' }}>kalıcı silme</strong> mevcut.
         </p>
       </div>
 
@@ -669,16 +676,49 @@ export default function CopKutusuPage() {
                       style={{ background: `${sc}18`, color: sc, border: `1px solid ${sc}30` }}>
                       {u.severity}
                     </span>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleOne(u.id)} className="cursor-pointer" />
-                      <button onClick={() => setPermDeleteItem({ id: u.id, tip: 'uygunsuzluklar', ad: u.baslik })}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                        style={{ color: '#EF4444' }} title="Kalıcı Sil"
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-                        <i className="ri-delete-bin-line text-sm" />
-                      </button>
+                    {renderRowActions(u.id, 'uygunsuzluklar', u.baslik)}
+                  </div>
+                );
+              })}
+            </div>
+        )}
+
+        {/* Görevler Tab */}
+        {activeTab === 'gorevler' && (
+          deletedGorevler.length === 0
+            ? <TrashEmpty type="gorev" />
+            : <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {deletedGorevler.map(g => {
+                const firma = firmalar.find(f => f.id === g.firmaId);
+                const ONCELIK_COLOR: Record<string, string> = {
+                  'Düşük': '#34D399', 'Normal': '#60A5FA', 'Yüksek': '#FBBF24', 'Kritik': '#F87171',
+                };
+                const DURUM_COLOR: Record<string, string> = {
+                  'Bekliyor': '#94A3B8', 'Devam Ediyor': '#60A5FA', 'Tamamlandı': '#34D399', 'İptal': '#F87171',
+                };
+                const oc = ONCELIK_COLOR[g.oncelik] ?? '#94A3B8';
+                const dc = DURUM_COLOR[g.durum] ?? '#94A3B8';
+                return (
+                  <div key={g.id} className="flex items-center gap-4 px-5 py-4" style={{ background: selected.has(g.id) ? 'rgba(99,102,241,0.04)' : undefined }}>
+                    <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                      <i className="ri-task-line text-sm" style={{ color: '#8B5CF6' }} />
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{g.baslik}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {firma?.ad || g.atananKisi || '—'} · {g.bitisTarihi ? new Date(g.bitisTarihi).toLocaleDateString('tr-TR') : '—'} · Silinme: {fmt(g.silinmeTarihi)}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap mr-1"
+                      style={{ background: `${oc}18`, color: oc, border: `1px solid ${oc}30` }}>
+                      {g.oncelik}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: `${dc}18`, color: dc, border: `1px solid ${dc}30` }}>
+                      {g.durum}
+                    </span>
+                    {renderRowActions(g.id, 'gorevler', g.baslik)}
                   </div>
                 );
               })}
@@ -920,6 +960,7 @@ function TrashEmpty({ type }: { type: string }) {
     muayene:        'Çöp kutusunda sağlık kaydı yok',
     ekipman:        'Çöp kutusunda ekipman kaydı yok',
     uygunsuzluk:    'Çöp kutusunda saha denetim kaydı yok',
+    gorev:          'Çöp kutusunda görev yok',
     tutanak:        'Çöp kutusunda tutanak yok',
     is_izni:        'Çöp kutusunda iş izni yok',
     is_kazasi:      'Çöp kutusunda iş kazası kaydı yok',

@@ -9,6 +9,7 @@ import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import { getEvrakKategori, KATEGORI_META } from '../../utils/evrakKategori';
 import BulkEvrakUpload from './components/BulkEvrakUpload';
 import { getSignedUrlFromPath } from '@/utils/fileUpload';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const EVRAK_TURLERI = ['Kimlik', 'EK-2', 'Sağlık Raporu', 'Sürücü Belgesi', 'SRC', 'Sertifika / MYK / Diploma', 'Oryantasyon Eğitimi', 'İşbaşı Eğitimi', 'İş Sözleşmesi', 'Diğer'];
 
@@ -40,6 +41,7 @@ const statusConfig = {
 
 export default function EvraklarPage() {
   const { evraklar, firmalar, personeller, addEvrak, updateEvrak, deleteEvrak, addToast, quickCreate, setQuickCreate, org, refreshData, pageLoading } = useApp();
+  const { canDelete } = usePermissions();
   const isGeziciUzman = org?.osgbRole === 'gezici_uzman';
   // Gezici uzman için atanan firmayı listeye ekle (firmalar listesi boş olabilir)
   const firmaListesiEvrak = isGeziciUzman && org?.id
@@ -369,13 +371,15 @@ export default function EvraklarPage() {
       {selected.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
           <span className="text-sm font-semibold" style={{ color: '#F87171' }}>{selected.size} evrak seçildi</span>
-          <button
-            onClick={() => setBulkDeleteConfirm(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
-            style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
-          >
-            <i className="ri-delete-bin-line" /> Seçilenleri Sil
-          </button>
+          {canDelete && (
+            <button
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+              style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              <i className="ri-delete-bin-line" /> Seçilenleri Sil
+            </button>
+          )}
           <button onClick={() => setSelected(new Set())} className="text-xs px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap ml-auto" style={{ background: 'rgba(100,116,139,0.1)', color: '#94A3B8' }}>
             Seçimi Kaldır
           </button>
@@ -418,7 +422,9 @@ export default function EvraklarPage() {
                   <ABtn icon="ri-eye-line" color={ev.dosyaUrl ? '#60A5FA' : '#475569'} onClick={() => handlePreview(ev)} title="Görüntüle" />
                   <ABtn icon="ri-download-line" color={ev.dosyaUrl ? '#10B981' : '#475569'} onClick={() => handleDownload(ev)} title="İndir" />
                   <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(ev)} title="Düzenle" />
-                  <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
+                  {canDelete && (
+                    <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
+                  )}
                 </div>
               </div>
             ))}
@@ -481,7 +487,9 @@ export default function EvraklarPage() {
                           <ABtn icon="ri-eye-line" color={ev.dosyaAdi || ev.dosyaUrl ? '#60A5FA' : '#475569'} onClick={() => handlePreview(ev)} title="Görüntüle" />
                           <ABtn icon="ri-download-line" color={ev.dosyaAdi || ev.dosyaUrl ? '#10B981' : '#475569'} onClick={() => handleDownload(ev)} title="Dosyayı İndir" />
                           <ABtn icon="ri-edit-line" color="#F59E0B" onClick={() => openEdit(ev)} title="Düzenle" />
-                          <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
+                          {canDelete && (
+                            <ABtn icon="ri-delete-bin-line" color="#EF4444" onClick={() => setDeleteConfirm(ev.id)} title="Sil" />
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -581,7 +589,7 @@ export default function EvraklarPage() {
             <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
               <i className="ri-information-line text-sm" style={{ color: '#818CF8' }} />
               <p className="text-xs" style={{ color: '#94A3B8' }}>
-                Durum otomatik hesaplanır: dosya yoksa <strong className="text-red-400">Eksik</strong>, geçerlilik tarihi 7 günden az kaldıysa <strong className="text-amber-400">Süre Yaklaşıyor</strong>, geçtiyse <strong className="text-orange-400">Süre Dolmuş</strong>, aksi halde <strong className="text-green-400">Yüklü</strong>.
+                Durum otomatik hesaplanır: dosya yoksa <strong className="text-red-400">Eksik</strong>, geçerlilik tarihi 7 günden az kaldıyssa <strong className="text-amber-400">Süre Yaklaşıyor</strong>, geçtiyse <strong className="text-orange-400">Süre Dolmuş</strong>, aksi halde <strong className="text-green-400">Yüklü</strong>.
               </p>
             </div>
           </div>
@@ -642,13 +650,15 @@ export default function EvraklarPage() {
       />
 
       {/* Toplu Silme Onay Modal */}
-      <ConfirmDeleteModal
-        open={bulkDeleteConfirm}
-        onClose={() => setBulkDeleteConfirm(false)}
-        onConfirm={handleBulkDelete}
-        title={`${selected.size} Evrakı Sil`}
-        description={`${selected.size} evrak çöp kutusuna taşınacak. Çöp kutusundan geri yükleyebilirsiniz.`}
-      />
+      {canDelete && (
+        <ConfirmDeleteModal
+          open={bulkDeleteConfirm}
+          onClose={() => setBulkDeleteConfirm(false)}
+          onConfirm={handleBulkDelete}
+          title={`${selected.size} Evrakı Sil`}
+          description={`${selected.size} evrak çöp kutusuna taşınacak. Çöp kutusundan geri yükleyebilirsiniz.`}
+        />
+      )}
 
       {/* Bulk Upload Modal */}
       <BulkEvrakUpload open={bulkOpen} onClose={() => setBulkOpen(false)} />
