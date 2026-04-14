@@ -21,7 +21,7 @@ interface UzmanDetayModalProps {
   orgId: string;
   altFirmalar: AltFirma[];
   onClose: () => void;
-  onRefresh: () => void;
+  onRefresh: (updated?: { user_id: string; is_active?: boolean; active_firm_id?: string | null; active_firm_ids?: string[] | null; active_firm_name?: string | null }) => void;
   addToast: (msg: string, type: 'success' | 'error') => void;
 }
 
@@ -197,8 +197,20 @@ export default function UzmanDetayModal({
         }
       }
 
+      // Firma adlarını bul
+      const firmaAd = secilenFirmaIds.length > 0
+        ? altFirmalar.filter(f => secilenFirmaIds.includes(f.id)).map(f => f.name).join(', ')
+        : null;
+
       addToast('Uzman bilgileri güncellendi!', 'success');
-      onRefresh();
+      // ✅ fetchData YOK — sadece değişen partial state'i döndür
+      onRefresh({
+        user_id: uzman.user_id,
+        is_active: isActive,
+        active_firm_id: secilenFirmaIds[0] ?? null,
+        active_firm_ids: secilenFirmaIds.length > 0 ? secilenFirmaIds : null,
+        active_firm_name: firmaAd,
+      });
       onClose();
     } catch (err) {
       addToast(`Güncelleme yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');

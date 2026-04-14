@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 
+const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
+
 interface SilinmisFirma {
   id: string;
   name: string;
@@ -22,9 +24,7 @@ interface FirmaVeriOzet {
 interface CopKutusuTabProps {
   orgId: string;
   isDark: boolean;
-  /** Üst liste yenileme (firmalar sekmesi için) — kullanıcı çöp sekmesinde kalır */
   onFirmaRestored: () => Promise<void> | void;
-  /** artık kullanılmıyor ama uyumluluk için bırakıldı */
   onGoToFirmalar?: () => void;
 }
 
@@ -164,23 +164,34 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutu
       uygunsuzlukCount: 0, egitimCount: 0, loading: true,
     });
     try {
-      const [
-        { count: personelC },
-        { count: evrakC },
-        { count: ekipmanC },
-        { count: uygunsuzlukC },
-        { count: egitimC },
-      ] = await Promise.all([
-        supabase.from('personeller').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
-        supabase.from('evraklar').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
-        supabase.from('ekipmanlar').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
-        supabase.from('uygunsuzluklar').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
-        supabase.from('egitimler').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
-      ]);
+      // Edge function üzerinden sorgula (service key → RLS bypass → gerçek sayılar)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Oturum bulunamadı.');
+
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'firma_data_count', organization_id: orgId, firma_id: firmaId }),
+      });
+      const json = await res.json() as {
+        error?: string;
+        personelCount?: number;
+        evrakCount?: number;
+        ekipmanCount?: number;
+        uygunsuzlukCount?: number;
+        egitimCount?: number;
+      };
+
+      if (json.error) throw new Error(json.error);
+
       setKaliciSilVeriOzet({
-        personelCount: personelC ?? 0, evrakCount: evrakC ?? 0,
-        ekipmanCount: ekipmanC ?? 0, uygunsuzlukCount: uygunsuzlukC ?? 0,
-        egitimCount: egitimC ?? 0, loading: false,
+        personelCount: json.personelCount ?? 0,
+        evrakCount: json.evrakCount ?? 0,
+        ekipmanCount: json.ekipmanCount ?? 0,
+        uygunsuzlukCount: json.uygunsuzlukCount ?? 0,
+        egitimCount: json.egitimCount ?? 0,
+        loading: false,
       });
     } catch {
       setKaliciSilVeriOzet({
@@ -193,35 +204,34 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutu
   const handleKaliciSil = async (firmaId: string, firmaAdi: string) => {
     setIslemLoading(firmaId);
     try {
-      const { error } = await supabase
-        .from('organizations')
-        .update({
-          name: `[SİLİNDİ] ${firmaAdi.replace(/^\[SİLİNDİ\]\s*/i, '')}`,
-          is_active: false,
-          deleted_at: new Date().toISOString(),
-        })
-        .eq('id', firmaId);
+      // Edge function üzerinden kalıcı sil (service key → tüm veriler cascade silinir)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Oturum bulunamadı.');
 
-      if (error) {
-        if (error.message?.includes('row-level security') || error.code === '42501') {
+      const res = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'permanent_delete_firm', organization_id: orgId, firma_id: firmaId }),
+      });
+      const json = await res.json() as { error?: string; success?: boolean };
+
+      if (json.error) {
+        if (json.error.includes('yetki') || json.error.includes('403')) {
           showMesaj('error', 'Yetki hatası: Bu firmayı silme yetkiniz yok.');
         } else {
-          showMesaj('error', `Silme başarısız: ${error.message}`);
+          showMesaj('error', `Silme başarısız: ${json.error}`);
         }
         return;
       }
 
-      // Uzman/hekim atamalarından bu firmayı temizle
-      await temizleAtamalar(firmaId);
-
       // Üst listeyi arka planda yenile
       void onFirmaRestored();
 
-      // Listeden çıkar — SONRA (önce state güncellenir, sonra modal kapanır)
       setFirmalar(prev => prev.filter(f => f.id !== firmaId));
       setKaliciSilOnayId(null);
       setKaliciSilVeriOzet(null);
-      showMesaj('success', `"${firmaAdi}" kalıcı olarak kaldırıldı. Uzman/hekim atamaları da temizlendi.`);
+      showMesaj('success', `"${firmaAdi}" tüm verileriyle birlikte kalıcı olarak silindi.`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
       showMesaj('error', `Kalıcı silme başarısız: ${msg}`);
@@ -597,7 +607,7 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutu
           <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
           <p className="text-[11px] leading-relaxed" style={{ color: textMuted }}>
             <span className="font-semibold" style={{ color: '#D97706' }}>Dikkat:</span> Kalıcı silme geri alınamaz.
-            Firmaya ait tüm veriler (personel kayıtları hariç) silinecektir. Uzman/hekim atamaları otomatik temizlenir.
+            Firmaya ait tüm veriler (personel, uygunsuzluk, eğitim, evrak, ekipman vb.) silinecektir. Uzman/hekim atamaları otomatik temizlenir.
             &quot;Geri Al&quot; ile firmayı aktif listeye geri taşıyabilirsiniz.
           </p>
         </div>

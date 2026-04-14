@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useApp } from '@/store/AppContext';
 import ZiyaretDetayPanel from './ZiyaretDetayPanel';
@@ -369,7 +369,7 @@ interface ZiyaretlerTabProps {
 }
 
 // ── ANA COMPONENT ──────────────────────────────────────────────
-export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
+function ZiyaretlerTabInner({ isDark }: ZiyaretlerTabProps) {
   const { org, addToast } = useApp();
   const [ziyaretler, setZiyaretler] = useState<Ziyaret[]>([]);
   const [tumZiyaretler, setTumZiyaretler] = useState<Ziyaret[]>([]);
@@ -475,23 +475,70 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     void fetchTumZiyaretler();
   }, [fetchZiyaretler, fetchTumZiyaretler]);
 
-  // Realtime subscription — osgb_ziyaretler değişince otomatik refresh
+  // Realtime subscription — full fetch YOK, sadece gelen kaydı state'e işle
   useEffect(() => {
     if (!org?.id) return;
+
+    const applyToState = (
+      setFn: React.Dispatch<React.SetStateAction<Ziyaret[]>>,
+      event: 'INSERT' | 'UPDATE' | 'DELETE',
+      payload: { new?: Record<string, unknown>; old?: Record<string, unknown> },
+    ) => {
+      if (event === 'INSERT') {
+        const yeni = payload.new as Ziyaret;
+        setFn(prev => {
+          if (prev.some(z => z.id === yeni.id)) return prev;
+          const updated = [yeni, ...prev];
+          // aktif önce, sonra giris_saati desc
+          updated.sort((a, b) => {
+            if (a.durum === 'aktif' && b.durum !== 'aktif') return -1;
+            if (a.durum !== 'aktif' && b.durum === 'aktif') return 1;
+            return new Date(b.giris_saati).getTime() - new Date(a.giris_saati).getTime();
+          });
+          return updated;
+        });
+      } else if (event === 'UPDATE') {
+        const guncellendi = payload.new as Ziyaret;
+        setFn(prev => {
+          const updated = prev.map(z => z.id === guncellendi.id ? { ...z, ...guncellendi } : z);
+          // Durum değişebilir (aktif→tamamlandi), yeniden sırala
+          updated.sort((a, b) => {
+            if (a.durum === 'aktif' && b.durum !== 'aktif') return -1;
+            if (a.durum !== 'aktif' && b.durum === 'aktif') return 1;
+            return new Date(b.giris_saati).getTime() - new Date(a.giris_saati).getTime();
+          });
+          return updated;
+        });
+      } else if (event === 'DELETE') {
+        const silindi = payload.old as { id: string };
+        setFn(prev => prev.filter(z => z.id !== silindi.id));
+      }
+    };
 
     const channel = supabase
       .channel(`ziyaretler_rt_${org.id}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'osgb_ziyaretler',
-          filter: `osgb_org_id=eq.${org.id}`,
-        },
-        () => {
-          void fetchZiyaretler();
-          void fetchTumZiyaretler();
+        { event: 'INSERT', schema: 'public', table: 'osgb_ziyaretler', filter: `osgb_org_id=eq.${org.id}` },
+        (payload) => {
+          applyToState(setZiyaretler, 'INSERT', payload as { new: Record<string, unknown> });
+          applyToState(setTumZiyaretler, 'INSERT', payload as { new: Record<string, unknown> });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'osgb_ziyaretler', filter: `osgb_org_id=eq.${org.id}` },
+        (payload) => {
+          applyToState(setZiyaretler, 'UPDATE', payload as { new: Record<string, unknown> });
+          applyToState(setTumZiyaretler, 'UPDATE', payload as { new: Record<string, unknown> });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'osgb_ziyaretler', filter: `osgb_org_id=eq.${org.id}` },
+        (payload) => {
+          applyToState(setZiyaretler, 'DELETE', payload as { old: Record<string, unknown> });
+          applyToState(setTumZiyaretler, 'DELETE', payload as { old: Record<string, unknown> });
         }
       )
       .subscribe();
@@ -499,20 +546,21 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [org?.id, fetchZiyaretler, fetchTumZiyaretler]);
+  }, [org?.id]);
 
-  // Aktif ziyaretler için ek polling (15sn — realtime backup)
+  // Aktif ziyaretler için hafif polling (60sn — sadece süre bilgisi için, fallback)
   useEffect(() => {
     const hasAktif = ziyaretler.some(z => z.durum === 'aktif');
     if (hasAktif) {
       realtimeRef.current = setInterval(() => {
-        void fetchZiyaretler();
-      }, 15000);
+        // Aktif ziyaretlerin süre bilgisini güncelle (sadece giris_saati değişmeden render tetikle)
+        setZiyaretler(prev => [...prev]);
+      }, 60000);
     }
     return () => {
       if (realtimeRef.current) clearInterval(realtimeRef.current);
     };
-  }, [ziyaretler, fetchZiyaretler]);
+  }, [ziyaretler.some(z => z.durum === 'aktif')]);
 
   const handleBitir = async (ziyaretId: string) => {
     try {
@@ -525,8 +573,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
       if (error) throw error;
       addToast('Ziyaret tamamlandı!', 'success');
       setSecilenZiyaret(null);
-      void fetchZiyaretler();
-      void fetchTumZiyaretler();
+      // Realtime UPDATE event otomatik gelecek, ekstra fetch yok
     } catch (err) {
       addToast(`Hata: ${err instanceof Error ? err.message : String(err)}`, 'error');
     }
@@ -1106,3 +1153,5 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     </div>
   );
 }
+
+export default memo(ZiyaretlerTabInner);

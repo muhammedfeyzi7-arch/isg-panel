@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface AltFirma {
@@ -116,7 +116,7 @@ function VisitStatusBadge({ days }: { days: number | null }) {
   );
 }
 
-export default function DashboardTab({
+function DashboardTabInner({
   altFirmalar, uzmanlar, isDark, orgId, onFirmaEkle, onUzmanEkle,
   onFirmaClick, onUzmanClick, setActiveTab,
 }: DashboardTabProps) {
@@ -139,7 +139,8 @@ export default function DashboardTab({
   useEffect(() => {
     if (!orgId) return;
 
-    const doFetch = async () => {
+    // İlk yüklemede tüm listeyi bir kez çek
+    const initialFetch = async () => {
       setLoading(true);
       try {
         const thirtyDaysAgo = new Date();
@@ -158,20 +159,65 @@ export default function DashboardTab({
       }
     };
 
-    doFetch();
+    initialFetch();
 
-    // Realtime subscription — anında güncelleme
+    // Realtime subscription — full fetch YOK, sadece gelen kaydı state'e işle
     const channel = supabase
       .channel(`dashboard_ziyaret_rt_${orgId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'osgb_ziyaretler',
           filter: `osgb_org_id=eq.${orgId}`,
         },
-        () => { void doFetch(); }
+        (payload) => {
+          const yeni = payload.new as Ziyaret;
+          // 30 gün filtresi — eski kayıt ise ekleme
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          if (new Date(yeni.giris_saati) < thirtyDaysAgo) return;
+
+          setZiyaretler(prev => {
+            // Duplicate kontrolü
+            if (prev.some(z => z.id === yeni.id)) return prev;
+            // giris_saati desc sırasına ekle
+            const updated = [yeni, ...prev];
+            updated.sort((a, b) =>
+              new Date(b.giris_saati).getTime() - new Date(a.giris_saati).getTime()
+            );
+            return updated;
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'osgb_ziyaretler',
+          filter: `osgb_org_id=eq.${orgId}`,
+        },
+        (payload) => {
+          const guncellendi = payload.new as Ziyaret;
+          setZiyaretler(prev =>
+            prev.map(z => z.id === guncellendi.id ? { ...z, ...guncellendi } : z)
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'osgb_ziyaretler',
+          filter: `osgb_org_id=eq.${orgId}`,
+        },
+        (payload) => {
+          const silindi = payload.old as { id: string };
+          setZiyaretler(prev => prev.filter(z => z.id !== silindi.id));
+        }
       )
       .subscribe();
 
@@ -632,3 +678,5 @@ export default function DashboardTab({
     </div>
   );
 }
+
+export default memo(DashboardTabInner);

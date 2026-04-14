@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { supabase } from '@/lib/supabase';
 import ConfirmDeleteModal from '@/components/base/ConfirmDeleteModal';
 
@@ -89,7 +89,106 @@ function GpsBadge({ active }: { active: boolean }) {
   );
 }
 
-export default function FirmalarTab({
+// ── FIRMA ROW (Desktop) — ayrı memo component, sadece props değişince render ──
+interface FirmaRowProps {
+  f: AltFirma;
+  isDark: boolean;
+  isAktif: boolean;
+  gpsActive: boolean;
+  days: number | null;
+  vizitLoading: boolean;
+  hasUzman: boolean;
+  borderColor: string;
+  textPrimary: string;
+  textSecondary: string;
+  onFirmaClick: (firma: { id: string; name: string }) => void;
+  onAtamaYap: (firmaId: string) => void;
+  onSilAc: (id: string, name: string) => void;
+}
+
+const FirmaRow = memo(function FirmaRow({
+  f, isDark, isAktif, gpsActive, days, vizitLoading, hasUzman,
+  borderColor, textPrimary, textSecondary, onFirmaClick, onAtamaYap, onSilAc,
+}: FirmaRowProps) {
+  return (
+    <div
+      className="grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3 rounded-xl transition-all"
+      style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff', border: `1px solid ${borderColor}` }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
+
+      {/* Firma */}
+      <div className="flex items-center gap-2.5 min-w-0 pr-2 cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
+        <div className="relative flex-shrink-0">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold text-white"
+            style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
+            {f.name.charAt(0).toUpperCase()}
+          </div>
+          {isAktif && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse" style={{ background: '#22C55E', borderColor: isDark ? 'rgba(20,30,50,0.98)' : '#ffffff' }} />}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-bold truncate" style={{ color: textPrimary }}>{f.name}</p>
+            <GpsBadge active={gpsActive} />
+          </div>
+          <span className="text-[9px]" style={{ color: isAktif ? '#22C55E' : textSecondary }}>
+            {isAktif ? '● Ziyaret devam ediyor' : 'Firma'}
+          </span>
+        </div>
+      </div>
+
+      {/* Personel */}
+      <div className="cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+          style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary, border: `1px solid ${borderColor}` }}>
+          <i className="ri-group-line text-[9px]" />{f.personelSayisi}
+        </span>
+      </div>
+
+      {/* Son ziyaret */}
+      <div className="cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
+        {!vizitLoading && <VisitBadge days={days} />}
+        {vizitLoading && <span className="text-[10px]" style={{ color: textSecondary }}>...</span>}
+      </div>
+
+      {/* İşlemler */}
+      <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+        {!hasUzman && (
+          <button onClick={() => onAtamaYap(f.id)} title="Uzman Ata"
+            className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.15)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.08)'; }}>
+            <i className="ri-links-line text-[10px]" />
+          </button>
+        )}
+        <button onClick={() => onFirmaClick({ id: f.id, name: f.name })} title="Detay"
+          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+          style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1px solid ${borderColor}`, color: textSecondary }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'; (e.currentTarget as HTMLElement).style.color = textSecondary; }}>
+          <i className="ri-eye-line text-[10px]" />
+        </button>
+        <button onClick={() => onFirmaClick({ id: f.id, name: f.name })} title="Düzenle"
+          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+          style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1px solid ${borderColor}`, color: textSecondary }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'; (e.currentTarget as HTMLElement).style.color = textSecondary; }}>
+          <i className="ri-edit-line text-[10px]" />
+        </button>
+        <button onClick={() => onSilAc(f.id, f.name)} title="Sil"
+          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+          style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)'; }}>
+          <i className="ri-delete-bin-line text-[10px]" />
+        </button>
+      </div>
+    </div>
+  );
+});
+
+function FirmalarTabInner({
   altFirmalar, uzmanlar, orgId, isDark, onFirmaClick, onFirmaEkle, onAtamaYap, onFirmaDeleted,
 }: FirmalarTabProps) {
   const [search, setSearch] = useState('');
@@ -147,6 +246,11 @@ export default function FirmalarTab({
     };
     void fetchVisits();
   }, [orgId, altFirmalar, fetchGpsInfo]);
+
+  const handleSilAc = useCallback((id: string, name: string) => {
+    setSilOnayId(id);
+    setSilAdi(name);
+  }, []);
 
   const handleSil = async (firmaId: string) => {
     setSilLoading(true);
@@ -303,85 +407,23 @@ export default function FirmalarTab({
               const firmaUzmanlar = getFirmaUzmanlar(f.id);
               const hasUzman = firmaUzmanlar.length > 0;
               const gpsActive = firmaGpsMap[f.id] ?? false;
-
               return (
-                <div key={f.id}
-                  className="grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3 rounded-xl transition-all"
-                  style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff', border: `1px solid ${borderColor}` }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
-
-                  {/* Firma */}
-                  <div className="flex items-center gap-2.5 min-w-0 pr-2 cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
-                    <div className="relative flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold text-white"
-                        style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
-                        {f.name.charAt(0).toUpperCase()}
-                      </div>
-                      {isAktif && <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse" style={{ background: '#22C55E', borderColor: isDark ? 'rgba(20,30,50,0.98)' : '#ffffff' }} />}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-bold truncate" style={{ color: textPrimary }}>{f.name}</p>
-                        <GpsBadge active={gpsActive} />
-                      </div>
-                      <span className="text-[9px]" style={{ color: isAktif ? '#22C55E' : textSecondary }}>
-                        {isAktif ? '● Ziyaret devam ediyor' : 'Firma'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Personel */}
-                  <div className="cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary, border: `1px solid ${borderColor}` }}>
-                      <i className="ri-group-line text-[9px]" />{f.personelSayisi}
-                    </span>
-                  </div>
-
-                  {/* Son ziyaret */}
-                  <div className="cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
-                    {!vizitLoading && <VisitBadge days={days} />}
-                    {vizitLoading && <span className="text-[10px]" style={{ color: textSecondary }}>...</span>}
-                  </div>
-
-                  {/* İşlem butonları — sabit 140px, yan yana hizalı */}
-                  <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
-                    {!hasUzman && (
-                      <button onClick={() => onAtamaYap(f.id)} title="Uzman Ata"
-                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
-                        style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.15)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.08)'; }}>
-                        <i className="ri-links-line text-[10px]" />
-                      </button>
-                    )}
-                    {/* Detay */}
-                    <button onClick={() => onFirmaClick({ id: f.id, name: f.name })} title="Detay"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
-                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1px solid ${borderColor}`, color: textSecondary }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'; (e.currentTarget as HTMLElement).style.color = textSecondary; }}>
-                      <i className="ri-eye-line text-[10px]" />
-                    </button>
-                    {/* Düzenle — gri ikon */}
-                    <button onClick={() => onFirmaClick({ id: f.id, name: f.name })} title="Düzenle"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
-                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1px solid ${borderColor}`, color: textSecondary }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'; (e.currentTarget as HTMLElement).style.color = textSecondary; }}>
-                      <i className="ri-edit-line text-[10px]" />
-                    </button>
-                    {/* Sil — kırmızı ikon, modal aç */}
-                    <button onClick={() => { setSilOnayId(f.id); setSilAdi(f.name); }} title="Sil"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
-                      style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)'; }}>
-                      <i className="ri-delete-bin-line text-[10px]" />
-                    </button>
-                  </div>
-                </div>
+                <FirmaRow
+                  key={f.id}
+                  f={f}
+                  isDark={isDark}
+                  isAktif={isAktif}
+                  gpsActive={gpsActive}
+                  days={days}
+                  vizitLoading={vizitLoading}
+                  hasUzman={hasUzman}
+                  borderColor={borderColor}
+                  textPrimary={textPrimary}
+                  textSecondary={textSecondary}
+                  onFirmaClick={onFirmaClick}
+                  onAtamaYap={onAtamaYap}
+                  onSilAc={handleSilAc}
+                />
               );
             })}
           </div>
@@ -401,3 +443,5 @@ export default function FirmalarTab({
     </div>
   );
 }
+
+export default memo(FirmalarTabInner);

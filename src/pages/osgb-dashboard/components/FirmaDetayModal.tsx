@@ -17,7 +17,7 @@ interface FirmaDetayModalProps {
   orgId: string;
   uzmanlar: Uzman[];
   onClose: () => void;
-  onRefresh: () => void;
+  onRefresh: (updated?: { id: string; name?: string; uzmanAd?: string | null }) => void;
   addToast: (msg: string, type: 'success' | 'error') => void;
   isDark?: boolean;
 }
@@ -214,13 +214,15 @@ export default function FirmaDetayModal({
         }
       }
 
+      // Atanan uzman adını bul (ilk atanan)
+      const ilkAtanan = uzmanlar.find(u => atananUzmanIds.includes(u.user_id));
       addToast(
         atananUzmanIds.length > 0
           ? `${atananUzmanIds.length} uzman bu firmaya atandı!`
           : 'Uzman ataması kaldırıldı.',
         'success'
       );
-      onRefresh();
+      onRefresh({ id: firmaId, uzmanAd: ilkAtanan?.display_name ?? null });
     } catch (err) {
       addToast(`Uzman ataması yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
     } finally { setAtanmaLoading(false); }
@@ -264,7 +266,8 @@ export default function FirmaDetayModal({
       setFirmaInfo({ yetkili: editForm.yetkili, telefon: editForm.telefon, email: editForm.email, sgkSicil: editForm.sgkSicil, adres: editForm.adres });
       addToast('Firma bilgileri güncellendi!', 'success');
       setActiveTab('ozet');
-      onRefresh();
+      // Sadece değişen firma adını parent'a bildir — full refetch yok
+      onRefresh({ id: firmaId, name: editForm.ad.trim() });
     } catch (err) { setEditError(err instanceof Error ? err.message : String(err)); }
     finally { setEditLoading(false); }
   };
@@ -277,7 +280,8 @@ export default function FirmaDetayModal({
       if (error) throw error;
       setFirmaDurum(yeniDurum ? 'aktif' : 'pasif');
       addToast(`Firma ${yeniDurum ? 'aktif' : 'pasif'} yapıldı.`, 'success');
-      onRefresh();
+      // Sadece local state güncellendi — parent'a tam refresh gerekmiyor
+      onRefresh({ id: firmaId });
     } catch (err) {
       addToast(`İşlem başarısız: ${String(err)}`, 'error');
     } finally { setDurumLoading(false); }
@@ -296,7 +300,7 @@ export default function FirmaDetayModal({
       if (error) throw error;
       addToast('Firma silindi. Çöp kutusundan geri alabilirsiniz.', 'success');
       onClose();
-      onRefresh();
+      onRefresh({ id: firmaId });
     } catch (err) {
       addToast(`Silme başarısız: ${String(err)}`, 'error');
     } finally { setSilLoading(false); }
