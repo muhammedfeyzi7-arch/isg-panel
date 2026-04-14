@@ -158,6 +158,9 @@ export default function NonconformityForm({ isOpen, onClose, editRecord }: Props
         addToast('Uygunsuzluk kaydı oluşturuldu.', 'success');
       }
       onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addToast(`Kayıt sırasında hata oluştu: ${msg}`, 'error');
     } finally {
       setSaving(false);
       submittingRef.current = false;

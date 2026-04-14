@@ -909,7 +909,8 @@ export function useStore(
     const durum = u.kapatmaFotoMevcut ? 'Kapandı' as const : 'Açık' as const;
     const newU: Uygunsuzluk = { ...u, id, durum, olusturmaTarihi: now, acilisNo };
     setUygunsuzluklar(prev => [newU, ...prev]);
-    void saveToDb('uygunsuzluklar', newU as unknown as { id: string } & Record<string, unknown>);
+    // throwOnError=true — orgId/userId hazır değilse form hata göstersin, sessizce geçmesin
+    await saveToDb('uygunsuzluklar', newU as unknown as { id: string } & Record<string, unknown>, true);
     logFnRef.current?.('uygunsuzluk_created', 'Uygunsuzluklar', id, u.baslik, `${u.baslik} uygunsuzluk kaydı oluşturuldu.`);
     return newU;
   }, [setUygunsuzluklar, saveToDb]);
