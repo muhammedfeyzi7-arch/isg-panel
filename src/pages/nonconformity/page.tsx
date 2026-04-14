@@ -48,8 +48,8 @@ export default function UygunsuzluklarPage() {
     }
   }, [refreshing, dataLoading, refreshData, addToast]);
 
-  const canCreateNonconformity = canCreate || role === 'denetci';
-  const canCloseNonconformity = canEdit || role === 'denetci';
+  const canCreateNonconformity = canCreate || role === 'denetci' || role === 'admin' || role === 'member';
+  const canCloseNonconformity = canEdit || role === 'denetci' || role === 'admin' || role === 'member';
 
   const [search, setSearch] = useState('');
   const [firmaFilter, setFirmaFilter] = useState('');
@@ -212,13 +212,11 @@ export default function UygunsuzluklarPage() {
                 <i className="ri-file-excel-2-line text-xs" />İçe Aktar
               </button>
             )}
-            {canCreateNonconformity && (
-              <button onClick={() => { setEditRecord(null); setShowForm(true); }}
+                    <button onClick={() => { setEditRecord(null); setShowForm(true); }}
                 className="whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
                 style={{ background: 'linear-gradient(135deg, #0284C7, #0EA5E9)', fontSize: '12px' }}>
                 <i className="ri-add-line" />Yeni Kayıt
               </button>
-            )}
           </div>
         </div>
       </div>

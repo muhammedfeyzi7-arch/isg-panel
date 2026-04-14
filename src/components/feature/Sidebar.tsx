@@ -68,7 +68,7 @@ const menuGroups: { label: string; items: MenuItem[] }[] = [
   {
     label: 'SİSTEM',
     items: [
-      { id: 'saha',       label: 'Saha Denetimleri', icon: 'ri-map-pin-user-line', mobileOnly: true },
+      { id: 'saha',       label: 'Saha', icon: 'ri-map-pin-user-line', mobileOnly: true },
       { id: 'raporlar',   label: 'Raporlar',          icon: 'ri-bar-chart-2-line' },
       { id: 'dokumanlar', label: 'Dökümanlar',        icon: 'ri-file-text-line' },
       { id: 'copkutusu',  label: 'Çöp Kutusu',        icon: 'ri-delete-bin-2-line' },

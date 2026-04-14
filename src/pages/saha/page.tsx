@@ -41,9 +41,11 @@ const QrTab = memo(function QrTab({ isOnline, onKontrolYapildi, onDurumDegistir 
   const { ekipmanlar, addToast } = useApp();
   const [showQr, setShowQr] = useState(false);
   const [qrFoundEkipman, setQrFoundEkipman] = useState<Ekipman | null>(null);
+  const [scanCount, setScanCount] = useState(0);
 
   const handleQrResult = useCallback((text: string) => {
     setShowQr(false);
+    setScanCount(prev => prev + 1);
     const urlMatch    = text.match(/\/equipment\/qr\/([^/?#\s]+)/);
     const moduleMatch = text.match(/[?&]qr=([^&\s]+)/);
     const uuidMatch   = text.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
@@ -72,7 +74,8 @@ const QrTab = memo(function QrTab({ isOnline, onKontrolYapildi, onDurumDegistir 
   }, [ekipmanlar, addToast]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* QR Bulundu Kartı */}
       {qrFoundEkipman && (
         <QrEkipmanKart
           ekipman={qrFoundEkipman}
@@ -82,36 +85,130 @@ const QrTab = memo(function QrTab({ isOnline, onKontrolYapildi, onDurumDegistir 
           isOnline={isOnline}
         />
       )}
-      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+
+      {/* Ana QR Tarama Alanı */}
+      <div className="relative rounded-3xl overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(6,182,212,0.04) 50%, rgba(14,165,233,0.06) 100%)', border: '1px solid rgba(52,211,153,0.18)' }}>
+        {/* Köşe dekorasyonları */}
+        <div className="absolute top-0 left-0 w-16 h-16 opacity-20" style={{ background: 'radial-gradient(circle at top left, rgba(52,211,153,0.4), transparent 70%)' }} />
+        <div className="absolute bottom-0 right-0 w-20 h-20 opacity-15" style={{ background: 'radial-gradient(circle at bottom right, rgba(6,182,212,0.4), transparent 70%)' }} />
+
         {showQr ? (
-          <div className="p-4">
+          <div className="p-4 relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>QR Kod Tara</p>
-              <button onClick={() => setShowQr(false)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 flex items-center justify-center rounded-xl" style={{ background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.25)' }}>
+                  <i className="ri-qr-scan-2-line text-xs" style={{ color: '#34D399' }} />
+                </div>
+                <p className="text-sm font-bold" style={{ color: '#34D399', letterSpacing: '-0.02em' }}>QR Kod Taranıyor</p>
+              </div>
+              <button onClick={() => setShowQr(false)} className="w-7 h-7 flex items-center justify-center rounded-xl cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}>
                 <i className="ri-close-line text-sm" />
               </button>
             </div>
             <QrScanner onResult={handleQrResult} onClose={() => setShowQr(false)} />
           </div>
         ) : (
-          <button onClick={() => setShowQr(true)} className="w-full flex flex-col items-center justify-center gap-3 py-10 cursor-pointer transition-all duration-200" style={{ background: 'transparent' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.04)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-            <div className="relative">
-              <div className="w-24 h-24 flex items-center justify-center rounded-2xl" style={{ background: 'rgba(52,211,153,0.08)', border: '2px dashed rgba(52,211,153,0.3)' }}>
-                <i className="ri-qr-code-line text-5xl" style={{ color: '#34D399' }} />
+          <button
+            onClick={() => setShowQr(true)}
+            className="w-full relative z-10 cursor-pointer transition-all duration-300 group"
+            style={{ padding: '32px 24px' }}
+          >
+            {/* İkon + animasyon */}
+            <div className="flex flex-col items-center gap-5">
+              {/* Pulse ring + QR ikonu */}
+              <div className="relative">
+                {/* Dış pulse halkası */}
+                <div className="absolute inset-0 rounded-2xl" style={{ background: 'rgba(52,211,153,0.06)', animation: 'qrPulseRing 3s ease-in-out infinite', transform: 'scale(1.3)' }} />
+                {/* Orta halka */}
+                <div className="absolute inset-0 rounded-2xl" style={{ background: 'rgba(52,211,153,0.08)', animation: 'qrPulseRing 3s ease-in-out infinite 0.5s', transform: 'scale(1.15)' }} />
+                {/* Ana ikon kutusu */}
+                <div className="relative w-28 h-28 flex items-center justify-center rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(52,211,153,0.12), rgba(6,182,212,0.08))', border: '1.5px solid rgba(52,211,153,0.28)' }}>
+                  {/* Köşe çizgileri */}
+                  <div className="absolute top-2 left-2 w-5 h-5 border-t-2 border-l-2 rounded-tl-lg" style={{ borderColor: '#34D399' }} />
+                  <div className="absolute top-2 right-2 w-5 h-5 border-t-2 border-r-2 rounded-tr-lg" style={{ borderColor: '#34D399' }} />
+                  <div className="absolute bottom-2 left-2 w-5 h-5 border-b-2 border-l-2 rounded-bl-lg" style={{ borderColor: '#34D399' }} />
+                  <div className="absolute bottom-2 right-2 w-5 h-5 border-b-2 border-r-2 rounded-br-lg" style={{ borderColor: '#34D399' }} />
+                  {/* Tarama çizgisi animasyonu */}
+                  <div className="absolute left-4 right-4 h-0.5 rounded-full opacity-60" style={{ background: 'linear-gradient(90deg, transparent, #34D399, transparent)', animation: 'qrIdleScan 2.5s ease-in-out infinite', top: '30%' }} />
+                  <i className="ri-qr-code-line text-5xl" style={{ color: '#34D399' }} />
+                </div>
               </div>
-              {(['absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 rounded-tl-md', 'absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 rounded-tr-md', 'absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 rounded-bl-md', 'absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 rounded-br-md'] as const).map((cls, i) => (
-                <div key={i} className={cls} style={{ borderColor: '#34D399' }} />
-              ))}
-            </div>
-            <div className="text-center">
-              <p className="text-base font-bold" style={{ color: '#34D399' }}>Ekipman QR kodunu okutun</p>
-              <p className="text-xs mt-1" style={{ color: '#475569' }}>Kameraya erişim gereklidir</p>
+
+              {/* Metin */}
+              <div className="text-center">
+                <p className="text-lg font-bold mb-1.5" style={{ color: '#34D399', letterSpacing: '-0.03em' }}>
+                  QR Kodu Tara
+                </p>
+                <p className="text-xs font-medium" style={{ color: '#475569', lineHeight: '1.5' }}>
+                  Ekipman etiketini kameranıza gösterin<br />otomatik olarak tanınır
+                </p>
+              </div>
+
+              {/* Başlat butonu */}
+              <div className="flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-200" style={{ background: 'linear-gradient(135deg, rgba(52,211,153,0.2), rgba(6,182,212,0.15))', border: '1px solid rgba(52,211,153,0.35)' }}>
+                <i className="ri-camera-line text-sm" style={{ color: '#34D399' }} />
+                <span className="text-sm font-bold" style={{ color: '#34D399' }}>Kamerayı Aç</span>
+                <i className="ri-arrow-right-s-line text-base" style={{ color: 'rgba(52,211,153,0.6)' }} />
+              </div>
             </div>
           </button>
         )}
+
+        <style>{`
+          @keyframes qrPulseRing {
+            0%, 100% { opacity: 0; transform: scale(1.1); }
+            50% { opacity: 1; transform: scale(1.3); }
+          }
+          @keyframes qrIdleScan {
+            0% { top: 18%; opacity: 0.3; }
+            50% { top: 72%; opacity: 0.9; }
+            100% { top: 18%; opacity: 0.3; }
+          }
+        `}</style>
       </div>
+
+      {/* Bilgi kartları */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
+            <i className="ri-scan-line text-sm" style={{ color: '#34D399' }} />
+          </div>
+          <div>
+            <p className="text-base font-bold" style={{ color: '#34D399' }}>{scanCount}</p>
+            <p className="text-[10px] font-medium" style={{ color: '#475569' }}>Bu oturumda</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: isOnline ? 'rgba(52,211,153,0.1)' : 'rgba(251,191,36,0.1)', border: `1px solid ${isOnline ? 'rgba(52,211,153,0.2)' : 'rgba(251,191,36,0.2)'}` }}>
+            <i className={`${isOnline ? 'ri-wifi-line' : 'ri-wifi-off-line'} text-sm`} style={{ color: isOnline ? '#34D399' : '#FBBF24' }} />
+          </div>
+          <div>
+            <p className="text-sm font-bold" style={{ color: isOnline ? '#34D399' : '#FBBF24' }}>{isOnline ? 'Online' : 'Offline'}</p>
+            <p className="text-[10px] font-medium" style={{ color: '#475569' }}>{isOnline ? 'Canlı bağlantı' : 'Yerel kayıt'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Nasıl çalışır */}
+      <div className="rounded-2xl px-4 py-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#334155' }}>NASIL ÇALIŞIR</p>
+        <div className="space-y-2.5">
+          {[
+            { icon: 'ri-qr-code-line', color: '#34D399', text: 'Ekipmandaki QR etiketi kameranıza gösterin' },
+            { icon: 'ri-search-eye-line', color: '#0EA5E9', text: 'Sistem otomatik olarak ekipmanı tanır' },
+            { icon: 'ri-checkbox-circle-line', color: '#818CF8', text: 'Kontrol yapın veya durum güncelleyin' },
+          ].map((step, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${step.color}12`, border: `1px solid ${step.color}22` }}>
+                <i className={`${step.icon} text-xs`} style={{ color: step.color }} />
+              </div>
+              <p className="text-xs font-medium" style={{ color: '#475569' }}>{step.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Son kontrol edilenler */}
       <RecentEkipmanlar onKontrolYapildi={onKontrolYapildi} onDurumDegistir={onDurumDegistir} isOnline={isOnline} />
     </div>
   );
