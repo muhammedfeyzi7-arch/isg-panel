@@ -112,7 +112,7 @@ export default function HekimPage() {
     try {
       const { data } = await supabase
         .from('user_organizations')
-        .select('organization_id, active_firm_ids')
+        .select('organization_id, active_firm_ids, active_firm_id')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .maybeSingle();
@@ -120,10 +120,23 @@ export default function HekimPage() {
       if (data) {
         const baseOrgId = data.organization_id;
         setOrgId(baseOrgId);
+
+        // active_firm_ids varsa onu kullan, yoksa active_firm_id'yi dene
+        // Eğer hiçbiri yoksa boş bırak — baseOrgId (OSGB org) firma değil
         const rawFirmIds: string[] =
           Array.isArray(data.active_firm_ids) && data.active_firm_ids.length > 0
             ? data.active_firm_ids
-            : [baseOrgId];
+            : (data as Record<string, unknown>).active_firm_id
+              ? [(data as Record<string, unknown>).active_firm_id as string]
+              : [];
+
+        if (rawFirmIds.length === 0) {
+          setAtanmisFirmaIds([]);
+          setFirmaOptions([]);
+          setAktiveFirmaId(null);
+          setLoading(false);
+          return;
+        }
 
         // Silinmemiş firmaları filtrele
         const { data: orgs } = await supabase

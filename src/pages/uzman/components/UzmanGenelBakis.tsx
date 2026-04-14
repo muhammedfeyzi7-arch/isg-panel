@@ -503,6 +503,9 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
         const in7   = new Date(Date.now() + 7  * 86400000).toISOString().split('T')[0];
         const in30  = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
 
+        // Tüm tablolarda durum, silinmis vs. kolonlar yok — data JSONB içinde.
+        // Sadece deleted_at ile silinmemiş filtresi yapılabilir.
+        // Uygunsuzluk açık/kapalı, ekipman durumu için data->'durum' filtrelemesi gerekiyor.
         const [
           { count: personelC },
           { count: uygunsuzlukAcikC },
@@ -513,24 +516,45 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
           { count: egitimC },
           { count: tutanakC },
           { count: saglikC },
+        ] = await Promise.all([
+          supabase.from('personeller').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+          supabase.from('uygunsuzluklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).not('data->>durum', 'in', '("Kapandı","Kapatıldı","Kapandı")'),
+          supabase.from('uygunsuzluklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).or('data->>durum.eq.Kapandı,data->>durum.eq.Kapatıldı'),
+          supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+          supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).eq('data->>durum', 'Uygun Değil'),
+          supabase.from('is_izinleri').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).eq('data->>durum', 'Onay Bekliyor'),
+          supabase.from('egitimler').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+          supabase.from('tutanaklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+          supabase.from('muayeneler').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+        ]);
+
+        // Gecikmiş belge: data->>'gecerlilikTarihi' < today filtrelemesi
+        // Supabase client ile JSONB text cast + lt/lte kullanılabilir
+        const [
           { count: gecikmisBelgeC },
           { count: gecikmisEkipmanC },
           { count: yaklasan7C },
           { count: yaklasan30C },
         ] = await Promise.all([
-          supabase.from('personeller').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false),
-          supabase.from('uygunsuzluklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).neq('durum','Kapandı').eq('silinmis',false),
-          supabase.from('uygunsuzluklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('durum','Kapandı').eq('silinmis',false),
-          supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false),
-          supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('durum','Uygun Değil').eq('silinmis',false),
-          supabase.from('is_izinleri').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('durum','Onay Bekliyor').eq('silinmis',false),
-          supabase.from('egitimler').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false),
-          supabase.from('tutanaklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false),
-          supabase.from('muayeneler').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false),
-          supabase.from('evraklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false).lt('gecerlilik_tarihi', today),
-          supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false).neq('durum','Uygun Değil').lt('sonraki_kontrol_tarihi', today),
-          supabase.from('evraklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false).gte('gecerlilik_tarihi', today).lte('gecerlilik_tarihi', in7),
-          supabase.from('evraklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).eq('silinmis',false).gte('gecerlilik_tarihi', today).lte('gecerlilik_tarihi', in30),
+          supabase.from('evraklar').select('id', { count: 'exact', head: true })
+            .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
+            .lt('data->>gecerlilikTarihi', today)
+            .not('data->>gecerlilikTarihi', 'is', null),
+          supabase.from('ekipmanlar').select('id', { count: 'exact', head: true })
+            .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
+            .lt('data->>sonrakiKontrolTarihi', today)
+            .not('data->>sonrakiKontrolTarihi', 'is', null)
+            .not('data->>durum', 'eq', 'Uygun Değil'),
+          supabase.from('evraklar').select('id', { count: 'exact', head: true })
+            .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
+            .gte('data->>gecerlilikTarihi', today)
+            .lte('data->>gecerlilikTarihi', in7)
+            .not('data->>gecerlilikTarihi', 'is', null),
+          supabase.from('evraklar').select('id', { count: 'exact', head: true })
+            .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
+            .gte('data->>gecerlilikTarihi', today)
+            .lte('data->>gecerlilikTarihi', in30)
+            .not('data->>gecerlilikTarihi', 'is', null),
         ]);
 
         setStats({
@@ -544,10 +568,10 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
           egitimCount: egitimC ?? 0,
           tutanakCount: tutanakC ?? 0,
           saglikCount: saglikC ?? 0,
-          gecikmisBelge: gecikmisBelgeC ?? 0,
-          gecikmisEkipman: gecikmisEkipmanC ?? 0,
-          yaklasan7: yaklasan7C ?? 0,
-          yaklasan30: yaklasan30C ?? 0,
+          gecikmisBelge: gecikmisBelgeC,
+          gecikmisEkipman: gecikmisEkipmanC,
+          yaklasan7: yaklasan7C,
+          yaklasan30: yaklasan30C,
         });
       } catch (err) {
         console.error('[UzmanGenelBakis]', err);

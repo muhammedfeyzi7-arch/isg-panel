@@ -9,6 +9,15 @@ interface SilinmisFirma {
   deleted_at: string;
 }
 
+interface FirmaVeriOzet {
+  personelCount: number;
+  evrakCount: number;
+  ekipmanCount: number;
+  uygunsuzlukCount: number;
+  egitimCount: number;
+  loading: boolean;
+}
+
 interface CopKutusuTabProps {
   orgId: string;
   isDark: boolean;
@@ -19,6 +28,7 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutu
   const [firmalar, setFirmalar] = useState<SilinmisFirma[]>([]);
   const [loading, setLoading] = useState(true);
   const [kaliciSilOnayId, setKaliciSilOnayId] = useState<string | null>(null);
+  const [kaliciSilVeriOzet, setKaliciSilVeriOzet] = useState<FirmaVeriOzet | null>(null);
   const [islemLoading, setIslemLoading] = useState<string | null>(null);
   const [mesaj, setMesaj] = useState<{ tip: 'success' | 'error'; metin: string } | null>(null);
 
@@ -30,14 +40,34 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutu
   const fetchSilinmis = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
+      // deleted_at dolu VEYA is_active: false olan firmaları göster
+      const { data: byDeleted } = await supabase
         .from('organizations')
         .select('id, name, invite_code, created_at, deleted_at')
         .eq('parent_org_id', orgId)
         .eq('org_type', 'firma')
         .not('deleted_at', 'is', null)
         .order('deleted_at', { ascending: false });
-      setFirmalar((data ?? []) as SilinmisFirma[]);
+
+      // deleted_at yoksa is_active: false olanları da kontrol et
+      const { data: byInactive } = await supabase
+        .from('organizations')
+        .select('id, name, invite_code, created_at, deleted_at')
+        .eq('parent_org_id', orgId)
+        .eq('org_type', 'firma')
+        .eq('is_active', false)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      const allDeleted = [...(byDeleted ?? []), ...(byInactive ?? [])];
+      // Deduplicate
+      const seen = new Set<string>();
+      const unique = allDeleted.filter(f => {
+        if (seen.has(f.id)) return false;
+        seen.add(f.id);
+        return true;
+      });
+      setFirmalar(unique as SilinmisFirma[]);
     } finally {
       setLoading(false);
     }
@@ -53,18 +83,43 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutu
   const handleGeriAl = async (firmaId: string, firmaAdi: string) => {
     setIslemLoading(firmaId);
     try {
+      // [SİLİNDİ] prefix'ini temizle, is_active'i geri aç
+      const temizAd = firmaAdi.replace(/^\[SİLİNDİ\]\s*/i, '').trim();
       const { error } = await supabase
         .from('organizations')
-        .update({ deleted_at: null })
+        .update({ deleted_at: null, is_active: true, name: temizAd })
         .eq('id', firmaId);
       if (error) throw error;
       setFirmalar(prev => prev.filter(f => f.id !== firmaId));
-      showMesaj('success', `"${firmaAdi}" geri alındı.`);
+      showMesaj('success', `"${temizAd}" başarıyla geri alındı ve aktif edildi.`);
       onFirmaRestored();
     } catch {
       showMesaj('error', 'Geri alma başarısız oldu.');
     } finally {
       setIslemLoading(null);
+    }
+  };
+
+  const handleKaliciSilOnayla = async (firmaId: string) => {
+    setKaliciSilOnayId(firmaId);
+    setKaliciSilVeriOzet({ personelCount: 0, evrakCount: 0, ekipmanCount: 0, uygunsuzlukCount: 0, egitimCount: 0, loading: true });
+    try {
+      const [
+        { count: personelC },
+        { count: evrakC },
+        { count: ekipmanC },
+        { count: uygunsuzlukC },
+        { count: egitimC },
+      ] = await Promise.all([
+        supabase.from('personeller').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
+        supabase.from('evraklar').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
+        supabase.from('ekipmanlar').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
+        supabase.from('uygunsuzluklar').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
+        supabase.from('egitimler').select('id', { count: 'exact', head: true }).eq('organization_id', firmaId).is('deleted_at', null),
+      ]);
+      setKaliciSilVeriOzet({ personelCount: personelC ?? 0, evrakCount: evrakC ?? 0, ekipmanCount: ekipmanC ?? 0, uygunsuzlukCount: uygunsuzlukC ?? 0, egitimCount: egitimC ?? 0, loading: false });
+    } catch {
+      setKaliciSilVeriOzet({ personelCount: 0, evrakCount: 0, ekipmanCount: 0, uygunsuzlukCount: 0, egitimCount: 0, loading: false });
     }
   };
 
@@ -222,43 +277,94 @@ export default function CopKutusuTab({ orgId, isDark, onFirmaRestored }: CopKutu
                   </button>
 
                   {/* Kalıcı Sil */}
-                  {!isKaliciOnay ? (
-                    <button
-                      onClick={() => setKaliciSilOnayId(f.id)}
-                      disabled={islem}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer text-xs font-semibold whitespace-nowrap transition-all"
-                      style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.14)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)'; }}>
-                      <i className="ri-delete-bin-line text-xs" />
-                      Kalıcı Sil
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-semibold whitespace-nowrap" style={{ color: '#EF4444' }}>
-                        Emin misin?
-                      </span>
-                      <button
-                        onClick={() => void handleKaliciSil(f.id, f.name)}
-                        disabled={islem}
-                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer text-white whitespace-nowrap"
-                        style={{ background: '#EF4444' }}>
-                        {islem ? <i className="ri-loader-4-line animate-spin" /> : 'Evet, Sil'}
-                      </button>
-                      <button
-                        onClick={() => setKaliciSilOnayId(null)}
-                        className="px-2.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer whitespace-nowrap"
-                        style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)', color: textMuted, border: `1px solid ${border}` }}>
-                        Vazgeç
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => void handleKaliciSilOnayla(f.id)}
+                    disabled={islem}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer text-xs font-semibold whitespace-nowrap transition-all"
+                    style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.14)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)'; }}>
+                    <i className="ri-delete-bin-line text-xs" />
+                    Kalıcı Sil
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Kalıcı Silme Onay Modalı */}
+      {kaliciSilOnayId && (() => {
+        const firma = firmalar.find(f => f.id === kaliciSilOnayId);
+        if (!firma) return null;
+        const ozet = kaliciSilVeriOzet;
+        const islem = islemLoading === kaliciSilOnayId;
+        const toplamVeri = ozet ? (ozet.personelCount + ozet.evrakCount + ozet.ekipmanCount + ozet.uygunsuzlukCount + ozet.egitimCount) : 0;
+        return (
+          <div className="fixed inset-0 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)', zIndex: 99999 }}>
+            <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: isDark ? 'rgba(15,23,42,0.98)' : '#ffffff', border: '1px solid rgba(239,68,68,0.3)' }}>
+              <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg,#EF4444,#DC2626)' }} />
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                    <i className="ri-delete-bin-2-line text-lg" style={{ color: '#EF4444' }} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Kalıcı Silme Onayı</h3>
+                    <p className="text-xs mt-0.5" style={{ color: textMuted }}>Bu işlem geri alınamaz!</p>
+                  </div>
+                </div>
+                <p className="text-sm font-semibold mb-4" style={{ color: textPrimary }}>
+                  <span className="font-black" style={{ color: '#EF4444' }}>"{firma.name}"</span> firmasını kalıcı olarak silmek üzeresiniz.
+                </p>
+                {ozet?.loading ? (
+                  <div className="rounded-xl p-4 flex items-center gap-3 mb-4" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                    <i className="ri-loader-4-line animate-spin text-sm" style={{ color: '#EF4444' }} />
+                    <span className="text-xs" style={{ color: textMuted }}>Firmaya ait veriler kontrol ediliyor...</span>
+                  </div>
+                ) : toplamVeri > 0 ? (
+                  <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <p className="text-xs font-bold mb-3" style={{ color: '#EF4444' }}>⚠️ Bu firmaya ait aşağıdaki veriler orphan (sahipsiz) kalacak:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: 'Personel', count: ozet?.personelCount ?? 0, icon: 'ri-group-line' },
+                        { label: 'Evrak', count: ozet?.evrakCount ?? 0, icon: 'ri-file-list-line' },
+                        { label: 'Ekipman', count: ozet?.ekipmanCount ?? 0, icon: 'ri-tools-line' },
+                        { label: 'Uygunsuzluk', count: ozet?.uygunsuzlukCount ?? 0, icon: 'ri-alert-line' },
+                        { label: 'Eğitim', count: ozet?.egitimCount ?? 0, icon: 'ri-graduation-cap-line' },
+                      ].filter(x => x.count > 0).map(item => (
+                        <div key={item.label} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)' }}>
+                          <i className={`${item.icon} text-xs`} style={{ color: '#EF4444' }} />
+                          <span className="text-xs font-bold" style={{ color: '#EF4444' }}>{item.count}</span>
+                          <span className="text-xs" style={{ color: textMuted }}>{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl p-3 mb-4 flex items-center gap-2" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                    <i className="ri-checkbox-circle-line text-sm" style={{ color: '#22C55E' }} />
+                    <span className="text-xs" style={{ color: '#16A34A' }}>Bu firmaya ait kayıt bulunmuyor, güvenle silinebilir.</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 justify-end">
+                  <button onClick={() => { setKaliciSilOnayId(null); setKaliciSilVeriOzet(null); }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap"
+                    style={{ background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.06)', color: textMuted, border: `1px solid ${border}` }}>
+                    Vazgeç
+                  </button>
+                  <button onClick={() => void handleKaliciSil(firma.id, firma.name)} disabled={islem || ozet?.loading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer text-white whitespace-nowrap"
+                    style={{ background: 'linear-gradient(135deg,#EF4444,#DC2626)', opacity: (islem || ozet?.loading) ? 0.7 : 1 }}>
+                    {islem ? <><i className="ri-loader-4-line animate-spin" />Siliniyor...</> : <><i className="ri-delete-bin-line" />Kalıcı Olarak Sil</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Bilgi notu */}
       {firmalar.length > 0 && (

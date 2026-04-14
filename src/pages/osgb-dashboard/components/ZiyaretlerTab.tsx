@@ -461,13 +461,39 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
     void fetchTumZiyaretler();
   }, [fetchZiyaretler, fetchTumZiyaretler]);
 
-  // Aktif ziyaretler için canlı güncelleme (30sn'de bir)
+  // Realtime subscription — osgb_ziyaretler değişince otomatik refresh
+  useEffect(() => {
+    if (!org?.id) return;
+
+    const channel = supabase
+      .channel(`ziyaretler_rt_${org.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'osgb_ziyaretler',
+          filter: `osgb_org_id=eq.${org.id}`,
+        },
+        () => {
+          void fetchZiyaretler();
+          void fetchTumZiyaretler();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [org?.id, fetchZiyaretler, fetchTumZiyaretler]);
+
+  // Aktif ziyaretler için ek polling (15sn — realtime backup)
   useEffect(() => {
     const hasAktif = ziyaretler.some(z => z.durum === 'aktif');
     if (hasAktif) {
       realtimeRef.current = setInterval(() => {
         void fetchZiyaretler();
-      }, 30000);
+      }, 15000);
     }
     return () => {
       if (realtimeRef.current) clearInterval(realtimeRef.current);

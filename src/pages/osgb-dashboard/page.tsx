@@ -166,9 +166,11 @@ export default function OsgbDashboardPage() {
           ] = await Promise.all([
             supabase.from('personeller').select('id', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
             supabase.from('uygunsuzluklar').select('id', { count: 'exact', head: true })
-              .eq('organization_id', f.id).neq('durum', 'Kapatıldı').is('deleted_at', null),
+              .eq('organization_id', f.id).is('deleted_at', null)
+              .not('data->>durum', 'in', '("Kapandı","Kapatıldı","Kapandı")'),
             supabase.from('uygunsuzluklar').select('id', { count: 'exact', head: true })
-              .eq('organization_id', f.id).eq('durum', 'Kapatıldı').is('deleted_at', null),
+              .eq('organization_id', f.id).is('deleted_at', null)
+              .or('data->>durum.eq.Kapandı,data->>durum.eq.Kapatıldı'),
             supabase.from('tutanaklar').select('id', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
             supabase.from('egitimler').select('id', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
           ]);

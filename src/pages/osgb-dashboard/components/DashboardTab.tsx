@@ -138,7 +138,8 @@ export default function DashboardTab({
 
   useEffect(() => {
     if (!orgId) return;
-    const fetchZiyaretler = async () => {
+
+    const doFetch = async () => {
       setLoading(true);
       try {
         const thirtyDaysAgo = new Date();
@@ -156,7 +157,27 @@ export default function DashboardTab({
         setLoading(false);
       }
     };
-    fetchZiyaretler();
+
+    doFetch();
+
+    // Realtime subscription — anında güncelleme
+    const channel = supabase
+      .channel(`dashboard_ziyaret_rt_${orgId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'osgb_ziyaretler',
+          filter: `osgb_org_id=eq.${orgId}`,
+        },
+        () => { void doFetch(); }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [orgId]);
 
   const todayStr = new Date().toDateString();

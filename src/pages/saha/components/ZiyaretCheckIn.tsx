@@ -13,6 +13,8 @@ interface AktifZiyaret {
   firmaOrgId: string;
   firmaAd: string | null;
   girisAt: string;
+  cikisAt?: string | null;
+  sureDakika?: number | null;
   qrIleGiris: boolean;
   isOffline: boolean;
 }
@@ -273,7 +275,7 @@ export default function ZiyaretCheckIn() {
 
       const { data: gecmisData } = await supabase
         .from('osgb_ziyaretler')
-        .select('id, firma_org_id, firma_ad, giris_saati, qr_ile_giris')
+        .select('id, firma_org_id, firma_ad, giris_saati, cikis_saati, sure_dakika, qr_ile_giris')
         .eq('uzman_user_id', user.id)
         .not('cikis_saati', 'is', null)
         .order('giris_saati', { ascending: false })
@@ -282,6 +284,7 @@ export default function ZiyaretCheckIn() {
       setGecmis((gecmisData ?? []).map(z => ({
         id: z.id, tempId: z.id, firmaOrgId: z.firma_org_id,
         firmaAd: z.firma_ad, girisAt: z.giris_saati,
+        cikisAt: z.cikis_saati, sureDakika: z.sure_dakika,
         qrIleGiris: z.qr_ile_giris, isOffline: false,
       })));
     } finally {
@@ -490,8 +493,15 @@ export default function ZiyaretCheckIn() {
     setGpsError(null);
     setShowQr(false);
 
+    // ID ve bilgileri ÖNCEDEN sakla (state null yapılmadan)
+    const ziyaretSnapshot = { ...aktifZiyaret };
+
+    // UI'yi ANINDA temizle — kullanıcı beklemeden görür
+    setAktifZiyaret(null);
+
     setGpsStatus('loading');
-    const coords = await getGpsCoords(5000).catch(() => null);
+    // GPS timeout 3sn — hız önceliği
+    const coords = await getGpsCoords(3000).catch(() => null);
     setGpsStatus(coords ? 'ok' : 'idle');
 
     const now        = new Date().toISOString();
@@ -499,11 +509,11 @@ export default function ZiyaretCheckIn() {
 
     try {
       if (isOnline) {
-        // ── Adım 1: ID çözüm — önce aktifZiyaret.id ──────────────────────
-        let ziyaretId: string | null = aktifZiyaret.id;
+        // ── Adım 1: ID çözüm — önce snapshot'tan al ──────────────────────
+        let ziyaretId: string | null = ziyaretSnapshot.id;
 
         // ── Adım 2: ID yoksa veya offline ise — user.id ile fallback ──────
-        if (!ziyaretId || aktifZiyaret.isOffline) {
+        if (!ziyaretId || ziyaretSnapshot.isOffline) {
           const { data: byUser } = await supabase
             .from('osgb_ziyaretler')
             .select('id')
@@ -533,7 +543,7 @@ export default function ZiyaretCheckIn() {
         }
 
         console.log('CHECKOUT START', {
-          aktifZiyaretId: aktifZiyaret.id,
+          aktifZiyaretId: ziyaretSnapshot.id,
           resolvedId:     ziyaretId,
           authUserId,
         });
@@ -541,8 +551,8 @@ export default function ZiyaretCheckIn() {
         if (ziyaretId) {
           // Süreyi hesapla: giris_saatini önce çek
           let sureDakika: number | null = null;
-          if (aktifZiyaret?.girisAt) {
-            sureDakika = Math.max(1, Math.round((new Date(now).getTime() - new Date(aktifZiyaret.girisAt).getTime()) / 60000));
+          if (ziyaretSnapshot?.girisAt) {
+            sureDakika = Math.max(1, Math.round((new Date(now).getTime() - new Date(ziyaretSnapshot.girisAt).getTime()) / 60000));
           } else {
             // DB'den giris_saati çek
             const { data: zRow } = await supabase
@@ -596,8 +606,8 @@ export default function ZiyaretCheckIn() {
       } else {
         // ── Offline checkout ──────────────────────────────────────────────
         const payload: ZiyaretCheckoutPayload = {
-          tempId:      aktifZiyaret.tempId,
-          realId:      aktifZiyaret.id,
+          tempId:      ziyaretSnapshot.tempId,
+          realId:      ziyaretSnapshot.id,
           uzmanUserId: authUserId,
           cikisAt:     now,
           sureDakika:  null,    // GENERATED ALWAYS — gönderilmez
@@ -612,7 +622,6 @@ export default function ZiyaretCheckIn() {
         addToast('İşlem kaydedildi (çevrimdışı) — bağlantı gelince sunucuya gönderilecek', 'success');
       }
 
-      setAktifZiyaret(null);
       if (isOnline) await fetchZiyaret();
     } catch (err) {
       addToast(`Check-out yapılamadı: ${err instanceof Error ? err.message : String(err)}`, 'error');
@@ -859,22 +868,35 @@ export default function ZiyaretCheckIn() {
         <div>
           <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#475569' }}>Son Ziyaretler</p>
           <div className="space-y-2">
-            {gecmis.map(z => (
-              <div key={z.id ?? z.tempId} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(148,163,184,0.1)' }}>
-                  <i className="ri-building-2-line text-xs" style={{ color: '#94A3B8' }} />
+            {gecmis.map(z => {
+              const sureDk = z.sureDakika ?? (z.cikisAt && z.girisAt
+                ? Math.round((new Date(z.cikisAt).getTime() - new Date(z.girisAt).getTime()) / 60000)
+                : null);
+              const sureStr = sureDk && sureDk > 0
+                ? (sureDk >= 60 ? `${Math.floor(sureDk / 60)}s ${sureDk % 60}dk` : `${sureDk}dk`)
+                : null;
+              return (
+                <div key={z.id ?? z.tempId} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(148,163,184,0.1)' }}>
+                    <i className="ri-building-2-line text-xs" style={{ color: '#94A3B8' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{z.firmaAd ?? '—'}</p>
+                    <p className="text-[10px]" style={{ color: '#475569' }}>{fmtDate(z.girisAt)} · {fmtTime(z.girisAt)}{z.cikisAt ? ` — ${fmtTime(z.cikisAt)}` : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {sureStr && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>
+                        {sureStr}
+                      </span>
+                    )}
+                    {z.qrIleGiris && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9' }}>QR</span>}
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(148,163,184,0.1)', color: '#94A3B8' }}>Tamam</span>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{z.firmaAd ?? '—'}</p>
-                  <p className="text-[10px]" style={{ color: '#475569' }}>{fmtDate(z.girisAt)} · {fmtTime(z.girisAt)}</p>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {z.qrIleGiris && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0EA5E9' }}>QR</span>}
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(148,163,184,0.1)', color: '#94A3B8' }}>Tamamlandı</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

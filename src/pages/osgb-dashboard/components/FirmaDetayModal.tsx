@@ -287,10 +287,14 @@ export default function FirmaDetayModal({
     setSilLoading(true);
     try {
       const { error } = await supabase.from('organizations')
-        .update({ is_active: false, name: `[SİLİNDİ] ${firmaAdi}` })
+        .update({
+          is_active: false,
+          deleted_at: new Date().toISOString(),
+          name: firmaAdi.startsWith('[SİLİNDİ]') ? firmaAdi : `[SİLİNDİ] ${firmaAdi}`,
+        })
         .eq('id', firmaId);
       if (error) throw error;
-      addToast('Firma silindi.', 'success');
+      addToast('Firma silindi. Çöp kutusundan geri alabilirsiniz.', 'success');
       onClose();
       onRefresh();
     } catch (err) {
@@ -398,16 +402,7 @@ export default function FirmaDetayModal({
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.08)'; }}>
               <i className="ri-qr-code-line text-xs" />QR
             </button>
-            <button onClick={handleDurumDegistir} disabled={durumLoading}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
-              style={{
-                background: firmaDurum === 'aktif' ? 'rgba(239,68,68,0.07)' : 'rgba(14,165,233,0.08)',
-                border: `1px solid ${firmaDurum === 'aktif' ? 'rgba(239,68,68,0.2)' : 'rgba(14,165,233,0.2)'}`,
-                color: firmaDurum === 'aktif' ? '#EF4444' : '#0EA5E9',
-              }}>
-              {durumLoading ? <i className="ri-loader-4-line animate-spin text-xs" /> : <i className={`${firmaDurum === 'aktif' ? 'ri-pause-circle-line' : 'ri-play-circle-line'} text-xs`} />}
-              {firmaDurum === 'aktif' ? 'Pasif Yap' : 'Aktif Et'}
-            </button>
+
             {!silOnay ? (
               <button onClick={() => setSilOnay(true)}
                 className="w-8 h-8 flex items-center justify-center rounded-xl cursor-pointer transition-all"
