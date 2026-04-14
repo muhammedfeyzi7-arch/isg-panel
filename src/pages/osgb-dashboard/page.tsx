@@ -61,13 +61,12 @@ interface FirmaDetay {
 export default function OsgbDashboardPage() {
   const { user } = useAuth();
   const { org, addToast, mustChangePassword, theme } = useApp();
-  const [activeTab, setActiveTab] = useState<Tab>(() => {
-    try { return (localStorage.getItem('osgb_active_tab') as Tab) || 'dashboard'; } catch { return 'dashboard'; }
-  });
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
 
   useEffect(() => {
-    try { localStorage.setItem('osgb_active_tab', activeTab); } catch { /* ignore */ }
-  }, [activeTab]);
+    // Sekme değişimini sakla ama başlangıçta her zaman dashboard'dan başla
+    try { localStorage.removeItem('osgb_active_tab'); } catch { /* ignore */ }
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [osgbTheme, setOsgbTheme] = useState<'dark' | 'light'>(() => {
@@ -880,7 +879,7 @@ export default function OsgbDashboardPage() {
 
               {/* ── ÇÖP KUTUSU TAB ── */}
               {activeTab === 'copkutusu' && org?.id && (
-                <CopKutusuTab orgId={org.id} isDark={isDark} onFirmaRestored={() => void fetchData()} onGoToFirmalar={() => setActiveTab('firmalar')} />
+                <CopKutusuTab orgId={org.id} isDark={isDark} onFirmaRestored={() => void fetchData()} />
               )}
 
               {/* ── AYARLAR TAB ── */}
