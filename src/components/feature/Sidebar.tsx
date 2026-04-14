@@ -244,7 +244,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                   const badge = badges[item.id];
 
                   return (
-                    <li key={item.id} className={item.mobileOnly ? 'lg:hidden' : ''}>
+                    <li key={item.id}>
                       <button
                         id={`sidebar-${item.id}`}
                         onClick={() => { setActiveModule(item.id); onMobileClose?.(); }}
