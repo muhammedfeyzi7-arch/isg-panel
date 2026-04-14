@@ -187,56 +187,35 @@ export default function ZiyaretCheckIn() {
   }, [aktifZiyaret]);
 
   // ────────────────────────────────────────────────────────────────────────
-  // ORG ÇÖZÜCÜ — Her çağrıda doğrudan DB'den çeker, cache YOK
+  // ORG ÇÖZÜCÜ — SADECE osgb_role kayıtlarına bakar, fallback YOK
   // ────────────────────────────────────────────────────────────────────────
   const getOrgFromDB = useCallback(async (): Promise<{ orgId: string; uzman: string } | null> => {
     if (!user?.id) return null;
 
-    // ── Önce osgb_role olan kayıttan OSGB org'unu çek (en güvenilir) ──
-    const { data: osgbRow } = await supabase
+    // SADECE osgb_role NOT NULL olan kayıt — firma üyeliği ASLA alınmaz
+    const { data, error } = await supabase
       .from('user_organizations')
       .select('organization_id, display_name')
       .eq('user_id', user.id)
+      .not('osgb_role', 'is', null)
       .eq('is_active', true)
-      .in('osgb_role', ['gezici_uzman', 'isyeri_hekimi'])
-      .order('joined_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-
-    if (osgbRow?.organization_id) {
-      console.log('[getOrgFromDB] osgb_role ile bulundu:', osgbRow.organization_id);
-      return {
-        orgId: osgbRow.organization_id,
-        uzman: osgbRow.display_name ?? user.email ?? 'Uzman',
-      };
-    }
-
-    // ── Fallback: herhangi aktif kayıt ──
-    const { data, error } = await supabase
-      .from('user_organizations')
-      .select('organization_id, display_name, osgb_role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('joined_at', { ascending: false })
-      .limit(5);
 
     if (error) {
       console.error('[getOrgFromDB] DB error:', error);
       return null;
     }
 
-    if (!data || data.length === 0) {
-      console.error('[getOrgFromDB] Org bulunamadı! user_id:', user.id);
+    if (!data?.organization_id) {
+      console.error('[getOrgFromDB] OSGB kaydı bulunamadı — osgb_role NULL veya is_active:false. user_id:', user.id);
       return null;
     }
 
-    // osgb_role null olan kaydı önce dene (OSGB üyeliği, firma değil)
-    const best = data[0];
-    console.log('[getOrgFromDB] fallback ile bulundu:', best.organization_id, 'osgb_role:', best.osgb_role);
-
+    console.log('[getOrgFromDB] OSGB org bulundu:', data.organization_id, 'uzman:', data.display_name);
     return {
-      orgId: best.organization_id,
-      uzman: best.display_name ?? user.email ?? 'Uzman',
+      orgId: data.organization_id,
+      uzman: data.display_name ?? user.email ?? 'Uzman',
     };
   }, [user?.id, user?.email]);
 
@@ -306,14 +285,13 @@ export default function ZiyaretCheckIn() {
     setGpsError(null);
 
     try {
-      // ── 1. Her zaman DB'den org çek ─────────────────────────────────────
+      // ── 1. OSGB org'unu DB'den çek — fallback YOK ───────────────────────
       const orgInfo = await getOrgFromDB();
-      if (!orgInfo) {
-        addToast('Organizasyon bilgisi bulunamadı. Lütfen tekrar giriş yapın.', 'error');
+      if (!orgInfo?.orgId) {
+        addToast('OSGB bilgisi bulunamadı. Lütfen tekrar giriş yapın.', 'error');
         return;
       }
 
-      // user.id = auth.uid() — state veya prop DEĞİL
       const authUserId = user.id;
       const now    = new Date().toISOString();
       const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -331,7 +309,7 @@ export default function ZiyaretCheckIn() {
 
         if (!firmaData) { addToast('Firma bulunamadı. QR geçersiz olabilir.', 'error'); return; }
 
-        // ── 3. Çakışma kontrolü — user.id ile ─────────────────────────────
+        // ── 3. Çakışma kontrolü ───────────────────────────────────────────
         const { data: existing } = await supabase
           .from('osgb_ziyaretler')
           .select('id, firma_ad')
@@ -344,7 +322,7 @@ export default function ZiyaretCheckIn() {
           return;
         }
 
-        // ── 4. GPS kontrolü ────────────────────────────────────────────────
+        // ── 4. GPS kontrolü ───────────────────────────────────────────────
         const firmaHasCoords = firmaData.firma_lat !== null && firmaData.firma_lng !== null;
         if (firmaData.gps_required || firmaHasCoords) {
           setGpsStatus('loading');
@@ -389,12 +367,12 @@ export default function ZiyaretCheckIn() {
           setGpsStatus(coords ? 'ok' : 'idle');
         }
 
-        // ── 5. INSERT — osgb_org_id DB'den, uzman_user_id = auth.uid() ────
+        // ── 5. INSERT — osgb_org_id SADECE getOrgFromDB'den ──────────────
         const insertPayload = {
-          osgb_org_id:         orgInfo.orgId,   // ← DB'den gelen gerçek org
+          osgb_org_id:         orgInfo.orgId,
           firma_org_id:        firmaId,
           firma_ad:            firmaData.name,
-          uzman_user_id:       authUserId,       // ← auth.uid(), state değil
+          uzman_user_id:       authUserId,
           uzman_ad:            orgInfo.uzman || user.email || 'Uzman',
           uzman_email:         user.email,
           giris_saati:         now,
@@ -408,12 +386,13 @@ export default function ZiyaretCheckIn() {
           check_in_distance_m: checkInDistanceM,
         };
 
-        // Zorunlu log — veri tutarlılığı doğrulama
-        console.log('CHECKIN FINAL', {
+        // DEBUG LOG — INSERT öncesi zorunlu
+        console.log('ZİYARET INSERT', {
           osgb_org_id:   insertPayload.osgb_org_id,
-          uzman_user_id: insertPayload.uzman_user_id,
           firma_org_id:  insertPayload.firma_org_id,
+          user_id:       insertPayload.uzman_user_id,
           firma_ad:      insertPayload.firma_ad,
+          gps_status:    insertPayload.gps_status,
         });
 
         const { data: yeni, error } = await supabase
@@ -437,7 +416,7 @@ export default function ZiyaretCheckIn() {
         if (checkInGpsStatus === 'ok') setTimeout(() => { setGpsStatus('idle'); setGpsError(null); }, 3000);
 
       } else {
-        // ── OFFLINE ─────────────────────────────────────────────────────────
+        // ── OFFLINE ──────────────────────────────────────────────────────
         setGpsStatus('loading');
         coords = await getGpsCoords(5000).catch(() => null);
         checkInGpsStatus = coords ? 'ok' : 'no_permission';
@@ -446,12 +425,19 @@ export default function ZiyaretCheckIn() {
         const local = (() => { try { const r = localStorage.getItem(LS_AKTIF_ZIYARET); return r ? JSON.parse(r) as AktifZiyaret : null; } catch { return null; } })();
         if (local) { addToast('Aktif bir ziyaret zaten var (çevrimdışı). Önce bitirin.', 'error'); return; }
 
+        // DEBUG LOG — offline queue için de zorunlu
+        console.log('ZİYARET INSERT (OFFLINE)', {
+          osgb_org_id:  orgInfo.orgId,
+          firma_org_id: firmaId,
+          user_id:      authUserId,
+        });
+
         const payload: ZiyaretCheckinPayload = {
           tempId,
-          osgbOrgId:         orgInfo.orgId,   // ← DB'den gelen org
+          osgbOrgId:         orgInfo.orgId,
           firmaOrgId:        firmaId,
           firmaAd:           `Firma (${firmaId.slice(0, 6)}...)`,
-          uzmanUserId:       authUserId,       // ← auth.uid()
+          uzmanUserId:       authUserId,
           uzmanAd:           orgInfo.uzman || user.email || 'Uzman',
           uzmanEmail:        user.email ?? null,
           girisAt:           now,
@@ -493,26 +479,24 @@ export default function ZiyaretCheckIn() {
     setGpsError(null);
     setShowQr(false);
 
-    // ID ve bilgileri ÖNCEDEN sakla (state null yapılmadan)
     const ziyaretSnapshot = { ...aktifZiyaret };
 
-    // UI'yi ANINDA temizle — kullanıcı beklemeden görür
+    // UI'yi ANINDA temizle
     setAktifZiyaret(null);
 
     setGpsStatus('loading');
-    // GPS timeout 3sn — hız önceliği
     const coords = await getGpsCoords(3000).catch(() => null);
     setGpsStatus(coords ? 'ok' : 'idle');
 
     const now        = new Date().toISOString();
-    const authUserId = user.id; // auth.uid() — state değil
+    const authUserId = user.id;
 
     try {
       if (isOnline) {
-        // ── Adım 1: ID çözüm — önce snapshot'tan al ──────────────────────
+        // ── Adım 1: ID çözüm — önce snapshot'tan al ─────────────────────
         let ziyaretId: string | null = ziyaretSnapshot.id;
 
-        // ── Adım 2: ID yoksa veya offline ise — user.id ile fallback ──────
+        // ── Adım 2: ID yoksa veya offline ise — user.id ile DB'den çek ───
         if (!ziyaretId || ziyaretSnapshot.isOffline) {
           const { data: byUser } = await supabase
             .from('osgb_ziyaretler')
@@ -525,21 +509,24 @@ export default function ZiyaretCheckIn() {
           ziyaretId = byUser?.id ?? null;
         }
 
-        // ── Adım 3: Hâlâ yoksa — DB'den org alıp osgb_org_id ile fallback ─
+        // ── Adım 3: Hâlâ yoksa — SADECE getOrgFromDB üzerinden bul ──────
         if (!ziyaretId) {
           const orgInfo = await getOrgFromDB();
-          if (orgInfo) {
-            const { data: byOrg } = await supabase
-              .from('osgb_ziyaretler')
-              .select('id')
-              .eq('osgb_org_id', orgInfo.orgId)
-              .eq('uzman_user_id', authUserId)
-              .is('cikis_saati', null)
-              .order('giris_saati', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            ziyaretId = byOrg?.id ?? null;
+          if (!orgInfo?.orgId) {
+            console.error('[handleCheckOut] OSGB bilgisi bulunamadı, checkout iptal.');
+            addToast('OSGB bilgisi bulunamadı. Ziyaret kaydı temizlendi.', 'info');
+            return;
           }
+          const { data: byOrg } = await supabase
+            .from('osgb_ziyaretler')
+            .select('id')
+            .eq('osgb_org_id', orgInfo.orgId)
+            .eq('uzman_user_id', authUserId)
+            .is('cikis_saati', null)
+            .order('giris_saati', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          ziyaretId = byOrg?.id ?? null;
         }
 
         console.log('CHECKOUT START', {
@@ -549,25 +536,6 @@ export default function ZiyaretCheckIn() {
         });
 
         if (ziyaretId) {
-          // Süreyi hesapla: giris_saatini önce çek
-          let sureDakika: number | null = null;
-          if (ziyaretSnapshot?.girisAt) {
-            sureDakika = Math.max(1, Math.round((new Date(now).getTime() - new Date(ziyaretSnapshot.girisAt).getTime()) / 60000));
-          } else {
-            // DB'den giris_saati çek
-            const { data: zRow } = await supabase
-              .from('osgb_ziyaretler')
-              .select('giris_saati')
-              .eq('id', ziyaretId)
-              .maybeSingle();
-            if (zRow?.giris_saati) {
-              sureDakika = Math.max(1, Math.round((new Date(now).getTime() - new Date(zRow.giris_saati).getTime()) / 60000));
-            }
-          }
-
-          // ── UPDATE — sadece id + cikis_saati null filtresi
-          // .eq('uzman_user_id') KALDIRILDI — user mismatch bypass
-          // sure_dakika GENERATED ALWAYS — DB otomatik hesaplar, gönderilmez
           const { data: updateData, error, count } = await supabase
             .from('osgb_ziyaretler')
             .update({
@@ -581,7 +549,6 @@ export default function ZiyaretCheckIn() {
             .is('cikis_saati', null)
             .select('id', { count: 'exact' });
 
-          // Zorunlu log — her zaman yazdır
           console.log('CHECKOUT RESULT', {
             ziyaretId,
             data:  updateData,
@@ -604,13 +571,13 @@ export default function ZiyaretCheckIn() {
           addToast('Yerel ziyaret kaydı temizlendi.', 'info');
         }
       } else {
-        // ── Offline checkout ──────────────────────────────────────────────
+        // ── Offline checkout ─────────────────────────────────────────────
         const payload: ZiyaretCheckoutPayload = {
           tempId:      ziyaretSnapshot.tempId,
           realId:      ziyaretSnapshot.id,
           uzmanUserId: authUserId,
           cikisAt:     now,
-          sureDakika:  null,    // GENERATED ALWAYS — gönderilmez
+          sureDakika:  null,
           checkOutLat: coords?.lat ?? null,
           checkOutLng: coords?.lng ?? null,
         };
@@ -837,7 +804,7 @@ export default function ZiyaretCheckIn() {
                 <div className="text-center">
                   <p className="text-sm font-bold" style={{ color: '#0EA5E9' }}>{actionLoading ? 'İşleniyor...' : 'QR ile Ziyaret Başlat'}</p>
                   <p className="text-xs mt-1" style={{ color: '#475569' }}>
-                    {!isOnline ? 'Çevrimdışı — ziyaret yerel olarak kaydedilir' : 'Firma QR kodunu okutun — anında check-in'}
+                    {!isOnline ? 'Çevrimdışı modasındasınız. QR okutulunca ziyaret yerel olarak kaydedilir ve bağlantı gelince senkronize edilir.' : 'Firmanın QR kodunu tarat — sistem otomatik check-in ve check-out yapar. Aynı QR\'ı ikinci kez okutunca ziyaret biter.'}
                   </p>
                 </div>
               </button>

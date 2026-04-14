@@ -242,10 +242,9 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                   const isActive = activeModule === item.id;
                   const isHovered = hoveredItem === item.id;
                   const badge = badges[item.id];
-                  if (item.mobileOnly && !mobileOpen) return null;
 
                   return (
-                    <li key={item.id}>
+                    <li key={item.id} className={item.mobileOnly ? 'lg:hidden' : ''}>
                       <button
                         id={`sidebar-${item.id}`}
                         onClick={() => { setActiveModule(item.id); onMobileClose?.(); }}
