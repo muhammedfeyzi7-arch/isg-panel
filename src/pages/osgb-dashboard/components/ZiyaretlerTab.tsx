@@ -28,12 +28,24 @@ interface Ziyaret {
 
 // ── HELPERS ──────────────────────────────────────────────────────
 
-function formatSure(dakika: number | null): string {
-  if (!dakika || dakika < 0) return '—';
-  const h = Math.floor(dakika / 60);
-  const m = dakika % 60;
-  if (h > 0) return `${h}s ${m}d`;
-  return `${m}d`;
+function formatSure(dakika: number | null, giris?: string, cikis?: string | null): string {
+  // sure_dakika varsa ve > 0 ise direkt kullan
+  if (dakika != null && dakika > 0) {
+    const h = Math.floor(dakika / 60);
+    const m = dakika % 60;
+    if (h > 0) return `${h}s ${m}d`;
+    return `${m}d`;
+  }
+  // sure_dakika 0 veya null ise giris/cikis farkından hesapla
+  if (giris && cikis) {
+    const dk = Math.round((new Date(cikis).getTime() - new Date(giris).getTime()) / 60000);
+    if (dk <= 0) return '&lt;1d';
+    const h = Math.floor(dk / 60);
+    const m = dk % 60;
+    if (h > 0) return `${h}s ${m}d`;
+    return `${m}d`;
+  }
+  return '—';
 }
 
 function formatSaat(iso: string): string {
@@ -214,10 +226,12 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   const fmtSaat = (iso: string) =>
     new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const fmtSure = (dk: number | null): string => {
-    if (!dk || dk < 0) return '—';
-    const h = Math.floor(dk / 60);
-    const m = dk % 60;
-    return h > 0 ? `${h}s ${m}dk` : `${m} dk`;
+    if (dk != null && dk > 0) {
+      const h = Math.floor(dk / 60);
+      const m = dk % 60;
+      return h > 0 ? `${h}s ${m}dk` : `${m} dk`;
+    }
+    return dk != null && dk === 0 ? '<1 dk' : '—';
   };
 
   const DARK_NAVY  = 'FF0F172A';
@@ -254,7 +268,7 @@ async function exportZiyaretlerExcel(ziyaretler: Ziyaret[], donem: string) {
   const tamamlanan = sorted.filter(z => z.durum === 'tamamlandi').length;
 
   sorted.forEach((z, i) => {
-    const sureDk = z.sure_dakika != null
+    const sureDk = (z.sure_dakika != null && z.sure_dakika > 0)
       ? z.sure_dakika
       : z.cikis_saati
         ? Math.round((new Date(z.cikis_saati).getTime() - new Date(z.giris_saati).getTime()) / 60000)
@@ -933,15 +947,18 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                     <div>
                       {isAktif
                         ? <ElapsedTimer since={z.giris_saati} />
-                        : (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-lg"
-                            style={{
-                              background: z.sure_dakika ? 'rgba(99,102,241,0.08)' : 'transparent',
-                              color: z.sure_dakika ? '#6366F1' : textMuted,
-                            }}>
-                            {formatSure(z.sure_dakika)}
-                          </span>
-                        )}
+                        : (() => {
+                            const sureStr = formatSure(z.sure_dakika, z.giris_saati, z.cikis_saati);
+                            return (
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-lg"
+                                style={{
+                                  background: sureStr !== '—' ? 'rgba(99,102,241,0.08)' : 'transparent',
+                                  color: sureStr !== '—' ? '#6366F1' : textMuted,
+                                }}>
+                                {sureStr}
+                              </span>
+                            );
+                          })()}
                     </div>
 
                     {/* Mesafe */}
@@ -1057,7 +1074,7 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
                         <span className="text-[10px]" style={{ color: textMuted }}>{formatSaat(z.giris_saati)}</span>
                         {isAktif
                           ? <ElapsedTimer since={z.giris_saati} />
-                          : <span className="text-[10px]" style={{ color: textMuted }}>{formatSure(z.sure_dakika)}</span>}
+                          : <span className="text-[10px]" style={{ color: textMuted }}>{formatSure(z.sure_dakika, z.giris_saati, z.cikis_saati)}</span>}
                         {gpsCfg && <GpsBadge status={z.gps_status} distanceM={z.check_in_distance_m} />}
                       </div>
                     </div>

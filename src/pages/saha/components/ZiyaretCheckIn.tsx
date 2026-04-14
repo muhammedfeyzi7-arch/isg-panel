@@ -836,11 +836,13 @@ export default function ZiyaretCheckIn() {
           <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#475569' }}>Son Ziyaretler</p>
           <div className="space-y-2">
             {gecmis.map(z => {
-              const sureDk = z.sureDakika ?? (z.cikisAt && z.girisAt
-                ? Math.round((new Date(z.cikisAt).getTime() - new Date(z.girisAt).getTime()) / 60000)
-                : null);
-              const sureStr = sureDk && sureDk > 0
-                ? (sureDk >= 60 ? `${Math.floor(sureDk / 60)}s ${sureDk % 60}dk` : `${sureDk}dk`)
+              const sureDk = (z.sureDakika != null && z.sureDakika > 0)
+                ? z.sureDakika
+                : (z.cikisAt && z.girisAt
+                  ? Math.round((new Date(z.cikisAt).getTime() - new Date(z.girisAt).getTime()) / 60000)
+                  : null);
+              const sureStr = sureDk != null && sureDk >= 0
+                ? (sureDk === 0 ? '<1dk' : sureDk >= 60 ? `${Math.floor(sureDk / 60)}s ${sureDk % 60}dk` : `${sureDk}dk`)
                 : null;
               return (
                 <div key={z.id ?? z.tempId} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
