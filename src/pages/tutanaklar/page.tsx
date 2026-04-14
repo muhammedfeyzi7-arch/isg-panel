@@ -7,6 +7,7 @@ import {
 import { useApp } from '../../store/AppContext';
 import type { Tutanak, TutanakStatus, Firma } from '../../types';
 import Modal from '../../components/base/Modal';
+import ConfirmDeleteModal from '@/components/base/ConfirmDeleteModal';
 import { generateTutanakNo } from '../../store/useStore';
 import TutanakDetailModal from './components/TutanakDetailModal';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -1395,60 +1396,22 @@ export default function TutanaklarPage() {
       </Modal>
 
       {/* ── Silme Onay Modal ──────────────────────────────── */}
-      <Modal
+      <ConfirmDeleteModal
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
         title="Tutanağı Sil"
-        size="sm"
-        icon="ri-delete-bin-line"
-        footer={
-          <>
-            <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4"
-            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
-            Bu tutanağı silmek istediğinizden emin misiniz?
-          </p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>
-            Tutanak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.
-          </p>
-        </div>
-      </Modal>
+        description="Tutanak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz."
+      />
 
       {/* ── Toplu Silme Onay Modal ── */}
-      <Modal
+      <ConfirmDeleteModal
         open={bulkDeleteConfirm}
         onClose={() => setBulkDeleteConfirm(false)}
-        title="Toplu Silme Onayı"
-        size="sm"
-        icon="ri-delete-bin-2-line"
-        footer={
-          <>
-            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
-              <i className="ri-delete-bin-line" /> {selected.size} Tutanağı Sil
-            </button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4"
-            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
-            <strong>{selected.size}</strong> tutanak çöp kutusuna taşınacak.
-          </p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Çöp kutusundan geri yükleyebilirsiniz.</p>
-        </div>
-      </Modal>
+        onConfirm={handleBulkDelete}
+        title={`${selected.size} Tutanağı Sil`}
+        description={`${selected.size} tutanak çöp kutusuna taşınacak. Çöp kutusundan geri yükleyebilirsiniz.`}
+      />
 
       {/* ── Tutanak Detay / Önizleme Modal ─────────────────── */}
       <TutanakDetailModal

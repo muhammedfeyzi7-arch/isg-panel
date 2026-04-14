@@ -477,10 +477,14 @@ export default function ZiyaretlerTab({ isDark }: ZiyaretlerTabProps) {
   const handleBitir = async (ziyaretId: string) => {
     try {
       const cikis = new Date().toISOString();
-      // sure_dakika GENERATED ALWAYS — göndermiyoruz, DB cikis_saati'nden otomatik hesaplar
+      // Ziyaretin giriş saatini bul ve sure_dakika'yı hesapla
+      const ziyaret = ziyaretler.find(z => z.id === ziyaretId);
+      const sureDakika = ziyaret
+        ? Math.max(1, Math.round((new Date(cikis).getTime() - new Date(ziyaret.giris_saati).getTime()) / 60000))
+        : null;
       const { error } = await supabase
         .from('osgb_ziyaretler')
-        .update({ durum: 'tamamlandi', cikis_saati: cikis })
+        .update({ durum: 'tamamlandi', cikis_saati: cikis, sure_dakika: sureDakika })
         .eq('id', ziyaretId);
       if (error) throw error;
       addToast('Ziyaret tamamlandı!', 'success');

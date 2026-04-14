@@ -539,6 +539,22 @@ export default function ZiyaretCheckIn() {
         });
 
         if (ziyaretId) {
+          // Süreyi hesapla: giris_saatini önce çek
+          let sureDakika: number | null = null;
+          if (aktifZiyaret?.girisAt) {
+            sureDakika = Math.max(1, Math.round((new Date(now).getTime() - new Date(aktifZiyaret.girisAt).getTime()) / 60000));
+          } else {
+            // DB'den giris_saati çek
+            const { data: zRow } = await supabase
+              .from('osgb_ziyaretler')
+              .select('giris_saati')
+              .eq('id', ziyaretId)
+              .maybeSingle();
+            if (zRow?.giris_saati) {
+              sureDakika = Math.max(1, Math.round((new Date(now).getTime() - new Date(zRow.giris_saati).getTime()) / 60000));
+            }
+          }
+
           // ── UPDATE — sadece id + cikis_saati null filtresi
           // .eq('uzman_user_id') KALDIRILDI — user mismatch bypass
           const { data: updateData, error, count } = await supabase
@@ -547,6 +563,7 @@ export default function ZiyaretCheckIn() {
               cikis_saati:   now,
               durum:         'tamamlandi',
               updated_at:    now,
+              sure_dakika:   sureDakika,
               check_out_lat: coords?.lat ?? null,
               check_out_lng: coords?.lng ?? null,
             })

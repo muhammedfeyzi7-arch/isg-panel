@@ -4,6 +4,7 @@ import { useApp } from '../../store/AppContext';
 import { EvrakListSkeleton } from '../../components/base/Skeleton';
 import type { Evrak, EvrakStatus } from '../../types';
 import Modal from '../../components/base/Modal';
+import ConfirmDeleteModal from '@/components/base/ConfirmDeleteModal';
 import Badge, { getEvrakStatusColor } from '../../components/base/Badge';
 import { getEvrakKategori, KATEGORI_META } from '../../utils/evrakKategori';
 import BulkEvrakUpload from './components/BulkEvrakUpload';
@@ -632,44 +633,22 @@ export default function EvraklarPage() {
       </Modal>
 
       {/* Delete Modal */}
-      <Modal open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="Evrakı Sil" size="sm" icon="ri-delete-bin-line"
-        footer={
-          <>
-            <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">İptal</button>
-            <button onClick={() => handleDelete(deleteConfirm!)} className="btn-danger"><i className="ri-delete-bin-line" /> Evet, Sil</button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu evrakı silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Evrak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
-        </div>
-      </Modal>
+      <ConfirmDeleteModal
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => handleDelete(deleteConfirm!)}
+        title="Evrakı Sil"
+        description="Evrak çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz."
+      />
 
       {/* Toplu Silme Onay Modal */}
-      <Modal open={bulkDeleteConfirm} onClose={() => setBulkDeleteConfirm(false)} title="Toplu Silme Onayı" size="sm" icon="ri-delete-bin-2-line"
-        footer={
-          <>
-            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary">İptal</button>
-            <button onClick={handleBulkDelete} className="btn-danger">
-              <i className="ri-delete-bin-line" /> {selected.size} Evrakı Sil
-            </button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
-            <strong>{selected.size}</strong> evrak çöp kutusuna taşınacak.
-          </p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Çöp kutusundan geri yükleyebilirsiniz.</p>
-        </div>
-      </Modal>
+      <ConfirmDeleteModal
+        open={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        onConfirm={handleBulkDelete}
+        title={`${selected.size} Evrakı Sil`}
+        description={`${selected.size} evrak çöp kutusuna taşınacak. Çöp kutusundan geri yükleyebilirsiniz.`}
+      />
 
       {/* Bulk Upload Modal */}
       <BulkEvrakUpload open={bulkOpen} onClose={() => setBulkOpen(false)} />

@@ -5,6 +5,7 @@ import type ExcelJSType from 'exceljs';
 import Modal from '../../components/base/Modal';
 import { usePermissions } from '@/hooks/usePermissions';
 import AiKatilimAnaliz from './components/AiKatilimAnaliz';
+import ConfirmDeleteModal from '@/components/base/ConfirmDeleteModal';
 
 
 
@@ -1126,58 +1127,22 @@ export default function EgitimlerPage() {
       )}
 
       {/* ── TOPLU SİL MODAL ── */}
-      <Modal
+      <ConfirmDeleteModal
         open={bulkDeleteConfirm}
         onClose={() => setBulkDeleteConfirm(false)}
-        title="Toplu Silme"
-        size="sm"
-        icon="ri-delete-bin-2-line"
-        footer={
-          <>
-            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
-              <i className="ri-delete-bin-line" /> {selectedIds.size} Kaydı Sil
-            </button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4"
-            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
-            <strong>{selectedIds.size}</strong> eğitim kaydı silinecek.
-          </p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
-        </div>
-      </Modal>
+        onConfirm={handleBulkDelete}
+        title={`${selectedIds.size} Eğitimi Sil`}
+        description={`${selectedIds.size} eğitim kaydı çöp kutusuna taşınacak.`}
+      />
 
       {/* ── SİL MODAL ── */}
-      <Modal
+      <ConfirmDeleteModal
         open={!!deleteConfirm}
         onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => handleDelete(deleteConfirm!)}
         title="Eğitimi Sil"
-        size="sm"
-        icon="ri-delete-bin-line"
-        footer={
-          <>
-            <button onClick={() => setDeleteConfirm(null)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={() => handleDelete(deleteConfirm!)} className="btn-danger whitespace-nowrap">
-              <i className="ri-delete-bin-line" /> Evet, Sil
-            </button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4"
-            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu eğitim kaydını silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
-        </div>
-      </Modal>
+        description="Bu eğitim kaydını silmek istediğinizden emin misiniz? Çöp kutusuna taşınacak."
+      />
     </div>
   );
 }

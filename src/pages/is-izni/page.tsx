@@ -4,6 +4,7 @@ import type { IsIzni, IsIzniTip, IsIzniStatus } from '@/types';
 import { usePermissions } from '@/hooks/usePermissions';
 import { generateIsIzniNo } from '@/store/useStore';
 import Modal from '@/components/base/Modal';
+import ConfirmDeleteModal from '@/components/base/ConfirmDeleteModal';
 import { generateIsIzniPdf } from './utils/isIzniPdfGenerator';
 import { uploadFileToStorage, getSignedUrl, getSignedUrlFromPath } from '@/utils/fileUpload';
 import { supabase } from '@/lib/supabase';
@@ -1485,7 +1486,7 @@ export default function IsIzniPage() {
           {/* Reddedilmiş uyarı */}
           {editId && isIzinleri.find(i => i.id === editId)?.durum === 'Reddedildi' && (
             <div className="flex items-start gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <i className="ri-error-warning-line flex-shrink-0 mt-0.5" style={{ color: '#EF4444' }} />
+              <i className="ri-error-warning-line flex-shrink-0" style={{ color: '#EF4444' }} />
               <div>
                 <p className="text-xs font-semibold" style={{ color: '#EF4444' }}>Bu iş izni reddedildi</p>
                 {isIzinleri.find(i => i.id === editId)?.sahaNotu && (
@@ -1662,27 +1663,13 @@ export default function IsIzniPage() {
       )}
 
       {/* ── Silme Modal ── */}
-      <Modal
+      <ConfirmDeleteModal
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
         title="İş İzni Sil"
-        size="sm"
-        icon="ri-delete-bin-line"
-        footer={
-          <>
-            <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Bu iş iznini silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>İş izni çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
-        </div>
-      </Modal>
+        description="İş izni çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz."
+      />
     </div>
   );
 }

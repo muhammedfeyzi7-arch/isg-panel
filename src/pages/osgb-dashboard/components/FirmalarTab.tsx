@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import ConfirmDeleteModal from '@/components/base/ConfirmDeleteModal';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -98,20 +99,17 @@ export default function FirmalarTab({
   const [vizitLoading, setVizitLoading] = useState(false);
   const [silOnayId, setSilOnayId] = useState<string | null>(null);
   const [silLoading, setSilLoading] = useState(false);
+  const [silAdi, setSilAdi] = useState('');
 
   const textPrimary = 'var(--text-primary)';
   const textSecondary = isDark ? '#94A3B8' : '#64748B';
   const tableBg = isDark ? 'rgba(20,30,50,0.98)' : '#ffffff';
   const borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
 
-  // GPS bilgilerini çek
   const fetchGpsInfo = useCallback(async () => {
     if (altFirmalar.length === 0) return;
     const ids = altFirmalar.map(f => f.id);
-    const { data } = await supabase
-      .from('organizations')
-      .select('id, gps_required')
-      .in('id', ids);
+    const { data } = await supabase.from('organizations').select('id, gps_required').in('id', ids);
     const map: Record<string, boolean> = {};
     (data ?? []).forEach((r: { id: string; gps_required: boolean }) => { map[r.id] = r.gps_required ?? false; });
     setFirmaGpsMap(map);
@@ -133,7 +131,6 @@ export default function FirmalarTab({
           .in('firma_org_id', firmaIds)
           .gte('giris_saati', thirtyDaysAgo.toISOString())
           .order('giris_saati', { ascending: false });
-
         const lastVisit: Record<string, string> = {};
         const aktif = new Set<string>();
         (data ?? []).forEach((z: { firma_org_id: string; giris_saati: string; cikis_saati: string | null }) => {
@@ -151,46 +148,33 @@ export default function FirmalarTab({
     void fetchVisits();
   }, [orgId, altFirmalar, fetchGpsInfo]);
 
-  const handleSil = async (firmaId: string, _firmaAdi: string) => {
+  const handleSil = async (firmaId: string) => {
     setSilLoading(true);
     try {
-      // Edge function üzerinden sil — service_role ile RLS bypass
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (!token) throw new Error('Oturum bulunamadı.');
-
       const res = await fetch(EDGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          action: 'delete_firm',
-          organization_id: orgId,
-          firma_id: firmaId,
-        }),
+        body: JSON.stringify({ action: 'delete_firm', organization_id: orgId, firma_id: firmaId }),
       });
-
       const json = await res.json() as { error?: string; success?: boolean };
+      console.log('DELETE RESULT', json);
       if (json.error) throw new Error(json.error);
-
       setSilOnayId(null);
-      if (onFirmaDeleted) {
-        onFirmaDeleted(firmaId);
-      }
+      setSilAdi('');
+      if (onFirmaDeleted) onFirmaDeleted(firmaId);
     } catch (err) {
       console.error('[Sil] err:', err);
-      alert(`Silme hatası: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSilLoading(false);
     }
   };
 
   const filtered = altFirmalar.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
-
   const getFirmaUzmanlar = (firmaId: string) =>
-    uzmanlar.filter(u =>
-      (u.active_firm_ids && u.active_firm_ids.includes(firmaId)) ||
-      u.active_firm_id === firmaId
-    );
+    uzmanlar.filter(u => (u.active_firm_ids && u.active_firm_ids.includes(firmaId)) || u.active_firm_id === firmaId);
 
   return (
     <div className="space-y-4 page-enter">
@@ -205,8 +189,7 @@ export default function FirmalarTab({
             onFocus={e => { e.currentTarget.style.borderColor = '#0EA5E9'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.1)'; }}
             onBlur={e => { e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.boxShadow = 'none'; }} />
           {search && (
-            <button onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full cursor-pointer"
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full cursor-pointer"
               style={{ background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.08)', color: textSecondary }}>
               <i className="ri-close-line text-[10px]" />
             </button>
@@ -218,9 +201,7 @@ export default function FirmalarTab({
         </span>
         <button onClick={onFirmaEkle}
           className="whitespace-nowrap ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all"
-          style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}>
+          style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
           <i className="ri-add-line text-sm" />Firma Ekle
         </button>
       </div>
@@ -254,7 +235,6 @@ export default function FirmalarTab({
       {/* Liste */}
       {filtered.length > 0 && (
         <div className="space-y-1">
-          {/* Sütun başlıkları — desktop */}
           <div className="hidden md:grid grid-cols-[2.5fr_1.5fr_1fr_1.2fr_140px] items-center px-4 py-2"
             style={{ borderBottom: `1px solid ${borderColor}` }}>
             {['FİRMA', 'UZMAN', 'PERSONEL', 'SON ZİYARET', 'İŞLEM'].map(h => (
@@ -262,7 +242,7 @@ export default function FirmalarTab({
             ))}
           </div>
 
-          {/* Mobil kart */}
+          {/* Mobil */}
           <div className="md:hidden space-y-2 pt-1">
             {filtered.map((f) => {
               const days = getDaysDiff(firmaLastVisit[f.id]);
@@ -298,10 +278,15 @@ export default function FirmalarTab({
                         <i className="ri-links-line text-xs" />Uzman Ata
                       </button>
                     )}
-                    <button onClick={() => { onFirmaClick({ id: f.id, name: f.name }); }}
+                    <button onClick={() => onFirmaClick({ id: f.id, name: f.name })}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
                       style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}>
                       <i className="ri-edit-line text-xs" />Düzenle
+                    </button>
+                    <button onClick={() => { setSilOnayId(f.id); setSilAdi(f.name); }}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
+                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}>
+                      <i className="ri-delete-bin-line text-xs" />Sil
                     </button>
                   </div>
                 </div>
@@ -309,7 +294,7 @@ export default function FirmalarTab({
             })}
           </div>
 
-          {/* Desktop satırlar */}
+          {/* Desktop */}
           <div className="hidden md:block space-y-1.5 pt-1">
             {filtered.map((f) => {
               const days = getDaysDiff(firmaLastVisit[f.id]);
@@ -317,7 +302,6 @@ export default function FirmalarTab({
               const firmaUzmanlar = getFirmaUzmanlar(f.id);
               const hasUzman = firmaUzmanlar.length > 0;
               const gpsActive = firmaGpsMap[f.id] ?? false;
-              const isSilOnay = silOnayId === f.id;
 
               return (
                 <div key={f.id}
@@ -326,7 +310,7 @@ export default function FirmalarTab({
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
 
-                  {/* Firma adı + GPS rozeti */}
+                  {/* Firma */}
                   <div className="flex items-center gap-2.5 min-w-0 pr-2 cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
                     <div className="relative flex-shrink-0">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold text-white"
@@ -351,8 +335,7 @@ export default function FirmalarTab({
                     {hasUzman ? (
                       <div className="flex items-center gap-1 flex-wrap">
                         {firmaUzmanlar.slice(0, 2).map(u => (
-                          <span key={u.user_id}
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                          <span key={u.user_id} className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                             style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.2)' }}>
                             <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0"
                               style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
@@ -390,59 +373,41 @@ export default function FirmalarTab({
                     {vizitLoading && <span className="text-[10px]" style={{ color: textSecondary }}>...</span>}
                   </div>
 
-                  {/* İŞLEM — detay + düzenle + sil */}
+                  {/* İşlem butonları — sabit 140px, yan yana hizalı */}
                   <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
                     {!hasUzman && (
                       <button onClick={() => onAtamaYap(f.id)} title="Uzman Ata"
-                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
                         style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.15)'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.08)'; }}>
                         <i className="ri-links-line text-[10px]" />
                       </button>
                     )}
-
                     {/* Detay */}
                     <button onClick={() => onFirmaClick({ id: f.id, name: f.name })} title="Detay"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
                       style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1px solid ${borderColor}`, color: textSecondary }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'; (e.currentTarget as HTMLElement).style.color = textSecondary; }}>
                       <i className="ri-eye-line text-[10px]" />
                     </button>
-
-                    {/* Düzenle — detay modal'ın Düzenle sekmesini aç */}
+                    {/* Düzenle — gri ikon */}
                     <button onClick={() => onFirmaClick({ id: f.id, name: f.name })} title="Düzenle"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                      style={{ background: 'rgba(14,165,233,0.07)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.15)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.07)'; }}>
+                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1px solid ${borderColor}`, color: textSecondary }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'; (e.currentTarget as HTMLElement).style.color = textSecondary; }}>
                       <i className="ri-edit-line text-[10px]" />
                     </button>
-
-                    {/* Sil */}
-                    {!isSilOnay ? (
-                      <button onClick={() => setSilOnayId(f.id)} title="Sil"
-                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all"
-                        style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)'; }}>
-                        <i className="ri-delete-bin-line text-[10px]" />
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => void handleSil(f.id, f.name)} disabled={silLoading}
-                          className="px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer text-white whitespace-nowrap"
-                          style={{ background: '#EF4444' }}>
-                          {silLoading ? <i className="ri-loader-4-line animate-spin" /> : 'Sil'}
-                        </button>
-                        <button onClick={() => setSilOnayId(null)}
-                          className="px-2 py-1 rounded-lg text-[10px] font-semibold cursor-pointer whitespace-nowrap"
-                          style={{ background: 'var(--bg-item)', color: textSecondary }}>
-                          Vazgeç
-                        </button>
-                      </div>
-                    )}
+                    {/* Sil — kırmızı ikon, modal aç */}
+                    <button onClick={() => { setSilOnayId(f.id); setSilAdi(f.name); }} title="Sil"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"
+                      style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)'; }}>
+                      <i className="ri-delete-bin-line text-[10px]" />
+                    </button>
                   </div>
                 </div>
               );
@@ -450,6 +415,17 @@ export default function FirmalarTab({
           </div>
         </div>
       )}
+
+      {/* Silme Onay Modalı */}
+      <ConfirmDeleteModal
+        open={!!silOnayId}
+        onClose={() => { setSilOnayId(null); setSilAdi(''); }}
+        onConfirm={() => silOnayId && void handleSil(silOnayId)}
+        title="Firmayı silmek istediğinize emin misiniz?"
+        description={`"${silAdi}" firması çöp kutusuna taşınacak. Bağlı veriler korunur.`}
+        loading={silLoading}
+        isDark={isDark}
+      />
     </div>
   );
 }

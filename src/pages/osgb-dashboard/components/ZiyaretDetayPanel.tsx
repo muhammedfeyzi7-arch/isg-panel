@@ -15,6 +15,9 @@ interface Ziyaret {
   notlar: string | null;
   sure_dakika: number | null;
   gps_status: 'ok' | 'too_far' | 'no_permission' | null;
+  check_in_distance_m?: number | null;
+  check_in_lat?: number | null;
+  check_in_lng?: number | null;
 }
 
 interface GpsStatusConfig {
@@ -251,6 +254,10 @@ export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir: _
           {(() => {
             const cfg = getGpsStatusConfig(ziyaret.gps_status);
             if (!cfg) return null;
+            const distM = ziyaret.check_in_distance_m;
+            const distStr = distM != null
+              ? (distM >= 1000 ? `${(distM / 1000).toFixed(2)} km` : `${distM} m`)
+              : null;
             return (
               <div className="p-4 rounded-2xl" style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}>
                 <p className="text-[9.5px] font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--text-faint)' }}>Konum Durumu</p>
@@ -262,13 +269,41 @@ export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir: _
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold" style={{ color: cfg.color }}>{cfg.label}</p>
                     <p className="text-[10px] mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>{cfg.sub}</p>
+                    {distStr && (
+                      <p className="text-[10px] mt-1 font-semibold" style={{ color: cfg.color }}>
+                        <i className="ri-map-pin-2-line mr-0.5" />
+                        {ziyaret.gps_status === 'too_far'
+                          ? `Firma konumundan ${distStr} uzakta`
+                          : `Firma konumuna mesafe: ${distStr}`}
+                      </p>
+                    )}
                   </div>
                   <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-xl flex-shrink-0 whitespace-nowrap"
                     style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
                     <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.color }} />
-                    {ziyaret.gps_status === 'ok' ? 'ok' : ziyaret.gps_status === 'too_far' ? 'too_far' : 'no_permission'}
+                    {ziyaret.gps_status === 'ok' ? 'Doğrulandı' : ziyaret.gps_status === 'too_far' ? 'İhlal' : 'GPS yok'}
                   </span>
                 </div>
+                {/* Mesafe görsel göstergesi */}
+                {distM != null && (
+                  <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${cfg.border}` }}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>Mesafe</span>
+                      <span className="text-[10px] font-bold" style={{ color: cfg.color }}>{distStr}</span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.08)' }}>
+                      <div className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(100, (distM / 2000) * 100)}%`,
+                          background: distM > 1000 ? '#EF4444' : distM > 300 ? '#F59E0B' : '#22C55E',
+                        }} />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[9px]" style={{ color: 'var(--text-faint)' }}>0m</span>
+                      <span className="text-[9px]" style={{ color: 'var(--text-faint)' }}>2km+</span>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}

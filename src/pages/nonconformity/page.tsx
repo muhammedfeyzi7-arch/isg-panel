@@ -8,6 +8,7 @@ import DetailModal from './components/DetailModal';
 import ReportBuilder from './components/ReportBuilder';
 import DofImport from './components/DofImport';
 import Modal from '../../components/base/Modal';
+import ConfirmDeleteModal from '@/components/base/ConfirmDeleteModal';
 import { usePermissions } from '../../hooks/usePermissions';
 
 function NcBtn({ icon, title, onClick }: { icon: string; title: string; onClick: () => void }) {
@@ -475,53 +476,21 @@ export default function UygunsuzluklarPage() {
       <ReportBuilder isOpen={showReport} onClose={() => setShowReport(false)} />
       <DofImport isOpen={showImport} onClose={() => setShowImport(false)} onImport={handleDofImport} />
 
-      <Modal
-        isOpen={!!deleteId}
+      <ConfirmDeleteModal
+        open={!!deleteId}
         onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
         title="Kaydı Sil"
-        size="sm"
-        icon="ri-delete-bin-line"
-        footer={
-          <>
-            <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Bu uygunsuzluk kaydını silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz. Tüm fotoğraflar da silinecektir.</p>
-        </div>
-      </Modal>
+        description="Bu uygunsuzluk kaydını silmek istediğinizden emin misiniz? Çöp kutusuna taşınacak."
+      />
 
-      <Modal
-        isOpen={bulkDeleteConfirm}
+      <ConfirmDeleteModal
+        open={bulkDeleteConfirm}
         onClose={() => setBulkDeleteConfirm(false)}
-        title="Toplu Silme"
-        size="sm"
-        icon="ri-delete-bin-2-line"
-        footer={
-          <>
-            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
-              <i className="ri-delete-bin-line" /> {selected.size} Kaydı Sil
-            </button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-            <strong>{selected.size}</strong> saha denetim kaydı silinecek.
-          </p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Bu işlem geri alınamaz.</p>
-        </div>
-      </Modal>
+        onConfirm={handleBulkDelete}
+        title={`${selected.size} Kaydı Sil`}
+        description={`${selected.size} saha denetim kaydı çöp kutusuna taşınacak.`}
+      />
     </div>
   );
 }

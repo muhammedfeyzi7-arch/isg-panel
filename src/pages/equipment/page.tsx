@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../store/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import Modal from '../../components/base/Modal';
+import ConfirmDeleteModal from '@/components/base/ConfirmDeleteModal';
 import QrModal from './components/QrModal';
 import KontrolGecmisiPanel from './components/KontrolGecmisiPanel';
 import EkipmanBelgePanel from './components/EkipmanBelgePanel';
@@ -550,7 +551,7 @@ export default function EkipmanlarPage() {
 
   // Bir ekipmanın görüntüleme durumunu hesapla:
   // Kullanıcının seçtiği durum her zaman önceliklidir.
-  // Sadece istatistik kartlarında "kontrol tarihi geçmiş" bilgisi ayrıca gösterilir.
+  // Sadece istatistik kartlarında "kontrol tarihi geçmiş" bilgisi gösterilir.
   const getEffectiveDurum = (ekipman: Ekipman): EkipmanStatus => {
     // Kullanıcının kaydettiği durumu olduğu gibi döndür — override etme
     return ekipman.durum;
@@ -593,8 +594,6 @@ export default function EkipmanlarPage() {
       durum: ekipman.durum, aciklama: ekipman.aciklama, belgeMevcut: ekipman.belgeMevcut,
       dosyaAdi: ekipman.dosyaAdi || '', dosyaBoyutu: ekipman.dosyaBoyutu || 0,
       dosyaTipi: ekipman.dosyaTipi || '', dosyaVeri: '', notlar: ekipman.notlar,
-      kontrolGecmisi: ekipman.kontrolGecmisi,
-      belgeler: ekipman.belgeler,
       belgeGecerlilikTarihi: (ekipman as Ekipman & { belgeGecerlilikTarihi?: string }).belgeGecerlilikTarihi || '',
     });
     setShowModal(true);
@@ -925,7 +924,7 @@ export default function EkipmanlarPage() {
                 </span>
                 {stats.uygunDegil > 0 && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.18)', color: '#F87171' }}>
+                    style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.18)', color: '#FBBF24' }}>
                     {stats.uygunDegil} uygun değil
                   </span>
                 )}
@@ -1290,7 +1289,7 @@ export default function EkipmanlarPage() {
                   <i className="ri-camera-line text-lg" style={{ color: '#34D399' }} />
                 </div>
                 <p className="text-xs font-medium" style={{ color: '#64748B' }}>Fotoğraf ekle</p>
-                <p className="text-[10px]" style={{ color: '#475569' }}>JPG, PNG • Maks. 10MB</p>
+                <p className="text-xs mt-1" style={{ color: '#334155' }}>.xlsx, .xls veya .csv formatı desteklenir</p>
               </div>
             )}
             <input
@@ -1666,54 +1665,22 @@ export default function EkipmanlarPage() {
       </Modal>
 
       {/* Delete Confirm */}
-      <Modal
-        isOpen={!!deleteId}
+      <ConfirmDeleteModal
+        open={!!deleteId}
         onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
         title="Ekipmanı Sil"
-        size="sm"
-        icon="ri-delete-bin-line"
-        footer={
-          <>
-            <button onClick={() => setDeleteId(null)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleDelete} className="btn-danger whitespace-nowrap">Evet, Sil</button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>Bu ekipmanı silmek istediğinizden emin misiniz?</p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Ekipman çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz.</p>
-        </div>
-      </Modal>
+        description="Bu ekipman çöp kutusuna taşınacak, oradan geri yükleyebilirsiniz."
+      />
 
       {/* Toplu Silme Onay Modal */}
-      <Modal
-        isOpen={bulkDeleteConfirm}
+      <ConfirmDeleteModal
+        open={bulkDeleteConfirm}
         onClose={() => setBulkDeleteConfirm(false)}
-        title="Toplu Silme Onayı"
-        size="sm"
-        icon="ri-delete-bin-2-line"
-        footer={
-          <>
-            <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary whitespace-nowrap">İptal</button>
-            <button onClick={handleBulkDelete} className="btn-danger whitespace-nowrap">
-              <i className="ri-delete-bin-line" /> {selected.size} Ekipmanı Sil
-            </button>
-          </>
-        }
-      >
-        <div className="py-2">
-          <div className="w-12 h-12 flex items-center justify-center rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
-          </div>
-          <p className="text-sm font-semibold mb-1" style={{ color: '#E2E8F0' }}>
-            <strong>{selected.size}</strong> ekipman çöp kutusuna taşınacak.
-          </p>
-          <p className="text-xs" style={{ color: '#94A3B8' }}>Çöp kutusundan geri yükleyebilirsiniz.</p>
-        </div>
-      </Modal>
+        onConfirm={handleBulkDelete}
+        title={`${selected.size} Ekipmanı Sil`}
+        description={`${selected.size} ekipman çöp kutusuna taşınacak. Çöp kutusundan geri yükleyebilirsiniz.`}
+      />
 
       {/* QR Modal */}
       <QrModal ekipman={qrEkipman} onClose={() => setQrEkipman(null)} />

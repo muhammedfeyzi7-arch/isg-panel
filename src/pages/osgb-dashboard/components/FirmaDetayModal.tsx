@@ -30,6 +30,9 @@ interface ZiyaretRow {
   cikis_saati: string | null;
   durum: string;
   qr_ile_giris?: boolean;
+  sure_dakika?: number | null;
+  gps_status?: 'ok' | 'too_far' | 'no_permission' | null;
+  check_in_distance_m?: number | null;
 }
 
 export default function FirmaDetayModal({
@@ -86,7 +89,7 @@ export default function FirmaDetayModal({
       supabase.from('personeller').select('id, ad_soyad, gorevi, created_at').eq('organization_id', firmaId).order('created_at', { ascending: false }).limit(10),
       supabase.from('organizations').select('id, name, is_active, gps_required, gps_radius, gps_strict, firma_lat, firma_lng').eq('id', firmaId).maybeSingle(),
       supabase.from('osgb_ziyaretler')
-        .select('id, uzman_ad, uzman_email, giris_saati, cikis_saati, durum, qr_ile_giris')
+        .select('id, uzman_ad, uzman_email, giris_saati, cikis_saati, durum, qr_ile_giris, sure_dakika, gps_status, check_in_distance_m')
         .eq('firma_org_id', firmaId)
         .order('giris_saati', { ascending: false })
         .limit(20),
@@ -320,11 +323,24 @@ export default function FirmaDetayModal({
     return `${Math.floor(diff)}g önce`;
   };
 
-  const ziyaretSuresi = (giris: string, cikis: string | null) => {
-    if (!cikis) return null;
-    const dk = Math.round((new Date(cikis).getTime() - new Date(giris).getTime()) / 60000);
+  const ziyaretSuresi = (giris: string, cikis: string | null, sureDakika?: number | null) => {
+    // Önce sure_dakika DB değerini kullan
+    const dk = sureDakika != null
+      ? sureDakika
+      : cikis
+        ? Math.round((new Date(cikis).getTime() - new Date(giris).getTime()) / 60000)
+        : null;
+    if (!dk || dk <= 0) return null;
     if (dk < 60) return `${dk}dk`;
     return `${Math.floor(dk / 60)}sa ${dk % 60}dk`;
+  };
+
+  const gpsLabel = (status?: 'ok' | 'too_far' | 'no_permission' | null, distM?: number | null) => {
+    if (!status) return null;
+    const distStr = distM != null ? (distM >= 1000 ? ` (${(distM / 1000).toFixed(1)}km)` : ` (${distM}m)`) : '';
+    if (status === 'ok') return { text: 'GPS OK', color: '#16A34A', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.25)' };
+    if (status === 'too_far') return { text: `İhlal${distStr}`, color: '#DC2626', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)' };
+    return { text: 'GPS yok', color: '#D97706', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' };
   };
 
   const modal = createPortal(
@@ -764,7 +780,8 @@ export default function FirmaDetayModal({
                     </div>
                   ) : ziyaretler.map(z => {
                     const aktif = z.durum === 'aktif' || !z.cikis_saati;
-                    const sure = ziyaretSuresi(z.giris_saati, z.cikis_saati);
+                    const sure = ziyaretSuresi(z.giris_saati, z.cikis_saati, z.sure_dakika);
+                    const gpsBadge = gpsLabel(z.gps_status, z.check_in_distance_m);
                     return (
                       <div key={z.id} className="flex items-center gap-3 p-3 rounded-xl transition-all"
                         style={{ background: aktif ? 'rgba(34,197,94,0.06)' : cardBg, border: `1px solid ${aktif ? 'rgba(34,197,94,0.2)' : cardBorder}` }}
@@ -785,11 +802,25 @@ export default function FirmaDetayModal({
                             {z.cikis_saati && ` — ${new Date(z.cikis_saati).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {sure && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7' }}>{sure}</span>}
-                          {z.qr_ile_giris && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7' }}>QR</span>}
+                        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                          {sure && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,0.2)' }}>
+                              <i className="ri-timer-line mr-0.5" />{sure}
+                            </span>
+                          )}
+                          {gpsBadge && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                              style={{ background: gpsBadge.bg, color: gpsBadge.color, border: `1px solid ${gpsBadge.border}` }}>
+                              {gpsBadge.text}
+                            </span>
+                          )}
+                          {z.qr_ile_giris && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,0.1)', color: '#0284C7', border: '1px solid rgba(14,165,233,0.2)' }}>
+                              <i className="ri-qr-code-line mr-0.5" />QR
+                            </span>
+                          )}
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{ background: aktif ? 'rgba(34,197,94,0.1)' : 'rgba(148,163,184,0.1)', color: aktif ? '#16A34A' : '#94A3B8' }}>
+                            style={{ background: aktif ? 'rgba(34,197,94,0.1)' : 'rgba(148,163,184,0.1)', color: aktif ? '#16A34A' : '#94A3B8', border: `1px solid ${aktif ? 'rgba(34,197,94,0.2)' : 'rgba(148,163,184,0.2)'}` }}>
                             {aktif ? '● Aktif' : 'Tamam'}
                           </span>
                         </div>
