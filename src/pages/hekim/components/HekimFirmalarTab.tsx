@@ -61,30 +61,36 @@ export default function HekimFirmalarTab({ orgId, atanmisFirmaIds, isDark }: Hek
         const allMuayeneler = muayeneAll.data ?? [];
         const allKazalar = kazaAll.data ?? [];
 
-        const firmaRows: FirmaRow[] = await Promise.all(
-          (orgs ?? []).map(async (org) => {
-            const { count: personelCount } = await supabase
-              .from('personeller').select('id', { count: 'exact', head: true })
-              .eq('organization_id', org.id).is('deleted_at', null);
+        // Tüm personelleri tek sorguda çek — N+1 önlemi
+        const { data: tumPersoneller } = await supabase
+          .from('personeller')
+          .select('organization_id')
+          .in('organization_id', safeIds)
+          .is('deleted_at', null);
 
-            const orgMuayeneler = allMuayeneler.filter(m => m.organization_id === org.id);
-            const orgKazalar = allKazalar.filter(k => k.organization_id === org.id);
+        const personelByFirma = new Map<string, number>();
+        (tumPersoneller ?? []).forEach(p => {
+          personelByFirma.set(p.organization_id, (personelByFirma.get(p.organization_id) ?? 0) + 1);
+        });
 
-            const tarihler = orgMuayeneler
-              .map(m => (m.data as Record<string, unknown>)?.muayeneTarihi as string | undefined)
-              .filter((t): t is string => !!t)
-              .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+        const firmaRows: FirmaRow[] = (orgs ?? []).map((org) => {
+          const orgMuayeneler = allMuayeneler.filter(m => m.organization_id === org.id);
+          const orgKazalar = allKazalar.filter(k => k.organization_id === org.id);
 
-            return {
-              id: org.id,
-              name: org.name,
-              personelSayisi: personelCount ?? 0,
-              sonMuayene: tarihler[0] ?? null,
-              kazaSayisi: orgKazalar.length,
-              muayeneSayisi: orgMuayeneler.length,
-            };
-          })
-        );
+          const tarihler = orgMuayeneler
+            .map(m => (m.data as Record<string, unknown>)?.muayeneTarihi as string | undefined)
+            .filter((t): t is string => !!t)
+            .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+          return {
+            id: org.id,
+            name: org.name,
+            personelSayisi: personelByFirma.get(org.id) ?? 0,
+            sonMuayene: tarihler[0] ?? null,
+            kazaSayisi: orgKazalar.length,
+            muayeneSayisi: orgMuayeneler.length,
+          };
+        });
 
         setFirmalar(firmaRows);
       } catch (err) {

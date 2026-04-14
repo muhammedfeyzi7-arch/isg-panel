@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useQueryCache } from '@/hooks/useQueryCache';
 import { useCountUp } from '@/hooks/useCountUp';
 
 const SUPABASE_FUNC_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/openai-assistant';
@@ -479,6 +480,7 @@ function InsightRow({ icon, title, detail, color, level, isDark }: {
 
 /* ── Ana component ──────────────────────────────────────────────── */
 export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
+  const cache = useQueryCache<Stats>(3 * 60 * 1000); // 3 dakika cache
   const [stats, setStats] = useState<Stats>({
     firmaCount: 0, personelCount: 0,
     uygunsuzlukAcik: 0, uygunsuzlukKapali: 0,
@@ -497,6 +499,14 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
   useEffect(() => {
     if (atanmisFirmaIds.length === 0) { setLoading(false); return; }
     const fetchStats = async () => {
+      // Cache kontrolü — aynı firma listesi için daha önce çekilmiş veri varsa kullan
+      const cacheKey = `uzman_genel_${atanmisFirmaIds.slice().sort().join(',')}`;
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        setStats(cached);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const today = new Date().toISOString().split('T')[0];
@@ -557,7 +567,7 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
             .not('data->>gecerlilikTarihi', 'is', null),
         ]);
 
-        setStats({
+        const newStats: Stats = {
           firmaCount: atanmisFirmaIds.length,
           personelCount: personelC ?? 0,
           uygunsuzlukAcik: uygunsuzlukAcikC ?? 0,
@@ -572,7 +582,9 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
           gecikmisEkipman: gecikmisEkipmanC,
           yaklasan7: yaklasan7C,
           yaklasan30: yaklasan30C,
-        });
+        };
+        cache.set(cacheKey, newStats);
+        setStats(newStats);
       } catch (err) {
         console.error('[UzmanGenelBakis]', err);
       } finally {

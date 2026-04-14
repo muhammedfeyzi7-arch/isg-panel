@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useQueryCache } from '@/hooks/useQueryCache';
 
 interface Props {
   atanmisFirmaIds: string[];
@@ -74,8 +75,21 @@ export default function UzmanFirmalar({ atanmisFirmaIds, isDark }: Props) {
   const subBorder = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)';
   const rowHover = isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)';
 
+  const cache = useQueryCache<{ firmalar: Firma[]; stats: Record<string, FirmaStats> }>(3 * 60 * 1000);
+
   const loadData = useCallback(async () => {
     if (atanmisFirmaIds.length === 0) { setLoading(false); return; }
+
+    // Cache kontrolü
+    const cacheKey = `uzman_firmalar_${atanmisFirmaIds.slice().sort().join(',')}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      setFirmalar(cached.firmalar);
+      setFirmaStats(cached.stats);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: firmData } = await supabase
@@ -87,17 +101,40 @@ export default function UzmanFirmalar({ atanmisFirmaIds, isDark }: Props) {
       const list: Firma[] = (firmData ?? []).map(o => ({ id: o.id, name: o.name, is_active: o.is_active, created_at: o.created_at }));
       setFirmalar(list);
 
+      // Tüm firmaların istatistiklerini 4 paralel toplu sorguyla çek — N+1 tamamen kaldırıldı
+      // Eskiden: N firma × 4 sorgu = 4N sorgu | Şimdi: 4 sorgu toplam
+      const firmIds = list.map(f => f.id);
+      const [personelRes, ekipmanRes, evrakRes, egitimRes] = await Promise.all([
+        supabase.from('personeller').select('organization_id').in('organization_id', firmIds).is('deleted_at', null),
+        supabase.from('ekipmanlar').select('organization_id').in('organization_id', firmIds).is('deleted_at', null),
+        supabase.from('evraklar').select('organization_id').in('organization_id', firmIds).is('deleted_at', null),
+        supabase.from('egitimler').select('organization_id').in('organization_id', firmIds).is('deleted_at', null),
+      ]);
+
+      // Her tablo için firma bazlı count map'i oluştur
+      const countByFirma = (rows: { organization_id: string }[] | null) => {
+        const map = new Map<string, number>();
+        (rows ?? []).forEach(r => map.set(r.organization_id, (map.get(r.organization_id) ?? 0) + 1));
+        return map;
+      };
+
+      const personelMap = countByFirma(personelRes.data);
+      const ekipmanMap = countByFirma(ekipmanRes.data);
+      const evrakMap = countByFirma(evrakRes.data);
+      const egitimMap = countByFirma(egitimRes.data);
+
       const statsMap: Record<string, FirmaStats> = {};
-      await Promise.all(list.map(async f => {
-        const [{ count: p }, { count: e }, { count: ev }, { count: eg }] = await Promise.all([
-          supabase.from('personeller').select('*', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
-          supabase.from('ekipmanlar').select('*', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
-          supabase.from('evraklar').select('*', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
-          supabase.from('egitimler').select('*', { count: 'exact', head: true }).eq('organization_id', f.id).is('deleted_at', null),
-        ]);
-        statsMap[f.id] = { personel: p ?? 0, ekipman: e ?? 0, evrak: ev ?? 0, egitim: eg ?? 0 };
-      }));
+      firmIds.forEach(id => {
+        statsMap[id] = {
+          personel: personelMap.get(id) ?? 0,
+          ekipman: ekipmanMap.get(id) ?? 0,
+          evrak: evrakMap.get(id) ?? 0,
+          egitim: egitimMap.get(id) ?? 0,
+        };
+      });
       setFirmaStats(statsMap);
+      // Cache'e kaydet
+      cache.set(cacheKey, { firmalar: list, stats: statsMap });
     } catch (err) {
       console.error('[UzmanFirmalar]', err);
     } finally {

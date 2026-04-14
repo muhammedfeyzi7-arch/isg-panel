@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useQueryCache } from '@/hooks/useQueryCache';
 
 interface Props {
   atanmisFirmaIds: string[];
@@ -49,6 +50,7 @@ export default function UzmanSaglik({ atanmisFirmaIds, isDark }: Props) {
   const [firmaFilter, setFirmaFilter] = useState('');
   const [firmaMap, setFirmaMap] = useState<Record<string, string>>({});
 
+  const cache = useQueryCache<{ kayitlar: MuayeneKayit[]; firmaMap: Record<string, string> }>(3 * 60 * 1000);
   const cardBg    = isDark ? 'rgba(255,255,255,0.04)' : '#ffffff';
   const border    = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)';
   const sectionBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)';
@@ -59,6 +61,14 @@ export default function UzmanSaglik({ atanmisFirmaIds, isDark }: Props) {
   useEffect(() => {
     if (atanmisFirmaIds.length === 0) { setLoading(false); return; }
     const fetchData = async () => {
+      const cacheKey = `uzman_saglik_${atanmisFirmaIds.slice().sort().join(',')}`;
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        setKayitlar(cached.kayitlar);
+        setFirmaMap(cached.firmaMap);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
@@ -129,6 +139,7 @@ export default function UzmanSaglik({ atanmisFirmaIds, isDark }: Props) {
           };
         });
 
+        cache.set(cacheKey, { kayitlar: list, firmaMap: fMap });
         setKayitlar(list);
       } catch (err) {
         console.error('[UzmanSaglik] unexpected error:', err);

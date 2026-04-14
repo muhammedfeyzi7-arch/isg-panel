@@ -84,55 +84,51 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
     try {
       const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
 
-      const { data: orgs } = await supabase.from('organizations').select('id, name').in('id', safeIds);
+      // Tüm sorguları tek seferde paralel çek — N+1 tamamen kaldırıldı
+      const [orgsResult, personelResult, kazaResult] = await Promise.all([
+        supabase.from('organizations').select('id, name').in('id', safeIds),
+        supabase.from('personeller').select('id, organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
+        supabase.from('is_kazalari').select('*').in('organization_id', safeIds).is('deleted_at', null).order('kaza_tarihi', { ascending: false }),
+      ]);
+
       const firmaAdMap: Record<string, string> = {};
-      (orgs ?? []).forEach(o => { firmaAdMap[o.id] = o.name; });
+      (orgsResult.data ?? []).forEach(o => { firmaAdMap[o.id] = o.name; });
 
-      const allKazalar: KazaRow[] = [];
-      await Promise.all(safeIds.map(async (firmaId) => {
-        const { data: personelRows } = await supabase.from('personeller').select('id, data').eq('organization_id', firmaId).is('deleted_at', null);
-        const personelAdMap: Record<string, string> = {};
-        (personelRows ?? []).forEach(r => {
-          const d = r.data as Record<string, unknown>;
-          personelAdMap[r.id] = (d.adSoyad as string) ?? 'Bilinmiyor';
-        });
+      // Personel adlarını global map'e al
+      const personelAdMap: Record<string, string> = {};
+      (personelResult.data ?? []).forEach(r => {
+        const d = r.data as Record<string, unknown>;
+        personelAdMap[r.id] = (d.adSoyad as string) ?? 'Bilinmiyor';
+      });
 
-        const { data: rows } = await supabase.from('is_kazalari')
-          .select('*').eq('organization_id', firmaId).is('deleted_at', null)
-          .order('kaza_tarihi', { ascending: false });
-
-        (rows ?? []).forEach(r => {
-          allKazalar.push({
-            id: r.id,
-            personelId: r.personel_id,
-            personelAd: personelAdMap[r.personel_id] ?? 'Bilinmiyor',
-            firmaAd: firmaAdMap[firmaId] ?? firmaId,
-            firmaId,
-            kazaTarihi: r.kaza_tarihi,
-            kazaSaati: r.kaza_saati ?? '',
-            kazaYeri: r.kaza_yeri ?? '',
-            kazaTuru: r.kaza_turu ?? '',
-            kazaAciklamasi: r.kaza_aciklamasi ?? '',
-            yaraliVucutBolgeleri: Array.isArray(r.yarali_vucut_bolgeleri) ? r.yarali_vucut_bolgeleri : [],
-            yaralanmaSiddeti: r.yaralanma_siddeti ?? 'Hafif',
-            isGunuKaybi: r.is_gunu_kaybi ?? 0,
-            hastaneyeKaldirildi: r.hastaneye_kaldirildi ?? false,
-            durum: r.durum ?? 'Açık',
-            yaralanmaTuru: r.yaralanma_turu ?? '',
-            hastaneAdi: r.hastane_adi ?? '',
-            tanikBilgileri: r.tanik_bilgileri ?? '',
-            onlemler: r.onlemler ?? '',
-            sgkBildirildi: r.sgk_bildirildi ?? false,
-            sgkBildirimTarihi: r.sgk_bildirim_tarihi ?? '',
-            sgkBildirimNotu: r.sgk_bildirim_notu ?? '',
-            fotografPaths: Array.isArray(r.fotograf_paths) ? r.fotograf_paths : [],
-            olayYeriDiagram: r.olay_yeri_diagram ?? '',
-            besNeden: Array.isArray(r.bes_neden) ? r.bes_neden : [],
-          });
-        });
+      const allKazalar: KazaRow[] = (kazaResult.data ?? []).map(r => ({
+        id: r.id,
+        personelId: r.personel_id,
+        personelAd: personelAdMap[r.personel_id] ?? 'Bilinmiyor',
+        firmaAd: firmaAdMap[r.organization_id] ?? r.organization_id,
+        firmaId: r.organization_id,
+        kazaTarihi: r.kaza_tarihi,
+        kazaSaati: r.kaza_saati ?? '',
+        kazaYeri: r.kaza_yeri ?? '',
+        kazaTuru: r.kaza_turu ?? '',
+        kazaAciklamasi: r.kaza_aciklamasi ?? '',
+        yaraliVucutBolgeleri: Array.isArray(r.yarali_vucut_bolgeleri) ? r.yarali_vucut_bolgeleri : [],
+        yaralanmaSiddeti: r.yaralanma_siddeti ?? 'Hafif',
+        isGunuKaybi: r.is_gunu_kaybi ?? 0,
+        hastaneyeKaldirildi: r.hastaneye_kaldirildi ?? false,
+        durum: r.durum ?? 'Açık',
+        yaralanmaTuru: r.yaralanma_turu ?? '',
+        hastaneAdi: r.hastane_adi ?? '',
+        tanikBilgileri: r.tanik_bilgileri ?? '',
+        onlemler: r.onlemler ?? '',
+        sgkBildirildi: r.sgk_bildirildi ?? false,
+        sgkBildirimTarihi: r.sgk_bildirim_tarihi ?? '',
+        sgkBildirimNotu: r.sgk_bildirim_notu ?? '',
+        fotografPaths: Array.isArray(r.fotograf_paths) ? r.fotograf_paths : [],
+        olayYeriDiagram: r.olay_yeri_diagram ?? '',
+        besNeden: Array.isArray(r.bes_neden) ? r.bes_neden : [],
       }));
 
-      allKazalar.sort((a, b) => new Date(b.kazaTarihi).getTime() - new Date(a.kazaTarihi).getTime());
       setKazalar(allKazalar);
     } catch (err) {
       console.error('[HekimIsKazasiTab] load error:', err);

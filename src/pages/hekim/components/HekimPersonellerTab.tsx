@@ -51,66 +51,44 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
         const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
         if (safeIds.length === 0) { setPersoneller([]); setLoading(false); return; }
 
-        const { data: orgs } = await supabase
-          .from('organizations')
-          .select('id, name')
-          .in('id', safeIds);
+        // Tüm sorguları paralel çek — N+1 tamamen kaldırıldı
+        const [orgsResult, personelResult, muayeneResult] = await Promise.all([
+          supabase.from('organizations').select('id, name').in('id', safeIds),
+          supabase.from('personeller').select('id, organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
+          supabase.from('muayeneler').select('data').in('organization_id', safeIds).is('deleted_at', null).order('created_at', { ascending: false }),
+        ]);
 
         const adMap: Record<string, string> = {};
-        (orgs ?? []).forEach(o => { adMap[o.id] = o.name; });
+        (orgsResult.data ?? []).forEach(o => { adMap[o.id] = o.name; });
         setFirmaAdMap(adMap);
 
-        const allPersonel: PersonelRow[] = [];
+        // En son muayeneyi personel bazlı map'e al
+        const muayeneMap: Record<string, { tarih: string; sonuc: string }> = {};
+        (muayeneResult.data ?? []).forEach(m => {
+          const md = m.data as Record<string, unknown>;
+          const pid = md.personelId as string;
+          if (pid && !muayeneMap[pid]) {
+            muayeneMap[pid] = {
+              tarih: (md.muayeneTarihi as string) ?? '',
+              sonuc: (md.sonuc as string) ?? '',
+            };
+          }
+        });
 
-        await Promise.all(
-          safeIds.map(async (firmaId) => {
-            const { data: rows } = await supabase
-              .from('personeller')
-              .select('id, data')
-              .eq('organization_id', firmaId)
-              .is('deleted_at', null);
-
-            (rows ?? []).forEach(r => {
-              const d = r.data as Record<string, unknown>;
-              allPersonel.push({
-                id: r.id,
-                adSoyad: (d.adSoyad as string) ?? '',
-                gorev: (d.gorev as string) ?? '',
-                firmaAd: adMap[firmaId] ?? firmaId,
-                firmaId,
-                durum: (d.durum as string) ?? 'Aktif',
-                sonMuayene: null,
-                sonMuayeneSonuc: null,
-              });
-            });
-
-            const { data: muayeneler } = await supabase
-              .from('muayeneler')
-              .select('data')
-              .eq('organization_id', firmaId)
-              .is('deleted_at', null)
-              .order('created_at', { ascending: false });
-
-            const muayeneMap: Record<string, { tarih: string; sonuc: string }> = {};
-            (muayeneler ?? []).forEach(m => {
-              const md = m.data as Record<string, unknown>;
-              const pid = md.personelId as string;
-              if (pid && !muayeneMap[pid]) {
-                muayeneMap[pid] = {
-                  tarih: (md.muayeneTarihi as string) ?? '',
-                  sonuc: (md.sonuc as string) ?? '',
-                };
-              }
-            });
-
-            allPersonel.forEach(p => {
-              if (p.firmaId === firmaId && muayeneMap[p.id]) {
-                p.sonMuayene = muayeneMap[p.id].tarih;
-                p.sonMuayeneSonuc = muayeneMap[p.id].sonuc;
-              }
-            });
-          })
-        );
+        const allPersonel: PersonelRow[] = (personelResult.data ?? []).map(r => {
+          const d = r.data as Record<string, unknown>;
+          const muayene = muayeneMap[r.id];
+          return {
+            id: r.id,
+            adSoyad: (d.adSoyad as string) ?? '',
+            gorev: (d.gorev as string) ?? '',
+            firmaAd: adMap[r.organization_id] ?? r.organization_id,
+            firmaId: r.organization_id,
+            durum: (d.durum as string) ?? 'Aktif',
+            sonMuayene: muayene?.tarih ?? null,
+            sonMuayeneSonuc: muayene?.sonuc ?? null,
+          };
+        });
 
         setPersoneller(allPersonel);
       } catch (err) {

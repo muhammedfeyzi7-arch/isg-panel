@@ -77,54 +77,50 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark, addToast, heki
       const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
       if (safeIds.length === 0) { setMuayeneler([]); setLoading(false); return; }
 
-      const { data: orgs } = await supabase.from('organizations').select('id, name').in('id', safeIds);
+      // Tüm sorguları tek seferde paralel çek — N+1 tamamen kaldırıldı
+      const [orgsResult, personelResult, muayeneResult] = await Promise.all([
+        supabase.from('organizations').select('id, name').in('id', safeIds),
+        supabase.from('personeller').select('id, organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
+        supabase.from('muayeneler').select('id, organization_id, data').in('organization_id', safeIds).is('deleted_at', null).order('created_at', { ascending: false }),
+      ]);
+
       const firmaAdMap: Record<string, string> = {};
-      (orgs ?? []).forEach(o => { firmaAdMap[o.id] = o.name; });
+      (orgsResult.data ?? []).forEach(o => { firmaAdMap[o.id] = o.name; });
 
-      const allMuayeneler: MuayeneRow[] = [];
-      await Promise.all(safeIds.map(async (firmaId) => {
-        const { data: personelRows } = await supabase.from('personeller').select('id, data').eq('organization_id', firmaId).is('deleted_at', null);
-        const personelAdMap: Record<string, string> = {};
-        (personelRows ?? []).forEach(r => {
-          const d = r.data as Record<string, unknown>;
-          personelAdMap[r.id] = (d.adSoyad as string) ?? 'Bilinmiyor';
-        });
-        const { data: mRows, error } = await supabase
-          .from('muayeneler').select('id, data')
-          .eq('organization_id', firmaId)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
+      // Personel adlarını map'e al
+      const personelAdMap: Record<string, string> = {};
+      (personelResult.data ?? []).forEach(r => {
+        const d = r.data as Record<string, unknown>;
+        personelAdMap[r.id] = (d.adSoyad as string) ?? 'Bilinmiyor';
+      });
 
-        if (error) {
-          console.error('[HekimSaglikTab] muayeneler load error:', error);
-        }
+      const allMuayeneler: MuayeneRow[] = (muayeneResult.data ?? []).map(m => {
+        const d = m.data as Record<string, unknown>;
+        const personelId = (d.personelId as string) ?? '';
+        return {
+          id: m.id,
+          personelId,
+          personelAd: personelAdMap[personelId] ?? 'Bilinmiyor',
+          firmaAd: firmaAdMap[m.organization_id] ?? m.organization_id,
+          firmaId: m.organization_id,
+          muayeneTarihi: (d.muayeneTarihi as string) ?? '',
+          sonrakiTarih: (d.sonrakiTarih as string) ?? '',
+          sonuc: (d.sonuc as string) ?? '',
+          hastane: (d.hastane as string) ?? '',
+          doktor: (d.doktor as string) ?? '',
+          notlar: (d.notlar as string) ?? '',
+          ek2: !!(d.ek2),
+          kronikHastaliklar: (d.kronikHastaliklar as string) ?? '',
+          ilacKullanim: (d.ilacKullanim as string) ?? '',
+          ameliyatGecmisi: (d.ameliyatGecmisi as string) ?? '',
+          tansiyon: (d.tansiyon as string) ?? '',
+          nabiz: (d.nabiz as string) ?? '',
+          gorme: (d.gorme as string) ?? '',
+          isitme: (d.isitme as string) ?? '',
+          aciklama: (d.aciklama as string) ?? '',
+        };
+      });
 
-        (mRows ?? []).forEach(m => {
-          const d = m.data as Record<string, unknown>;
-          allMuayeneler.push({
-            id: m.id,
-            personelId: (d.personelId as string) ?? '',
-            personelAd: personelAdMap[(d.personelId as string) ?? ''] ?? 'Bilinmiyor',
-            firmaAd: firmaAdMap[firmaId] ?? firmaId,
-            firmaId,
-            muayeneTarihi: (d.muayeneTarihi as string) ?? '',
-            sonrakiTarih: (d.sonrakiTarih as string) ?? '',
-            sonuc: (d.sonuc as string) ?? '',
-            hastane: (d.hastane as string) ?? '',
-            doktor: (d.doktor as string) ?? '',
-            notlar: (d.notlar as string) ?? '',
-            ek2: !!(d.ek2),
-            kronikHastaliklar: (d.kronikHastaliklar as string) ?? '',
-            ilacKullanim: (d.ilacKullanim as string) ?? '',
-            ameliyatGecmisi: (d.ameliyatGecmisi as string) ?? '',
-            tansiyon: (d.tansiyon as string) ?? '',
-            nabiz: (d.nabiz as string) ?? '',
-            gorme: (d.gorme as string) ?? '',
-            isitme: (d.isitme as string) ?? '',
-            aciklama: (d.aciklama as string) ?? '',
-          });
-        });
-      }));
       allMuayeneler.sort((a, b) => new Date(b.muayeneTarihi).getTime() - new Date(a.muayeneTarihi).getTime());
       setMuayeneler(allMuayeneler);
     } catch (err) { console.error('[HekimSaglikTab] load error:', err); }
