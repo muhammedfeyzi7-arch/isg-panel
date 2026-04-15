@@ -771,64 +771,66 @@ function ZiyaretlerTabInner({ isDark }: ZiyaretlerTabProps) {
             label: 'Aktif Ziyaret',
             value: aktifZiyaretler.length,
             sub: aktifZiyaretler.length > 0 ? `${aktifZiyaretler.length} kişi sahada` : 'Şu an kimse yok',
-            icon: 'ri-map-pin-user-line',
-            color: '#22C55E',
-            bg: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(16,185,129,0.04) 100%)',
-            border: 'rgba(34,197,94,0.2)',
+            icon: 'ri-map-pin-user-fill',
+            gradient: aktifZiyaretler.length > 0
+              ? 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)'
+              : 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
+            shadow: aktifZiyaretler.length > 0 ? 'rgba(34,197,94,0.35)' : 'rgba(14,165,233,0.3)',
             pulse: aktifZiyaretler.length > 0,
           },
           {
             label: 'Bugün',
             value: bugunSayisi,
-            sub: 'Bugünkü ziyaret',
-            icon: 'ri-calendar-check-line',
-            color: '#0EA5E9',
-            bg: 'linear-gradient(135deg, rgba(14,165,233,0.1) 0%, rgba(2,132,199,0.04) 100%)',
-            border: 'rgba(14,165,233,0.2)',
+            sub: 'Bugünkü ziyaret sayısı',
+            icon: 'ri-calendar-check-fill',
+            gradient: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+            shadow: 'rgba(99,102,241,0.35)',
             pulse: false,
           },
           {
             label: 'Son 30 Gün',
             value: son30GunSayisi,
-            sub: 'Toplam ziyaret',
+            sub: 'Toplam ziyaret kaydı',
             icon: 'ri-calendar-2-line',
-            color: '#F59E0B',
-            bg: 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(217,119,6,0.04) 100%)',
-            border: 'rgba(245,158,11,0.2)',
+            gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+            shadow: 'rgba(245,158,11,0.35)',
             pulse: false,
           },
           {
-            label: 'İhlal Oranı',
+            label: 'GPS İhlali',
             value: `%${ihlalOrani}`,
-            sub: 'GPS ihlali',
+            sub: 'Kapsam dışı check-in',
             icon: 'ri-map-pin-2-line',
-            color: ihlalOrani > 20 ? '#EF4444' : ihlalOrani > 5 ? '#F59E0B' : '#22C55E',
-            bg: ihlalOrani > 20
-              ? 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(220,38,38,0.04) 100%)'
+            gradient: ihlalOrani > 20
+              ? 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
               : ihlalOrani > 5
-                ? 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(217,119,6,0.04) 100%)'
-                : 'linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(16,185,129,0.04) 100%)',
-            border: ihlalOrani > 20 ? 'rgba(239,68,68,0.2)' : ihlalOrani > 5 ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)',
+                ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+            shadow: ihlalOrani > 20 ? 'rgba(239,68,68,0.35)' : ihlalOrani > 5 ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)',
             pulse: false,
           },
         ].map(kpi => (
-          <div key={kpi.label} className="rounded-2xl p-4"
-            style={{ background: kpi.bg, border: `1px solid ${kpi.border}` }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-8 h-8 flex items-center justify-center rounded-xl"
-                style={{ background: `${kpi.color}18`, border: `1px solid ${kpi.border}` }}>
-                <i className={`${kpi.icon} text-sm`} style={{ color: kpi.color }} />
+          <div key={kpi.label} className="rounded-2xl p-5 relative overflow-hidden cursor-default"
+            style={{ background: kpi.gradient, boxShadow: `0 8px 24px ${kpi.shadow}` }}>
+            {/* Glow overlay */}
+            <div className="absolute top-0 right-0 w-24 h-24 opacity-20"
+              style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
+            <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10"
+              style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
+            <div className="relative flex items-center justify-between mb-3">
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                <i className={`${kpi.icon} text-lg text-white`} />
               </div>
               {kpi.pulse && (
-                <span className="flex items-center gap-1 text-[9px] font-bold" style={{ color: '#22C55E' }}>
-                  <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{ background: '#22C55E', opacity: 0.7 }} />
-                  CANLI
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full animate-pulse bg-white opacity-80" />
+                  <span className="text-[10px] font-bold text-white opacity-80">CANLI</span>
+                </div>
               )}
             </div>
-            <p className="text-2xl font-black leading-none" style={{ color: textPrimary }}>{kpi.value}</p>
-            <p className="text-[10px] mt-1.5" style={{ color: textMuted }}>{kpi.sub}</p>
-            <p className="text-[9px] font-semibold mt-0.5 uppercase tracking-wide" style={{ color: kpi.color }}>{kpi.label}</p>
+            <p className="relative text-[34px] font-black leading-none text-white mb-1">{kpi.value}</p>
+            <p className="relative text-[12px] font-semibold text-white opacity-80">{kpi.label}</p>
+            <p className="relative text-[10px] mt-1 text-white opacity-60">{kpi.sub}</p>
           </div>
         ))}
       </div>

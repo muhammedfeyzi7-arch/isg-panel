@@ -97,10 +97,10 @@ export default function OsgbSidebar({
             className="absolute pointer-events-none"
             style={{
               top: '-40px', left: '50%', transform: 'translateX(-50%)',
-              width: '180px', height: '100px',
+              width: '200px', height: '120px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, rgba(99,102,241,0.18) 0%, transparent 70%)',
-              filter: 'blur(12px)',
+              background: 'radial-gradient(ellipse, rgba(99,102,241,0.25) 0%, transparent 70%)',
+              filter: 'blur(16px)',
             }}
           />
           {/* Dekoratif glow altta */}
@@ -108,10 +108,10 @@ export default function OsgbSidebar({
             className="absolute pointer-events-none"
             style={{
               bottom: '60px', right: '-30px',
-              width: '120px', height: '120px',
+              width: '140px', height: '140px',
               borderRadius: '50%',
-              background: 'radial-gradient(ellipse, rgba(139,92,246,0.1) 0%, transparent 70%)',
-              filter: 'blur(16px)',
+              background: 'radial-gradient(ellipse, rgba(139,92,246,0.18) 0%, transparent 70%)',
+              filter: 'blur(20px)',
             }}
           />
 
@@ -193,7 +193,7 @@ export default function OsgbSidebar({
                 {!collapsed ? (
                   <p
                     className="text-[8.5px] font-bold uppercase px-2 mb-1.5 select-none"
-                    style={{ color: 'rgba(255,255,255,0.2)', letterSpacing: '0.14em' }}
+                    style={{ color: 'rgba(255,255,255,0.35)', letterSpacing: '0.14em' }}
                   >
                     {group.label}
                   </p>
@@ -276,11 +276,11 @@ export default function OsgbSidebar({
                               className="flex-1 text-[12px] truncate leading-none"
                               style={{
                                 color: isActive
-                                  ? '#C7D2FE'
+                                  ? '#E0E7FF'
                                   : isHovered
-                                  ? 'rgba(255,255,255,0.8)'
-                                  : 'rgba(255,255,255,0.38)',
-                                fontWeight: isActive ? 600 : 500,
+                                  ? 'rgba(255,255,255,0.9)'
+                                  : 'rgba(255,255,255,0.55)',
+                                fontWeight: isActive ? 700 : 500,
                                 transition: 'color 0.15s ease',
                               }}
                             >
@@ -319,7 +319,7 @@ export default function OsgbSidebar({
               >
                 <p
                   className="text-[8.5px] font-bold uppercase tracking-[0.14em] mb-2"
-                  style={{ color: 'rgba(255,255,255,0.22)' }}
+                  style={{ color: 'rgba(255,255,255,0.42)' }}
                 >
                   İstatistikler
                 </p>
@@ -339,7 +339,7 @@ export default function OsgbSidebar({
                       <p className="text-[19px] font-black leading-none" style={{ color: stat.color }}>
                         {stat.value}
                       </p>
-                      <p className="text-[9px] font-medium mt-1" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                      <p className="text-[9px] font-medium mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
                         {stat.label}
                       </p>
                     </div>
@@ -371,10 +371,10 @@ export default function OsgbSidebar({
               }}
             >
               <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                <i className="ri-customer-service-2-line text-xs" style={{ color: 'rgba(255,255,255,0.38)' }} />
+                <i className="ri-customer-service-2-line text-xs" style={{ color: 'rgba(255,255,255,0.6)' }} />
               </span>
               {!collapsed && (
-                <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>
                   Destek
                 </span>
               )}
@@ -405,7 +405,7 @@ export default function OsgbSidebar({
                   <p className="text-[11px] font-semibold leading-tight text-white truncate">
                     {userName}
                   </p>
-                  <p className="text-[9px] mt-0.5" style={{ color: 'rgba(165,180,252,0.6)' }}>
+                  <p className="text-[9px] mt-0.5" style={{ color: 'rgba(165,180,252,0.8)' }}>
                     OSGB Admin
                   </p>
                 </div>

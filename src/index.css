@@ -51,8 +51,13 @@
 
   /* Misc */
   --select-bg:           #161b30;
-  --modal-bg:            rgba(14, 17, 32, 0.99);
-  --modal-border:        rgba(255,255,255,0.10);
+  --modal-bg:            #141827;
+  --modal-bg-elevated:   #1a1f35;
+  --modal-border:        rgba(255,255,255,0.09);
+  --modal-header-bg:     rgba(255,255,255,0.025);
+  --modal-footer-bg:     rgba(255,255,255,0.02);
+  --modal-input-bg:      rgba(255,255,255,0.06);
+  --modal-input-border:  rgba(255,255,255,0.10);
 
   /* Charts */
   --chart-tooltip-bg:    rgba(10, 13, 26, 0.98);
@@ -101,8 +106,13 @@
   --table-row-border:    rgba(15,23,42,0.045);
 
   --select-bg:           #FFFFFF;
-  --modal-bg:            rgba(255,255,255,0.99);
-  --modal-border:        rgba(15,23,42,0.11);
+  --modal-bg:            #ffffff;
+  --modal-bg-elevated:   #f8fafc;
+  --modal-border:        rgba(15,23,42,0.10);
+  --modal-header-bg:     rgba(15,23,42,0.02);
+  --modal-footer-bg:     rgba(15,23,42,0.015);
+  --modal-input-bg:      rgba(15,23,42,0.04);
+  --modal-input-border:  rgba(15,23,42,0.11);
 
   --chart-tooltip-bg:    rgba(255,255,255,0.99);
   --chart-tooltip-border:rgba(15,23,42,0.11);

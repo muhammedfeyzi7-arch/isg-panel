@@ -112,10 +112,10 @@ const FirmaRow = memo(function FirmaRow({
 }: FirmaRowProps) {
   return (
     <div
-      className="grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3 rounded-xl transition-all"
-      style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff', border: `1px solid ${borderColor}` }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
+      className="grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3.5 transition-all"
+      style={{ background: 'transparent' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
 
       {/* Firma */}
       <div className="flex items-center gap-2.5 min-w-0 pr-2 cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
@@ -313,14 +313,14 @@ function FirmalarTabInner({
 
       {/* Boş state */}
       {filtered.length === 0 && (
-        <div className="rounded-xl p-12 flex flex-col items-center gap-4 text-center"
+        <div className="rounded-2xl p-12 flex flex-col items-center gap-4 text-center"
           style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
-          <div className="w-14 h-14 rounded-xl flex items-center justify-center"
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
             style={{ background: 'rgba(14,165,233,0.08)', border: '1.5px solid rgba(14,165,233,0.15)' }}>
             <i className="ri-building-2-line text-2xl" style={{ color: '#0EA5E9' }} />
           </div>
           <div>
-            <p className="text-sm font-bold mb-1" style={{ color: textPrimary }}>
+            <p className="text-sm font-bold mb-1.5" style={{ color: textPrimary }}>
               {search ? `"${search}" için sonuç yok` : 'Henüz firma eklenmedi'}
             </p>
             <p className="text-xs" style={{ color: textSecondary }}>
@@ -329,7 +329,7 @@ function FirmalarTabInner({
           </div>
           {!search && (
             <button onClick={onFirmaEkle}
-              className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer"
+              className="whitespace-nowrap flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
               style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
               <i className="ri-add-line" />İlk Firmayı Ekle
             </button>
@@ -339,9 +339,10 @@ function FirmalarTabInner({
 
       {/* Liste */}
       {filtered.length > 0 && (
-        <div className="space-y-1">
-          <div className="hidden md:grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-2"
-            style={{ borderBottom: `1px solid ${borderColor}` }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
+          {/* Tablo header */}
+          <div className="hidden md:grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3"
+            style={{ borderBottom: `1px solid ${borderColor}`, background: isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.025)' }}>
             {['FİRMA', 'PERSONEL', 'SON ZİYARET', 'İŞLEM'].map(h => (
               <span key={h} className="text-[10px] font-bold tracking-wider uppercase" style={{ color: textSecondary }}>{h}</span>
             ))}
@@ -405,7 +406,7 @@ function FirmalarTabInner({
           </div>
 
           {/* Desktop */}
-          <div className="hidden md:block space-y-1.5 pt-1">
+          <div className="hidden md:block divide-y" style={{ borderColor }}>
             {filtered.map((f) => {
               const days = getDaysDiff(firmaLastVisit[f.id]);
               const isAktif = aktifFirmaIds.has(f.id);
