@@ -75,11 +75,11 @@ export default function HekimPage() {
   const { org, theme, mustChangePassword, addToast } = useApp();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<HekimTab>(() => {
-    try { return (localStorage.getItem('hekim_active_tab') as HekimTab) || 'genel_bakis'; } catch { return 'genel_bakis'; }
+    try { return (sessionStorage.getItem('hekim_active_tab') as HekimTab) || 'genel_bakis'; } catch { return 'genel_bakis'; }
   });
 
   useEffect(() => {
-    try { localStorage.setItem('hekim_active_tab', activeTab); } catch { /* ignore */ }
+    try { sessionStorage.setItem('hekim_active_tab', activeTab); } catch { /* ignore */ }
   }, [activeTab]);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -105,6 +105,54 @@ export default function HekimPage() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Ziyaret planı bildirimi — bugün plan varsa toast göster
+  useEffect(() => {
+    if (!user?.id || !orgId) return;
+    const TODAY_DOW_TR = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][new Date().getDay()];
+    const TODAY_DOW_EN = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][new Date().getDay()];
+    supabase
+      .from('osgb_ziyaret_planlari')
+      .select('id, firma_org_id, gunler, notlar')
+      .eq('osgb_org_id', orgId)
+      .eq('aktif', true)
+      .then(({ data }) => {
+        const bugunPlanlar = (data ?? []).filter(p => {
+          const gunler: string[] = p.gunler ?? [];
+          return gunler.some(g => g === TODAY_DOW_TR || g.toLowerCase() === TODAY_DOW_EN);
+        });
+        if (bugunPlanlar.length === 0) return;
+        supabase
+          .from('user_organizations')
+          .select('active_firm_ids, active_firm_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle()
+          .then(({ data: uData }) => {
+            if (!uData) return;
+            const firmIds: string[] = Array.isArray(uData.active_firm_ids) && uData.active_firm_ids.length > 0
+              ? uData.active_firm_ids
+              : (uData as Record<string, unknown>).active_firm_id ? [(uData as Record<string, unknown>).active_firm_id as string] : [];
+            const ilgiliPlanlar = bugunPlanlar.filter(p =>
+              firmIds.includes(p.firma_org_id) || bugunPlanlar.some(bp => !bp.firma_org_id)
+            );
+            if (ilgiliPlanlar.length > 0) {
+              supabase
+                .from('organizations')
+                .select('id, name')
+                .in('id', ilgiliPlanlar.map(p => p.firma_org_id).filter(Boolean))
+                .then(({ data: firmData }) => {
+                  const firmaMap: Record<string, string> = {};
+                  (firmData ?? []).forEach(f => { firmaMap[f.id] = f.name; });
+                  ilgiliPlanlar.slice(0, 2).forEach(p => {
+                    const firmaAd = firmaMap[p.firma_org_id] ?? 'Firma';
+                    addToast(`Bugün ${firmaAd} için ziyaret planlanmış`, 'info');
+                  });
+                });
+            }
+          });
+      });
+  }, [user?.id, orgId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchFirmalar = useCallback(async () => {
     if (!user) return;
@@ -296,7 +344,7 @@ export default function HekimPage() {
 
   return (
     <div
-      className="min-h-screen panel-shell"
+      className="min-h-screen"
       style={{
         background: isDark
           ? 'linear-gradient(135deg, #0a0f1a 0%, #0d1525 50%, #0a1020 100%)'
@@ -350,7 +398,7 @@ export default function HekimPage() {
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      <main className="min-h-screen overflow-y-auto transition-all duration-300 lg:block mobile-panel-main">
+      <main className="min-h-screen overflow-y-auto transition-all duration-300 lg:block">
         {/* ── Topbar ── */}
         <div
           className={`sticky top-0 z-30 transition-all duration-300 ${collapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
@@ -539,7 +587,7 @@ export default function HekimPage() {
 
         {/* ── İçerik ── */}
         <div
-          className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 panel-main-wrap rounded-2xl mobile-panel-content ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'}`}
+          className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'}`}
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
         >
           {renderContent()}

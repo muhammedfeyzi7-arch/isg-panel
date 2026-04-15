@@ -96,15 +96,15 @@ const TAB_TITLES: Record<UzmanTab, { title: string; subtitle: string; icon: stri
 };
 
 export default function UzmanPage() {
-  const { org, theme, mustChangePassword, sidebarCollapsed, setSidebarCollapsed } = useApp();
+  const { org, theme, mustChangePassword, sidebarCollapsed, setSidebarCollapsed, addToast } = useApp();
   const { user, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState<UzmanTab>(() => {
-    try { return (localStorage.getItem('uzman_active_tab') as UzmanTab) || 'genel_bakis'; } catch { return 'genel_bakis'; }
+    try { return (sessionStorage.getItem('uzman_active_tab') as UzmanTab) || 'genel_bakis'; } catch { return 'genel_bakis'; }
   });
 
   useEffect(() => {
-    try { localStorage.setItem('uzman_active_tab', activeTab); } catch { /* ignore */ }
+    try { sessionStorage.setItem('uzman_active_tab', activeTab); } catch { /* ignore */ }
   }, [activeTab]);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -169,6 +169,57 @@ export default function UzmanPage() {
   useEffect(() => {
     if (!user || !org) return;
     fetchFirmalar();
+  }, [user?.id, org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ziyaret planı bildirimi — bugün plan varsa toast göster
+  useEffect(() => {
+    if (!user?.id || !org?.id) return;
+    const TODAY_DOW_TR = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][new Date().getDay()];
+    const TODAY_DOW_EN = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][new Date().getDay()];
+    supabase
+      .from('osgb_ziyaret_planlari')
+      .select('id, firma_org_id, gunler, notlar')
+      .eq('osgb_org_id', org.id)
+      .eq('aktif', true)
+      .then(({ data }) => {
+        const bugunPlanlar = (data ?? []).filter(p => {
+          const gunler: string[] = p.gunler ?? [];
+          return gunler.some(g => g === TODAY_DOW_TR || g.toLowerCase() === TODAY_DOW_EN);
+        });
+        if (bugunPlanlar.length === 0) return;
+        // Kendi firma ataması olan planları filtrele
+        supabase
+          .from('user_organizations')
+          .select('active_firm_ids, active_firm_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle()
+          .then(({ data: uData }) => {
+            if (!uData) return;
+            const firmIds: string[] = Array.isArray(uData.active_firm_ids) && uData.active_firm_ids.length > 0
+              ? uData.active_firm_ids
+              : uData.active_firm_id ? [uData.active_firm_id] : [];
+            const ilgiliPlanlar = bugunPlanlar.filter(p =>
+              firmIds.includes(p.firma_org_id) ||
+              bugunPlanlar.some(bp => !bp.firma_org_id)
+            );
+            if (ilgiliPlanlar.length > 0) {
+              // Firma adlarını çek
+              supabase
+                .from('organizations')
+                .select('id, name')
+                .in('id', ilgiliPlanlar.map(p => p.firma_org_id).filter(Boolean))
+                .then(({ data: firmData }) => {
+                  const firmaMap: Record<string, string> = {};
+                  (firmData ?? []).forEach(f => { firmaMap[f.id] = f.name; });
+                  ilgiliPlanlar.slice(0, 2).forEach(p => {
+                    const firmaAd = firmaMap[p.firma_org_id] ?? 'Firma';
+                    addToast(`Bugün ${firmaAd} için ziyaret planlanmış`, 'info');
+                  });
+                });
+            }
+          });
+      });
   }, [user?.id, org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime: user_organizations değişince firma listesini yenile
@@ -241,7 +292,7 @@ export default function UzmanPage() {
 
   return (
     <div
-      className="min-h-screen panel-shell"
+      className="min-h-screen"
       style={{
         background: isDark
           ? 'linear-gradient(135deg, #0a0f1a 0%, #0d1525 50%, #0a1020 100%)'
@@ -320,16 +371,16 @@ export default function UzmanPage() {
       />
 
       <main
-        className="min-h-screen transition-all duration-300 mobile-panel-main"
+        className="min-h-screen transition-all duration-300"
         style={{ overflowX: 'hidden', overflowY: 'auto' }}
       >
         {/* ── İçerik ── */}
         <div
-          className={`pt-[56px] uzman-content transition-all duration-300 mobile-panel-content ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'} pb-8`}
+          className={`pt-[56px] uzman-content transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'} pb-8`}
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
           style={{ minHeight: 'calc(100vh - 56px)' }}
         >
-          <div className="px-3 sm:px-5 md:px-6 py-4 max-w-[1600px] w-full panel-main-wrap rounded-2xl mobile-inner-wrap">
+          <div className="px-3 sm:px-5 md:px-6 py-4 max-w-[1600px] w-full">
             {renderContent()}
           </div>
         </div>

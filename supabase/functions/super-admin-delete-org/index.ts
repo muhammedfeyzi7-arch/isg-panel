@@ -67,8 +67,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[delete-org] Başlıyor: ${org_id}`);
-
     // 1. Bu org'a bağlı kullanıcı ID'lerini bul
     const { data: members } = await adminClient
       .from('user_organizations')
@@ -76,13 +74,13 @@ Deno.serve(async (req) => {
       .eq('organization_id', org_id);
 
     const userIds: string[] = (members ?? []).map((m: { user_id: string }) => m.user_id);
-    console.log(`[delete-org] ${userIds.length} üye bulundu`);
 
-    // 2. organization_id ile bağlı tüm tabloları temizle (FK sırasına göre — alt tablolar önce)
-    const orgTables = [
+    // 2. İlgili tüm tabloları temizle (sırayla — FK bağımlılıkları göz önünde)
+    const tables = [
       'notifications',
       'activity_logs',
       'document_alert_settings',
+      'company_documents',
       'support_tickets',
       'osgb_ziyaretler',
       'is_izinleri',
@@ -95,65 +93,53 @@ Deno.serve(async (req) => {
       'tutanaklar',
       'is_kazalari',
       'app_data',
-      'company_documents',
-      'personeller',
       'firmalar',
+      'personeller',
     ];
 
-    for (const table of orgTables) {
+    for (const table of tables) {
       const { error: delErr } = await adminClient
         .from(table)
         .delete()
         .eq('organization_id', org_id);
       if (delErr) {
         console.warn(`[delete-org] ${table} silme uyarısı:`, delErr.message);
-      } else {
-        console.log(`[delete-org] ${table} temizlendi`);
       }
     }
 
     // 3. role_permissions temizle
-    const { error: rpErr } = await adminClient
+    await adminClient
       .from('role_permissions')
       .delete()
       .eq('organization_id', org_id);
-    if (rpErr) console.warn('[delete-org] role_permissions:', rpErr.message);
 
     // 4. user_organizations temizle
-    const { error: uoErr } = await adminClient
+    await adminClient
       .from('user_organizations')
       .delete()
       .eq('organization_id', org_id);
-    if (uoErr) console.warn('[delete-org] user_organizations:', uoErr.message);
 
-    // 5. profiles + auth.users temizle (başka org'da olmayan kullanıcılar için)
-    let deletedUsers = 0;
+    // 5. profiles temizle (sadece bu org'a ait kullanıcılar için)
+    // Başka orglarda da olan kullanıcıların profillerini silme
     if (userIds.length > 0) {
       for (const uid of userIds) {
-        // Başka aktif org üyeliği var mı?
+        // Bu kullanıcının başka aktif org üyeliği var mı?
         const { data: otherMemberships } = await adminClient
           .from('user_organizations')
           .select('id')
           .eq('user_id', uid)
+          .neq('organization_id', org_id)
           .limit(1);
 
         if (!otherMemberships || otherMemberships.length === 0) {
-          // Profile sil
-          const { error: profileErr } = await adminClient
-            .from('profiles')
-            .delete()
-            .eq('user_id', uid);
-          if (profileErr) console.warn(`[delete-org] profile silme (${uid}):`, profileErr.message);
+          // Başka org'u yok — profiles'ı sil
+          await adminClient.from('profiles').delete().eq('user_id', uid);
 
-          // auth.users'dan sil
+          // auth.users'dan da sil
           const { error: authDelErr } = await adminClient.auth.admin.deleteUser(uid);
           if (authDelErr) {
             console.warn(`[delete-org] auth user silme uyarısı (${uid}):`, authDelErr.message);
-          } else {
-            deletedUsers++;
           }
-        } else {
-          console.log(`[delete-org] Kullanıcı ${uid} başka org'da üye, silme atlandı`);
         }
       }
     }
@@ -170,13 +156,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[delete-org] Tamamlandı. Silinen kullanıcı: ${deletedUsers}/${userIds.length}`);
-
-    return new Response(JSON.stringify({ 
-      success: true, 
-      deleted_users: deletedUsers,
-      total_members: userIds.length,
-    }), {
+    return new Response(JSON.stringify({ success: true, deleted_users: userIds.length }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

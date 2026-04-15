@@ -122,7 +122,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
   const collapsed = sidebarCollapsed;
 
   // Design tokens (matching hekim sidebar)
-  const sidebarBg     = isDark ? 'linear-gradient(180deg, #0F172A 0%, #111827 38%, #0B1324 100%)' : 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)';
+  const sidebarBg     = isDark ? '#111827' : '#ffffff';
   const borderColor   = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
   const labelColor    = isDark ? 'rgba(255,255,255,0.28)' : '#cbd5e1';
   const textPrimary   = isDark ? '#f1f5f9' : '#0f172a';
@@ -130,7 +130,7 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
   const textFaint     = isDark ? '#334155' : '#cbd5e1';
   const statsBg       = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)';
   const profileBg     = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)';
-  const hoverBg       = isDark ? 'rgba(148,163,184,0.11)' : 'rgba(15,23,42,0.06)';
+  const hoverBg       = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)';
 
   const orgDisplayName = org?.displayName ?? org?.name ?? 'Organizasyon';
   const userInitial = (currentUser.ad || user?.email || 'U').charAt(0).toUpperCase();
@@ -155,7 +155,6 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         style={{
           background: sidebarBg,
           borderRight: `1px solid ${borderColor}`,
-          boxShadow: isDark ? '10px 0 30px rgba(2,6,23,0.38)' : '8px 0 24px rgba(15,23,42,0.06)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.26s cubic-bezier(0.4,0,0.2,1)',
         }}
       >
@@ -262,12 +261,11 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
                           justifyContent: collapsed ? 'center' : undefined,
                           gap: collapsed ? undefined : '10px',
                           background: isActive
-                            ? (isDark ? 'linear-gradient(135deg, rgba(14,165,233,0.18), rgba(2,132,199,0.09))' : 'linear-gradient(135deg, rgba(14,165,233,0.14), rgba(2,132,199,0.06))')
+                            ? 'rgba(14,165,233,0.1)'
                             : isHovered ? hoverBg : 'transparent',
                           border: isActive
-                            ? '1px solid rgba(14,165,233,0.28)'
+                            ? '1px solid rgba(14,165,233,0.2)'
                             : '1px solid transparent',
-                          boxShadow: isActive ? '0 6px 18px rgba(14,165,233,0.14)' : 'none',
                           transition: 'all 0.18s ease',
                         }}
                       >

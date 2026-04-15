@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../../store/AuthContext';
 import { useApp } from '../../store/AppContext';
 import { supabase } from '../../lib/supabase';
+import RealtimeBadge from '../../components/base/RealtimeBadge';
 import { downloadOsgbReportPdf } from './utils/osgbReportPdf';
 import { downloadOsgbReportExcel } from './utils/osgbReportExcel';
 import FirmaDetayModal from './components/FirmaDetayModal';
@@ -21,10 +22,7 @@ import OnboardingTour from '../../components/feature/OnboardingTour';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import FirmaModal from './components/FirmaModal';
 import UzmanModal from './components/UzmanModal';
-import PersonelZiyaretDetay from './components/PersonelZiyaretDetay';
-import ZiyaretTakvimi from './components/ZiyaretTakvimi';
-import ZiyaretPlanlama from './components/ZiyaretPlanlama';
-import FirmalarHaritasi from './components/FirmalarHaritasi';
+import AnalitikHaritaTab from './components/AnalitikHaritaTab';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -221,7 +219,7 @@ interface Uzman {
   osgb_role?: string | null;
 }
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'araclar' | 'raporlar' | 'copkutusu' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'analitik' | 'copkutusu' | 'ayarlar';
 
 interface FirmaDetay {
   id: string;
@@ -237,12 +235,14 @@ interface FirmaDetay {
 export default function OsgbDashboardPage() {
   const { user } = useAuth();
   const { org, addToast, mustChangePassword, theme } = useApp();
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    try { return (sessionStorage.getItem('osgb_active_tab') as Tab) || 'dashboard'; } catch { return 'dashboard'; }
+  });
 
   useEffect(() => {
-    // Sekme değişimini sakla ama başlangıçta her zaman dashboard'dan başla
-    try { localStorage.removeItem('osgb_active_tab'); } catch { /* ignore */ }
-  }, []);
+    try { sessionStorage.setItem('osgb_active_tab', activeTab); } catch { /* ignore */ }
+  }, [activeTab]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [osgbTheme, setOsgbTheme] = useState<'dark' | 'light'>(() => {
@@ -592,12 +592,24 @@ export default function OsgbDashboardPage() {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'organizations', filter: `parent_org_id=eq.${org.id}` },
         (p) => handleFirmaChange({ ...p, eventType: p.eventType }))
-      .subscribe();
+      // Ziyaret bildirimi — uzman saha girişi
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'osgb_ziyaretler', filter: `osgb_org_id=eq.${org.id}` },
+        (p: { new: Record<string, unknown> }) => {
+          const uzmanAd = (p.new?.uzman_ad ?? p.new?.uzman_email ?? 'Bir uzman') as string;
+          const firmaAd = (p.new?.firma_ad ?? 'firmaya') as string;
+          addToast(`${uzmanAd} — ${firmaAd} ziyareti başladı`, 'info');
+        })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') setRealtimeStatus('connected');
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setRealtimeStatus('disconnected');
+        else setRealtimeStatus('connecting');
+      });
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [org?.id, fetchData, updateFirmaInState, removeFirmaFromState]);
+  }, [org?.id, fetchData, updateFirmaInState, removeFirmaFromState, addToast]);
 
   // RLS fix effect REMOVED — artık her açılışta çalışmıyor
 
@@ -910,7 +922,8 @@ export default function OsgbDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen panel-shell" style={{ background: 'var(--bg-app)' }}>
+    <div className="min-h-screen" style={{ background: 'var(--bg-app)' }}>
+      <RealtimeBadge status={realtimeStatus} fixed hideWhenConnected />
 
       {/* Onboarding Tour */}
       <OnboardingTour />
@@ -956,7 +969,7 @@ export default function OsgbDashboardPage() {
       <main
         className={`transition-all duration-300 pt-[46px] min-h-screen ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
       >
-        <div className="px-2 sm:px-3 md:px-5 py-3 max-w-[1680px] panel-main-wrap rounded-2xl">
+        <div className="px-2 sm:px-3 md:px-5 py-3 max-w-[1680px]">
           {!dataLoading && (
             <>
               {/* ── DASHBOARD ── hidden/block ile mount edilmiş kalır, unmount olmaz */}
@@ -1084,48 +1097,6 @@ export default function OsgbDashboardPage() {
                 <ZiyaretlerTab isDark={isDark} />
               )}
 
-              {/* ── ANALİZ & HARİTA TAB ── */}
-              {activeTab === 'araclar' && (
-                <div className="space-y-8 page-enter">
-                  {/* Personel Ziyaret Detay */}
-                  <PersonelZiyaretDetay
-                    personeller={uzmanlar.map(u => ({
-                      user_id: u.user_id,
-                      display_name: u.display_name,
-                      email: u.email,
-                      is_active: u.is_active,
-                      active_firm_ids: u.active_firm_ids,
-                      osgb_role: u.osgb_role ?? null,
-                    }))}
-                    isDark={isDark}
-                  />
-                  {/* Ziyaret Planlama */}
-                  <ZiyaretPlanlama
-                    firmalar={altFirmalar.map(f => ({ id: f.id, name: f.name }))}
-                    personeller={uzmanlar.map(u => ({
-                      user_id: u.user_id,
-                      display_name: u.display_name,
-                      email: u.email,
-                      osgb_role: u.osgb_role ?? null,
-                    }))}
-                    isDark={isDark}
-                  />
-                  {/* Takvim */}
-                  <ZiyaretTakvimi
-                    isDark={isDark}
-                    onFirmaClick={fid => {
-                      const f = altFirmalar.find(x => x.id === fid);
-                      if (f) handleFirmaClick(f);
-                    }}
-                  />
-                  {/* Harita */}
-                  <FirmalarHaritasi
-                    isDark={isDark}
-                    onFirmaClick={(fid, fad) => handleFirmaClick({ id: fid, name: fad })}
-                  />
-                </div>
-              )}
-
               {/* ── ÇÖP KUTUSU TAB ── */}
               {activeTab === 'copkutusu' && org?.id && (
                 <CopKutusuTab orgId={org.id} isDark={isDark} onFirmaRestored={handleCopKutusuFirmaRestored} />
@@ -1139,6 +1110,11 @@ export default function OsgbDashboardPage() {
                   firmaCount={altFirmalar.length}
                   uzmanCount={uzmanlar.length}
                 />
+              )}
+
+              {/* ── ANALİTİK & HARİTA TAB ── */}
+              {activeTab === 'analitik' && (
+                <AnalitikHaritaTab isDark={isDark} />
               )}
 
               {/* ── RAPORLAR TAB ── */}

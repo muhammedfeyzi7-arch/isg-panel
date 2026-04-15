@@ -118,21 +118,6 @@ export default function FirmaModal({ open, orgId, onClose, onSuccess, addToast }
       const inviteCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
       const gpsRequired = firmaForm.ziyaretDogrulama === 'qr_konum';
 
-      // Sadece QR modunda da adres varsa geocode yap
-      let finalLat = gpsRequired ? firmaForm.firmaLat : null;
-      let finalLng = gpsRequired ? firmaForm.firmaLng : null;
-      if (!gpsRequired && firmaForm.adres.trim() && finalLat === null) {
-        try {
-          const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(firmaForm.adres.trim())}&limit=1`;
-          const geoRes = await fetch(geoUrl, { headers: { 'Accept-Language': 'tr' } });
-          const geoData = await geoRes.json() as Array<{ lat: string; lon: string }>;
-          if (geoData?.length > 0) {
-            finalLat = parseFloat(geoData[0].lat);
-            finalLng = parseFloat(geoData[0].lon);
-          }
-        } catch { /* sessizce geç */ }
-      }
-
       const { data: newFirma, error } = await supabase
         .from('organizations')
         .insert({
@@ -145,8 +130,8 @@ export default function FirmaModal({ open, orgId, onClose, onSuccess, addToast }
           gps_radius: gpsRequired ? firmaForm.izinVerilenMesafe : 1000,
           gps_strict: gpsRequired ? firmaForm.gpsStrict : true,
           firma_adres: firmaForm.adres.trim() || null,
-          firma_lat: finalLat,
-          firma_lng: finalLng,
+          firma_lat: gpsRequired ? firmaForm.firmaLat : null,
+          firma_lng: gpsRequired ? firmaForm.firmaLng : null,
         })
         .select()
         .maybeSingle();

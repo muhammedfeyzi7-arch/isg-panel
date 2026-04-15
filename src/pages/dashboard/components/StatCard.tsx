@@ -72,15 +72,14 @@ export default function StatCard({
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden cursor-default select-none group transition-all duration-300 isg-card"
+      className="relative rounded-2xl overflow-hidden cursor-default select-none group transition-all duration-300"
       style={{
-        background: 'linear-gradient(160deg, var(--bg-card-solid) 0%, var(--bg-card) 100%)',
+        background: 'var(--bg-card-solid)',
         border: '1px solid var(--border-subtle)',
-        backdropFilter: 'blur(8px)',
       }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)';
-        (e.currentTarget as HTMLElement).style.boxShadow = `0 20px 44px ${accentLight}, 0 8px 18px rgba(2,6,23,0.18)`;
+        (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)';
+        (e.currentTarget as HTMLElement).style.boxShadow = `0 16px 40px ${accentLight}, 0 4px 16px rgba(0,0,0,0.06)`;
         (e.currentTarget as HTMLElement).style.borderColor = accentBorder;
       }}
       onMouseLeave={e => {
@@ -92,10 +91,7 @@ export default function StatCard({
       {/* Accent top bar */}
       <div
         className="h-[3px] w-full"
-        style={{
-          background: v.barGrad,
-          boxShadow: `0 0 18px ${accentLight}`,
-        }}
+        style={{ background: v.barGrad }}
       />
 
       {/* Shimmer background blob */}
@@ -153,7 +149,6 @@ export default function StatCard({
               color: 'var(--text-primary)',
               letterSpacing: '-0.06em',
               fontVariantNumeric: 'tabular-nums',
-              textShadow: '0 1px 0 rgba(255,255,255,0.04)',
             }}
           >
             {animatedValue}

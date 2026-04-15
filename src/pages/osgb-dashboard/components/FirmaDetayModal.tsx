@@ -313,11 +313,6 @@ export default function FirmaDetayModal({
     return diff <= 7;
   }).length;
 
-  // GPS ihlal istatistikleri
-  const gpsliZiyaretler = ziyaretler.filter(z => z.gps_status !== null && z.gps_status !== undefined);
-  const ihlalSayisi = gpsliZiyaretler.filter(z => z.gps_status === 'too_far' || z.gps_status === 'no_permission').length;
-  const ihlalOrani = gpsliZiyaretler.length > 0 ? Math.round((ihlalSayisi / gpsliZiyaretler.length) * 100) : 0;
-
   const avgSure = (() => {
     const tamamlanan = ziyaretler.filter(z => z.cikis_saati);
     if (tamamlanan.length === 0) return null;
@@ -599,60 +594,14 @@ export default function FirmaDetayModal({
                       <i className="ri-bar-chart-line text-xs" style={{ color: '#0EA5E9' }} />
                       <p className="text-xs font-semibold" style={{ color: textMuted }}>Ziyaret Performansı</p>
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10.5px]" style={{ color: textFaint }}>Son 7 günde ziyaret</p>
-                          <span className="text-xs font-bold" style={{ color: son7Gun > 0 ? '#0EA5E9' : textFaint }}>{son7Gun} ziyaret</span>
-                        </div>
-                        <div className="h-2.5 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0' }}>
-                          <div className="h-full rounded-full transition-all"
-                            style={{ width: `${Math.min(100, (son7Gun / 7) * 100)}%`, background: son7Gun >= 5 ? '#0EA5E9' : son7Gun >= 2 ? '#F59E0B' : '#EF4444' }} />
-                        </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[10.5px]" style={{ color: textFaint }}>Son 7 günde ziyaret oranı</p>
+                        <span className="text-xs font-bold" style={{ color: son7Gun > 0 ? '#0EA5E9' : textFaint }}>{son7Gun} ziyaret</span>
                       </div>
-
-                      {/* GPS İhlal Oranı */}
-                      {gpsliZiyaretler.length > 0 && (
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <p className="text-[10.5px]" style={{ color: textFaint }}>GPS ihlal oranı</p>
-                            <span className="text-xs font-bold"
-                              style={{ color: ihlalOrani > 20 ? '#EF4444' : ihlalOrani > 5 ? '#F59E0B' : '#22C55E' }}>
-                              %{ihlalOrani} ({ihlalSayisi}/{gpsliZiyaretler.length})
-                            </span>
-                          </div>
-                          <div className="h-2.5 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0' }}>
-                            <div className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${ihlalOrani}%`,
-                                background: ihlalOrani > 20 ? '#EF4444' : ihlalOrani > 5 ? '#F59E0B' : '#22C55E',
-                              }} />
-                          </div>
-                          {ihlalSayisi > 0 && (
-                            <div className="flex items-center gap-1.5 mt-1.5 p-2 rounded-lg"
-                              style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                              <i className="ri-error-warning-line text-xs flex-shrink-0" style={{ color: '#EF4444' }} />
-                              <p className="text-[10px]" style={{ color: '#DC2626' }}>
-                                {ihlalSayisi} ziyarette konum ihlali tespit edildi
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Özet satırlar */}
-                      <div className="grid grid-cols-3 gap-2 pt-1">
-                        {[
-                          { label: 'Toplam', value: totalZiyaret, color: '#0EA5E9' },
-                          { label: 'Bu Hafta', value: son7Gun, color: '#10B981' },
-                          { label: 'İhlal', value: ihlalSayisi, color: ihlalSayisi > 0 ? '#EF4444' : '#22C55E' },
-                        ].map(s => (
-                          <div key={s.label} className="text-center p-2 rounded-lg"
-                            style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)' }}>
-                            <p className="text-base font-extrabold" style={{ color: s.color }}>{s.value}</p>
-                            <p className="text-[9px] mt-0.5" style={{ color: textFaint }}>{s.label}</p>
-                          </div>
-                        ))}
+                      <div className="h-2.5 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0' }}>
+                        <div className="h-full rounded-full transition-all"
+                          style={{ width: `${Math.min(100, (son7Gun / 7) * 100)}%`, background: son7Gun >= 5 ? '#0EA5E9' : son7Gun >= 2 ? '#F59E0B' : '#EF4444' }} />
                       </div>
                     </div>
                   </div>
@@ -794,7 +743,7 @@ export default function FirmaDetayModal({
                               style={{
                                 background: editForm.gpsStrict === opt.val ? 'rgba(14,165,233,0.1)' : 'var(--bg-item)',
                                 border: `1px solid ${editForm.gpsStrict === opt.val ? 'rgba(14,165,233,0.3)' : cardBorder}`,
-                                color: editForm.gpsStrict === opt.val ? '#0EA5E9' : '#94A3B8',
+                                color: editForm.gpsStrict === opt.val ? '#0EA5E9' : textMuted,
                               }}>
                               {opt.label}
                             </button>

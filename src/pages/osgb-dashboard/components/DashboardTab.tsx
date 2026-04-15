@@ -29,7 +29,6 @@ interface Ziyaret {
   giris_saati: string;
   cikis_saati: string | null;
   qr_ile_giris?: boolean;
-  gps_status?: 'ok' | 'too_far' | 'no_permission' | null;
 }
 
 interface DashboardTabProps {
@@ -130,8 +129,8 @@ function DashboardTabInner({
 
   const card: React.CSSProperties = {
     background: isDark
-      ? 'linear-gradient(145deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.98) 100%)'
-      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 100%)',
+      ? 'linear-gradient(145deg, rgba(26,31,55,0.97) 0%, rgba(15,19,32,0.99) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.99) 0%, rgba(248,250,252,0.97) 100%)',
     border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
     borderRadius: '20px',
     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
@@ -144,13 +143,13 @@ function DashboardTabInner({
     const initialFetch = async () => {
       setLoading(true);
       try {
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const { data } = await supabase
           .from('osgb_ziyaretler')
-          .select('id, uzman_user_id, firma_org_id, firma_ad, giris_saati, cikis_saati, qr_ile_giris, gps_status')
+          .select('id, uzman_user_id, firma_org_id, firma_ad, giris_saati, cikis_saati, qr_ile_giris')
           .eq('osgb_org_id', orgId)
-          .gte('giris_saati', ninetyDaysAgo.toISOString())
+          .gte('giris_saati', thirtyDaysAgo.toISOString())
           .order('giris_saati', { ascending: false });
         setZiyaretler(data ?? []);
       } catch (err) {
@@ -176,9 +175,9 @@ function DashboardTabInner({
         (payload) => {
           const yeni = payload.new as Ziyaret;
           // 30 gün filtresi — eski kayıt ise ekleme
-          const ninetyDaysAgo = new Date();
-          ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-          if (new Date(yeni.giris_saati) < ninetyDaysAgo) return;
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          if (new Date(yeni.giris_saati) < thirtyDaysAgo) return;
 
           setZiyaretler(prev => {
             // Duplicate kontrolü
@@ -236,7 +235,6 @@ function DashboardTabInner({
   weekAgo.setDate(weekAgo.getDate() - 7);
   const buHaftaZiyaretler = ziyaretler.filter(z => new Date(z.giris_saati) >= weekAgo);
 
-  // Son 30 gün firma → son ziyaret tarihi map'i
   const firmaLastVisit: Record<string, string> = {};
   ziyaretler.forEach(z => {
     if (!firmaLastVisit[z.firma_org_id] || z.giris_saati > firmaLastVisit[z.firma_org_id]) {
@@ -264,21 +262,8 @@ function DashboardTabInner({
     return f?.name ?? firmaAd ?? 'Bilinmeyen Firma';
   };
 
-  // 30+ gün ziyaret edilmemiş firmalar
-  const ziyaretsizFirmalar = altFirmalar.filter(f => {
-    const lastVisit = firmaLastVisit[f.id];
-    if (!lastVisit) return true; // hiç ziyaret yok
-    const diff = (Date.now() - new Date(lastVisit).getTime()) / 86400000;
-    return diff > 30;
-  });
-
-  // Son 7 gündeki GPS ihlalleri
-  const son7GunIhlaller = ziyaretler.filter(z => {
-    const diff = (Date.now() - new Date(z.giris_saati).getTime()) / 86400000;
-    return diff <= 7 && (z.gps_status === 'too_far' || z.gps_status === 'no_permission');
-  });
-
   void bugunZiyaretler;
+
   void textMuted;
 
   return (
@@ -287,89 +272,116 @@ function DashboardTabInner({
       {/* ── KPI KARTLARI (PREMIUM) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-        {/* Müşteri Firma */}
-        <div className="rounded-2xl p-5 cursor-pointer group" style={card}
+        {/* Müşteri Firma - Coral/Orange */}
+        <div
+          className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #f97316 0%, #ef4444 100%)',
+            boxShadow: '0 8px 24px rgba(249,115,22,0.35)',
+          }}
           onClick={() => setActiveTab('firmalar')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = isDark ? '0 12px 32px rgba(0,0,0,0.35)' : '0 12px 28px rgba(15,23,42,0.1)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.08))' }}>
-                <i className="ri-building-2-fill text-sm" style={{ color: '#0EA5E9' }} />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: textSecondary }}>Müşteri Firma</span>
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 36px rgba(249,115,22,0.45)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(249,115,22,0.35)'; }}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 opacity-20" style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
+          <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
+          <div className="relative flex items-center justify-between mb-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
+              <i className="ri-building-2-fill text-lg text-white" />
             </div>
+            <i className="ri-arrow-right-up-line text-white opacity-60 text-lg" />
           </div>
-          <p className="text-[32px] font-black leading-none mb-2" style={{ color: textPrimary }}>{altFirmalar.length}</p>
-          <p className="text-[11px] font-medium" style={{ color: textSecondary }}>
-            {altFirmalar.length === 0 ? 'Henüz firma yok' : `${altFirmalar.filter(f => f.uzmanAd).length} firmaya uzman atanmış`}
+          <p className="relative text-[34px] font-black leading-none text-white mb-1">{altFirmalar.length}</p>
+          <p className="relative text-[12px] font-semibold text-white opacity-80">Müşteri Firma</p>
+          <p className="relative text-[10px] mt-1 text-white opacity-60">
+            {altFirmalar.filter(f => f.uzmanAd).length} firmaya uzman atanmış
           </p>
         </div>
 
-        {/* Aktif Ziyaret */}
-        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
-          style={{ ...card, border: aktifZiyaretler.length > 0 ? '1px solid rgba(34,197,94,0.3)' : card.border, boxShadow: aktifZiyaretler.length > 0 ? '0 0 0 1px rgba(34,197,94,0.1), inset 0 0 32px rgba(34,197,94,0.04)' : 'none' }}
+        {/* Aktif Ziyaret - Teal/Cyan */}
+        <div
+          className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
+          style={{
+            background: aktifZiyaretler.length > 0
+              ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
+              : 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+            boxShadow: aktifZiyaretler.length > 0
+              ? '0 8px 24px rgba(6,182,212,0.4)'
+              : '0 8px 24px rgba(14,165,233,0.35)',
+          }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = aktifZiyaretler.length > 0 ? '0 12px 32px rgba(34,197,94,0.2)' : (isDark ? '0 12px 32px rgba(0,0,0,0.35)' : '0 12px 28px rgba(15,23,42,0.1)'); }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = aktifZiyaretler.length > 0 ? '0 0 0 1px rgba(34,197,94,0.1), inset 0 0 32px rgba(34,197,94,0.04)' : 'none'; }}>
-          {aktifZiyaretler.length > 0 && (
-            <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 30% 50%, rgba(34,197,94,0.08) 0%, transparent 65%)' }} />
-          )}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; }}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 opacity-20" style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
+          <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
           <div className="relative flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,197,94,0.08))' }}>
-                <i className="ri-map-pin-user-fill text-sm" style={{ color: '#22C55E' }} />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: textSecondary }}>Aktif Ziyaret</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
+              <i className="ri-map-pin-user-fill text-lg text-white" />
             </div>
-            {aktifZiyaretler.length > 0 && (
+            {aktifZiyaretler.length > 0 ? (
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
-                <span className="text-[10px] font-bold" style={{ color: '#22C55E' }}>CANLI</span>
+                <span className="w-2 h-2 rounded-full animate-pulse bg-white opacity-80" />
+                <span className="text-[10px] font-bold text-white opacity-80">CANLI</span>
               </div>
-            )}
+            ) : <i className="ri-arrow-right-up-line text-white opacity-60 text-lg" />}
           </div>
-          <p className="relative text-[32px] font-black leading-none mb-2" style={{ color: aktifZiyaretler.length > 0 ? '#22C55E' : textPrimary }}>{aktifZiyaretler.length}</p>
-          <p className="relative text-[11px] font-medium" style={{ color: aktifZiyaretler.length > 0 ? '#22C55E' : textSecondary }}>
+          <p className="relative text-[34px] font-black leading-none text-white mb-1">{aktifZiyaretler.length}</p>
+          <p className="relative text-[12px] font-semibold text-white opacity-80">Aktif Ziyaret</p>
+          <p className="relative text-[10px] mt-1 text-white opacity-60">
             {aktifZiyaretler.length === 0 ? 'Sahada kimse yok' : `${aktifZiyaretler.length} personel şu an sahada`}
           </p>
         </div>
 
-        {/* Bugünkü Ziyaret */}
-        <div className="rounded-2xl p-5 cursor-pointer group" style={card}
+        {/* Bugünkü Ziyaret - Indigo/Purple */}
+        <div
+          className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            boxShadow: '0 8px 24px rgba(99,102,241,0.4)',
+          }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = isDark ? '0 12px 32px rgba(0,0,0,0.35)' : '0 12px 28px rgba(15,23,42,0.1)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.08))' }}>
-                <i className="ri-calendar-check-fill text-sm" style={{ color: '#0EA5E9' }} />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: textSecondary }}>Bugünkü Ziyaret</span>
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 36px rgba(99,102,241,0.5)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(99,102,241,0.4)'; }}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 opacity-20" style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
+          <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
+          <div className="relative flex items-center justify-between mb-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
+              <i className="ri-calendar-check-fill text-lg text-white" />
             </div>
+            <i className="ri-arrow-right-up-line text-white opacity-60 text-lg" />
           </div>
-          <p className="text-[32px] font-black leading-none mb-2" style={{ color: textPrimary }}>{bugunZiyaretler.length}</p>
-          <p className="text-[11px] font-medium" style={{ color: textSecondary }}>Bu hafta {buHaftaZiyaretler.length} ziyaret</p>
+          <p className="relative text-[34px] font-black leading-none text-white mb-1">{bugunZiyaretler.length}</p>
+          <p className="relative text-[12px] font-semibold text-white opacity-80">Bugünkü Ziyaret</p>
+          <p className="relative text-[10px] mt-1 text-white opacity-60">Bu hafta {buHaftaZiyaretler.length} ziyaret</p>
         </div>
 
-        {/* Son Aktivite */}
-        <div className="rounded-2xl p-5 cursor-pointer group" style={card}
+        {/* Son Aktivite - Emerald/Green */}
+        <div
+          className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            boxShadow: '0 8px 24px rgba(16,185,129,0.35)',
+          }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = isDark ? '0 12px 32px rgba(0,0,0,0.35)' : '0 12px 28px rgba(15,23,42,0.1)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.08))' }}>
-                <i className="ri-pulse-fill text-sm" style={{ color: '#F59E0B' }} />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: textSecondary }}>Son Aktivite</span>
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 36px rgba(16,185,129,0.45)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(16,185,129,0.35)'; }}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 opacity-20" style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
+          <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
+          <div className="relative flex items-center justify-between mb-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
+              <i className="ri-pulse-fill text-lg text-white" />
             </div>
+            <i className="ri-arrow-right-up-line text-white opacity-60 text-lg" />
           </div>
-          <p className="text-base font-black leading-snug mb-1" style={{ color: '#F59E0B' }}>
+          <p className="relative text-base font-black leading-snug text-white mb-1">
             {sonZiyaret ? timeAgo(sonZiyaret.giris_saati) : '—'}
           </p>
-          {sonZiyaret && <p className="text-[11px] font-semibold truncate" style={{ color: textSecondary }}>{getFirmaAd(sonZiyaret.firma_org_id, sonZiyaret.firma_ad)}</p>}
-          {!sonZiyaret && <p className="text-[11px] font-medium" style={{ color: textSecondary }}>Henüz ziyaret yok</p>}
+          <p className="relative text-[12px] font-semibold text-white opacity-80">Son Aktivite</p>
+          {sonZiyaret && <p className="relative text-[10px] mt-1 text-white opacity-60 truncate">{getFirmaAd(sonZiyaret.firma_org_id, sonZiyaret.firma_ad)}</p>}
+          {!sonZiyaret && <p className="relative text-[10px] mt-1 text-white opacity-60">Henüz ziyaret yok</p>}
         </div>
       </div>
 
@@ -551,132 +563,6 @@ function DashboardTabInner({
           )}
         </div>
       </div>
-
-      {/* ── UYARI KARTLARI ── */}
-      {(ziyaretsizFirmalar.length > 0 || son7GunIhlaller.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* 30+ gün ziyaret edilmeyen firmalar */}
-          {ziyaretsizFirmalar.length > 0 && (
-            <div className="rounded-2xl overflow-hidden" style={card}>
-              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3"
-                style={{ borderBottom: `1px solid ${isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.1)'}` }}>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(239,68,68,0.1)' }}>
-                  <i className="ri-alarm-warning-line text-sm" style={{ color: '#EF4444' }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold" style={{ color: '#EF4444' }}>Uzun Süredir Ziyaret Yok</p>
-                  <p className="text-[10px]" style={{ color: textSecondary }}>30+ gündür ziyaret yapılmayan firmalar</p>
-                </div>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full flex-shrink-0"
-                  style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
-                  {ziyaretsizFirmalar.length}
-                </span>
-              </div>
-              <div className="px-5 py-3 space-y-2">
-                {ziyaretsizFirmalar.slice(0, 4).map(f => {
-                  const lastVisit = firmaLastVisit[f.id];
-                  const days = lastVisit ? Math.floor((Date.now() - new Date(lastVisit).getTime()) / 86400000) : null;
-                  return (
-                    <div key={f.id}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all"
-                      style={{
-                        background: isDark ? 'rgba(239,68,68,0.04)' : 'rgba(239,68,68,0.03)',
-                        border: '1px solid rgba(239,68,68,0.12)',
-                      }}
-                      onClick={() => onFirmaClick({ id: f.id, name: f.name })}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(239,68,68,0.04)' : 'rgba(239,68,68,0.03)'; }}>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                        style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
-                        {f.name.charAt(0).toUpperCase()}
-                      </div>
-                      <p className="text-xs font-semibold flex-1 truncate" style={{ color: textPrimary }}>{f.name}</p>
-                      <span className="text-[10px] font-bold flex-shrink-0"
-                        style={{ color: '#EF4444' }}>
-                        {days === null ? 'Hiç' : `${days}g`}
-                      </span>
-                    </div>
-                  );
-                })}
-                {ziyaretsizFirmalar.length > 4 && (
-                  <button onClick={() => setActiveTab('firmalar')}
-                    className="w-full text-center text-[10px] font-semibold py-1.5 rounded-lg cursor-pointer"
-                    style={{ color: '#EF4444', background: 'rgba(239,68,68,0.05)' }}>
-                    +{ziyaretsizFirmalar.length - 4} firma daha →
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* GPS ihlal bildirimi */}
-          {son7GunIhlaller.length > 0 && (
-            <div className="rounded-2xl overflow-hidden" style={card}>
-              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3"
-                style={{ borderBottom: `1px solid ${isDark ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.1)'}` }}>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(245,158,11,0.1)' }}>
-                  <i className="ri-map-pin-line text-sm" style={{ color: '#F59E0B' }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold" style={{ color: '#D97706' }}>Son 7 Günde GPS İhlali</p>
-                  <p className="text-[10px]" style={{ color: textSecondary }}>Konum dışı veya GPS alınamayan ziyaretler</p>
-                </div>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full flex-shrink-0"
-                  style={{ background: 'rgba(245,158,11,0.12)', color: '#D97706', border: '1px solid rgba(245,158,11,0.25)' }}>
-                  {son7GunIhlaller.length}
-                </span>
-              </div>
-              <div className="px-5 py-3 space-y-2">
-                {son7GunIhlaller.slice(0, 4).map(z => {
-                  const gpsStatus = z.gps_status;
-                  const uzmanAd = getUzmanAd(z.uzman_user_id);
-                  const firmaAd = getFirmaAd(z.firma_org_id, z.firma_ad);
-                  const tarih = new Date(z.giris_saati).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
-                  return (
-                    <div key={z.id}
-                      className="flex items-start gap-2.5 px-3 py-2 rounded-xl"
-                      style={{
-                        background: gpsStatus === 'too_far'
-                          ? (isDark ? 'rgba(239,68,68,0.04)' : 'rgba(239,68,68,0.03)')
-                          : (isDark ? 'rgba(245,158,11,0.04)' : 'rgba(245,158,11,0.03)'),
-                        border: `1px solid ${gpsStatus === 'too_far' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)'}`,
-                      }}>
-                      <i className={`ri-map-pin-line text-xs flex-shrink-0 mt-0.5`}
-                        style={{ color: gpsStatus === 'too_far' ? '#EF4444' : '#F59E0B' }} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <p className="text-[10px] font-bold truncate" style={{ color: textPrimary }}>{uzmanAd}</p>
-                          <span className="text-[9px]" style={{ color: textSecondary }}>→</span>
-                          <p className="text-[10px] truncate" style={{ color: textSecondary }}>{firmaAd}</p>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{
-                              background: gpsStatus === 'too_far' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
-                              color: gpsStatus === 'too_far' ? '#EF4444' : '#D97706',
-                            }}>
-                            {gpsStatus === 'too_far' ? 'Konum Dışı' : 'GPS Yok'}
-                          </span>
-                          <span className="text-[9px]" style={{ color: textSecondary }}>{tarih}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {son7GunIhlaller.length > 4 && (
-                  <button onClick={() => setActiveTab('ziyaretler')}
-                    className="w-full text-center text-[10px] font-semibold py-1.5 rounded-lg cursor-pointer"
-                    style={{ color: '#D97706', background: 'rgba(245,158,11,0.05)' }}>
-                    +{son7GunIhlaller.length - 4} ihlal daha →
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── BUGÜN SAHA AKIŞI ── */}
       {son5.length > 0 && (

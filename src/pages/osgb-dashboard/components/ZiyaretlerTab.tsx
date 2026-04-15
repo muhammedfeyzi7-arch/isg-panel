@@ -611,14 +611,41 @@ function ZiyaretlerTabInner({ isDark }: ZiyaretlerTabProps) {
     <div className="space-y-4 page-enter">
 
       {/* HEADER */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <h2 className="text-base font-bold" style={{ color: textPrimary }}>Saha Ziyaretleri</h2>
-          <p className="text-xs mt-0.5" style={{ color: textMuted }}>Uzmanların saha ziyaret takibi</p>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-base font-bold" style={{ color: textPrimary }}>Saha Ziyaretleri</h2>
+            <p className="text-xs mt-0.5" style={{ color: textMuted }}>Uzmanların saha ziyaret takibi</p>
+          </div>
+          <div className="ml-auto flex items-center gap-1.5">
+            {/* Excel */}
+            <button onClick={() => { setExporting(true); void exportZiyaretlerExcel(ziyaretler, filterTarih).finally(() => setExporting(false)); }}
+              disabled={exporting || ziyaretler.length === 0}
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap transition-all"
+              style={{
+                background: ziyaretler.length > 0 ? 'rgba(14,165,233,0.1)' : 'var(--bg-item)',
+                border: `1px solid ${ziyaretler.length > 0 ? 'rgba(14,165,233,0.25)' : 'var(--border-subtle)'}`,
+                color: ziyaretler.length > 0 ? '#0EA5E9' : textMuted,
+                opacity: exporting ? 0.7 : 1,
+              }}>
+              {exporting ? <><i className="ri-loader-4-line animate-spin text-xs" /><span className="hidden sm:inline">İndiriliyor...</span></> : <><i className="ri-file-excel-2-line text-sm" /><span className="hidden sm:inline">Excel</span></>}
+            </button>
+
+            {/* Yenile */}
+            <button onClick={() => { void fetchZiyaretler(); void fetchTumZiyaretler(); }}
+              className="w-8 h-8 flex items-center justify-center rounded-xl cursor-pointer transition-all"
+              style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; }}>
+              <i className="ri-refresh-line text-sm" />
+            </button>
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
+
+        {/* Filtre bar — ayrı satır, mobilde scroll */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {/* Dönem */}
-          <div className="flex items-center gap-0.5 p-1 rounded-xl"
+          <div className="flex items-center gap-0.5 p-1 rounded-xl flex-shrink-0"
             style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)' }}>
             {([
               { id: 'bugun', label: 'Bugün' },
@@ -639,19 +666,19 @@ function ZiyaretlerTabInner({ isDark }: ZiyaretlerTabProps) {
           </div>
 
           {filterTarih === 'ozel' && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <input type="date" value={filterOzelBaslangic} onChange={e => setFilterOzelBaslangic(e.target.value)}
-                className="text-xs px-3 py-2 rounded-xl outline-none"
-                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary, colorScheme: isDark ? 'dark' : 'light' }} />
-              <span className="text-xs" style={{ color: textMuted }}>—</span>
+                className="text-xs px-2 py-1.5 rounded-xl outline-none"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary, colorScheme: isDark ? 'dark' : 'light', maxWidth: '130px' }} />
+              <span className="text-xs flex-shrink-0" style={{ color: textMuted }}>—</span>
               <input type="date" value={filterOzelBitis} onChange={e => setFilterOzelBitis(e.target.value)}
-                className="text-xs px-3 py-2 rounded-xl outline-none"
-                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary, colorScheme: isDark ? 'dark' : 'light' }} />
+                className="text-xs px-2 py-1.5 rounded-xl outline-none"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-input)', color: textPrimary, colorScheme: isDark ? 'dark' : 'light', maxWidth: '130px' }} />
             </div>
           )}
 
           {/* Filtre */}
-          <div className="relative" ref={filterRef}>
+          <div className="relative flex-shrink-0" ref={filterRef}>
             <button onClick={() => setFilterOpen(v => !v)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap"
               style={{
@@ -734,27 +761,6 @@ function ZiyaretlerTabInner({ isDark }: ZiyaretlerTabProps) {
             )}
           </div>
 
-          {/* Excel */}
-          <button onClick={() => { setExporting(true); void exportZiyaretlerExcel(ziyaretler, filterTarih).finally(() => setExporting(false)); }}
-            disabled={exporting || ziyaretler.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer whitespace-nowrap transition-all"
-            style={{
-              background: ziyaretler.length > 0 ? 'rgba(14,165,233,0.1)' : 'var(--bg-item)',
-              border: `1px solid ${ziyaretler.length > 0 ? 'rgba(14,165,233,0.25)' : 'var(--border-subtle)'}`,
-              color: ziyaretler.length > 0 ? '#0EA5E9' : textMuted,
-              opacity: exporting ? 0.7 : 1,
-            }}>
-            {exporting ? <><i className="ri-loader-4-line animate-spin text-xs" />İndiriliyor...</> : <><i className="ri-file-excel-2-line text-sm" />Excel</>}
-          </button>
-
-          {/* Yenile */}
-          <button onClick={() => { void fetchZiyaretler(); void fetchTumZiyaretler(); }}
-            className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all"
-            style={{ background: 'var(--bg-item)', border: '1px solid var(--border-subtle)', color: textMuted }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = '#0EA5E9'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; }}>
-            <i className="ri-refresh-line text-sm" />
-          </button>
         </div>
       </div>
 

@@ -147,6 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearAuthStorage]);
 
   const logout = useCallback(async () => {
+    // Tab hafızasını temizle — çıkışta her panel genel bakıştan başlasın
+    const TAB_KEYS = ['uzman_active_tab', 'hekim_active_tab', 'osgb_active_tab', 'admin_active_tab', 'isg_active_module'];
+    TAB_KEYS.forEach(key => { try { sessionStorage.removeItem(key); } catch { /* ignore */ } });
     clearAuthStorage();
     try {
       await supabase.auth.signOut({ scope: 'global' });

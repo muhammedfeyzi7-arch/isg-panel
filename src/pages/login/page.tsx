@@ -5,19 +5,33 @@ import { useNavigate, Link } from 'react-router-dom';
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
 
+const REMEMBER_KEY = 'isg_remember_me';
+const REMEMBER_EMAIL_KEY = 'isg_remember_email';
+const REMEMBER_PW_KEY = 'isg_remember_pw';
+
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+
+  // Beni Hatırla — localStorage'dan yükle
+  const [rememberMe, setRememberMe] = useState(() => {
+    try { return localStorage.getItem(REMEMBER_KEY) === '1'; } catch { return false; }
+  });
+  const [email, setEmail] = useState(() => {
+    try { return rememberMe ? (localStorage.getItem(REMEMBER_EMAIL_KEY) || '') : ''; } catch { return ''; }
+  });
+  const [password, setPassword] = useState(() => {
+    try { return rememberMe ? (localStorage.getItem(REMEMBER_PW_KEY) || '') : ''; } catch { return ''; }
+  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    emailRef.current?.focus();
-  }, []);
+    // Eğer hatırlanan bilgi yoksa email'e focus
+    if (!email) emailRef.current?.focus();
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -27,6 +41,20 @@ export default function LoginPage() {
     }
     setLoading(true);
     setError(null);
+
+    // Beni Hatırla kaydet/temizle
+    try {
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_KEY, '1');
+        localStorage.setItem(REMEMBER_EMAIL_KEY, email.trim());
+        localStorage.setItem(REMEMBER_PW_KEY, password);
+      } else {
+        localStorage.removeItem(REMEMBER_KEY);
+        localStorage.removeItem(REMEMBER_EMAIL_KEY);
+        localStorage.removeItem(REMEMBER_PW_KEY);
+      }
+    } catch { /* ignore */ }
+
     const { error: loginError } = await login(email.trim(), password);
     if (loginError) {
       setLoading(false);
@@ -313,6 +341,27 @@ export default function LoginPage() {
                   <i className={`${showPassword ? 'ri-eye-off-line' : 'ri-eye-line'} text-sm`} />
                 </button>
               </div>
+            </div>
+
+            {/* Beni Hatırla */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                <div
+                  onClick={() => setRememberMe(v => !v)}
+                  className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
+                  style={{
+                    background: rememberMe ? 'linear-gradient(135deg, #0891B2, #06B6D4)' : '#fff',
+                    border: rememberMe ? '1.5px solid #0891B2' : '1.5px solid #d1d8e0',
+                    boxShadow: rememberMe ? '0 0 0 3px rgba(8,145,178,0.12)' : 'none',
+                  }}
+                >
+                  {rememberMe && <i className="ri-check-line text-[11px] text-white font-bold" />}
+                </div>
+                <span className="text-sm font-medium" style={{ color: '#475569' }}>Beni Hatırla</span>
+              </label>
+              <span className="text-[11px]" style={{ color: '#b0bac5' }}>
+                {rememberMe ? 'Giriş bilgileri kaydedilecek' : 'Bu oturuma özel'}
+              </span>
             </div>
 
             {/* Error */}

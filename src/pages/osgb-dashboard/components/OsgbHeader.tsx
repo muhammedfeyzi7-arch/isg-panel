@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 import SupportModal from '@/components/feature/SupportModal';
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'araclar' | 'raporlar' | 'copkutusu' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'analitik' | 'copkutusu' | 'ayarlar';
 
 interface OsgbHeaderProps {
   activeTab: Tab;
@@ -20,14 +20,14 @@ interface OsgbHeaderProps {
 }
 
 const tabMeta: Record<Tab, { label: string; icon: string }> = {
-  dashboard:  { label: 'Genel Bakış',    icon: 'ri-layout-grid-line' },
-  firmalar:   { label: 'Firmalar',       icon: 'ri-building-3-line' },
-  uzmanlar:   { label: 'Uzmanlar',       icon: 'ri-shield-user-line' },
-  ziyaretler: { label: 'Ziyaretler',     icon: 'ri-map-pin-2-line' },
-  araclar:    { label: 'Analiz & Harita', icon: 'ri-pie-chart-2-line' },
-  raporlar:   { label: 'Raporlar',       icon: 'ri-bar-chart-grouped-line' },
-  copkutusu:  { label: 'Çöp Kutusu',    icon: 'ri-delete-bin-2-line' },
-  ayarlar:    { label: 'Ayarlar',        icon: 'ri-settings-3-line' },
+  dashboard:  { label: 'Genel Bakış',      icon: 'ri-layout-grid-line' },
+  firmalar:   { label: 'Firmalar',         icon: 'ri-building-3-line' },
+  uzmanlar:   { label: 'Uzmanlar',         icon: 'ri-shield-user-line' },
+  ziyaretler: { label: 'Ziyaretler',       icon: 'ri-map-pin-2-line' },
+  raporlar:   { label: 'Raporlar',         icon: 'ri-bar-chart-grouped-line' },
+  analitik:   { label: 'Analiz & Harita',  icon: 'ri-map-2-line' },
+  copkutusu:  { label: 'Çöp Kutusu',      icon: 'ri-delete-bin-2-line' },
+  ayarlar:    { label: 'Ayarlar',          icon: 'ri-settings-3-line' },
 };
 
 interface SupportNotification {
@@ -145,21 +145,21 @@ export default function OsgbHeader({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const headerBg     = isDark ? 'var(--bg-header, rgba(15,23,42,0.95))' : 'rgba(255,255,255,0.97)';
-  const headerBorder = isDark ? 'var(--border-subtle, rgba(255,255,255,0.07))' : 'rgba(15,23,42,0.075)';
-  const textMuted    = '#64748B';
-  const nameColor    = isDark ? '#EDF2F7' : '#0F172A';
-  const iconBtnBg    = isDark ? 'var(--bg-item, rgba(255,255,255,0.05))' : 'rgba(15,23,42,0.038)';
-  const iconBtnBorder= isDark ? 'var(--border-main, rgba(255,255,255,0.08))' : 'rgba(15,23,42,0.09)';
-  const inputBg      = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)';
+  const headerBg     = isDark ? 'rgba(15,19,32,0.96)' : 'rgba(255,255,255,0.97)';
+  const headerBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.075)';
+  const textMuted    = isDark ? 'rgba(255,255,255,0.35)' : '#64748B';
+  const nameColor    = isDark ? '#E0E7FF' : '#0F172A';
+  const iconBtnBg    = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.038)';
+  const iconBtnBorder= isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)';
+  const inputBg      = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)';
   const inputBorder  = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)';
-  const dropdownBg   = isDark ? 'var(--bg-card-solid, #1e293b)' : 'rgba(255,255,255,0.99)';
+  const dropdownBg   = isDark ? '#1a1f37' : 'rgba(255,255,255,0.99)';
   const dropdownBorder= isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.09)';
   const dropdownHover= isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.038)';
 
-  // ACCENT = #0EA5E9, ACCENT_DARK = #0284C7
-  const ACCENT = '#0EA5E9';
-  const ACCENT_DARK = '#0284C7';
+  // ACCENT = indigo/violet
+  const ACCENT = '#818CF8';
+  const ACCENT_DARK = '#6366F1';
 
   const navToTab = (tab: Tab) => {
     setActiveTab?.(tab);

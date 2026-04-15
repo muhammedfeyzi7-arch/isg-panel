@@ -361,9 +361,8 @@ export default function ZiyaretCheckIn() {
             setGpsStatus('ok');
           }
         } else {
-          // Firma GPS zorunlu değil ve koordinat yok — yine de konumu al, kaydet (ihlal olmaz)
           setGpsStatus('loading');
-          coords = await getGpsCoords(6000).catch(() => null);
+          coords = await getGpsCoords();
           checkInGpsStatus = coords ? 'ok' : 'no_permission';
           setGpsStatus(coords ? 'ok' : 'idle');
         }
@@ -403,6 +402,28 @@ export default function ZiyaretCheckIn() {
           .maybeSingle();
 
         if (error) throw error;
+
+        // GPS ihlali varsa activity_logs'a kaydet
+        if (checkInGpsStatus === 'too_far' && yeni?.id) {
+          const distStr = checkInDistanceM != null
+            ? (checkInDistanceM >= 1000 ? `${(checkInDistanceM / 1000).toFixed(1)} km` : `${checkInDistanceM} m`)
+            : 'bilinmiyor';
+          supabase.from('activity_logs').insert({
+            organization_id: orgInfo.orgId,
+            user_id: authUserId,
+            action: 'gps_ihlal',
+            entity_type: 'osgb_ziyaretler',
+            entity_id: yeni.id,
+            details: {
+              uzman_ad: orgInfo.uzman || user?.email || 'Uzman',
+              firma_org_id: firmaId,
+              firma_ad: firmaData.name,
+              mesafe: distStr,
+              check_in_distance_m: checkInDistanceM,
+              giris_saati: now,
+            },
+          }).then(() => { /* fire and forget */ });
+        }
 
         setAktifZiyaret({
           id:          yeni?.id ?? null,

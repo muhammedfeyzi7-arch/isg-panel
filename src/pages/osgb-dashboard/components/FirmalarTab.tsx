@@ -375,23 +375,28 @@ function FirmalarTabInner({
                     </div>
                     {!vizitLoading && <VisitBadge days={days} />}
                   </div>
-                  <div className="flex items-center gap-2 justify-end flex-wrap pt-2" style={{ borderTop: `1px solid ${borderColor}` }}>
+                  <div className="flex items-center gap-1.5 justify-end pt-2" style={{ borderTop: `1px solid ${borderColor}` }}>
                     {!hasUzman && (
-                      <button onClick={() => onAtamaYap(f.id)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
+                      <button onClick={() => onAtamaYap(f.id)} title="Uzman Ata"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
                         style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#D97706' }}>
-                        <i className="ri-links-line text-xs" />Uzman Ata
+                        <i className="ri-links-line text-sm" />
                       </button>
                     )}
-                    <button onClick={() => onFirmaClick({ id: f.id, name: f.name })}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
+                    <button onClick={() => onFirmaClick({ id: f.id, name: f.name })} title="Detay"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
                       style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}>
-                      <i className="ri-edit-line text-xs" />Düzenle
+                      <i className="ri-eye-line text-sm" />
                     </button>
-                    <button onClick={() => { setSilOnayId(f.id); setSilAdi(f.name); }}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer text-[11px] font-semibold whitespace-nowrap"
+                    <button onClick={() => onFirmaClick({ id: f.id, name: f.name })} title="Düzenle"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
+                      style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}>
+                      <i className="ri-edit-line text-sm" />
+                    </button>
+                    <button onClick={() => { setSilOnayId(f.id); setSilAdi(f.name); }} title="Sil"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
                       style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}>
-                      <i className="ri-delete-bin-line text-xs" />Sil
+                      <i className="ri-delete-bin-line text-sm" />
                     </button>
                   </div>
                 </div>

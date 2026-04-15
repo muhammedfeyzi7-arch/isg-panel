@@ -218,7 +218,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen panel-shell" style={{ background: 'var(--bg-app)', transition: 'background 0.3s ease' }}>
+    <div className="min-h-screen" style={{ background: 'var(--bg-app)', transition: 'background 0.3s ease' }}>
       <ConnectionBanner />
 
       {/* Mobile overlay */}
@@ -253,12 +253,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         }`}
         style={{ paddingTop: hasBanner ? '84px' : '56px' }}
       >
-        <div
-          className="px-2 sm:px-3 md:px-5 py-2 sm:py-3 max-w-[1680px] panel-main-wrap rounded-2xl"
-          style={{
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0))',
-          }}
-        >
+        <div className="px-2 sm:px-3 md:px-5 py-2 sm:py-3 max-w-[1680px]">
           <div
             key={`${animKey}_${transitionKey}`}
             className="page-enter"
