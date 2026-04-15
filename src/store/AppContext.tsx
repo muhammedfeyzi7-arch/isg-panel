@@ -446,16 +446,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Merged data (gezici uzman: all firms merged) ────────────────────────
-  // Tüm merge işlemleri tek useMemo'da — 8 ayrı memo yerine 1 memo
-  // Sadece ilgili veriler değişince yeniden hesaplar
   const isGezici = org?.osgbRole === 'gezici_uzman';
 
-  // Yardımcı: iki liste merge et (dedup by id)
-  function mergeList<T extends { id: string }>(base: T[], extra: T[]): T[] {
+  // Yardımcı: iki liste merge et (dedup by id) — hook dışında sabit referans
+  const mergeListFn = useCallback(<T extends { id: string }>(base: T[], extra: T[]): T[] => {
     if (extra.length === 0) return base;
     const baseIds = new Set(base.map(r => r.id));
     return [...base, ...extra.filter(r => !baseIds.has(r.id))];
-  }
+  }, []);
 
   // Gezici uzman merge — sadece isGezici=true iken çalışır
   const geziciMergedData = useMemo(() => {
@@ -464,50 +462,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const yeniFirmalar = geziciFirmalar.filter(f => !mevcutIds.has(f.id));
     return {
       firmalar: [...yeniFirmalar, ...store.firmalar],
-      personeller: mergeList(store.personeller, extraFirmaVeriler.personeller),
-      evraklar: mergeList(store.evraklar, extraFirmaVeriler.evraklar),
-      egitimler: mergeList(store.egitimler, extraFirmaVeriler.egitimler),
-      muayeneler: mergeList(store.muayeneler, extraFirmaVeriler.muayeneler),
-      uygunsuzluklar: mergeList(store.uygunsuzluklar, extraFirmaVeriler.uygunsuzluklar),
-      ekipmanlar: mergeList(store.ekipmanlar, extraFirmaVeriler.ekipmanlar),
-      tutanaklar: mergeList(store.tutanaklar, extraFirmaVeriler.tutanaklar),
-      isIzinleri: mergeList(store.isIzinleri, extraFirmaVeriler.isIzinleri),
+      personeller: mergeListFn(store.personeller, extraFirmaVeriler.personeller),
+      evraklar: mergeListFn(store.evraklar, extraFirmaVeriler.evraklar),
+      egitimler: mergeListFn(store.egitimler, extraFirmaVeriler.egitimler),
+      muayeneler: mergeListFn(store.muayeneler, extraFirmaVeriler.muayeneler),
+      uygunsuzluklar: mergeListFn(store.uygunsuzluklar, extraFirmaVeriler.uygunsuzluklar),
+      ekipmanlar: mergeListFn(store.ekipmanlar, extraFirmaVeriler.ekipmanlar),
+      tutanaklar: mergeListFn(store.tutanaklar, extraFirmaVeriler.tutanaklar),
+      isIzinleri: mergeListFn(store.isIzinleri, extraFirmaVeriler.isIzinleri),
     };
   }, [
-    isGezici,
-    geziciFirmalar,
-    extraFirmaVeriler,
+    isGezici, geziciFirmalar, extraFirmaVeriler, mergeListFn,
     store.firmalar, store.personeller, store.evraklar, store.egitimler,
     store.muayeneler, store.uygunsuzluklar, store.ekipmanlar,
     store.tutanaklar, store.isIzinleri,
   ]);
 
-  // Normal kullanıcı için doğrudan store referansları — hesaplama yok
-  const mergedData = isGezici
-    ? geziciMergedData!
-    : {
-        firmalar: store.firmalar,
-        personeller: store.personeller,
-        evraklar: store.evraklar,
-        egitimler: store.egitimler,
-        muayeneler: store.muayeneler,
-        uygunsuzluklar: store.uygunsuzluklar,
-        ekipmanlar: store.ekipmanlar,
-        tutanaklar: store.tutanaklar,
-        isIzinleri: store.isIzinleri,
-      };
-
-  const {
-    firmalar: mergedFirmalar,
-    personeller: mergedPersoneller,
-    evraklar: mergedEvraklar,
-    egitimler: mergedEgitimler,
-    muayeneler: mergedMuayeneler,
-    uygunsuzluklar: mergedUygunsuzluklar,
-    ekipmanlar: mergedEkipmanlar,
-    tutanaklar: mergedTutanaklar,
-    isIzinleri: mergedIsIzinleri,
-  } = mergedData;
+  // Normal kullanıcı — store referanslarını doğrudan kullan, yeni nesne YARATMA
+  // Bu sayede her AppContext render'ında tüm consumer'lar yeniden render olmaz
+  const mergedFirmalar      = isGezici ? geziciMergedData!.firmalar      : store.firmalar;
+  const mergedPersoneller   = isGezici ? geziciMergedData!.personeller   : store.personeller;
+  const mergedEvraklar      = isGezici ? geziciMergedData!.evraklar      : store.evraklar;
+  const mergedEgitimler     = isGezici ? geziciMergedData!.egitimler     : store.egitimler;
+  const mergedMuayeneler    = isGezici ? geziciMergedData!.muayeneler    : store.muayeneler;
+  const mergedUygunsuzluklar = isGezici ? geziciMergedData!.uygunsuzluklar : store.uygunsuzluklar;
+  const mergedEkipmanlar    = isGezici ? geziciMergedData!.ekipmanlar    : store.ekipmanlar;
+  const mergedTutanaklar    = isGezici ? geziciMergedData!.tutanaklar    : store.tutanaklar;
+  const mergedIsIzinleri    = isGezici ? geziciMergedData!.isIzinleri    : store.isIzinleri;
 
   // ── Gorev store (isolated) ──────────────────────────────────────────────
   const gorevStore = useGorevStore({
