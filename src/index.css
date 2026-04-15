@@ -16,54 +16,54 @@
    DESIGN TOKENS — DARK MODE (DEFAULT)
 ══════════════════════════════════════════════════════════ */
 :root {
-  /* App backgrounds */
-  --bg-app:              #1E2433;
-  --bg-card:             rgba(36, 44, 62, 0.85);
-  --bg-card-solid:       #242C3E;
-  --bg-card-elevated:    rgba(42, 52, 72, 0.92);
-  --bg-header:           rgba(26, 32, 46, 0.97);
-  --bg-sidebar:          #1A2030;
-  --bg-input:            rgba(255,255,255,0.07);
-  --bg-hover:            rgba(255,255,255,0.09);
-  --bg-row-hover:        rgba(99,102,241,0.07);
-  --bg-item:             rgba(255,255,255,0.05);
-  --bg-item-border:      rgba(255,255,255,0.09);
+  /* App backgrounds — koyu lacivert/slate, sidebar ile kontrast */
+  --bg-app:              #0e1120;
+  --bg-card:             rgba(22, 27, 48, 0.92);
+  --bg-card-solid:       #161b30;
+  --bg-card-elevated:    rgba(28, 33, 56, 0.96);
+  --bg-header:           rgba(13, 16, 30, 0.97);
+  --bg-sidebar:          #1a1f37;
+  --bg-input:            rgba(255,255,255,0.06);
+  --bg-hover:            rgba(255,255,255,0.07);
+  --bg-row-hover:        rgba(99,102,241,0.08);
+  --bg-item:             rgba(255,255,255,0.04);
+  --bg-item-border:      rgba(255,255,255,0.08);
 
-  /* Text */
-  --text-primary:        #F1F5F9;
-  --text-secondary:      #94A3B8;
-  --text-muted:          #64748B;
-  --text-faint:          #475569;
+  /* Text — parlak ve net */
+  --text-primary:        #e8eaf6;
+  --text-secondary:      #a0aec0;
+  --text-muted:          #718096;
+  --text-faint:          #4a5568;
 
   /* Borders */
   --border-main:         rgba(255,255,255,0.08);
   --border-subtle:       rgba(255,255,255,0.05);
   --border-input:        rgba(255,255,255,0.10);
-  --border-strong:       rgba(255,255,255,0.13);
+  --border-strong:       rgba(255,255,255,0.14);
 
   /* Scrollbar */
-  --scrollbar-thumb:     rgba(255,255,255,0.09);
+  --scrollbar-thumb:     rgba(255,255,255,0.08);
 
   /* Table */
-  --table-head-bg:       rgba(0,0,0,0.18);
-  --table-border:        rgba(255,255,255,0.08);
-  --table-row-border:    rgba(255,255,255,0.045);
+  --table-head-bg:       rgba(0,0,0,0.22);
+  --table-border:        rgba(255,255,255,0.07);
+  --table-row-border:    rgba(255,255,255,0.04);
 
   /* Misc */
-  --select-bg:           #1A2030;
-  --modal-bg:            rgba(18, 24, 38, 0.99);
+  --select-bg:           #161b30;
+  --modal-bg:            rgba(14, 17, 32, 0.99);
   --modal-border:        rgba(255,255,255,0.10);
 
   /* Charts */
-  --chart-tooltip-bg:    rgba(8, 13, 24, 0.98);
+  --chart-tooltip-bg:    rgba(10, 13, 26, 0.98);
   --chart-tooltip-border:rgba(255,255,255,0.09);
   --chart-grid:          rgba(255,255,255,0.05);
-  --chart-axis:          #475569;
-  --chart-tick:          #64748B;
+  --chart-axis:          #4a5568;
+  --chart-tick:          #718096;
 
   /* Accent */
-  --accent-primary:      #6366F1;
-  --accent-primary-glow: rgba(99,102,241,0.25);
+  --accent-primary:      #818CF8;
+  --accent-primary-glow: rgba(129,140,248,0.28);
   --accent-cyan:         #22D3EE;
   --accent-cyan-glow:    rgba(34,211,238,0.2);
 }

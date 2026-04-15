@@ -201,9 +201,9 @@ function FirmalarTabInner({
   const [silAdi, setSilAdi] = useState('');
 
   const textPrimary = 'var(--text-primary)';
-  const textSecondary = isDark ? '#94A3B8' : '#64748B';
-  const tableBg = isDark ? 'rgba(20,30,50,0.98)' : '#ffffff';
-  const borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
+  const textSecondary = isDark ? '#a0aec0' : '#64748B';
+  const tableBg = isDark ? 'var(--bg-card-solid)' : '#ffffff';
+  const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)';
 
   const fetchGpsInfo = useCallback(async () => {
     if (altFirmalar.length === 0) return;
