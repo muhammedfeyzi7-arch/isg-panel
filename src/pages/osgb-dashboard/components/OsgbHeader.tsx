@@ -160,15 +160,19 @@ export default function OsgbHeader({
       <header
         className={`fixed top-0 right-0 z-30 flex items-center gap-2 ${collapsed ? 'lg:left-[88px]' : 'lg:left-[244px]'} left-0`}
         style={{
-          height: '50px',
-          background: bg,
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          borderBottom: `1px solid ${border}`,
-          boxShadow: isDark ? '0 1px 0 rgba(255,255,255,0.04), 0 4px 20px rgba(0,0,0,0.3)' : '0 1px 0 rgba(15,23,42,0.06)',
+          height: '52px',
+          background: isDark
+            ? 'linear-gradient(180deg, rgba(18,22,42,0.98) 0%, rgba(14,17,32,0.96) 100%)'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(248,250,252,0.97) 100%)',
+          backdropFilter: 'blur(28px)',
+          WebkitBackdropFilter: 'blur(28px)',
+          borderBottom: `1px solid ${isDark ? 'rgba(99,102,241,0.08)' : 'rgba(15,23,42,0.07)'}`,
+          boxShadow: isDark
+            ? '0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)'
+            : '0 1px 0 rgba(15,23,42,0.05), 0 2px 16px rgba(15,23,42,0.06)',
           transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1)',
-          paddingLeft: '14px',
-          paddingRight: '14px',
+          paddingLeft: '16px',
+          paddingRight: '16px',
         }}
       >
         {/* Mobile hamburger */}
@@ -179,30 +183,47 @@ export default function OsgbHeader({
         </button>
 
         {/* Sayfa başlığı */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0"
-            style={{ background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.2)' }}>
+        <div className="flex items-center gap-2.5 flex-shrink-0">
+          <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0 relative"
+            style={{
+              background: `linear-gradient(135deg, rgba(129,140,248,0.22), rgba(99,102,241,0.1))`,
+              border: '1px solid rgba(129,140,248,0.22)',
+              boxShadow: '0 2px 8px rgba(99,102,241,0.18)',
+            }}>
             <i className={`${meta.icon} text-[11px]`} style={{ color: ACCENT }} />
           </div>
-          <span className="text-[13px] font-bold truncate" style={{ color: text, maxWidth: '140px' }}>
-            {meta.label}
-          </span>
+          <div>
+            <span className="text-[13px] font-bold leading-tight block" style={{ color: text, maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {meta.label}
+            </span>
+          </div>
         </div>
 
         <div className="flex-1" />
 
         {/* Selamlama */}
         <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
-          <p className="text-[11.5px] font-medium" style={{ color: muted }}>
-            {greeting}, <span className="font-bold" style={{ color: text }}>{displayName}</span>
-          </p>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)'}` }}>
+            <div className="w-5 h-5 rounded-lg flex items-center justify-center text-[9px] font-black text-white flex-shrink-0"
+              style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_D})` }}>
+              {(user?.email ?? 'O').charAt(0).toUpperCase()}
+            </div>
+            <p className="text-[11px] font-medium" style={{ color: muted }}>
+              {greeting},&nbsp;<span className="font-bold" style={{ color: text }}>{displayName}</span>
+            </p>
+          </div>
         </div>
 
         {/* OSGB badge */}
-        <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold flex-shrink-0"
-          style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.2)', color: ACCENT }}>
+        <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold flex-shrink-0"
+          style={{
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.16)',
+            color: ACCENT,
+          }}>
           <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: ACCENT }} />
-          OSGB · {orgName}
+          {orgName}
         </div>
 
         {/* Arama */}
@@ -257,8 +278,15 @@ export default function OsgbHeader({
         <div className="relative flex-shrink-0" ref={quickRef}>
           <button
             onClick={() => { setQuickOpen(v => !v); setProfileOpen(false); setNotifOpen(false); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer whitespace-nowrap flex-shrink-0"
-            style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_D})`, fontSize: '11px', boxShadow: quickOpen ? '0 4px 16px rgba(99,102,241,0.45)' : 'none' }}>
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer whitespace-nowrap flex-shrink-0 transition-all"
+            style={{
+              background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_D})`,
+              fontSize: '11px',
+              boxShadow: quickOpen ? '0 6px 20px rgba(99,102,241,0.5)' : '0 2px 8px rgba(99,102,241,0.25)',
+              transform: quickOpen ? 'scale(0.97)' : 'scale(1)',
+            }}
+            onMouseEnter={e => { if (!quickOpen) { (e.currentTarget as HTMLElement).style.boxShadow = '0 6px 20px rgba(99,102,241,0.45)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; } }}
+            onMouseLeave={e => { if (!quickOpen) { (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(99,102,241,0.25)'; (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; } }}>
             <i className="ri-add-line text-sm" />
             <span className="hidden sm:inline">Hızlı Ekle</span>
           </button>
