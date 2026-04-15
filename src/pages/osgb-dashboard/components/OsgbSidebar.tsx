@@ -10,7 +10,7 @@ const ACCENT = '#0EA5E9';
 const ACCENT_DARK = '#0284C7';
 const ACCENT_LIGHT = '#38BDF8';
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'copkutusu' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'araclar' | 'raporlar' | 'copkutusu' | 'ayarlar';
 
 interface OsgbSidebarProps {
   activeTab: Tab;
@@ -41,6 +41,7 @@ const navGroups = [
     label: 'SİSTEM',
     items: [
       { id: 'raporlar' as Tab, label: 'Raporlar', icon: 'ri-bar-chart-grouped-line' },
+      { id: 'araclar' as Tab, label: 'Analiz & Harita', icon: 'ri-pie-chart-2-line' },
       { id: 'copkutusu' as Tab, label: 'Çöp Kutusu', icon: 'ri-delete-bin-2-line' },
       { id: 'ayarlar' as Tab, label: 'Ayarlar', icon: 'ri-settings-3-line' },
     ],

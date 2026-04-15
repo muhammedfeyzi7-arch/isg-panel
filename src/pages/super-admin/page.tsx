@@ -29,7 +29,7 @@ export default function SuperAdminPage() {
   const [search, setSearch] = useState('');
   const [selectedOrg, setSelectedOrg] = useState<OrgAdmin | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'passive' | 'expired' | 'expiring'>('all');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'osgb' | 'firma'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'osgb'>('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'orgs' | 'support'>('orgs');
 
@@ -88,7 +88,6 @@ export default function SuperAdminPage() {
     if (statusFilter === 'expired' && !isExpiredFn(org)) return false;
     if (statusFilter === 'expiring' && !isExpiringFn(org)) return false;
     if (typeFilter === 'osgb' && org.org_type !== 'osgb') return false;
-    if (typeFilter === 'firma' && org.org_type !== 'firma') return false;
     if (search) {
       const q = search.toLowerCase();
       return org.name.toLowerCase().includes(q) || org.invite_code.toLowerCase().includes(q);
@@ -215,7 +214,6 @@ export default function SuperAdminPage() {
               <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-xl">
                 {([
                   { key: 'all' as const, label: 'Tümü' },
-                  { key: 'osgb' as const, label: 'OSGB' },
                 ]).map(f => (
                   <button key={f.key} onClick={() => setTypeFilter(f.key)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${

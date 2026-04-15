@@ -73,34 +73,6 @@ export default defineConfig({
   build: {
     sourcemap: true,
     outDir: 'dist',
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          // Ağır PDF/Excel kütüphanelerini ayrı chunk'lara böl — ilk yükleme ~40% azalır
-          if (id.includes('jspdf') || id.includes('html2canvas')) {
-            return 'vendor-pdf';
-          }
-          if (id.includes('exceljs') || id.includes('xlsx-js-style') || id.includes('file-saver') || id.includes('jszip')) {
-            return 'vendor-excel';
-          }
-          if (id.includes('recharts') || id.includes('d3-') || id.includes('victory')) {
-            return 'vendor-charts';
-          }
-          if (id.includes('@react-three') || id.includes('three')) {
-            return 'vendor-3d';
-          }
-          if (id.includes('leaflet') || id.includes('react-leaflet')) {
-            return 'vendor-maps';
-          }
-          if (id.includes('firebase')) {
-            return 'vendor-firebase';
-          }
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
-      },
-    },
   },
   resolve: {
     alias: {

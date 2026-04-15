@@ -361,8 +361,9 @@ export default function ZiyaretCheckIn() {
             setGpsStatus('ok');
           }
         } else {
+          // Firma GPS zorunlu değil ve koordinat yok — yine de konumu al, kaydet (ihlal olmaz)
           setGpsStatus('loading');
-          coords = await getGpsCoords();
+          coords = await getGpsCoords(6000).catch(() => null);
           checkInGpsStatus = coords ? 'ok' : 'no_permission';
           setGpsStatus(coords ? 'ok' : 'idle');
         }

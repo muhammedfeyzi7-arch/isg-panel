@@ -21,6 +21,10 @@ import OnboardingTour from '../../components/feature/OnboardingTour';
 import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import FirmaModal from './components/FirmaModal';
 import UzmanModal from './components/UzmanModal';
+import PersonelZiyaretDetay from './components/PersonelZiyaretDetay';
+import ZiyaretTakvimi from './components/ZiyaretTakvimi';
+import ZiyaretPlanlama from './components/ZiyaretPlanlama';
+import FirmalarHaritasi from './components/FirmalarHaritasi';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -217,7 +221,7 @@ interface Uzman {
   osgb_role?: string | null;
 }
 
-type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'raporlar' | 'copkutusu' | 'ayarlar';
+type Tab = 'dashboard' | 'firmalar' | 'uzmanlar' | 'ziyaretler' | 'araclar' | 'raporlar' | 'copkutusu' | 'ayarlar';
 
 interface FirmaDetay {
   id: string;
@@ -1078,6 +1082,48 @@ export default function OsgbDashboardPage() {
               {/* ── ZİYARETLER TAB ── */}
               {activeTab === 'ziyaretler' && (
                 <ZiyaretlerTab isDark={isDark} />
+              )}
+
+              {/* ── ANALİZ & HARİTA TAB ── */}
+              {activeTab === 'araclar' && (
+                <div className="space-y-8 page-enter">
+                  {/* Personel Ziyaret Detay */}
+                  <PersonelZiyaretDetay
+                    personeller={uzmanlar.map(u => ({
+                      user_id: u.user_id,
+                      display_name: u.display_name,
+                      email: u.email,
+                      is_active: u.is_active,
+                      active_firm_ids: u.active_firm_ids,
+                      osgb_role: u.osgb_role ?? null,
+                    }))}
+                    isDark={isDark}
+                  />
+                  {/* Ziyaret Planlama */}
+                  <ZiyaretPlanlama
+                    firmalar={altFirmalar.map(f => ({ id: f.id, name: f.name }))}
+                    personeller={uzmanlar.map(u => ({
+                      user_id: u.user_id,
+                      display_name: u.display_name,
+                      email: u.email,
+                      osgb_role: u.osgb_role ?? null,
+                    }))}
+                    isDark={isDark}
+                  />
+                  {/* Takvim */}
+                  <ZiyaretTakvimi
+                    isDark={isDark}
+                    onFirmaClick={fid => {
+                      const f = altFirmalar.find(x => x.id === fid);
+                      if (f) handleFirmaClick(f);
+                    }}
+                  />
+                  {/* Harita */}
+                  <FirmalarHaritasi
+                    isDark={isDark}
+                    onFirmaClick={(fid, fad) => handleFirmaClick({ id: fid, name: fad })}
+                  />
+                </div>
               )}
 
               {/* ── ÇÖP KUTUSU TAB ── */}

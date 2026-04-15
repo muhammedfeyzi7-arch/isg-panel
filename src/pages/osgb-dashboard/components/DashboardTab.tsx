@@ -29,6 +29,7 @@ interface Ziyaret {
   giris_saati: string;
   cikis_saati: string | null;
   qr_ile_giris?: boolean;
+  gps_status?: 'ok' | 'too_far' | 'no_permission' | null;
 }
 
 interface DashboardTabProps {
@@ -143,13 +144,13 @@ function DashboardTabInner({
     const initialFetch = async () => {
       setLoading(true);
       try {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
         const { data } = await supabase
           .from('osgb_ziyaretler')
-          .select('id, uzman_user_id, firma_org_id, firma_ad, giris_saati, cikis_saati, qr_ile_giris')
+          .select('id, uzman_user_id, firma_org_id, firma_ad, giris_saati, cikis_saati, qr_ile_giris, gps_status')
           .eq('osgb_org_id', orgId)
-          .gte('giris_saati', thirtyDaysAgo.toISOString())
+          .gte('giris_saati', ninetyDaysAgo.toISOString())
           .order('giris_saati', { ascending: false });
         setZiyaretler(data ?? []);
       } catch (err) {
@@ -175,9 +176,9 @@ function DashboardTabInner({
         (payload) => {
           const yeni = payload.new as Ziyaret;
           // 30 gün filtresi — eski kayıt ise ekleme
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          if (new Date(yeni.giris_saati) < thirtyDaysAgo) return;
+          const ninetyDaysAgo = new Date();
+          ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+          if (new Date(yeni.giris_saati) < ninetyDaysAgo) return;
 
           setZiyaretler(prev => {
             // Duplicate kontrolü
@@ -235,6 +236,7 @@ function DashboardTabInner({
   weekAgo.setDate(weekAgo.getDate() - 7);
   const buHaftaZiyaretler = ziyaretler.filter(z => new Date(z.giris_saati) >= weekAgo);
 
+  // Son 30 gün firma → son ziyaret tarihi map'i
   const firmaLastVisit: Record<string, string> = {};
   ziyaretler.forEach(z => {
     if (!firmaLastVisit[z.firma_org_id] || z.giris_saati > firmaLastVisit[z.firma_org_id]) {
@@ -262,8 +264,21 @@ function DashboardTabInner({
     return f?.name ?? firmaAd ?? 'Bilinmeyen Firma';
   };
 
-  void bugunZiyaretler;
+  // 30+ gün ziyaret edilmemiş firmalar
+  const ziyaretsizFirmalar = altFirmalar.filter(f => {
+    const lastVisit = firmaLastVisit[f.id];
+    if (!lastVisit) return true; // hiç ziyaret yok
+    const diff = (Date.now() - new Date(lastVisit).getTime()) / 86400000;
+    return diff > 30;
+  });
 
+  // Son 7 gündeki GPS ihlalleri
+  const son7GunIhlaller = ziyaretler.filter(z => {
+    const diff = (Date.now() - new Date(z.giris_saati).getTime()) / 86400000;
+    return diff <= 7 && (z.gps_status === 'too_far' || z.gps_status === 'no_permission');
+  });
+
+  void bugunZiyaretler;
   void textMuted;
 
   return (
@@ -398,7 +413,7 @@ function DashboardTabInner({
           ) : (
             <>
               <div className="grid grid-cols-[2fr_1fr_80px] items-center px-4 py-2"
-                style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }}>
+                style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }}>
                 {['FİRMA', 'PERSONEL', 'ZİYARET'].map(h => (
                   <div key={h}><span className="text-[9px] font-bold tracking-wider" style={{ color: textSecondary }}>{h}</span></div>
                 ))}
@@ -536,6 +551,132 @@ function DashboardTabInner({
           )}
         </div>
       </div>
+
+      {/* ── UYARI KARTLARI ── */}
+      {(ziyaretsizFirmalar.length > 0 || son7GunIhlaller.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* 30+ gün ziyaret edilmeyen firmalar */}
+          {ziyaretsizFirmalar.length > 0 && (
+            <div className="rounded-2xl overflow-hidden" style={card}>
+              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3"
+                style={{ borderBottom: `1px solid ${isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.1)'}` }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(239,68,68,0.1)' }}>
+                  <i className="ri-alarm-warning-line text-sm" style={{ color: '#EF4444' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold" style={{ color: '#EF4444' }}>Uzun Süredir Ziyaret Yok</p>
+                  <p className="text-[10px]" style={{ color: textSecondary }}>30+ gündür ziyaret yapılmayan firmalar</p>
+                </div>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full flex-shrink-0"
+                  style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  {ziyaretsizFirmalar.length}
+                </span>
+              </div>
+              <div className="px-5 py-3 space-y-2">
+                {ziyaretsizFirmalar.slice(0, 4).map(f => {
+                  const lastVisit = firmaLastVisit[f.id];
+                  const days = lastVisit ? Math.floor((Date.now() - new Date(lastVisit).getTime()) / 86400000) : null;
+                  return (
+                    <div key={f.id}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all"
+                      style={{
+                        background: isDark ? 'rgba(239,68,68,0.04)' : 'rgba(239,68,68,0.03)',
+                        border: '1px solid rgba(239,68,68,0.12)',
+                      }}
+                      onClick={() => onFirmaClick({ id: f.id, name: f.name })}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(239,68,68,0.04)' : 'rgba(239,68,68,0.03)'; }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+                        {f.name.charAt(0).toUpperCase()}
+                      </div>
+                      <p className="text-xs font-semibold flex-1 truncate" style={{ color: textPrimary }}>{f.name}</p>
+                      <span className="text-[10px] font-bold flex-shrink-0"
+                        style={{ color: '#EF4444' }}>
+                        {days === null ? 'Hiç' : `${days}g`}
+                      </span>
+                    </div>
+                  );
+                })}
+                {ziyaretsizFirmalar.length > 4 && (
+                  <button onClick={() => setActiveTab('firmalar')}
+                    className="w-full text-center text-[10px] font-semibold py-1.5 rounded-lg cursor-pointer"
+                    style={{ color: '#EF4444', background: 'rgba(239,68,68,0.05)' }}>
+                    +{ziyaretsizFirmalar.length - 4} firma daha →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* GPS ihlal bildirimi */}
+          {son7GunIhlaller.length > 0 && (
+            <div className="rounded-2xl overflow-hidden" style={card}>
+              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3"
+                style={{ borderBottom: `1px solid ${isDark ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.1)'}` }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(245,158,11,0.1)' }}>
+                  <i className="ri-map-pin-line text-sm" style={{ color: '#F59E0B' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold" style={{ color: '#D97706' }}>Son 7 Günde GPS İhlali</p>
+                  <p className="text-[10px]" style={{ color: textSecondary }}>Konum dışı veya GPS alınamayan ziyaretler</p>
+                </div>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full flex-shrink-0"
+                  style={{ background: 'rgba(245,158,11,0.12)', color: '#D97706', border: '1px solid rgba(245,158,11,0.25)' }}>
+                  {son7GunIhlaller.length}
+                </span>
+              </div>
+              <div className="px-5 py-3 space-y-2">
+                {son7GunIhlaller.slice(0, 4).map(z => {
+                  const gpsStatus = z.gps_status;
+                  const uzmanAd = getUzmanAd(z.uzman_user_id);
+                  const firmaAd = getFirmaAd(z.firma_org_id, z.firma_ad);
+                  const tarih = new Date(z.giris_saati).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+                  return (
+                    <div key={z.id}
+                      className="flex items-start gap-2.5 px-3 py-2 rounded-xl"
+                      style={{
+                        background: gpsStatus === 'too_far'
+                          ? (isDark ? 'rgba(239,68,68,0.04)' : 'rgba(239,68,68,0.03)')
+                          : (isDark ? 'rgba(245,158,11,0.04)' : 'rgba(245,158,11,0.03)'),
+                        border: `1px solid ${gpsStatus === 'too_far' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)'}`,
+                      }}>
+                      <i className={`ri-map-pin-line text-xs flex-shrink-0 mt-0.5`}
+                        style={{ color: gpsStatus === 'too_far' ? '#EF4444' : '#F59E0B' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <p className="text-[10px] font-bold truncate" style={{ color: textPrimary }}>{uzmanAd}</p>
+                          <span className="text-[9px]" style={{ color: textSecondary }}>→</span>
+                          <p className="text-[10px] truncate" style={{ color: textSecondary }}>{firmaAd}</p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                            style={{
+                              background: gpsStatus === 'too_far' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
+                              color: gpsStatus === 'too_far' ? '#EF4444' : '#D97706',
+                            }}>
+                            {gpsStatus === 'too_far' ? 'Konum Dışı' : 'GPS Yok'}
+                          </span>
+                          <span className="text-[9px]" style={{ color: textSecondary }}>{tarih}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {son7GunIhlaller.length > 4 && (
+                  <button onClick={() => setActiveTab('ziyaretler')}
+                    className="w-full text-center text-[10px] font-semibold py-1.5 rounded-lg cursor-pointer"
+                    style={{ color: '#D97706', background: 'rgba(245,158,11,0.05)' }}>
+                    +{son7GunIhlaller.length - 4} ihlal daha →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── BUGÜN SAHA AKIŞI ── */}
       {son5.length > 0 && (
