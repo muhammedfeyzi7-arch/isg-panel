@@ -480,7 +480,7 @@ function InsightRow({ icon, title, detail, color, level, isDark }: {
 
 /* ── Ana component ──────────────────────────────────────────────── */
 export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
-  const cache = useQueryCache<Stats>(3 * 60 * 1000); // 3 dakika cache
+  const cache = useQueryCache<Stats>(3 * 60 * 1000);
   const [stats, setStats] = useState<Stats>({
     firmaCount: 0, personelCount: 0,
     uygunsuzlukAcik: 0, uygunsuzlukKapali: 0,
@@ -496,104 +496,130 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
   const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
   const textSecondary = isDark ? '#94A3B8' : '#64748B';
 
-  useEffect(() => {
+  const fetchStats = useCallback(async (forceRefresh = false) => {
     if (atanmisFirmaIds.length === 0) { setLoading(false); return; }
-    const fetchStats = async () => {
-      // Cache kontrolü — aynı firma listesi için daha önce çekilmiş veri varsa kullan
-      const cacheKey = `uzman_genel_${atanmisFirmaIds.slice().sort().join(',')}`;
+
+    const cacheKey = `uzman_genel_${atanmisFirmaIds.slice().sort().join(',')}`;
+
+    if (!forceRefresh) {
       const cached = cache.get(cacheKey);
       if (cached) {
         setStats(cached);
         setLoading(false);
         return;
       }
-      setLoading(true);
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const in7   = new Date(Date.now() + 7  * 86400000).toISOString().split('T')[0];
-        const in30  = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+    }
 
-        // Tüm tablolarda durum, silinmis vs. kolonlar yok — data JSONB içinde.
-        // Sadece deleted_at ile silinmemiş filtresi yapılabilir.
-        // Uygunsuzluk açık/kapalı, ekipman durumu için data->'durum' filtrelemesi gerekiyor.
-        const [
-          { count: personelC },
-          { count: uygunsuzlukAcikC },
-          { count: uygunsuzlukKapaliC },
-          { count: ekipmanC },
-          { count: ekipmanUygunDegilC },
-          { count: izinC },
-          { count: egitimC },
-          { count: tutanakC },
-          { count: saglikC },
-        ] = await Promise.all([
-          supabase.from('personeller').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
-          supabase.from('uygunsuzluklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).not('data->>durum', 'in', '("Kapandı","Kapatıldı","Kapandı")'),
-          supabase.from('uygunsuzluklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).or('data->>durum.eq.Kapandı,data->>durum.eq.Kapatıldı'),
-          supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
-          supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).eq('data->>durum', 'Uygun Değil'),
-          supabase.from('is_izinleri').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).eq('data->>durum', 'Onay Bekliyor'),
-          supabase.from('egitimler').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
-          supabase.from('tutanaklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
-          supabase.from('muayeneler').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
-        ]);
+    setLoading(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const in7   = new Date(Date.now() + 7  * 86400000).toISOString().split('T')[0];
+      const in30  = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
 
-        // Gecikmiş belge: data->>'gecerlilikTarihi' < today filtrelemesi
-        // Supabase client ile JSONB text cast + lt/lte kullanılabilir
-        const [
-          { count: gecikmisBelgeC },
-          { count: gecikmisEkipmanC },
-          { count: yaklasan7C },
-          { count: yaklasan30C },
-        ] = await Promise.all([
-          supabase.from('evraklar').select('id', { count: 'exact', head: true })
-            .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
-            .lt('data->>gecerlilikTarihi', today)
-            .not('data->>gecerlilikTarihi', 'is', null),
-          supabase.from('ekipmanlar').select('id', { count: 'exact', head: true })
-            .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
-            .lt('data->>sonrakiKontrolTarihi', today)
-            .not('data->>sonrakiKontrolTarihi', 'is', null)
-            .not('data->>durum', 'eq', 'Uygun Değil'),
-          supabase.from('evraklar').select('id', { count: 'exact', head: true })
-            .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
-            .gte('data->>gecerlilikTarihi', today)
-            .lte('data->>gecerlilikTarihi', in7)
-            .not('data->>gecerlilikTarihi', 'is', null),
-          supabase.from('evraklar').select('id', { count: 'exact', head: true })
-            .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
-            .gte('data->>gecerlilikTarihi', today)
-            .lte('data->>gecerlilikTarihi', in30)
-            .not('data->>gecerlilikTarihi', 'is', null),
-        ]);
+      const [
+        { count: personelC },
+        { count: uygunsuzlukAcikC },
+        { count: uygunsuzlukKapaliC },
+        { count: ekipmanC },
+        { count: ekipmanUygunDegilC },
+        { count: izinC },
+        { count: egitimC },
+        { count: tutanakC },
+        { count: saglikC },
+      ] = await Promise.all([
+        supabase.from('personeller').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+        supabase.from('uygunsuzluklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).not('data->>durum', 'in', '("Kapandı","Kapatıldı","Kapandı")'),
+        supabase.from('uygunsuzluklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).or('data->>durum.eq.Kapandı,data->>durum.eq.Kapatıldı'),
+        supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+        supabase.from('ekipmanlar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).eq('data->>durum', 'Uygun Değil'),
+        supabase.from('is_izinleri').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null).eq('data->>durum', 'Onay Bekliyor'),
+        supabase.from('egitimler').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+        supabase.from('tutanaklar').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+        supabase.from('muayeneler').select('*',{ count:'exact',head:true }).in('organization_id',atanmisFirmaIds).is('deleted_at', null),
+      ]);
 
-        const newStats: Stats = {
-          firmaCount: atanmisFirmaIds.length,
-          personelCount: personelC ?? 0,
-          uygunsuzlukAcik: uygunsuzlukAcikC ?? 0,
-          uygunsuzlukKapali: uygunsuzlukKapaliC ?? 0,
-          ekipmanCount: ekipmanC ?? 0,
-          ekipmanUygunDegil: ekipmanUygunDegilC ?? 0,
-          izinBekleyen: izinC ?? 0,
-          egitimCount: egitimC ?? 0,
-          tutanakCount: tutanakC ?? 0,
-          saglikCount: saglikC ?? 0,
-          gecikmisBelge: gecikmisBelgeC,
-          gecikmisEkipman: gecikmisEkipmanC,
-          yaklasan7: yaklasan7C,
-          yaklasan30: yaklasan30C,
-        };
-        cache.set(cacheKey, newStats);
-        setStats(newStats);
-      } catch (err) {
-        console.error('[UzmanGenelBakis]', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const [
+        { count: gecikmisBelgeC },
+        { count: gecikmisEkipmanC },
+        { count: yaklasan7C },
+        { count: yaklasan30C },
+      ] = await Promise.all([
+        supabase.from('evraklar').select('id', { count: 'exact', head: true })
+          .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
+          .lt('data->>gecerlilikTarihi', today)
+          .not('data->>gecerlilikTarihi', 'is', null),
+        supabase.from('ekipmanlar').select('id', { count: 'exact', head: true })
+          .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
+          .lt('data->>sonrakiKontrolTarihi', today)
+          .not('data->>sonrakiKontrolTarihi', 'is', null)
+          .not('data->>durum', 'eq', 'Uygun Değil'),
+        supabase.from('evraklar').select('id', { count: 'exact', head: true })
+          .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
+          .gte('data->>gecerlilikTarihi', today)
+          .lte('data->>gecerlilikTarihi', in7)
+          .not('data->>gecerlilikTarihi', 'is', null),
+        supabase.from('evraklar').select('id', { count: 'exact', head: true })
+          .in('organization_id', atanmisFirmaIds).is('deleted_at', null)
+          .gte('data->>gecerlilikTarihi', today)
+          .lte('data->>gecerlilikTarihi', in30)
+          .not('data->>gecerlilikTarihi', 'is', null),
+      ]);
+
+      const newStats: Stats = {
+        firmaCount: atanmisFirmaIds.length,
+        personelCount: personelC ?? 0,
+        uygunsuzlukAcik: uygunsuzlukAcikC ?? 0,
+        uygunsuzlukKapali: uygunsuzlukKapaliC ?? 0,
+        ekipmanCount: ekipmanC ?? 0,
+        ekipmanUygunDegil: ekipmanUygunDegilC ?? 0,
+        izinBekleyen: izinC ?? 0,
+        egitimCount: egitimC ?? 0,
+        tutanakCount: tutanakC ?? 0,
+        saglikCount: saglikC ?? 0,
+        gecikmisBelge: gecikmisBelgeC,
+        gecikmisEkipman: gecikmisEkipmanC,
+        yaklasan7: yaklasan7C,
+        yaklasan30: yaklasan30C,
+      };
+      cache.set(cacheKey, newStats);
+      setStats(newStats);
+    } catch (err) {
+      console.error('[UzmanGenelBakis]', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [atanmisFirmaIds, cache]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     fetchStats();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atanmisFirmaIds.join(',')]);
+
+  // Realtime: ilgili tablolar değişince cache invalidate et ve yenile
+  useEffect(() => {
+    if (atanmisFirmaIds.length === 0) return;
+
+    const cacheKey = `uzman_genel_${atanmisFirmaIds.slice().sort().join(',')}`;
+    const refresh = () => {
+      cache.invalidate(cacheKey);
+      fetchStats(true);
+    };
+
+    const tables = ['uygunsuzluklar', 'personeller', 'ekipmanlar', 'evraklar', 'muayeneler', 'egitimler', 'is_izinleri'];
+    const rtKey = atanmisFirmaIds.slice().sort().join('_');
+
+    let channel = supabase.channel(`uzman_genel_rt_${rtKey}`);
+    for (const table of tables) {
+      channel = channel.on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: '*', schema: 'public', table } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        refresh
+      );
+    }
+    channel.subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [atanmisFirmaIds, cache, fetchStats]);
 
   const toplamKritik = stats.uygunsuzlukAcik + stats.ekipmanUygunDegil + stats.gecikmisBelge;
 
@@ -709,7 +735,7 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
       {/* ── Header banner ── */}
       <div className="rounded-2xl px-5 py-4 flex items-center justify-between gap-3 flex-wrap" style={card}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.22), rgba(14,165,233,0.08))' }}>
             <i className="ri-dashboard-3-line text-sm" style={{ color: '#0EA5E9' }} />
           </div>
@@ -800,14 +826,16 @@ export default function UzmanGenelBakis({ atanmisFirmaIds, isDark }: Props) {
                   <div key={item.label} className="rounded-xl p-3 text-center"
                     style={{
                       background: item.value > 0 ? `${item.color}15` : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)'),
-                      border: `1px solid ${item.value > 0 ? `${item.color}28` : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)')}`,
+                      border: `1px solid ${item.value > 0 ? `${item.color}28` : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)')}`,
                     }}>
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center mx-auto mb-1.5"
                       style={{ background: item.value > 0 ? `${item.color}20` : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)') }}>
                       <i className={`${item.icon} text-xs`} style={{ color: item.value > 0 ? item.color : textSecondary }} />
                     </div>
                     <p className="text-xl font-extrabold" style={{ color: item.value > 0 ? item.color : textSecondary }}>{item.value}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: textSecondary }}>{item.label}</p>
+                    <p className="text-[10px]" style={{ color: textSecondary }}>
+                      {item.value === 0 ? 'Yaklaşan belge yok' : `${item.value} belge süresi dolmak üzere`}
+                    </p>
                   </div>
                 ))}
               </div>

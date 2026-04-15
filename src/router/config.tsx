@@ -32,6 +32,8 @@ const MODULE_SLUGS = [
   'ekipmanlar',
   'is-izinleri',
   'raporlar',
+  'gelismis-raporlar',
+  'ziyaret-takvimi',
   'dokumanlar',
   'copkutusu',
   'ayarlar',

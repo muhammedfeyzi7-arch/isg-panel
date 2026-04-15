@@ -370,44 +370,67 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
   const band = gpsBandConfig[gpsStatus];
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: bg }}>
-      <style>{`@keyframes pulseRing{0%{transform:scale(1);opacity:.8}70%{transform:scale(1.8);opacity:0}100%{transform:scale(1.8);opacity:0}}@keyframes timerGlow{0%,100%{text-shadow:0 0 12px rgba(14,165,233,.3)}50%{text-shadow:0 0 24px rgba(14,165,233,.7)}}.hekim-timer-glow{animation:timerGlow 2s ease-in-out infinite}`}</style>
+    <div className="flex flex-col min-h-screen pb-8" style={{ maxWidth: '520px', margin: '0 auto', fontFamily: "'Inter', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        @keyframes pulseRing{0%{transform:scale(1);opacity:.8}70%{transform:scale(1.8);opacity:0}100%{transform:scale(1.8);opacity:0}}
+        @keyframes timerGlow{0%,100%{text-shadow:0 0 12px rgba(14,165,233,.3)}50%{text-shadow:0 0 24px rgba(14,165,233,.7)}}
+        .hekim-timer-glow{animation:timerGlow 2s ease-in-out infinite}
+        @keyframes qrPulseRing{0%,100%{opacity:0;transform:scale(1.1)}50%{opacity:1;transform:scale(1.3)}}
+        @keyframes qrIdleScan{0%{top:18%;opacity:0.3}50%{top:72%;opacity:0.9}100%{top:18%;opacity:0.3}}
+      `}</style>
 
-      {/* HERO HEADER */}
-      <div className="relative overflow-hidden px-5 pt-8 pb-6" style={{ background: isDark ? 'linear-gradient(160deg,#0c1929 0%,#0a1520 60%,#080f1a 100%)' : 'linear-gradient(160deg,#e0f2fe 0%,#f0f9ff 60%,#f8fafc 100%)', borderBottom: `1px solid ${border}` }}>
-        <div className="absolute top-0 right-0 w-48 h-48 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle,rgba(14,165,233,.08) 0%,transparent 70%)', transform: 'translate(30%,-30%)' }} />
-        <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg,${ACCENT_DARK},#38BDF8,${ACCENT})` }} />
-        <div className="relative z-10 flex items-start gap-4">
-          <div className="relative flex-shrink-0">
-            <div className="w-14 h-14 flex items-center justify-center rounded-2xl" style={{ background: 'linear-gradient(135deg,rgba(14,165,233,.2),rgba(14,165,233,.08))', border: '1.5px solid rgba(14,165,233,.3)' }}>
-              <i className="ri-heart-pulse-line text-2xl" style={{ color: ACCENT }} />
+      {/* Başlık Kartı — UzmanMobilSaha stilinde */}
+      <div className="rounded-2xl overflow-hidden mb-4" style={{ background: 'var(--bg-card-solid, rgba(17,24,39,0.8))', border: '1px solid rgba(14,165,233,0.2)' }}>
+        <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #0284C7 0%, #0EA5E9 50%, #38BDF8 100%)' }} />
+        <div className="px-4 pt-3.5 pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0 relative" style={{ background: 'linear-gradient(135deg,rgba(14,165,233,.2),rgba(14,165,233,.08))', border: '1.5px solid rgba(14,165,233,.3)' }}>
+                <i className="ri-heart-pulse-line text-lg" style={{ color: ACCENT }} />
+                {aktifZiyaret && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 flex items-center justify-center rounded-full" style={{ background: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT, boxShadow: `0 0 8px ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.6)' : 'rgba(14,165,233,.6)'}` }}><i className="ri-check-line text-white text-[8px] font-bold" /></span>}
+              </div>
+              <div>
+                <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary, #f1f5f9)', letterSpacing: '-0.02em' }}>
+                  {aktifZiyaret ? 'Aktif Ziyaret' : 'Hekim Saha Ziyareti'}
+                </h2>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted, #64748b)' }}>
+                  {aktifZiyaret ? aktifZiyaret.firma_ad ?? 'Firma' : 'QR ile check-in / check-out'}
+                </p>
+              </div>
             </div>
-            {aktifZiyaret && <span className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full" style={{ background: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT, boxShadow: `0 0 8px ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.6)' : 'rgba(14,165,233,.6)'}` }}><i className="ri-check-line text-white text-[9px] font-bold" /></span>}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-lg font-extrabold leading-tight" style={{ color: textPrimary, letterSpacing: '-0.03em' }}>Saha Ziyareti</h1>
-              {aktifZiyaret ? (
-                <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap" style={{ background: aktifZiyaret.isOffline ? 'rgba(245,158,11,.15)' : 'rgba(14,165,233,.15)', color: aktifZiyaret.isOffline ? '#D97706' : ACCENT, border: `1px solid ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.3)' : 'rgba(14,165,233,.3)'}` }}>
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }} />{aktifZiyaret.isOffline ? 'ÇEVRİMDIŞI' : 'AKTİF'}
-                </span>
-              ) : (
-                <span className="text-[9px] font-bold px-2 py-1 rounded-full whitespace-nowrap" style={{ background: isDark ? 'rgba(255,255,255,.05)' : 'rgba(15,23,42,.05)', color: textMuted, border: `1px solid ${border}` }}>BEKLİYOR</span>
+            <div className="flex items-center gap-2">
+              {pendingCount > 0 && isOnline && !isSyncing && (
+                <button onClick={() => syncNow()} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all" style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)', color: '#FBBF24' }}>
+                  <i className="ri-time-line text-xs" /><span className="text-xs font-bold">{pendingCount}</span>
+                </button>
               )}
+              <span className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-full whitespace-nowrap" style={{ background: isOnline ? 'rgba(14,165,233,0.1)' : 'rgba(245,158,11,0.1)', color: isOnline ? ACCENT : '#F59E0B', border: `1px solid ${isOnline ? 'rgba(14,165,233,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isOnline ? ACCENT : '#F59E0B' }} />
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
             </div>
-            <p className="text-xs leading-relaxed" style={{ color: textMuted }}>QR okutarak firma check-in / check-out yap</p>
           </div>
-        </div>
-        <div className="relative z-10 mt-3 flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap" style={{ background: isOnline ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: isOnline ? '#22C55E' : '#F59E0B', border: `1px solid ${isOnline ? 'rgba(34,197,94,.2)' : 'rgba(245,158,11,.2)'}` }}>
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isOnline ? '#22C55E' : '#F59E0B' }} />{isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
-          </span>
-          {pendingCount > 0 && <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: 'rgba(245,158,11,.1)', color: '#D97706', border: '1px solid rgba(245,158,11,.2)' }}>{pendingCount} bekliyor</span>}
-          {pendingCount > 0 && isOnline && !isSyncing && <button onClick={() => syncNow()} className="text-[10px] font-bold px-2 py-1 rounded-full cursor-pointer whitespace-nowrap" style={{ background: 'rgba(14,165,233,.1)', color: ACCENT, border: '1px solid rgba(14,165,233,.2)' }}>Şimdi Gönder</button>}
+          {aktifZiyaret && (
+            <div className="flex items-center gap-3 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }} />
+                <span className="text-[10px] font-bold" style={{ color: aktifZiyaret.isOffline ? '#D97706' : ACCENT }}>
+                  {aktifZiyaret.isOffline ? 'ÇEVRİMDIŞI' : 'AKTİF ZİYARET'}
+                </span>
+              </div>
+              <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.08)' }} />
+              <span className="text-[10px] font-mono font-bold" style={{ color: ACCENT }}>{elapsed || '00:00'}</span>
+              <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.08)' }} />
+              <span className="text-[10px]" style={{ color: 'var(--text-muted, #64748b)' }}>
+                {formatTime(aktifZiyaret.giris_saati)} giriş
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="pt-4"><HekimOfflineBant isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} isDark={isDark} /></div>
+      <div className="mb-4"><HekimOfflineBant isOnline={isOnline} isSyncing={isSyncing} pendingCount={pendingCount} isDark={isDark} /></div>
 
       <div className="px-4 space-y-4">
         {band && (
@@ -427,34 +450,40 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
         )}
 
         {aktifZiyaret ? (
+          /* ── AKTİF ZİYARET KARTI ── */
           <div className="rounded-2xl overflow-hidden" style={{ background: cardBg, border: `1.5px solid ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.4)' : 'rgba(14,165,233,.3)'}` }}>
             <div className="h-[3px]" style={{ background: aktifZiyaret.isOffline ? 'linear-gradient(90deg,#D97706,#F59E0B,#FBBF24)' : `linear-gradient(90deg,${ACCENT_DARK},#38BDF8,${ACCENT})` }} />
             <div className="p-5">
-              <div className="flex items-center gap-2 mb-5">
+              {/* Firma bilgisi */}
+              <div className="flex items-center gap-4 mb-4">
                 <div className="relative flex-shrink-0">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }} />
-                  <div className="absolute inset-0 rounded-full" style={{ background: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT, animation: 'pulseRing 2s ease-out infinite' }} />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-[.15em]" style={{ color: aktifZiyaret.isOffline ? '#D97706' : ACCENT }}>Aktif Ziyaret</span>
-                {aktifZiyaret.isOffline && <span className="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,.15)', color: '#D97706', border: '1px solid rgba(245,158,11,.3)' }}>ÇEVRİMDIŞI</span>}
-                {aktifZiyaret.qr_ile_giris && <span className="ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: 'rgba(14,165,233,.1)', color: ACCENT, border: '1px solid rgba(14,165,233,.2)' }}><i className="ri-qr-code-line mr-0.5" />QR Girişi</span>}
-              </div>
-              <div className="flex items-center gap-4 mb-5">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: aktifZiyaret.isOffline ? 'linear-gradient(135deg,rgba(245,158,11,.2),rgba(245,158,11,.06))' : 'linear-gradient(135deg,rgba(14,165,233,.2),rgba(14,165,233,.06))', border: `1px solid ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.25)' : 'rgba(14,165,233,.25)'}` }}>
-                  <i className="ri-building-2-line text-2xl" style={{ color: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }} />
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: aktifZiyaret.isOffline ? 'linear-gradient(135deg,rgba(245,158,11,.2),rgba(245,158,11,.06))' : 'linear-gradient(135deg,rgba(14,165,233,.2),rgba(14,165,233,.06))', border: `1px solid ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.25)' : 'rgba(14,165,233,.25)'}` }}>
+                    <i className="ri-building-2-line text-2xl" style={{ color: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }} />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }}>
+                    <div className="absolute inset-0 rounded-full" style={{ background: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT, animation: 'pulseRing 2s ease-out infinite' }} />
+                  </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-base font-extrabold leading-tight truncate" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>{aktifZiyaret.firma_ad ?? 'Bilinmeyen Firma'}</p>
-                  <div className="flex items-center gap-1.5 mt-1.5"><i className="ri-time-line text-xs" style={{ color: textMuted }} /><p className="text-xs" style={{ color: textMuted }}>Giriş: {formatTime(aktifZiyaret.giris_saati)} · {formatDate(aktifZiyaret.giris_saati)}</p></div>
-                  {aktifZiyaret.isOffline && <p className="text-[10px] mt-1 font-semibold" style={{ color: '#D97706' }}>Çevrimdışı kaydedildi — bağlantı gelince senkronize edilecek</p>}
+                  <div className="flex items-center gap-1.5 mt-1"><i className="ri-time-line text-xs" style={{ color: textMuted }} /><p className="text-xs" style={{ color: textMuted }}>Giriş: {formatTime(aktifZiyaret.giris_saati)} · {formatDate(aktifZiyaret.giris_saati)}</p></div>
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    {aktifZiyaret.isOffline && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,.15)', color: '#D97706', border: '1px solid rgba(245,158,11,.3)' }}>ÇEVRİMDIŞI</span>}
+                    {aktifZiyaret.qr_ile_giris && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,.1)', color: ACCENT, border: '1px solid rgba(14,165,233,.2)' }}><i className="ri-qr-code-line mr-0.5" />QR</span>}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center justify-center py-5 rounded-2xl mb-5" style={{ background: aktifZiyaret.isOffline ? 'rgba(245,158,11,.06)' : isDark ? 'rgba(14,165,233,.06)' : 'rgba(14,165,233,.05)', border: `1px solid ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.15)' : 'rgba(14,165,233,.15)'}` }}>
+
+              {/* Süre göstergesi */}
+              <div className="flex items-center justify-center py-6 rounded-2xl mb-4" style={{ background: aktifZiyaret.isOffline ? 'rgba(245,158,11,.06)' : 'rgba(14,165,233,.06)', border: `1px solid ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.15)' : 'rgba(14,165,233,.15)'}` }}>
                 <div className="text-center">
                   <p className="text-[10px] font-bold uppercase tracking-[.14em] mb-2" style={{ color: aktifZiyaret.isOffline ? 'rgba(245,158,11,.6)' : 'rgba(14,165,233,.6)' }}>Geçen Süre</p>
-                  <p className={`text-4xl font-black font-mono ${!aktifZiyaret.isOffline ? 'hekim-timer-glow' : ''}`} style={{ color: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT, letterSpacing: '0.04em' }}>{elapsed || '00d 00s'}</p>
+                  <p className={`text-5xl font-black font-mono ${!aktifZiyaret.isOffline ? 'hekim-timer-glow' : ''}`} style={{ color: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT, letterSpacing: '0.04em' }}>{elapsed || '00:00'}</p>
+                  {aktifZiyaret.isOffline && <p className="text-[10px] mt-2 font-medium" style={{ color: '#D97706' }}>Bağlantı gelince senkronize edilecek</p>}
                 </div>
               </div>
+
+              {/* QR ile bitir */}
               {showQr ? (
                 <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.2)' : 'rgba(14,165,233,.2)'}` }}>
                   <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -467,41 +496,105 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
               ) : (
                 <>
                   <button onClick={() => setShowQr(true)} disabled={actionLoading} className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl cursor-pointer transition-all mb-3"
-                    style={{ background: aktifZiyaret.isOffline ? 'rgba(245,158,11,.08)' : 'rgba(14,165,233,.08)', border: `2px dashed ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.35)' : 'rgba(14,165,233,.35)'}`, color: aktifZiyaret.isOffline ? '#D97706' : ACCENT, opacity: actionLoading ? 0.6 : 1 }}>
+                    style={{ background: aktifZiyaret.isOffline ? 'rgba(245,158,11,.08)' : 'linear-gradient(135deg, rgba(14,165,233,0.1), rgba(2,132,199,0.05))', border: `2px dashed ${aktifZiyaret.isOffline ? 'rgba(245,158,11,.35)' : 'rgba(14,165,233,.35)'}`, color: aktifZiyaret.isOffline ? '#D97706' : ACCENT, opacity: actionLoading ? 0.6 : 1 }}>
                     <div className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: aktifZiyaret.isOffline ? 'rgba(245,158,11,.15)' : 'rgba(14,165,233,.15)' }}>
                       {actionLoading ? <i className="ri-loader-4-line animate-spin text-base" style={{ color: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }} /> : <i className="ri-qr-scan-2-line text-base" style={{ color: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }} />}
                     </div>
                     <div className="text-left"><p className="text-sm font-bold">QR ile Ziyareti Bitir</p><p className="text-xs" style={{ color: textMuted }}>{aktifZiyaret.isOffline ? 'Çevrimdışı kaydedilir' : 'Aynı firma QR kodunu okutun'}</p></div>
+                    <i className="ri-arrow-right-s-line text-lg ml-auto" style={{ color: aktifZiyaret.isOffline ? '#F59E0B' : ACCENT }} />
                   </button>
-                  {!actionLoading && <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(14,165,233,.04)', border: '1px dashed rgba(14,165,233,.2)' }}><i className="ri-information-line text-xs flex-shrink-0 mt-0.5" style={{ color: ACCENT }} /><p className="text-[10px] leading-relaxed" style={{ color: '#64748B' }}>Ziyareti bitirmek için aynı firmanın QR kodunu tekrar okutun.</p></div>}
+                  {!actionLoading && <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}><i className="ri-information-line text-xs flex-shrink-0 mt-0.5" style={{ color: ACCENT }} /><p className="text-[10px] leading-relaxed" style={{ color: '#64748B' }}>Ziyareti bitirmek için aynı firmanın QR kodunu tekrar okutun.</p></div>}
                 </>
               )}
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="rounded-2xl overflow-hidden" style={{ background: cardBg, border: `1px solid ${border}` }}>
-              <div className="h-[2px]" style={{ background: `linear-gradient(90deg,${ACCENT},#38BDF8,transparent)` }} />
+          /* ── QR TARAMA (aktif ziyaret yok) ── */
+          <div className="space-y-4">
+            {/* Premium QR Butonu */}
+            <div className="relative rounded-3xl overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.06) 0%, rgba(2,132,199,0.04) 50%, rgba(56,189,248,0.06) 100%)', border: '1px solid rgba(14,165,233,0.18)' }}>
+              <div className="absolute top-0 left-0 w-16 h-16 opacity-20" style={{ background: 'radial-gradient(circle at top left, rgba(14,165,233,0.4), transparent 70%)' }} />
+              <div className="absolute bottom-0 right-0 w-20 h-20 opacity-15" style={{ background: 'radial-gradient(circle at bottom right, rgba(2,132,199,0.4), transparent 70%)' }} />
+
               {showQr ? (
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2"><div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,.1)' }}><i className="ri-qr-scan-2-line text-xs" style={{ color: ACCENT }} /></div><p className="text-sm font-bold" style={{ color: textPrimary }}>Firma QR&apos;ı Okut</p></div>
-                    <button onClick={() => setShowQr(false)} className="w-7 h-7 flex items-center justify-center rounded-xl cursor-pointer" style={{ background: 'rgba(239,68,68,.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,.2)' }}><i className="ri-close-line text-sm" /></button>
+                <div className="p-4 relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 flex items-center justify-center rounded-xl" style={{ background: 'rgba(14,165,233,0.15)', border: '1px solid rgba(14,165,233,0.25)' }}>
+                        <i className="ri-qr-scan-2-line text-xs" style={{ color: ACCENT }} />
+                      </div>
+                      <p className="text-sm font-bold" style={{ color: ACCENT, letterSpacing: '-0.02em' }}>QR Kod Taranıyor</p>
+                    </div>
+                    <button onClick={() => setShowQr(false)} className="w-7 h-7 flex items-center justify-center rounded-xl cursor-pointer transition-all" style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <i className="ri-close-line text-sm" />
+                    </button>
                   </div>
                   <QrScanner onResult={handleQrResult} onClose={() => setShowQr(false)} />
                   <p className="text-center text-xs mt-3 leading-relaxed" style={{ color: textMuted }}>Firma QR kodunu çerçeve içine getirin — {!isOnline ? 'çevrimdışı kaydedilir' : 'otomatik check-in'}</p>
                 </div>
               ) : (
-                <button onClick={() => setShowQr(true)} disabled={actionLoading} className="w-full flex flex-col items-center justify-center gap-4 py-10 cursor-pointer transition-all" style={{ background: 'transparent', opacity: actionLoading ? 0.6 : 1 }} onMouseEnter={e => { if (!actionLoading) (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,.03)'; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-                  <div className="relative flex items-center justify-center"><div className="absolute w-28 h-28 rounded-full opacity-20" style={{ background: 'radial-gradient(circle,rgba(14,165,233,.3) 0%,transparent 70%)' }} /><div className="w-20 h-20 flex items-center justify-center rounded-2xl relative z-10" style={{ background: 'linear-gradient(135deg,rgba(14,165,233,.16),rgba(14,165,233,.05))', border: '2px dashed rgba(14,165,233,.35)' }}>{actionLoading ? <i className="ri-loader-4-line text-4xl animate-spin" style={{ color: ACCENT }} /> : <i className="ri-qr-scan-2-line text-4xl" style={{ color: ACCENT }} />}</div></div>
-                  <div className="text-center px-4"><p className="text-base font-extrabold" style={{ color: ACCENT, letterSpacing: '-0.02em' }}>{actionLoading ? 'İşleniyor...' : 'QR ile Ziyaret Başlat'}</p><p className="text-xs mt-1.5 leading-relaxed" style={{ color: textMuted }}>{!isOnline ? 'Çevrimdışı modasındasınız — ziyaret yerel olarak kaydedilir' : 'Firma QR kodunu okutun — anında check-in yapılır'}</p></div>
-                  {!actionLoading && <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: 'rgba(14,165,233,.1)', border: '1px solid rgba(14,165,233,.2)' }}><i className="ri-camera-line text-xs" style={{ color: ACCENT }} /><span className="text-xs font-bold" style={{ color: ACCENT }}>Kamerayı Aç</span></div>}
+                <button onClick={() => setShowQr(true)} disabled={actionLoading} className="w-full relative z-10 cursor-pointer transition-all duration-300" style={{ padding: '32px 24px', opacity: actionLoading ? 0.6 : 1 }}>
+                  <div className="flex flex-col items-center gap-5">
+                    <div className="relative">
+                      <div className="absolute inset-0 rounded-2xl" style={{ background: 'rgba(14,165,233,0.06)', animation: 'qrPulseRing 3s ease-in-out infinite', transform: 'scale(1.3)' }} />
+                      <div className="absolute inset-0 rounded-2xl" style={{ background: 'rgba(14,165,233,0.08)', animation: 'qrPulseRing 3s ease-in-out infinite 0.5s', transform: 'scale(1.15)' }} />
+                      <div className="relative w-28 h-28 flex items-center justify-center rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.12), rgba(2,132,199,0.08))', border: '1.5px solid rgba(14,165,233,0.28)' }}>
+                        <div className="absolute top-2 left-2 w-5 h-5 border-t-2 border-l-2 rounded-tl-lg" style={{ borderColor: ACCENT }} />
+                        <div className="absolute top-2 right-2 w-5 h-5 border-t-2 border-r-2 rounded-tr-lg" style={{ borderColor: ACCENT }} />
+                        <div className="absolute bottom-2 left-2 w-5 h-5 border-b-2 border-l-2 rounded-bl-lg" style={{ borderColor: ACCENT }} />
+                        <div className="absolute bottom-2 right-2 w-5 h-5 border-b-2 border-r-2 rounded-br-lg" style={{ borderColor: ACCENT }} />
+                        <div className="absolute left-4 right-4 h-0.5 rounded-full opacity-60" style={{ background: `linear-gradient(90deg, transparent, ${ACCENT}, transparent)`, animation: 'qrIdleScan 2.5s ease-in-out infinite', top: '30%' }} />
+                        {actionLoading ? <i className="ri-loader-4-line animate-spin text-5xl" style={{ color: ACCENT }} /> : <i className="ri-qr-code-line text-5xl" style={{ color: ACCENT }} />}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold mb-1.5" style={{ color: ACCENT, letterSpacing: '-0.03em' }}>{actionLoading ? 'İşleniyor...' : 'Firma QR Kodunu Tara'}</p>
+                      <p className="text-xs font-medium" style={{ color: '#475569', lineHeight: '1.5' }}>{!isOnline ? 'Çevrimdışı modasındasınız — yerel kaydedilir' : 'Firmanın QR kodunu okutun — anında check-in'}</p>
+                    </div>
+                    {!actionLoading && <div className="flex items-center gap-2 px-5 py-2.5 rounded-full" style={{ background: `linear-gradient(135deg, rgba(14,165,233,0.2), rgba(2,132,199,0.15))`, border: '1px solid rgba(14,165,233,0.35)' }}><i className="ri-camera-line text-sm" style={{ color: ACCENT }} /><span className="text-sm font-bold" style={{ color: ACCENT }}>Kamerayı Aç</span><i className="ri-arrow-right-s-line text-base" style={{ color: 'rgba(14,165,233,0.6)' }} /></div>}
+                  </div>
                 </button>
               )}
             </div>
+
+            {/* Bilgi kartları */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)' }}>
+                  <i className="ri-history-line text-sm" style={{ color: ACCENT }} />
+                </div>
+                <div>
+                  <p className="text-base font-bold" style={{ color: ACCENT }}>{gecmis.length}</p>
+                  <p className="text-[10px] font-medium" style={{ color: '#475569' }}>Geçmiş ziyaret</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: isOnline ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${isOnline ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
+                  <i className={`${isOnline ? 'ri-wifi-line' : 'ri-wifi-off-line'} text-sm`} style={{ color: isOnline ? '#22C55E' : '#F59E0B' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: isOnline ? '#22C55E' : '#F59E0B' }}>{isOnline ? 'Online' : 'Offline'}</p>
+                  <p className="text-[10px] font-medium" style={{ color: '#475569' }}>{isOnline ? 'Canlı bağlantı' : 'Yerel kayıt'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Nasıl çalışır */}
             {!showQr && !actionLoading && (
-              <div className="rounded-2xl p-4" style={{ background: isDark ? 'rgba(14,165,233,.05)' : 'rgba(14,165,233,.04)', border: '1px dashed rgba(14,165,233,.25)' }}>
-                <div className="flex items-start gap-3"><div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: 'rgba(14,165,233,.1)' }}><i className="ri-qr-scan-2-line text-base" style={{ color: ACCENT }} /></div><div><p className="text-sm font-semibold" style={{ color: textPrimary }}>QR kod okutarak ziyaret başlatın</p><p className="text-xs mt-1 leading-relaxed" style={{ color: textMuted }}>{!isOnline ? 'Çevrimdışı modasındasınız. QR okutulunca ziyaret yerel olarak kaydedilir ve bağlantı gelince senkronize edilir.' : 'Firmanın QR kodunu tarat — sistem otomatik check-in ve check-out yapar.'}</p></div></div>
+              <div className="rounded-2xl px-4 py-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: '#334155' }}>NASIL ÇALIŞIR</p>
+                <div className="space-y-2.5">
+                  {[
+                    { icon: 'ri-qr-code-line', color: ACCENT, text: 'Firmadaki QR kodu kameranıza gösterin' },
+                    { icon: 'ri-map-pin-user-line', color: '#38BDF8', text: 'Sistem konumu doğrulayıp check-in yapar' },
+                    { icon: 'ri-check-double-line', color: ACCENT_DARK, text: 'Çıkarken aynı QR ile ziyareti bitirin' },
+                  ].map((step, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-7 h-7 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: `${step.color}12`, border: `1px solid ${step.color}22` }}><i className={`${step.icon} text-xs`} style={{ color: step.color }} /></div>
+                      <p className="text-xs font-medium" style={{ color: '#475569' }}>{step.text}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -509,21 +602,32 @@ export default function HekimMobilZiyaret({ isDark }: Props) {
 
         {gecmis.length > 0 && (
           <div className="rounded-2xl overflow-hidden" style={{ background: cardBg, border: `1px solid ${border}` }}>
-            <div className="px-4 pt-4 pb-2 flex items-center gap-2"><div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,.1)' }}><i className="ri-history-line text-xs" style={{ color: ACCENT }} /></div><p className="text-xs font-bold uppercase tracking-[.12em]" style={{ color: textMuted }}>Son Ziyaretler</p></div>
+            <div className="px-4 pt-4 pb-2 flex items-center gap-2">
+              <div className="w-6 h-6 flex items-center justify-center rounded-lg" style={{ background: 'rgba(14,165,233,.1)', border: '1px solid rgba(14,165,233,.2)' }}>
+                <i className="ri-history-line text-xs" style={{ color: ACCENT }} />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-[.12em]" style={{ color: textMuted }}>Son Ziyaretler</p>
+              <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,.1)', color: ACCENT }}>{gecmis.length}</span>
+            </div>
             <div className="px-3 pb-3 space-y-1.5">
               {gecmis.map(z => {
                 const sureDk = z.sure_dakika;
                 const sureStr = sureDk ? (sureDk >= 60 ? `${Math.floor(sureDk/60)}s ${sureDk%60}dk` : `${sureDk}dk`) : null;
                 return (
-                <button key={z.id ?? z.tempId} onClick={() => setDetayZiyaret(z)} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left cursor-pointer transition-all" style={{ background: isDark ? 'rgba(255,255,255,.025)' : 'rgba(15,23,42,.025)', border: `1px solid ${border}` }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,.3)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = border; }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isDark ? 'rgba(255,255,255,.04)' : 'rgba(15,23,42,.04)' }}><i className="ri-building-2-line text-sm" style={{ color: textMuted }} /></div>
-                  <div className="flex-1 min-w-0"><p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{z.firma_ad ?? '—'}</p><p className="text-[10px] mt-0.5" style={{ color: textMuted }}>{formatDate(z.giris_saati)} · {formatTime(z.giris_saati)}</p></div>
+                <button key={z.id ?? z.tempId} onClick={() => setDetayZiyaret(z)} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left cursor-pointer transition-all" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${border}` }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,.3)'; (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.04)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = border; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(14,165,233,.08)', border: '1px solid rgba(14,165,233,.15)' }}>
+                    <i className="ri-building-2-line text-sm" style={{ color: ACCENT }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{z.firma_ad ?? '—'}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: textMuted }}>{formatDate(z.giris_saati)} · {formatTime(z.giris_saati)}</p>
+                  </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {sureStr && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,.1)', color: '#6366F1', border: '1px solid rgba(99,102,241,.2)' }}>{sureStr}</span>}
-                    {z.qr_ile_giris && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,.1)', color: ACCENT, border: '1px solid rgba(14,165,233,.2)' }}>QR</span>}
-                    <i className="ri-arrow-right-s-line text-xs" style={{ color: textMuted }} />
+                    {sureStr && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(14,165,233,.1)', color: ACCENT, border: '1px solid rgba(14,165,233,.2)' }}>{sureStr}</span>}
+                    {z.gps_status === 'ok' && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,.1)', color: '#22C55E' }}><i className="ri-map-pin-line" /></span>}
+                    <i className="ri-arrow-right-s-line text-lg" style={{ color: '#475569' }} />
                   </div>
                 </button>
                 );

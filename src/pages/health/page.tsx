@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useApp } from '@/store/AppContext';
+import MuayeneUyariPanel from './components/MuayeneUyariPanel';
 import Modal from '@/components/base/Modal';
 import XLSXStyle from 'xlsx-js-style';
 import {
@@ -554,6 +555,9 @@ export default function MuayenelerPage() {
           </div>
         </div>
       </div>
+
+      {/* Muayene Uyarı Paneli */}
+      <MuayeneUyariPanel />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

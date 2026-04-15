@@ -27,6 +27,8 @@ const IsIzniPage         = lazy(() => import('../is-izni/page'));
 const FirmaEvraklariPage = lazy(() => import('../company-documents/page'));
 const DokumanlarPage     = lazy(() => import('../dokumanlar/page'));
 const SahaPage           = lazy(() => import('../saha/page'));
+const GelismisRaporlarPage = lazy(() => import('../raporlar/page'));
+const ZiyaretTakvimiPage   = lazy(() => import('../ziyaret-takvimi/page'));
 
 // URL path → modül adı eşlemesi
 const PATH_TO_MODULE: Record<string, string> = {
@@ -42,6 +44,8 @@ const PATH_TO_MODULE: Record<string, string> = {
   '/ekipmanlar':      'ekipmanlar',
   '/is-izinleri':     'is-izinleri',
   '/raporlar':        'raporlar',
+  '/gelismis-raporlar': 'gelismis-raporlar',
+  '/ziyaret-takvimi': 'ziyaret-takvimi',
   '/dokumanlar':      'dokumanlar',
   '/copkutusu':       'copkutusu',
   '/ayarlar':         'ayarlar',
@@ -138,6 +142,8 @@ function AppContent() {
       case 'is-izinleri':     return <IsIzniPage />;
       case 'firma-evraklari': return <FirmaEvraklariPage />;
       case 'raporlar':        return <RaporlarPage />;
+      case 'gelismis-raporlar': return <GelismisRaporlarPage />;
+      case 'ziyaret-takvimi': return <ZiyaretTakvimiPage />;
       case 'dokumanlar':      return <DokumanlarPage />;
       case 'copkutusu':       return <CopKutusuPage />;
       case 'ayarlar':         return isFirmaUser ? <DashboardPage /> : <SettingsPage />;

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../store/AppContext';
 import MonthlyStats from './components/MonthlyStats';
 import StatCard from './components/StatCard';
@@ -23,8 +23,46 @@ export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
     uygunsuzluklar, bildirimler, ekipmanlar, isIzinleri,
-    setActiveModule, fetchTable, org,
+    setActiveModule, fetchTable, org, realtimeStatus, refreshData,
   } = useApp();
+
+  // Son güncelleme zamanı takibi
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [lastUpdateStr, setLastUpdateStr] = useState('Az önce');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Veri değişince güncelleme zamanını güncelle
+  const prevLengthRef = useRef(
+    firmalar.length + personeller.length + evraklar.length + muayeneler.length
+  );
+  useEffect(() => {
+    const curr = firmalar.length + personeller.length + evraklar.length + muayeneler.length;
+    if (curr !== prevLengthRef.current) {
+      prevLengthRef.current = curr;
+      setLastUpdate(new Date());
+    }
+  }, [firmalar.length, personeller.length, evraklar.length, muayeneler.length]);
+
+  // "Az önce / X dk önce" metni
+  useEffect(() => {
+    const update = () => {
+      const diff = Math.floor((Date.now() - lastUpdate.getTime()) / 60000);
+      if (diff < 1) setLastUpdateStr('Az önce');
+      else if (diff < 60) setLastUpdateStr(`${diff} dk önce`);
+      else setLastUpdateStr(`${Math.floor(diff / 60)} sa önce`);
+    };
+    update();
+    const id = setInterval(update, 30000);
+    return () => clearInterval(id);
+  }, [lastUpdate]);
+
+  const handleManualRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    await refreshData();
+    setLastUpdate(new Date());
+    setIsRefreshing(false);
+  }, [isRefreshing, refreshData]);
 
   // Dashboard açılınca tüm tabloları fetch et
   // fetchedRef kaldırıldı — org değişiminde her seferinde taze veri çekilmeli
@@ -298,11 +336,25 @@ export default function DashboardPage() {
                 {riskStats.toplamGecikme + riskStats.uygunDegil} kritik
               </div>
             )}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
-              style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#0EA5E9' }} />
-              Sistem Aktif
-            </div>
+            {/* Realtime durum + son güncelleme */}
+            <button
+              onClick={() => void handleManualRefresh()}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition-all"
+              style={{
+                background: realtimeStatus === 'connected' ? 'rgba(14,165,233,0.1)' : realtimeStatus === 'connecting' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                border: `1px solid ${realtimeStatus === 'connected' ? 'rgba(14,165,233,0.2)' : realtimeStatus === 'connecting' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                color: realtimeStatus === 'connected' ? '#0EA5E9' : realtimeStatus === 'connecting' ? '#F59E0B' : '#F87171',
+              }}
+            >
+              {isRefreshing ? (
+                <i className="ri-loader-4-line text-[10px] animate-spin" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: realtimeStatus === 'connected' ? '#0EA5E9' : realtimeStatus === 'connecting' ? '#F59E0B' : '#F87171' }} />
+              )}
+              <span>{realtimeStatus === 'connected' ? 'Canlı' : realtimeStatus === 'connecting' ? 'Bağlanıyor' : 'Bağlantı Yok'}</span>
+              <span style={{ opacity: 0.6 }}>· {lastUpdateStr}</span>
+            </button>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useQueryCache } from '@/hooks/useQueryCache';
 import HekimMuayeneModal from './HekimMuayeneModal';
 
 const ACCENT = '#0EA5E9';
@@ -69,15 +70,28 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark, addToast, heki
   const tableBg = isDark ? 'rgba(20,30,50,0.98)' : '#ffffff';
   const tableHeadBg = isDark ? 'rgba(15,23,42,0.8)' : '#f8fafc';
   const borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
+  const { get, set, invalidate } = useQueryCache(3 * 60 * 1000); // 3 dakika TTL
 
-  const loadMuayeneler = useCallback(async () => {
+  const loadMuayeneler = useCallback(async (forceRefresh = false) => {
     if (atanmisFirmaIds.length === 0) { setMuayeneler([]); setLoading(false); return; }
+
+    const cacheKey = `hekim_saglik_${atanmisFirmaIds.sort().join(',')}`;
+
+    // Cache kontrolü
+    if (!forceRefresh) {
+      const cached = get<MuayeneRow[]>(cacheKey);
+      if (cached) {
+        setMuayeneler(cached);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
       if (safeIds.length === 0) { setMuayeneler([]); setLoading(false); return; }
 
-      // Tüm sorguları tek seferde paralel çek — N+1 tamamen kaldırıldı
       const [orgsResult, personelResult, muayeneResult] = await Promise.all([
         supabase.from('organizations').select('id, name').in('id', safeIds),
         supabase.from('personeller').select('id, organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
@@ -87,7 +101,6 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark, addToast, heki
       const firmaAdMap: Record<string, string> = {};
       (orgsResult.data ?? []).forEach(o => { firmaAdMap[o.id] = o.name; });
 
-      // Personel adlarını map'e al
       const personelAdMap: Record<string, string> = {};
       (personelResult.data ?? []).forEach(r => {
         const d = r.data as Record<string, unknown>;
@@ -122,19 +135,44 @@ export default function HekimSaglikTab({ atanmisFirmaIds, isDark, addToast, heki
       });
 
       allMuayeneler.sort((a, b) => new Date(b.muayeneTarihi).getTime() - new Date(a.muayeneTarihi).getTime());
+
+      // Cache'e kaydet
+      set(cacheKey, allMuayeneler);
       setMuayeneler(allMuayeneler);
     } catch (err) { console.error('[HekimSaglikTab] load error:', err); }
     finally { setLoading(false); }
-  }, [atanmisFirmaIds]);
+  }, [atanmisFirmaIds, get, set]);
 
   useEffect(() => { loadMuayeneler(); }, [loadMuayeneler]);
+
+  // Realtime: muayeneler tablosunu dinle
+  useEffect(() => {
+    if (atanmisFirmaIds.length === 0) return;
+
+    const channel = supabase
+      .channel(`hekim_saglik_rt_${atanmisFirmaIds.sort().join('_')}`)
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: '*', schema: 'public', table: 'muayeneler' } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        () => {
+          const cacheKey = `hekim_saglik_${atanmisFirmaIds.sort().join(',')}`;
+          invalidate(cacheKey);
+          loadMuayeneler(true);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [atanmisFirmaIds, invalidate, loadMuayeneler]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
     await supabase.from('muayeneler').update({ deleted_at: new Date().toISOString() }).eq('id', deleteId);
     setDeleteId(null);
     setDeleteConfirm(false);
-    loadMuayeneler();
+    const cacheKey = `hekim_saglik_${atanmisFirmaIds.sort().join(',')}`;
+    invalidate(cacheKey);
+    loadMuayeneler(true);
   };
 
   // Filtreleme — eski ve yeni sonuç değerlerini destekle

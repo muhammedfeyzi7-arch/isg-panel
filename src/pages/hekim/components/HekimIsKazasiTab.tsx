@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useQueryCache } from '@/hooks/useQueryCache';
 import HekimIsKazasiModal from './HekimIsKazasiModal';
 import HekimIsKazasiRaporBolumu from './HekimIsKazasiRaporBolumu';
 import { printIsKazasiTutanagi, downloadIsKazasiHtml } from '@/pages/hekim/utils/isKazasiRaporGenerator';
@@ -73,18 +74,31 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [raporMenuId, setRaporMenuId] = useState<string | null>(null);
 
+  const { get, set, invalidate } = useQueryCache(3 * 60 * 1000); // 3 dakika TTL
+
   const textPrimary   = isDark ? '#f1f5f9' : '#0f172a';
   const textSecondary = isDark ? '#94A3B8' : '#64748B';
   const borderColor   = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
   const cardBg        = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)';
 
-  const loadKazalar = useCallback(async () => {
+  const loadKazalar = useCallback(async (forceRefresh = false) => {
     if (atanmisFirmaIds.length === 0) { setKazalar([]); setLoading(false); return; }
+
+    const cacheKey = `hekim_iskaza_${atanmisFirmaIds.sort().join(',')}`;
+
+    if (!forceRefresh) {
+      const cached = get<KazaRow[]>(cacheKey);
+      if (cached) {
+        setKazalar(cached);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
 
-      // Tüm sorguları tek seferde paralel çek — N+1 tamamen kaldırıldı
       const [orgsResult, personelResult, kazaResult] = await Promise.all([
         supabase.from('organizations').select('id, name').in('id', safeIds),
         supabase.from('personeller').select('id, organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
@@ -94,7 +108,6 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
       const firmaAdMap: Record<string, string> = {};
       (orgsResult.data ?? []).forEach(o => { firmaAdMap[o.id] = o.name; });
 
-      // Personel adlarını global map'e al
       const personelAdMap: Record<string, string> = {};
       (personelResult.data ?? []).forEach(r => {
         const d = r.data as Record<string, unknown>;
@@ -129,21 +142,42 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
         besNeden: Array.isArray(r.bes_neden) ? r.bes_neden : [],
       }));
 
+      set(cacheKey, allKazalar);
       setKazalar(allKazalar);
     } catch (err) {
       console.error('[HekimIsKazasiTab] load error:', err);
     } finally {
       setLoading(false);
     }
-  }, [atanmisFirmaIds]);
+  }, [atanmisFirmaIds, get, set]);
 
   useEffect(() => { loadKazalar(); }, [loadKazalar]);
+
+  // Realtime: is_kazalari değişince yenile
+  useEffect(() => {
+    if (atanmisFirmaIds.length === 0) return;
+
+    const channel = supabase
+      .channel(`hekim_iskaza_rt_${atanmisFirmaIds.sort().join('_')}`)
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: '*', schema: 'public', table: 'is_kazalari' } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        () => {
+          invalidate(`hekim_iskaza_${atanmisFirmaIds.sort().join(',')}`);
+          loadKazalar(true);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [atanmisFirmaIds, invalidate, loadKazalar]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
     await supabase.from('is_kazalari').update({ deleted_at: new Date().toISOString() }).eq('id', deleteId);
     setDeleteId(null);
-    loadKazalar();
+    invalidate(`hekim_iskaza_${atanmisFirmaIds.sort().join(',')}`);
+    loadKazalar(true);
   };
 
   const filtered = kazalar.filter(k =>
@@ -744,7 +778,7 @@ export default function HekimIsKazasiTab({ atanmisFirmaIds, isDark, addToast }: 
             <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #EF4444, #F43F5E)' }} />
             <div className="p-6">
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-                style={{ background: 'rgba(239,68,68,0.1)' }}>
+                style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.15)' }}>
                 <i className="ri-error-warning-line text-xl" style={{ color: '#EF4444' }} />
               </div>
               <p className="text-sm font-bold mb-1" style={{ color: textPrimary }}>Kaza kaydını sil?</p>

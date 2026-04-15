@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useQueryCache } from '@/hooks/useQueryCache';
 
@@ -58,10 +58,12 @@ export default function UzmanSaglik({ atanmisFirmaIds, isDark }: Props) {
   const textSecondary = isDark ? '#94a3b8' : '#64748b';
   const textMuted     = isDark ? '#64748b' : '#94a3b8';
 
-  useEffect(() => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
     if (atanmisFirmaIds.length === 0) { setLoading(false); return; }
-    const fetchData = async () => {
-      const cacheKey = `uzman_saglik_${atanmisFirmaIds.slice().sort().join(',')}`;
+
+    const cacheKey = `uzman_saglik_${atanmisFirmaIds.slice().sort().join(',')}`;
+
+    if (!forceRefresh) {
       const cached = cache.get(cacheKey);
       if (cached) {
         setKayitlar(cached.kayitlar);
@@ -69,87 +71,108 @@ export default function UzmanSaglik({ atanmisFirmaIds, isDark }: Props) {
         setLoading(false);
         return;
       }
-      setLoading(true);
-      try {
-        const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
+    }
 
-        // Firma isimlerini çek
-        const { data: orgs } = await supabase
-          .from('organizations')
-          .select('id, name')
-          .in('id', safeIds);
-        const fMap: Record<string, string> = {};
-        (orgs ?? []).forEach(o => { fMap[o.id] = o.name; });
-        setFirmaMap(fMap);
+    setLoading(true);
+    try {
+      const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
 
-        // Muayene kayıtlarını çek — data JSON içinde tutuluyor
-        const { data: muayeneler, error } = await supabase
-          .from('muayeneler')
-          .select('id, organization_id, data, created_at')
-          .in('organization_id', safeIds)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false });
+      const { data: orgs } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .in('id', safeIds);
+      const fMap: Record<string, string> = {};
+      (orgs ?? []).forEach(o => { fMap[o.id] = o.name; });
+      setFirmaMap(fMap);
 
-        if (error) {
-          console.error('[UzmanSaglik] muayeneler fetch error:', error);
-          setKayitlar([]);
-          return;
-        }
+      const { data: muayeneler, error } = await supabase
+        .from('muayeneler')
+        .select('id, organization_id, data, created_at')
+        .in('organization_id', safeIds)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
 
-        if (!muayeneler || muayeneler.length === 0) {
-          setKayitlar([]);
-          return;
-        }
-
-        // Personel isimlerini çek — personelId data.personelId içinde
-        const personelIds = [...new Set(
-          muayeneler
-            .map(m => (m.data as Record<string, unknown>)?.personelId as string)
-            .filter(Boolean)
-        )];
-
-        const personelMap: Record<string, string> = {};
-        if (personelIds.length > 0) {
-          const { data: personeller } = await supabase
-            .from('personeller')
-            .select('id, data')
-            .in('id', personelIds);
-
-          (personeller ?? []).forEach(p => {
-            const d = p.data as Record<string, unknown>;
-            personelMap[p.id] = (d?.adSoyad as string) ?? `${d?.ad ?? ''} ${d?.soyad ?? ''}`.trim() ?? 'Bilinmiyor';
-          });
-        }
-
-        const list: MuayeneKayit[] = muayeneler.map(m => {
-          const d = (m.data ?? {}) as Record<string, unknown>;
-          const personelId = (d.personelId as string) ?? '';
-          return {
-            id: m.id,
-            personelId,
-            personelAdi: personelMap[personelId] ?? 'Bilinmiyor',
-            muayeneTarihi: (d.muayeneTarihi as string) ?? '',
-            sonrakiTarih: (d.sonrakiTarih as string) ?? '',
-            sonuc: (d.sonuc as string) ?? '',
-            organizationId: m.organization_id,
-            firmaAdi: fMap[m.organization_id] ?? 'Bilinmiyor',
-            ek2: (d.ek2 as boolean) ?? false,
-            doktor: (d.doktor as string) ?? '',
-            hastane: (d.hastane as string) ?? '',
-          };
-        });
-
-        cache.set(cacheKey, { kayitlar: list, firmaMap: fMap });
-        setKayitlar(list);
-      } catch (err) {
-        console.error('[UzmanSaglik] unexpected error:', err);
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error('[UzmanSaglik] muayeneler fetch error:', error);
+        setKayitlar([]);
+        return;
       }
-    };
+
+      if (!muayeneler || muayeneler.length === 0) {
+        cache.set(cacheKey, { kayitlar: [], firmaMap: fMap });
+        setKayitlar([]);
+        return;
+      }
+
+      const personelIds = [...new Set(
+        muayeneler
+          .map(m => (m.data as Record<string, unknown>)?.personelId as string)
+          .filter(Boolean)
+      )];
+
+      const personelMap: Record<string, string> = {};
+      if (personelIds.length > 0) {
+        const { data: personeller } = await supabase
+          .from('personeller')
+          .select('id, data')
+          .in('id', personelIds);
+
+        (personeller ?? []).forEach(p => {
+          const d = p.data as Record<string, unknown>;
+          personelMap[p.id] = (d?.adSoyad as string) ?? `${d?.ad ?? ''} ${d?.soyad ?? ''}`.trim() ?? 'Bilinmiyor';
+        });
+      }
+
+      const list: MuayeneKayit[] = muayeneler.map(m => {
+        const d = (m.data ?? {}) as Record<string, unknown>;
+        const personelId = (d.personelId as string) ?? '';
+        return {
+          id: m.id,
+          personelId,
+          personelAdi: personelMap[personelId] ?? 'Bilinmiyor',
+          muayeneTarihi: (d.muayeneTarihi as string) ?? '',
+          sonrakiTarih: (d.sonrakiTarih as string) ?? '',
+          sonuc: (d.sonuc as string) ?? '',
+          organizationId: m.organization_id,
+          firmaAdi: fMap[m.organization_id] ?? 'Bilinmiyor',
+          ek2: (d.ek2 as boolean) ?? false,
+          doktor: (d.doktor as string) ?? '',
+          hastane: (d.hastane as string) ?? '',
+        };
+      });
+
+      cache.set(cacheKey, { kayitlar: list, firmaMap: fMap });
+      setKayitlar(list);
+    } catch (err) {
+      console.error('[UzmanSaglik] unexpected error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [atanmisFirmaIds, cache]);
+
+  useEffect(() => {
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atanmisFirmaIds.join(',')]);
+
+  // Realtime: muayeneler değişince yenile
+  useEffect(() => {
+    if (atanmisFirmaIds.length === 0) return;
+
+    const channel = supabase
+      .channel(`uzman_saglik_rt_${atanmisFirmaIds.slice().sort().join('_')}`)
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: '*', schema: 'public', table: 'muayeneler' } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        () => {
+          cache.invalidate(`uzman_saglik_${atanmisFirmaIds.slice().sort().join(',')}`);
+          fetchData(true);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [atanmisFirmaIds, cache, fetchData]);
 
   const filtered = kayitlar.filter(k => {
     const matchSearch = searchQuery === '' || (k.personelAdi ?? '').toLowerCase().includes(searchQuery.toLowerCase());

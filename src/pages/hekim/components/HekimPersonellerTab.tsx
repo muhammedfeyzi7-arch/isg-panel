@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useQueryCache } from '@/hooks/useQueryCache';
 import HekimMuayeneModal from './HekimMuayeneModal';
 
 interface PersonelRow {
@@ -27,6 +28,8 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
   const [muayeneModalOpen, setMuayeneModalOpen] = useState(false);
   const [selectedPersonelId, setSelectedPersonelId] = useState<string | null>(null);
 
+  const { get, set, invalidate } = useQueryCache(3 * 60 * 1000); // 3 dakika TTL
+
   const ACCENT = '#0EA5E9';
   const textPrimary = 'var(--text-primary)';
   const textMuted = 'var(--text-muted)';
@@ -38,68 +41,106 @@ export default function HekimPersonellerTab({ atanmisFirmaIds, isDark }: HekimPe
     borderRadius: '16px',
   };
 
-  useEffect(() => {
+  const load = useCallback(async (forceRefresh = false) => {
     if (atanmisFirmaIds.length === 0) {
       setPersoneller([]);
       setLoading(false);
       return;
     }
 
-    const load = async () => {
-      setLoading(true);
-      try {
-        const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
-        if (safeIds.length === 0) { setPersoneller([]); setLoading(false); return; }
+    const cacheKey = `hekim_personeller_${atanmisFirmaIds.sort().join(',')}`;
 
-        // Tüm sorguları paralel çek — N+1 tamamen kaldırıldı
-        const [orgsResult, personelResult, muayeneResult] = await Promise.all([
-          supabase.from('organizations').select('id, name').in('id', safeIds),
-          supabase.from('personeller').select('id, organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
-          supabase.from('muayeneler').select('data').in('organization_id', safeIds).is('deleted_at', null).order('created_at', { ascending: false }),
-        ]);
-
-        const adMap: Record<string, string> = {};
-        (orgsResult.data ?? []).forEach(o => { adMap[o.id] = o.name; });
-        setFirmaAdMap(adMap);
-
-        // En son muayeneyi personel bazlı map'e al
-        const muayeneMap: Record<string, { tarih: string; sonuc: string }> = {};
-        (muayeneResult.data ?? []).forEach(m => {
-          const md = m.data as Record<string, unknown>;
-          const pid = md.personelId as string;
-          if (pid && !muayeneMap[pid]) {
-            muayeneMap[pid] = {
-              tarih: (md.muayeneTarihi as string) ?? '',
-              sonuc: (md.sonuc as string) ?? '',
-            };
-          }
-        });
-
-        const allPersonel: PersonelRow[] = (personelResult.data ?? []).map(r => {
-          const d = r.data as Record<string, unknown>;
-          const muayene = muayeneMap[r.id];
-          return {
-            id: r.id,
-            adSoyad: (d.adSoyad as string) ?? '',
-            gorev: (d.gorev as string) ?? '',
-            firmaAd: adMap[r.organization_id] ?? r.organization_id,
-            firmaId: r.organization_id,
-            durum: (d.durum as string) ?? 'Aktif',
-            sonMuayene: muayene?.tarih ?? null,
-            sonMuayeneSonuc: muayene?.sonuc ?? null,
-          };
-        });
-
-        setPersoneller(allPersonel);
-      } catch (err) {
-        console.error('[HekimPersonellerTab] load error:', err);
-      } finally {
+    if (!forceRefresh) {
+      const cached = get<{ personeller: PersonelRow[]; firmaAdMap: Record<string, string> }>(cacheKey);
+      if (cached) {
+        setPersoneller(cached.personeller);
+        setFirmaAdMap(cached.firmaAdMap);
         setLoading(false);
+        return;
       }
-    };
+    }
 
-    load();
-  }, [atanmisFirmaIds]);
+    setLoading(true);
+    try {
+      const safeIds = atanmisFirmaIds.filter(id => typeof id === 'string' && id.length > 0);
+      if (safeIds.length === 0) { setPersoneller([]); setLoading(false); return; }
+
+      const [orgsResult, personelResult, muayeneResult] = await Promise.all([
+        supabase.from('organizations').select('id, name').in('id', safeIds),
+        supabase.from('personeller').select('id, organization_id, data').in('organization_id', safeIds).is('deleted_at', null),
+        supabase.from('muayeneler').select('data').in('organization_id', safeIds).is('deleted_at', null).order('created_at', { ascending: false }),
+      ]);
+
+      const adMap: Record<string, string> = {};
+      (orgsResult.data ?? []).forEach(o => { adMap[o.id] = o.name; });
+
+      const muayeneMap: Record<string, { tarih: string; sonuc: string }> = {};
+      (muayeneResult.data ?? []).forEach(m => {
+        const md = m.data as Record<string, unknown>;
+        const pid = md.personelId as string;
+        if (pid && !muayeneMap[pid]) {
+          muayeneMap[pid] = {
+            tarih: (md.muayeneTarihi as string) ?? '',
+            sonuc: (md.sonuc as string) ?? '',
+          };
+        }
+      });
+
+      const allPersonel: PersonelRow[] = (personelResult.data ?? []).map(r => {
+        const d = r.data as Record<string, unknown>;
+        const muayene = muayeneMap[r.id];
+        return {
+          id: r.id,
+          adSoyad: (d.adSoyad as string) ?? '',
+          gorev: (d.gorev as string) ?? '',
+          firmaAd: adMap[r.organization_id] ?? r.organization_id,
+          firmaId: r.organization_id,
+          durum: (d.durum as string) ?? 'Aktif',
+          sonMuayene: muayene?.tarih ?? null,
+          sonMuayeneSonuc: muayene?.sonuc ?? null,
+        };
+      });
+
+      set(cacheKey, { personeller: allPersonel, firmaAdMap: adMap });
+      setFirmaAdMap(adMap);
+      setPersoneller(allPersonel);
+    } catch (err) {
+      console.error('[HekimPersonellerTab] load error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [atanmisFirmaIds, get, set]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Realtime: personeller ve muayeneler değişince yenile
+  useEffect(() => {
+    if (atanmisFirmaIds.length === 0) return;
+
+    const rtKey = atanmisFirmaIds.sort().join('_');
+
+    const channel = supabase
+      .channel(`hekim_personeller_rt_${rtKey}`)
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: '*', schema: 'public', table: 'personeller' } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        () => {
+          invalidate(`hekim_personeller_${atanmisFirmaIds.sort().join(',')}`);
+          load(true);
+        }
+      )
+      .on(
+        'postgres_changes' as Parameters<ReturnType<typeof supabase.channel>['on']>[0],
+        { event: '*', schema: 'public', table: 'muayeneler' } as Parameters<ReturnType<typeof supabase.channel>['on']>[1],
+        () => {
+          invalidate(`hekim_personeller_${atanmisFirmaIds.sort().join(',')}`);
+          load(true);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [atanmisFirmaIds, invalidate, load]);
 
   const filtered = personeller.filter(p => {
     const matchSearch = p.adSoyad.toLowerCase().includes(search.toLowerCase()) ||

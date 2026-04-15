@@ -9,7 +9,7 @@ const ROLE_MODULES: Record<string, string[]> = {
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
     'uygunsuzluklar', 'ekipmanlar', 'is-izinleri',
-    'saha', 'raporlar', 'dokumanlar', 'copkutusu', 'ayarlar',
+    'saha', 'raporlar', 'gelismis-raporlar', 'ziyaret-takvimi', 'dokumanlar', 'copkutusu', 'ayarlar',
   ],
   denetci: [
     'dashboard', 'firmalar', 'personeller',
@@ -19,7 +19,7 @@ const ROLE_MODULES: Record<string, string[]> = {
     'dashboard', 'firmalar', 'personeller',
     'evraklar', 'firma-evraklari', 'egitimler', 'muayeneler', 'tutanaklar',
     'uygunsuzluklar', 'ekipmanlar', 'is-izinleri',
-    'saha', 'raporlar', 'dokumanlar', 'copkutusu',
+    'saha', 'raporlar', 'gelismis-raporlar', 'ziyaret-takvimi', 'dokumanlar', 'copkutusu',
   ],
   firma_user: [
     'dashboard', 'personeller',
@@ -68,11 +68,13 @@ const menuGroups: { label: string; items: MenuItem[] }[] = [
   {
     label: 'SİSTEM',
     items: [
-      { id: 'saha',       label: 'Saha', icon: 'ri-map-pin-user-line', mobileOnly: true },
-      { id: 'raporlar',   label: 'Raporlar',          icon: 'ri-bar-chart-2-line' },
-      { id: 'dokumanlar', label: 'Dökümanlar',        icon: 'ri-file-text-line' },
-      { id: 'copkutusu',  label: 'Çöp Kutusu',        icon: 'ri-delete-bin-2-line' },
-      { id: 'ayarlar',    label: 'Ayarlar',            icon: 'ri-settings-4-line' },
+      { id: 'saha',               label: 'Saha',               icon: 'ri-map-pin-user-line', mobileOnly: true },
+      { id: 'raporlar',           label: 'Raporlar',           icon: 'ri-bar-chart-2-line' },
+      { id: 'gelismis-raporlar',  label: 'Gelişmiş Raporlar',  icon: 'ri-bar-chart-box-line' },
+      { id: 'ziyaret-takvimi',    label: 'Ziyaret Takvimi',    icon: 'ri-calendar-check-line' },
+      { id: 'dokumanlar',         label: 'Dökümanlar',         icon: 'ri-file-text-line' },
+      { id: 'copkutusu',          label: 'Çöp Kutusu',         icon: 'ri-delete-bin-2-line' },
+      { id: 'ayarlar',            label: 'Ayarlar',            icon: 'ri-settings-4-line' },
     ],
   },
 ];
