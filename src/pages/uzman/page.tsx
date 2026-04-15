@@ -241,7 +241,7 @@ export default function UzmanPage() {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen panel-shell"
       style={{
         background: isDark
           ? 'linear-gradient(135deg, #0a0f1a 0%, #0d1525 50%, #0a1020 100%)'
@@ -320,16 +320,16 @@ export default function UzmanPage() {
       />
 
       <main
-        className="min-h-screen transition-all duration-300"
+        className="min-h-screen transition-all duration-300 mobile-panel-main"
         style={{ overflowX: 'hidden', overflowY: 'auto' }}
       >
         {/* ── İçerik ── */}
         <div
-          className={`pt-[56px] uzman-content transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'} pb-8`}
+          className={`pt-[56px] uzman-content transition-all duration-300 mobile-panel-content ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'} pb-8`}
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
           style={{ minHeight: 'calc(100vh - 56px)' }}
         >
-          <div className="px-3 sm:px-5 md:px-6 py-4 max-w-[1600px] w-full">
+          <div className="px-3 sm:px-5 md:px-6 py-4 max-w-[1600px] w-full panel-main-wrap rounded-2xl mobile-inner-wrap">
             {renderContent()}
           </div>
         </div>

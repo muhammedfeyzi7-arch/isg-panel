@@ -910,7 +910,7 @@ export default function OsgbDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-app)' }}>
+    <div className="min-h-screen panel-shell" style={{ background: 'var(--bg-app)' }}>
 
       {/* Onboarding Tour */}
       <OnboardingTour />
@@ -956,7 +956,7 @@ export default function OsgbDashboardPage() {
       <main
         className={`transition-all duration-300 pt-[46px] min-h-screen ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
       >
-        <div className="px-2 sm:px-3 md:px-5 py-3 max-w-[1680px]">
+        <div className="px-2 sm:px-3 md:px-5 py-3 max-w-[1680px] panel-main-wrap rounded-2xl">
           {!dataLoading && (
             <>
               {/* ── DASHBOARD ── hidden/block ile mount edilmiş kalır, unmount olmaz */}

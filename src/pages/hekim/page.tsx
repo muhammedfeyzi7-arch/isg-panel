@@ -296,7 +296,7 @@ export default function HekimPage() {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen panel-shell"
       style={{
         background: isDark
           ? 'linear-gradient(135deg, #0a0f1a 0%, #0d1525 50%, #0a1020 100%)'
@@ -350,7 +350,7 @@ export default function HekimPage() {
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      <main className="min-h-screen overflow-y-auto transition-all duration-300 lg:block">
+      <main className="min-h-screen overflow-y-auto transition-all duration-300 lg:block mobile-panel-main">
         {/* ── Topbar ── */}
         <div
           className={`sticky top-0 z-30 transition-all duration-300 ${collapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
@@ -539,7 +539,7 @@ export default function HekimPage() {
 
         {/* ── İçerik ── */}
         <div
-          className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'}`}
+          className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 panel-main-wrap rounded-2xl mobile-panel-content ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'}`}
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
         >
           {renderContent()}

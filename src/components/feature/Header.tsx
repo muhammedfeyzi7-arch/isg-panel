@@ -136,9 +136,10 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
         style={{
           height: '56px',
           background: headerBg,
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
+          backdropFilter: 'blur(20px) saturate(130%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(130%)',
           borderBottom: `1px solid ${headerBorder}`,
+          boxShadow: isDark ? '0 6px 24px rgba(2,6,23,0.32)' : '0 4px 20px rgba(15,23,42,0.08)',
           transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1), background 0.3s ease',
           paddingLeft: '20px',
           paddingRight: '16px',
@@ -239,8 +240,14 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
           title={isDark ? 'Açık Tema' : 'Koyu Tema'}
           className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200 flex-shrink-0"
           style={{ background: iconBtnBg, border: `1px solid ${iconBtnBorder}` }}
-          onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = iconBtnBg; }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.08)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = iconBtnBg;
+            e.currentTarget.style.transform = 'none';
+          }}
         >
           <i className={`${isDark ? 'ri-sun-line' : 'ri-moon-line'} text-sm`} style={{ color: isDark ? '#F59E0B' : '#475569' }} />
         </button>
@@ -253,13 +260,19 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
             padding: '6px 14px',
             fontSize: '12px',
             borderRadius: '10px',
-            background: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+            background: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 48%, #0369A1 100%)',
             color: '#ffffff',
             border: 'none',
-            boxShadow: '0 2px 10px rgba(14,165,233,0.35)',
+            boxShadow: '0 4px 14px rgba(14,165,233,0.32), inset 0 1px 0 rgba(255,255,255,0.18)',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(14,165,233,0.5)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 10px rgba(14,165,233,0.35)'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(14,165,233,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
+            (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(14,165,233,0.32), inset 0 1px 0 rgba(255,255,255,0.18)';
+            (e.currentTarget as HTMLElement).style.transform = 'none';
+          }}
         >
           <i className="ri-add-line text-sm" />
           <span className="hidden lg:inline">Hızlı Ekle</span>

@@ -586,7 +586,7 @@ export default function SahaPage() {
 
 
   return (
-    <div className="flex flex-col min-h-screen pb-8" style={{ maxWidth: '520px', margin: '0 auto', fontFamily: "'Inter', sans-serif" }}>
+    <div className="flex flex-col min-h-screen pb-8 panel-shell panel-main-wrap rounded-2xl mobile-saha-wrap" style={{ maxWidth: '520px', margin: '0 auto', fontFamily: "'Inter', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
 
       {/* Başlık Kartı */}

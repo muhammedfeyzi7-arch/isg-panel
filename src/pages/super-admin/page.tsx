@@ -109,9 +109,9 @@ export default function SuperAdminPage() {
   if (!isSuperAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
+    <div className="min-h-screen bg-[#f8fafc] panel-shell">
       {/* Navbar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+      <header className="bg-white/95 border-b border-slate-200 sticky top-0 z-30 backdrop-blur-xl">
         <div className="max-w-screen-xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0">
@@ -143,7 +143,7 @@ export default function SuperAdminPage() {
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-4 md:px-8 py-6 space-y-5">
+      <main className="max-w-screen-xl mx-auto px-4 md:px-8 py-6 space-y-5 panel-main-wrap rounded-2xl">
         {/* Tab bar */}
         <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-xl w-fit">
           {([

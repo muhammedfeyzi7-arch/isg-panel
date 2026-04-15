@@ -79,7 +79,8 @@ export default function MonthlyStats() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* ── Bu Ay Personel ── */}
-      <div className="rounded-2xl p-5 isg-card">
+      <div className="rounded-2xl p-5 isg-card isg-card-hover relative overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: 'linear-gradient(90deg, #0EA5E9, #38BDF8)' }} />
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div
@@ -169,7 +170,8 @@ export default function MonthlyStats() {
       </div>
 
       {/* ── Bu Ay Muayeneler ── */}
-      <div className="rounded-2xl p-5 isg-card">
+      <div className="rounded-2xl p-5 isg-card isg-card-hover relative overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: 'linear-gradient(90deg, #60A5FA, #93C5FD)' }} />
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div
@@ -255,7 +257,8 @@ export default function MonthlyStats() {
       </div>
 
       {/* ── Uygunsuzluklar ── */}
-      <div className="rounded-2xl p-5 isg-card">
+      <div className="rounded-2xl p-5 isg-card isg-card-hover relative overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: 'linear-gradient(90deg, #EF4444, #F87171)' }} />
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <div
