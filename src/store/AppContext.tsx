@@ -277,25 +277,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const extraIds = allFirmIds.filter(id => id !== org.id);
     if (extraIds.length === 0) return;
 
-    // Paginated fetch for gezici uzman extra firms — uses fetchAllRows to bypass Supabase 1000-row limit
-    const fetchTableForOrg = async (table: string, orgId: string): Promise<unknown[]> => {
-      const { data } = await (await import('./storeHelpers')).fetchAllRows(table, orgId);
-      return (data ?? []).map(r => r.data as unknown);
+    // Optimized: tüm firmalar için her tabloyu TEK sorguda çek (N*8 sorgu → 8 sorgu)
+    const fetchAllExtraFirms = async (firmIds: string[]) => {
+      const { fetchAllRows } = await import('./storeHelpers');
+
+      // 8 tablo için paralel toplu sorgu — her tablo tüm firmIds'i tek seferde çeker
+      const [
+        personellerAll, evraklarAll, egitimlerAll, muayenelerAll,
+        uygunsuzluklarAll, ekipmanlarAll, tutanaklarAll, isIzinleriAll,
+      ] = await Promise.all([
+        fetchAllRows('personeller', firmIds[0], firmIds),
+        fetchAllRows('evraklar', firmIds[0], firmIds),
+        fetchAllRows('egitimler', firmIds[0], firmIds),
+        fetchAllRows('muayeneler', firmIds[0], firmIds),
+        fetchAllRows('uygunsuzluklar', firmIds[0], firmIds),
+        fetchAllRows('ekipmanlar', firmIds[0], firmIds),
+        fetchAllRows('tutanaklar', firmIds[0], firmIds),
+        fetchAllRows('is_izinleri', firmIds[0], firmIds),
+      ]);
+
+      // Firma bazında grupla
+      const groupByOrg = (rows: { organization_id?: string; data: unknown }[]) => {
+        const map: Record<string, unknown[]> = {};
+        firmIds.forEach(id => { map[id] = []; });
+        rows.forEach(r => {
+          const orgId = r.organization_id;
+          if (orgId && map[orgId]) map[orgId].push(r.data);
+        });
+        return map;
+      };
+
+      const pMap = groupByOrg((personellerAll.data ?? []) as { organization_id?: string; data: unknown }[]);
+      const eMap = groupByOrg((evraklarAll.data ?? []) as { organization_id?: string; data: unknown }[]);
+      const egMap = groupByOrg((egitimlerAll.data ?? []) as { organization_id?: string; data: unknown }[]);
+      const mMap = groupByOrg((muayenelerAll.data ?? []) as { organization_id?: string; data: unknown }[]);
+      const uMap = groupByOrg((uygunsuzluklarAll.data ?? []) as { organization_id?: string; data: unknown }[]);
+      const ekMap = groupByOrg((ekipmanlarAll.data ?? []) as { organization_id?: string; data: unknown }[]);
+      const tMap = groupByOrg((tutanaklarAll.data ?? []) as { organization_id?: string; data: unknown }[]);
+      const iMap = groupByOrg((isIzinleriAll.data ?? []) as { organization_id?: string; data: unknown }[]);
+
+      return firmIds.map(firmId => ({
+        firmId,
+        personeller: pMap[firmId] ?? [],
+        evraklar: eMap[firmId] ?? [],
+        egitimler: egMap[firmId] ?? [],
+        muayeneler: mMap[firmId] ?? [],
+        uygunsuzluklar: uMap[firmId] ?? [],
+        ekipmanlar: ekMap[firmId] ?? [],
+        tutanaklar: tMap[firmId] ?? [],
+        isIzinleri: iMap[firmId] ?? [],
+      }));
     };
 
-    Promise.all(extraIds.map(async (firmId) => {
-      const [personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri] = await Promise.all([
-        fetchTableForOrg('personeller', firmId),
-        fetchTableForOrg('evraklar', firmId),
-        fetchTableForOrg('egitimler', firmId),
-        fetchTableForOrg('muayeneler', firmId),
-        fetchTableForOrg('uygunsuzluklar', firmId),
-        fetchTableForOrg('ekipmanlar', firmId),
-        fetchTableForOrg('tutanaklar', firmId),
-        fetchTableForOrg('is_izinleri', firmId),
-      ]);
-      return { firmId, personeller, evraklar, egitimler, muayeneler, uygunsuzluklar, ekipmanlar, tutanaklar, isIzinleri };
-    })).then(results => {
+    fetchAllExtraFirms(extraIds).then((results) => {
       const newMap: ExtraFirmaVeriMap = {};
       results.forEach(r => {
         newMap[r.firmId] = {

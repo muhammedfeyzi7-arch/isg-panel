@@ -120,25 +120,37 @@ export async function dbUpdateDirect(
 
 // ── Paginated fetch — bypasses Supabase 1000-row default limit ──
 // Returns only rows with deleted_at IS NULL (active records).
+// orgIds: tek string veya string[] — çoklu org desteği
 export async function fetchAllRows(
   table: string,
   orgId: string,
-): Promise<{ data: { data: unknown }[] | null; error: unknown }> {
+  orgIds?: string[],
+): Promise<{ data: ({ data: unknown; organization_id?: string })[] | null; error: unknown }> {
   const PAGE_SIZE = 500;
-  let allRows: { data: unknown }[] = [];
+  let allRows: ({ data: unknown; organization_id?: string })[] = [];
   let from = 0;
   let hasMore = true;
   let pageNum = 0;
 
+  // Çoklu org varsa .in() kullan, tekli ise .eq() — performans için
+  const isMulti = orgIds && orgIds.length > 1;
+
   while (hasMore) {
     pageNum++;
-    const { data, error } = await supabase
+    let query = supabase
       .from(table)
-      .select('id, data, created_at')
-      .eq('organization_id', orgId)
+      .select('id, organization_id, data, created_at')
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
+
+    if (isMulti) {
+      query = query.in('organization_id', orgIds!);
+    } else {
+      query = query.eq('organization_id', orgIds?.[0] ?? orgId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       logError(`[ISG] fetchAllRows error (${table}) page=${pageNum}:`, error);
@@ -146,7 +158,7 @@ export async function fetchAllRows(
     }
 
     const rows = data ?? [];
-    allRows = allRows.concat(rows as { data: unknown }[]);
+    allRows = allRows.concat(rows as ({ data: unknown; organization_id?: string })[]);
 
     if (rows.length < PAGE_SIZE) { hasMore = false; }
     else { from += PAGE_SIZE; }
@@ -154,7 +166,7 @@ export async function fetchAllRows(
   }
 
   log(`[ISG] fetchAllRows DONE: ${table} total=${allRows.length} pages=${pageNum}`);
-  return { data: allRows as { data: unknown }[], error: null };
+  return { data: allRows, error: null };
 }
 
 // ── RPC: race-condition-safe record number ──

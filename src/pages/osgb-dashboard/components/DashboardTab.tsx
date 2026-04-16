@@ -129,9 +129,9 @@ function DashboardTabInner({
 
   const card: React.CSSProperties = {
     background: isDark
-      ? 'linear-gradient(145deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.98) 100%)'
-      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 100%)',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
+      ? 'linear-gradient(145deg, rgba(18,12,40,0.98) 0%, rgba(12,8,28,0.99) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(248,246,255,0.95) 100%)',
+    border: `1px solid ${isDark ? 'rgba(139,92,246,0.12)' : 'rgba(139,92,246,0.1)'}`,
     borderRadius: '20px',
     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
   };
@@ -269,40 +269,38 @@ function DashboardTabInner({
   return (
     <div className="space-y-5 page-enter">
 
-      {/* ── KPI KARTLARI (PREMIUM) ── */}
+      {/* ── KPI KARTLARI ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-        {/* Müşteri Firma — Sky/Cyan teması */}
-        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
+        {/* Müşteri Firma — Mor teması */}
+        <div className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
           style={{
             background: isDark
-              ? 'linear-gradient(145deg, rgba(14,165,233,0.14) 0%, rgba(2,132,199,0.08) 100%)'
-              : 'linear-gradient(145deg, rgba(224,242,254,0.9) 0%, rgba(186,230,253,0.6) 100%)',
-            border: isDark ? '1px solid rgba(14,165,233,0.22)' : '1px solid rgba(14,165,233,0.25)',
+              ? 'linear-gradient(145deg, rgba(139,92,246,0.18) 0%, rgba(109,40,217,0.1) 100%)'
+              : 'linear-gradient(145deg, rgba(237,233,254,0.95) 0%, rgba(221,214,254,0.7) 100%)',
+            border: isDark ? '1px solid rgba(139,92,246,0.28)' : '1px solid rgba(139,92,246,0.25)',
             borderRadius: '20px',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
           onClick={() => setActiveTab('firmalar')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(14,165,233,0.2)'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 40px rgba(139,92,246,0.25)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(14,165,233,0.15) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.2)', border: '1px solid rgba(14,165,233,0.3)' }}>
-                <i className="ri-building-2-fill text-sm" style={{ color: '#0EA5E9' }} />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: isDark ? 'rgba(14,165,233,0.7)' : '#0284C7' }}>Müşteri Firma</span>
+          <div className="absolute top-0 right-0 w-28 h-28 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%)', transform: 'translate(35%, -35%)' }} />
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.35)' }}>
+              <i className="ri-building-2-fill text-sm" style={{ color: '#A78BFA' }} />
             </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isDark ? 'rgba(167,139,250,0.8)' : '#7C3AED' }}>Müşteri Firma</span>
           </div>
-          <p className="text-[32px] font-black leading-none mb-2" style={{ color: isDark ? '#7DD3FC' : '#0369A1' }}>{altFirmalar.length}</p>
-          <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(125,211,252,0.7)' : '#0284C7' }}>
+          <p className="text-[36px] font-black leading-none mb-2" style={{ color: isDark ? '#C4B5FD' : '#5B21B6', letterSpacing: '-0.04em' }}>{altFirmalar.length}</p>
+          <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(196,181,253,0.65)' : '#7C3AED' }}>
             {altFirmalar.length === 0 ? 'Henüz firma yok' : `${altFirmalar.filter(f => f.uzmanAd).length} firmaya uzman atanmış`}
           </p>
         </div>
 
         {/* Aktif Ziyaret — Yeşil teması */}
-        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
+        <div className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
           style={{
             background: aktifZiyaretler.length > 0
               ? (isDark ? 'linear-gradient(145deg, rgba(34,197,94,0.18) 0%, rgba(22,163,74,0.1) 100%)' : 'linear-gradient(145deg, rgba(220,252,231,0.95) 0%, rgba(187,247,208,0.7) 100%)')
@@ -314,32 +312,32 @@ function DashboardTabInner({
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(34,197,94,0.2)'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 40px rgba(34,197,94,0.2)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.18) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
-          <div className="relative flex items-center justify-between mb-4">
+          <div className="absolute top-0 right-0 w-28 h-28 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.18) 0%, transparent 70%)', transform: 'translate(35%, -35%)' }} />
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.3)' }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.3)' }}>
                 <i className="ri-map-pin-user-fill text-sm" style={{ color: '#22C55E' }} />
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: isDark ? 'rgba(34,197,94,0.7)' : '#16A34A' }}>Aktif Ziyaret</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isDark ? 'rgba(34,197,94,0.8)' : '#16A34A' }}>Aktif Ziyaret</span>
             </div>
             {aktifZiyaretler.length > 0 && (
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
-                <span className="text-[10px] font-bold" style={{ color: '#22C55E' }}>CANLI</span>
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#22C55E', boxShadow: '0 0 6px rgba(34,197,94,0.6)' }} />
+                <span className="text-[9px] font-black tracking-wider" style={{ color: '#22C55E' }}>CANLI</span>
               </div>
             )}
           </div>
-          <p className="relative text-[32px] font-black leading-none mb-2" style={{ color: isDark ? '#86EFAC' : '#15803D' }}>{aktifZiyaretler.length}</p>
-          <p className="relative text-[11px] font-medium" style={{ color: isDark ? 'rgba(134,239,172,0.7)' : '#16A34A' }}>
+          <p className="text-[36px] font-black leading-none mb-2" style={{ color: isDark ? '#86EFAC' : '#15803D', letterSpacing: '-0.04em' }}>{aktifZiyaretler.length}</p>
+          <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(134,239,172,0.65)' : '#16A34A' }}>
             {aktifZiyaretler.length === 0 ? 'Sahada kimse yok' : `${aktifZiyaretler.length} personel şu an sahada`}
           </p>
         </div>
 
-        {/* Bugünkü Ziyaret — Turuncu/Amber teması */}
-        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
+        {/* Bugünkü Ziyaret — Amber teması */}
+        <div className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
           style={{
             background: isDark
               ? 'linear-gradient(145deg, rgba(245,158,11,0.14) 0%, rgba(217,119,6,0.08) 100%)'
@@ -349,24 +347,22 @@ function DashboardTabInner({
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(245,158,11,0.2)'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 40px rgba(245,158,11,0.2)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                <i className="ri-calendar-check-fill text-sm" style={{ color: '#F59E0B' }} />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: isDark ? 'rgba(245,158,11,0.7)' : '#B45309' }}>Bugünkü Ziyaret</span>
+          <div className="absolute top-0 right-0 w-28 h-28 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%)', transform: 'translate(35%, -35%)' }} />
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.3)' }}>
+              <i className="ri-calendar-check-fill text-sm" style={{ color: '#F59E0B' }} />
             </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isDark ? 'rgba(245,158,11,0.8)' : '#B45309' }}>Bugünkü Ziyaret</span>
           </div>
-          <p className="text-[32px] font-black leading-none mb-2" style={{ color: isDark ? '#FCD34D' : '#92400E' }}>{bugunZiyaretler.length}</p>
-          <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(252,211,77,0.7)' : '#B45309' }}>Bu hafta {buHaftaZiyaretler.length} ziyaret</p>
+          <p className="text-[36px] font-black leading-none mb-2" style={{ color: isDark ? '#FCD34D' : '#92400E', letterSpacing: '-0.04em' }}>{bugunZiyaretler.length}</p>
+          <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(252,211,77,0.65)' : '#B45309' }}>Bu hafta {buHaftaZiyaretler.length} ziyaret</p>
         </div>
 
-        {/* Son Aktivite — Kırmızı/Rose teması */}
-        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
+        {/* Son Aktivite — Rose teması */}
+        <div className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
           style={{
             background: isDark
               ? 'linear-gradient(145deg, rgba(239,68,68,0.12) 0%, rgba(220,38,38,0.07) 100%)'
@@ -376,23 +372,21 @@ function DashboardTabInner({
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(239,68,68,0.18)'; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 40px rgba(239,68,68,0.18)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.14) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.18)', border: '1px solid rgba(239,68,68,0.28)' }}>
-                <i className="ri-pulse-fill text-sm" style={{ color: '#EF4444' }} />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: isDark ? 'rgba(239,68,68,0.7)' : '#B91C1C' }}>Son Aktivite</span>
+          <div className="absolute top-0 right-0 w-28 h-28 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.14) 0%, transparent 70%)', transform: 'translate(35%, -35%)' }} />
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.18)', border: '1px solid rgba(239,68,68,0.28)' }}>
+              <i className="ri-pulse-fill text-sm" style={{ color: '#EF4444' }} />
             </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isDark ? 'rgba(239,68,68,0.8)' : '#B91C1C' }}>Son Aktivite</span>
           </div>
           <p className="text-base font-black leading-snug mb-1" style={{ color: isDark ? '#FCA5A5' : '#991B1B' }}>
             {sonZiyaret ? timeAgo(sonZiyaret.giris_saati) : '—'}
           </p>
-          {sonZiyaret && <p className="text-[11px] font-semibold truncate" style={{ color: isDark ? 'rgba(252,165,165,0.7)' : '#B91C1C' }}>{getFirmaAd(sonZiyaret.firma_org_id, sonZiyaret.firma_ad)}</p>}
-          {!sonZiyaret && <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(252,165,165,0.6)' : '#B91C1C' }}>Henüz ziyaret yok</p>}
+          {sonZiyaret && <p className="text-[11px] font-semibold truncate" style={{ color: isDark ? 'rgba(252,165,165,0.65)' : '#B91C1C' }}>{getFirmaAd(sonZiyaret.firma_org_id, sonZiyaret.firma_ad)}</p>}
+          {!sonZiyaret && <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(252,165,165,0.55)' : '#B91C1C' }}>Henüz ziyaret yok</p>}
         </div>
       </div>
 

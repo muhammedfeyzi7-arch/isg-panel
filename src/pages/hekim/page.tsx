@@ -352,23 +352,13 @@ export default function HekimPage() {
         fontFamily: "'Inter', sans-serif",
       }}
     >
+      {/* Statik stiller — isDark'tan bağımsız, sadece bir kez parse edilir */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes dropDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
         .hekim-content { animation: fadeSlideUp 0.3s ease forwards; }
         .switcher-dropdown { animation: dropDown 0.18s ease forwards; }
-        :root {
-          --bg-sidebar: ${isDark ? '#111827' : '#ffffff'};
-          --bg-main: ${isDark ? '#0f172a' : '#f8fafc'};
-          --bg-item: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)'};
-          --bg-hover: ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'};
-          --border-subtle: ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'};
-          --text-primary: ${isDark ? '#f1f5f9' : '#0f172a'};
-          --text-secondary: ${isDark ? '#94a3b8' : '#475569'};
-          --text-muted: ${isDark ? '#64748b' : '#64748b'};
-          --text-faint: ${isDark ? '#334155' : '#cbd5e1'};
-        }
       `}</style>
 
       {/* Onboarding Tour */}
@@ -592,11 +582,10 @@ export default function HekimPage() {
           </div>
         </div>
 
-        {/* ── İçerik ── */}
+        {/* ── İçerik — key prop KALDIRILDI, unmount/remount yok ── */}
         <div
           className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'}`}
           style={{ paddingTop: '76px' }}
-          key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
         >
           {renderContent()}
         </div>

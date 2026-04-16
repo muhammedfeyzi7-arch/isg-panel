@@ -10,8 +10,7 @@ import FirmaDetayModal from './components/FirmaDetayModal';
 import UzmanDetayModal from './components/UzmanDetayModal';
 import DashboardTab from './components/DashboardTab';
 import FirmalarTab from './components/FirmalarTab';
-import OsgbSidebar from './components/OsgbSidebar';
-import OsgbHeader from './components/OsgbHeader';
+
 import OsgbSettings from './components/OsgbSettings';
 import ZiyaretlerTab from './components/ZiyaretlerTab';
 import OsgbRaporlarPage from './components/OsgbRaporlarPage';
@@ -23,6 +22,7 @@ import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import FirmaModal from './components/FirmaModal';
 import UzmanModal from './components/UzmanModal';
 import AnalitikHaritaTab from './components/AnalitikHaritaTab';
+import OsgbTopNav from './components/OsgbTopNav';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -243,8 +243,6 @@ export default function OsgbDashboardPage() {
   useEffect(() => {
     try { sessionStorage.setItem('osgb_active_tab', activeTab); } catch { /* ignore */ }
   }, [activeTab]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [osgbTheme, setOsgbTheme] = useState<'dark' | 'light'>(() => {
     try { return (localStorage.getItem('isg_theme') as 'dark' | 'light') ?? 'dark'; } catch { return 'dark'; }
   });
@@ -703,20 +701,8 @@ export default function OsgbDashboardPage() {
     }
   }, [updateUzmanInState]);
 
-  const handleMobileMenuToggle = useCallback(() => {
-    setMobileOpen(v => !v);
-  }, []);
-
-  const handleMobileClose = useCallback(() => {
-    setMobileOpen(false);
-  }, []);
-
   const handleToggleTheme = useCallback(() => {
     setOsgbTheme(t => t === 'dark' ? 'light' : 'dark');
-  }, []);
-
-  const handleMobileOverlayClick = useCallback(() => {
-    setMobileOpen(false);
   }, []);
 
   const handleCopKutusuFirmaRestored = useCallback(() => {
@@ -922,47 +908,16 @@ export default function OsgbDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-app)' }}>
+    <div className="min-h-screen" style={{ background: isDark ? '#080614' : '#F1F0FF' }}>
       <RealtimeBadge status={realtimeStatus} fixed hideWhenConnected />
 
       {/* Onboarding Tour */}
       <OnboardingTour />
 
-      {/* Mobile overlay */}
-      <div
-        className="fixed inset-0 lg:hidden"
-        style={{
-          zIndex: 41,
-          background: mobileOpen ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0)',
-          backdropFilter: mobileOpen ? 'blur(8px) saturate(0.7)' : 'blur(0px)',
-          WebkitBackdropFilter: mobileOpen ? 'blur(8px) saturate(0.7)' : 'blur(0px)',
-          opacity: mobileOpen ? 1 : 0,
-          pointerEvents: mobileOpen ? 'auto' : 'none',
-          transition: mobileOpen
-            ? 'opacity 0.32s cubic-bezier(0.22,1,0.36,1), backdrop-filter 0.32s cubic-bezier(0.22,1,0.36,1)'
-            : 'opacity 0.22s ease, backdrop-filter 0.22s ease',
-        }}
-        onClick={handleMobileOverlayClick}
-      />
-
-      <OsgbSidebar
+      <OsgbTopNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         orgName={org?.name ?? 'OSGB'}
-        collapsed={sidebarCollapsed}
-        setCollapsed={setSidebarCollapsed}
-        mobileOpen={mobileOpen}
-        onMobileClose={handleMobileClose}
-        firmaCount={altFirmalar.length}
-        uzmanCount={uzmanlar.length}
-      />
-
-      <OsgbHeader
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        collapsed={sidebarCollapsed}
-        orgName={org?.name ?? 'OSGB'}
-        onMobileMenuToggle={handleMobileMenuToggle}
         onFirmaEkle={handleFirmaEkleOpen}
         onUzmanEkle={handleUzmanEkleOpen}
         theme={osgbTheme}
@@ -970,10 +925,10 @@ export default function OsgbDashboardPage() {
       />
 
       <main
-        className={`transition-all duration-300 min-h-screen ${sidebarCollapsed ? 'lg:pl-[82px]' : 'lg:pl-[238px]'}`}
-        style={{ paddingTop: '76px', paddingRight: '12px', paddingBottom: '12px' }}
+        className="min-h-screen"
+        style={{ paddingTop: '78px', paddingLeft: '20px', paddingRight: '20px', paddingBottom: '24px' }}
       >
-        <div className="max-w-[1680px]">
+        <div className="max-w-[1680px] mx-auto">
           {!dataLoading && (
             <>
               {/* ── DASHBOARD ── hidden/block ile mount edilmiş kalır, unmount olmaz */}

@@ -300,39 +300,23 @@ export default function UzmanPage() {
         fontFamily: "'Inter', sans-serif",
       }}
     >
+      {/* CSS değişkenleri — isDark değişince sadece bu küçük style güncellenir */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .uzman-content { animation: fadeSlideUp 0.3s ease forwards; }
-        :root {
-          --bg-sidebar: ${isDark ? '#111827' : '#ffffff'};
-          --bg-main: ${isDark ? '#0f172a' : '#f8fafc'};
-          --bg-item: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)'};
-          --bg-item-border: ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'};
-          --bg-hover: ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'};
-          --bg-card: ${isDark ? 'rgba(15,23,42,0.8)' : 'rgba(255,255,255,0.95)'};
-          --bg-card-solid: ${isDark ? '#1e293b' : '#ffffff'};
-          --bg-header: ${isDark ? 'rgba(10,15,26,0.95)' : 'rgba(255,255,255,0.97)'};
-          --bg-input: ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)'};
-          --border-subtle: ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'};
-          --border-main: ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.1)'};
-          --border-input: ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.12)'};
-          --text-primary: ${isDark ? '#f1f5f9' : '#0f172a'};
-          --text-secondary: ${isDark ? '#94a3b8' : '#475569'};
-          --text-muted: ${isDark ? '#64748b' : '#64748b'};
-          --text-faint: ${isDark ? '#334155' : '#cbd5e1'};
-          --chart-tooltip-bg: ${isDark ? 'rgba(10,16,32,0.95)' : '#ffffff'};
-          --chart-tooltip-border: ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)'};
-        }
+        @keyframes slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .uzman-content-enter { animation: fadeSlideUp 0.25s ease forwards; }
+        .animate-slide-up { animation: slide-up 0.18s ease forwards; }
+        .animate-fade-in { animation: fade-in 0.3s ease forwards; }
         .btn-primary { background: linear-gradient(135deg, #0EA5E9, #0284C7); color: #fff; border: none; border-radius: 10px; padding: 8px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: box-shadow 0.2s; }
         .btn-primary:hover { box-shadow: 0 4px 16px rgba(14,165,233,0.4); }
         .stat-card-interactive:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.15) !important; transform: translateY(-2px); }
-        .table-premium { border-collapse: collapse; } .table-premium th { padding: 10px 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); background: var(--bg-item); border-bottom: 1px solid var(--border-subtle); white-space: nowrap; } .table-premium td { padding: 10px 14px; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); } .table-premium tbody tr:hover td { background: var(--bg-hover); }
+        .table-premium { border-collapse: collapse; }
+        .table-premium th { padding: 10px 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); background: var(--bg-item); border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+        .table-premium td { padding: 10px 14px; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); }
+        .table-premium tbody tr:hover td { background: var(--bg-hover); }
         .isg-card { background: var(--bg-card-solid); border: 1px solid var(--border-subtle); border-radius: 16px; }
-        @keyframes slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-slide-up { animation: slide-up 0.18s ease forwards; }
-        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fade-in 0.3s ease forwards; }
       `}</style>
 
       {/* Mobile overlay */}
@@ -377,10 +361,9 @@ export default function UzmanPage() {
         className="min-h-screen transition-all duration-300"
         style={{ overflowX: 'hidden', overflowY: 'auto' }}
       >
-        {/* ── İçerik ── */}
+        {/* ── İçerik — key prop KALDIRILDI, unmount/remount yok ── */}
         <div
-          className={`pt-[76px] uzman-content transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-[232px]'} pb-8`}
-          key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
+          className={`pt-[76px] transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-[232px]'} pb-8`}
           style={{ minHeight: 'calc(100vh - 76px)' }}
         >
           <div className="px-3 sm:px-5 md:px-6 py-4 max-w-[1600px] w-full">
