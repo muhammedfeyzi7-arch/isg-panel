@@ -112,10 +112,10 @@ const FirmaRow = memo(function FirmaRow({
 }: FirmaRowProps) {
   return (
     <div
-      className="grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3.5 transition-all"
-      style={{ background: 'transparent' }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+      className="grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3 rounded-xl transition-all"
+      style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff', border: `1px solid ${borderColor}` }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(14,165,233,0.06)' : 'rgba(14,165,233,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.2)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}>
 
       {/* Firma */}
       <div className="flex items-center gap-2.5 min-w-0 pr-2 cursor-pointer" onClick={() => onFirmaClick({ id: f.id, name: f.name })}>
@@ -201,9 +201,9 @@ function FirmalarTabInner({
   const [silAdi, setSilAdi] = useState('');
 
   const textPrimary = 'var(--text-primary)';
-  const textSecondary = isDark ? '#a0aec0' : '#64748B';
-  const tableBg = isDark ? 'var(--bg-card-solid)' : '#ffffff';
-  const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)';
+  const textSecondary = isDark ? '#94A3B8' : '#64748B';
+  const tableBg = isDark ? 'rgba(20,30,50,0.98)' : '#ffffff';
+  const borderColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
 
   const fetchGpsInfo = useCallback(async () => {
     if (altFirmalar.length === 0) return;
@@ -284,60 +284,14 @@ function FirmalarTabInner({
   return (
     <div className="space-y-4 page-enter">
 
-      {/* ── PREMIUM HERO STATS BAR ── */}
-      <div className="rounded-2xl overflow-hidden relative"
-        style={{
-          background: isDark
-            ? 'linear-gradient(135deg, rgba(249,115,22,0.12) 0%, rgba(239,68,68,0.08) 50%, rgba(22,27,48,0.96) 100%)'
-            : 'linear-gradient(135deg, rgba(249,115,22,0.08) 0%, rgba(239,68,68,0.05) 50%, rgba(255,255,255,0.98) 100%)',
-          border: `1px solid ${isDark ? 'rgba(249,115,22,0.18)' : 'rgba(249,115,22,0.15)'}`,
-        }}>
-        {/* Dekoratif arka plan dairesi */}
-        <div className="absolute right-0 top-0 w-48 h-48 opacity-10 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #f97316 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
-        <div className="relative flex items-center gap-4 px-5 py-4 flex-wrap">
-          {/* İkon */}
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.3), rgba(239,68,68,0.2))', border: '1px solid rgba(249,115,22,0.3)' }}>
-            <i className="ri-building-3-fill text-lg" style={{ color: '#f97316' }} />
-          </div>
-          {/* Başlık */}
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-black" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>Müşteri Firmalar</h2>
-            <p className="text-[11px] mt-0.5" style={{ color: textSecondary }}>ISG hizmet verdiğiniz tüm firmalar</p>
-          </div>
-          {/* Mini stat kutucukları */}
-          <div className="flex items-center gap-2">
-            {[
-              { value: filtered.length, label: 'Toplam', color: '#f97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.2)' },
-              { value: altFirmalar.filter(f => uzmanlar.some(u => (u.active_firm_ids?.includes(f.id)) || u.active_firm_id === f.id)).length, label: 'Atanmış', color: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.2)' },
-            ].map(s => (
-              <div key={s.label} className="px-3 py-2 rounded-xl text-center flex-shrink-0"
-                style={{ background: s.bg, border: `1px solid ${s.border}` }}>
-                <p className="text-xl font-black leading-none" style={{ color: s.color }}>{s.value}</p>
-                <p className="text-[9px] font-semibold mt-0.5" style={{ color: s.color, opacity: 0.8 }}>{s.label}</p>
-              </div>
-            ))}
-          </div>
-          {/* Ekle butonu */}
-          <button onClick={onFirmaEkle}
-            className="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)', boxShadow: '0 4px 14px rgba(249,115,22,0.35)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 22px rgba(249,115,22,0.45)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(249,115,22,0.35)'; }}>
-            <i className="ri-add-circle-fill text-sm" />Firma Ekle
-          </button>
-        </div>
-      </div>
-
-      {/* Search bar */}
+      {/* Header bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-xs min-w-[180px]">
           <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: textSecondary }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Firma ara..."
             className="w-full pl-9 pr-4 py-2 text-sm rounded-xl outline-none transition-all"
             style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)', border: `1.5px solid ${borderColor}`, color: textPrimary }}
-            onFocus={e => { e.currentTarget.style.borderColor = '#f97316'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(249,115,22,0.12)'; }}
+            onFocus={e => { e.currentTarget.style.borderColor = '#0EA5E9'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.1)'; }}
             onBlur={e => { e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.boxShadow = 'none'; }} />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full cursor-pointer"
@@ -347,21 +301,26 @@ function FirmalarTabInner({
           )}
         </div>
         <span className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"
-          style={{ background: isDark ? 'rgba(249,115,22,0.08)' : 'rgba(249,115,22,0.06)', color: '#f97316', border: '1px solid rgba(249,115,22,0.15)' }}>
+          style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary }}>
           {filtered.length} firma
         </span>
+        <button onClick={onFirmaEkle}
+          className="whitespace-nowrap ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer transition-all"
+          style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
+          <i className="ri-add-line text-sm" />Firma Ekle
+        </button>
       </div>
 
       {/* Boş state */}
       {filtered.length === 0 && (
-        <div className="rounded-2xl p-12 flex flex-col items-center gap-4 text-center"
+        <div className="rounded-xl p-12 flex flex-col items-center gap-4 text-center"
           style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          <div className="w-14 h-14 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(14,165,233,0.08)', border: '1.5px solid rgba(14,165,233,0.15)' }}>
             <i className="ri-building-2-line text-2xl" style={{ color: '#0EA5E9' }} />
           </div>
           <div>
-            <p className="text-sm font-bold mb-1.5" style={{ color: textPrimary }}>
+            <p className="text-sm font-bold mb-1" style={{ color: textPrimary }}>
               {search ? `"${search}" için sonuç yok` : 'Henüz firma eklenmedi'}
             </p>
             <p className="text-xs" style={{ color: textSecondary }}>
@@ -370,7 +329,7 @@ function FirmalarTabInner({
           </div>
           {!search && (
             <button onClick={onFirmaEkle}
-              className="whitespace-nowrap flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white cursor-pointer"
+              className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white cursor-pointer"
               style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
               <i className="ri-add-line" />İlk Firmayı Ekle
             </button>
@@ -380,10 +339,9 @@ function FirmalarTabInner({
 
       {/* Liste */}
       {filtered.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
-          {/* Tablo header */}
-          <div className="hidden md:grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-3"
-            style={{ borderBottom: `1px solid ${borderColor}`, background: isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.025)' }}>
+        <div className="space-y-1">
+          <div className="hidden md:grid grid-cols-[2.5fr_1fr_1.2fr_140px] items-center px-4 py-2"
+            style={{ borderBottom: `1px solid ${borderColor}` }}>
             {['FİRMA', 'PERSONEL', 'SON ZİYARET', 'İŞLEM'].map(h => (
               <span key={h} className="text-[10px] font-bold tracking-wider uppercase" style={{ color: textSecondary }}>{h}</span>
             ))}
@@ -447,7 +405,7 @@ function FirmalarTabInner({
           </div>
 
           {/* Desktop */}
-          <div className="hidden md:block divide-y" style={{ borderColor }}>
+          <div className="hidden md:block space-y-1.5 pt-1">
             {filtered.map((f) => {
               const days = getDaysDiff(firmaLastVisit[f.id]);
               const isAktif = aktifFirmaIds.has(f.id);

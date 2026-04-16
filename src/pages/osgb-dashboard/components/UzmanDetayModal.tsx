@@ -264,52 +264,52 @@ export default function UzmanDetayModal({
         style={{ background: 'var(--modal-bg)', border: '1px solid var(--modal-border)', maxHeight: '90vh' }}
       >
         {/* ── Header ── */}
-        <div className="relative overflow-hidden px-6 py-5 flex-shrink-0"
-          style={{ background: isActive ? 'linear-gradient(135deg, rgba(16,185,129,0.14) 0%, rgba(5,150,105,0.06) 100%)' : 'linear-gradient(135deg, rgba(100,116,139,0.1) 0%, rgba(71,85,105,0.05) 100%)', borderBottom: `1px solid ${border}` }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Avatar */}
-              <div className="relative flex-shrink-0">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-base font-extrabold text-white"
-                  style={{ background: isActive ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #94a3b8, #64748b)', border: `2px solid ${isActive ? 'rgba(16,185,129,0.35)' : 'rgba(100,116,139,0.3)'}` }}>
-                  {(uzman.display_name ?? uzman.email ?? '?').charAt(0).toUpperCase()}
-                </div>
+        <div className="flex items-center justify-between px-6 py-5 flex-shrink-0"
+          style={{ borderBottom: `1px solid ${border}` }}>
+          <div className="flex items-center gap-3">
+            {/* Avatar */}
+            <div className="relative flex-shrink-0">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-base font-extrabold text-white"
+                style={{ background: isActive ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #94a3b8, #64748b)' }}>
+                {(uzman.display_name ?? uzman.email ?? '?').charAt(0).toUpperCase()}
+              </div>
+              {aktifZiyaret && (
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 animate-pulse"
+                  style={{ background: '#22C55E', borderColor: 'var(--modal-bg)' }} />
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold" style={{ color: textPrimary }}>{uzman.display_name}</h3>
+                {/* Aktif ziyaret badge */}
                 {aktifZiyaret && (
-                  <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 animate-pulse"
-                    style={{ background: '#22C55E', borderColor: 'var(--modal-bg)' }} />
+                  <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(34,197,94,0.1)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.25)' }}>
+                    <span className="w-1.5 h-1.5 rounded-full animate-ping inline-block" style={{ background: '#22C55E' }} />
+                    Sahada
+                  </span>
                 )}
               </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base font-bold" style={{ color: textPrimary }}>{uzman.display_name}</h3>
-                  {aktifZiyaret && (
-                    <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(34,197,94,0.12)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.28)' }}>
-                      <span className="w-1.5 h-1.5 rounded-full animate-ping inline-block" style={{ background: '#22C55E' }} />
-                      Sahada
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs mt-0.5" style={{ color: textMuted }}>{uzman.email}</p>
-              </div>
+              <p className="text-xs mt-0.5" style={{ color: textMuted }}>{uzman.email}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold px-3 py-1.5 rounded-xl"
-                style={{
-                  background: isActive ? 'rgba(16,185,129,0.15)' : 'rgba(100,116,139,0.12)',
-                  color: isActive ? '#10B981' : '#64748b',
-                  border: `1.5px solid ${isActive ? 'rgba(16,185,129,0.3)' : 'rgba(100,116,139,0.25)'}`,
-                }}>
-                {isActive ? '● Aktif' : '○ Pasif'}
-              </span>
-              <button onClick={onClose}
-                className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all"
-                style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}>
-                <i className="ri-close-line text-base" />
-              </button>
-            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Status badge */}
+            <span className="text-[10px] font-bold px-2.5 py-1 rounded-xl"
+              style={{
+                background: isActive ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
+                color: isActive ? '#10B981' : '#64748b',
+                border: `1px solid ${isActive ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)'}`,
+              }}>
+              {isActive ? '● Aktif' : '○ Pasif'}
+            </span>
+            <button onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-xl cursor-pointer transition-all"
+              style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}>
+              <i className="ri-close-line text-sm" />
+            </button>
           </div>
         </div>
 
@@ -361,21 +361,23 @@ export default function UzmanDetayModal({
 
             {/* ── KPI Kartları ── */}
             <div className="grid grid-cols-3 gap-3 px-6 py-4">
-              {[
-                { label: 'Toplam Personel', value: personelSayisi, icon: 'ri-group-line', gradient: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)', shadow: 'rgba(6,182,212,0.3)', pulse: false },
-                { label: 'Toplam Ziyaret', value: toplamZiyaret, icon: 'ri-map-pin-2-line', gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', shadow: 'rgba(16,185,129,0.3)', pulse: false },
-                { label: aktifZiyaret ? 'Şu An Sahada' : sonZiyaretGun === null ? 'Hiç Ziyaret' : sonZiyaretGun === 0 ? 'Bugün' : `${sonZiyaretGun}g Önce`, value: aktifZiyaret ? <><span className="w-2 h-2 rounded-full animate-pulse inline-block mr-1.5" style={{ background: '#22C55E' }} /></> : null, icon: 'ri-time-line', gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)', shadow: 'rgba(245,158,11,0.3)', pulse: !!aktifZiyaret },
-              ].map((k, idx) => (
-                <div key={idx} className="rounded-2xl p-4 relative overflow-hidden flex flex-col gap-2"
-                  style={{ background: k.gradient, boxShadow: `0 4px 14px ${k.shadow}` }}>
-                  <div className="absolute top-0 right-0 w-20 h-20 opacity-15"
-                    style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.7), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                    <i className={`${k.icon} text-sm text-white`} />
+              {kpiCards.map(k => (
+                <div key={k.label}
+                  className="rounded-2xl p-4 flex flex-col gap-2"
+                  style={{ background: 'var(--bg-item)', border: `1px solid ${border}` }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: k.bg }}>
+                    {k.pulse ? (
+                      <div className="relative w-4 h-4 flex items-center justify-center">
+                        <span className="w-2.5 h-2.5 rounded-full animate-ping absolute" style={{ background: k.color, opacity: 0.5 }} />
+                        <span className="w-2 h-2 rounded-full" style={{ background: k.color }} />
+                      </div>
+                    ) : (
+                      <i className={`${k.icon} text-base`} style={{ color: k.color }} />
+                    )}
                   </div>
                   <div>
-                    <p className="text-xl font-extrabold text-white leading-none">{k.value ?? kpiCards[idx].value}</p>
-                    <p className="text-[10px] mt-1 text-white opacity-75 font-medium">{k.label}</p>
+                    <p className="text-xl font-extrabold leading-none" style={{ color: textPrimary }}>{k.value}</p>
+                    <p className="text-[10px] mt-1 font-medium" style={{ color: textMuted }}>{k.label}</p>
                   </div>
                 </div>
               ))}

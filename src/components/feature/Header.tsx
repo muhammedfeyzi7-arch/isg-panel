@@ -132,16 +132,20 @@ export default function Header({ onMobileMenuToggle }: { onMobileMenuToggle?: ()
     <>
       {/* ═══════════════════ HEADER ═══════════════════ */}
       <header
-        className={`fixed top-0 right-0 z-30 flex items-center left-0 ${sidebarCollapsed ? 'lg:left-[64px]' : 'lg:left-[220px]'}`}
+        className={`fixed top-3 right-3 z-30 flex items-center ${sidebarCollapsed ? 'lg:left-[91px]' : 'lg:left-[247px]'} left-3`}
         style={{
-          height: '56px',
+          height: '52px',
           background: headerBg,
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
-          borderBottom: `1px solid ${headerBorder}`,
+          backdropFilter: 'blur(28px)',
+          WebkitBackdropFilter: 'blur(28px)',
+          border: `1px solid ${headerBorder}`,
+          borderRadius: '14px',
+          boxShadow: isDark
+            ? '0 4px 20px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.1)'
+            : '0 4px 20px rgba(15,23,42,0.10), 0 1px 4px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.06)',
           transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1), background 0.3s ease',
-          paddingLeft: '20px',
-          paddingRight: '16px',
+          paddingLeft: '14px',
+          paddingRight: '14px',
           gap: '8px',
         }}
       >

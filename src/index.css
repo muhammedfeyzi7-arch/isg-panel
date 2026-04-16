@@ -16,59 +16,54 @@
    DESIGN TOKENS — DARK MODE (DEFAULT)
 ══════════════════════════════════════════════════════════ */
 :root {
-  /* App backgrounds — koyu lacivert/slate, sidebar ile kontrast */
-  --bg-app:              #0e1120;
-  --bg-card:             rgba(22, 27, 48, 0.92);
-  --bg-card-solid:       #161b30;
-  --bg-card-elevated:    rgba(28, 33, 56, 0.96);
-  --bg-header:           rgba(13, 16, 30, 0.97);
-  --bg-sidebar:          #1a1f37;
-  --bg-input:            rgba(255,255,255,0.06);
-  --bg-hover:            rgba(255,255,255,0.07);
-  --bg-row-hover:        rgba(99,102,241,0.08);
-  --bg-item:             rgba(255,255,255,0.04);
-  --bg-item-border:      rgba(255,255,255,0.08);
+  /* App backgrounds */
+  --bg-app:              #1E2433;
+  --bg-card:             rgba(36, 44, 62, 0.85);
+  --bg-card-solid:       #242C3E;
+  --bg-card-elevated:    rgba(42, 52, 72, 0.92);
+  --bg-header:           rgba(26, 32, 46, 0.97);
+  --bg-sidebar:          #1A2030;
+  --bg-input:            rgba(255,255,255,0.07);
+  --bg-hover:            rgba(255,255,255,0.09);
+  --bg-row-hover:        rgba(99,102,241,0.07);
+  --bg-item:             rgba(255,255,255,0.05);
+  --bg-item-border:      rgba(255,255,255,0.09);
 
-  /* Text — parlak ve net */
-  --text-primary:        #e8eaf6;
-  --text-secondary:      #a0aec0;
-  --text-muted:          #718096;
-  --text-faint:          #4a5568;
+  /* Text */
+  --text-primary:        #F1F5F9;
+  --text-secondary:      #94A3B8;
+  --text-muted:          #64748B;
+  --text-faint:          #475569;
 
   /* Borders */
   --border-main:         rgba(255,255,255,0.08);
   --border-subtle:       rgba(255,255,255,0.05);
   --border-input:        rgba(255,255,255,0.10);
-  --border-strong:       rgba(255,255,255,0.14);
+  --border-strong:       rgba(255,255,255,0.13);
 
   /* Scrollbar */
-  --scrollbar-thumb:     rgba(255,255,255,0.08);
+  --scrollbar-thumb:     rgba(255,255,255,0.09);
 
   /* Table */
-  --table-head-bg:       rgba(0,0,0,0.22);
-  --table-border:        rgba(255,255,255,0.07);
-  --table-row-border:    rgba(255,255,255,0.04);
+  --table-head-bg:       rgba(0,0,0,0.18);
+  --table-border:        rgba(255,255,255,0.08);
+  --table-row-border:    rgba(255,255,255,0.045);
 
   /* Misc */
-  --select-bg:           #161b30;
-  --modal-bg:            #141827;
-  --modal-bg-elevated:   #1a1f35;
-  --modal-border:        rgba(255,255,255,0.09);
-  --modal-header-bg:     rgba(255,255,255,0.025);
-  --modal-footer-bg:     rgba(255,255,255,0.02);
-  --modal-input-bg:      rgba(255,255,255,0.06);
-  --modal-input-border:  rgba(255,255,255,0.10);
+  --select-bg:           #1A2030;
+  --modal-bg:            rgba(18, 24, 38, 0.99);
+  --modal-border:        rgba(255,255,255,0.10);
 
   /* Charts */
-  --chart-tooltip-bg:    rgba(10, 13, 26, 0.98);
+  --chart-tooltip-bg:    rgba(8, 13, 24, 0.98);
   --chart-tooltip-border:rgba(255,255,255,0.09);
   --chart-grid:          rgba(255,255,255,0.05);
-  --chart-axis:          #4a5568;
-  --chart-tick:          #718096;
+  --chart-axis:          #475569;
+  --chart-tick:          #64748B;
 
   /* Accent */
-  --accent-primary:      #818CF8;
-  --accent-primary-glow: rgba(129,140,248,0.28);
+  --accent-primary:      #6366F1;
+  --accent-primary-glow: rgba(99,102,241,0.25);
   --accent-cyan:         #22D3EE;
   --accent-cyan-glow:    rgba(34,211,238,0.2);
 }
@@ -77,17 +72,17 @@
    LIGHT MODE OVERRIDES
 ══════════════════════════════════════════════════════════ */
 .light-mode {
-  --bg-app:              #F0F4F8;
-  --bg-card:             rgba(255,255,255,0.94);
+  --bg-app:              #E8EDF5;
+  --bg-card:             rgba(255,255,255,0.96);
   --bg-card-solid:       #FFFFFF;
   --bg-card-elevated:    rgba(255,255,255,0.99);
   --bg-header:           rgba(255,255,255,0.97);
-  --bg-sidebar:          #ffffff;
-  --bg-input:            rgba(15,23,42,0.045);
-  --bg-hover:            rgba(15,23,42,0.038);
-  --bg-row-hover:        rgba(99,102,241,0.04);
-  --bg-item:             rgba(15,23,42,0.028);
-  --bg-item-border:      rgba(15,23,42,0.075);
+  --bg-sidebar:          #FFFFFF;
+  --bg-input:            rgba(15,23,42,0.055);
+  --bg-hover:            rgba(15,23,42,0.05);
+  --bg-row-hover:        rgba(14,165,233,0.04);
+  --bg-item:             rgba(15,23,42,0.038);
+  --bg-item-border:      rgba(15,23,42,0.09);
 
   --text-primary:        #0F172A;
   --text-secondary:      #334155;
@@ -106,13 +101,8 @@
   --table-row-border:    rgba(15,23,42,0.045);
 
   --select-bg:           #FFFFFF;
-  --modal-bg:            #ffffff;
-  --modal-bg-elevated:   #f8fafc;
-  --modal-border:        rgba(15,23,42,0.10);
-  --modal-header-bg:     rgba(15,23,42,0.02);
-  --modal-footer-bg:     rgba(15,23,42,0.015);
-  --modal-input-bg:      rgba(15,23,42,0.04);
-  --modal-input-border:  rgba(15,23,42,0.11);
+  --modal-bg:            rgba(255,255,255,0.99);
+  --modal-border:        rgba(15,23,42,0.11);
 
   --chart-tooltip-bg:    rgba(255,255,255,0.99);
   --chart-tooltip-border:rgba(15,23,42,0.11);

@@ -129,8 +129,8 @@ function DashboardTabInner({
 
   const card: React.CSSProperties = {
     background: isDark
-      ? 'linear-gradient(145deg, rgba(26,31,55,0.97) 0%, rgba(15,19,32,0.99) 100%)'
-      : 'linear-gradient(145deg, rgba(255,255,255,0.99) 0%, rgba(248,250,252,0.97) 100%)',
+      ? 'linear-gradient(145deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.98) 100%)'
+      : 'linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 100%)',
     border: `1px solid ${isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`,
     borderRadius: '20px',
     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
@@ -272,335 +272,305 @@ function DashboardTabInner({
       {/* ── KPI KARTLARI (PREMIUM) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-        {/* Müşteri Firma - Coral/Orange */}
-        <div
-          className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
+        {/* Müşteri Firma — Sky/Cyan teması */}
+        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
           style={{
-            background: 'linear-gradient(135deg, #f97316 0%, #ef4444 100%)',
-            boxShadow: '0 8px 24px rgba(249,115,22,0.35)',
+            background: isDark
+              ? 'linear-gradient(145deg, rgba(14,165,233,0.14) 0%, rgba(2,132,199,0.08) 100%)'
+              : 'linear-gradient(145deg, rgba(224,242,254,0.9) 0%, rgba(186,230,253,0.6) 100%)',
+            border: isDark ? '1px solid rgba(14,165,233,0.22)' : '1px solid rgba(14,165,233,0.25)',
+            borderRadius: '20px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
           onClick={() => setActiveTab('firmalar')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 36px rgba(249,115,22,0.45)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(249,115,22,0.35)'; }}
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 opacity-20" style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
-          <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
-          <div className="relative flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              <i className="ri-building-2-fill text-lg text-white" />
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(14,165,233,0.2)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(14,165,233,0.15) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.2)', border: '1px solid rgba(14,165,233,0.3)' }}>
+                <i className="ri-building-2-fill text-sm" style={{ color: '#0EA5E9' }} />
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: isDark ? 'rgba(14,165,233,0.7)' : '#0284C7' }}>Müşteri Firma</span>
             </div>
-            <i className="ri-arrow-right-up-line text-white opacity-60 text-lg" />
           </div>
-          <p className="relative text-[34px] font-black leading-none text-white mb-1">{altFirmalar.length}</p>
-          <p className="relative text-[12px] font-semibold text-white opacity-80">Müşteri Firma</p>
-          <p className="relative text-[10px] mt-1 text-white opacity-60">
-            {altFirmalar.filter(f => f.uzmanAd).length} firmaya uzman atanmış
+          <p className="text-[32px] font-black leading-none mb-2" style={{ color: isDark ? '#7DD3FC' : '#0369A1' }}>{altFirmalar.length}</p>
+          <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(125,211,252,0.7)' : '#0284C7' }}>
+            {altFirmalar.length === 0 ? 'Henüz firma yok' : `${altFirmalar.filter(f => f.uzmanAd).length} firmaya uzman atanmış`}
           </p>
         </div>
 
-        {/* Aktif Ziyaret - Teal/Cyan */}
-        <div
-          className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
+        {/* Aktif Ziyaret — Yeşil teması */}
+        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
           style={{
             background: aktifZiyaretler.length > 0
-              ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
-              : 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
-            boxShadow: aktifZiyaretler.length > 0
-              ? '0 8px 24px rgba(6,182,212,0.4)'
-              : '0 8px 24px rgba(14,165,233,0.35)',
+              ? (isDark ? 'linear-gradient(145deg, rgba(34,197,94,0.18) 0%, rgba(22,163,74,0.1) 100%)' : 'linear-gradient(145deg, rgba(220,252,231,0.95) 0%, rgba(187,247,208,0.7) 100%)')
+              : (isDark ? 'linear-gradient(145deg, rgba(34,197,94,0.08) 0%, rgba(22,163,74,0.04) 100%)' : 'linear-gradient(145deg, rgba(240,253,244,0.9) 0%, rgba(220,252,231,0.6) 100%)'),
+            border: aktifZiyaretler.length > 0
+              ? (isDark ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(34,197,94,0.35)')
+              : (isDark ? '1px solid rgba(34,197,94,0.15)' : '1px solid rgba(34,197,94,0.2)'),
+            borderRadius: '20px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; }}
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 opacity-20" style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
-          <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(34,197,94,0.2)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.18) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
           <div className="relative flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              <i className="ri-map-pin-user-fill text-lg text-white" />
-            </div>
-            {aktifZiyaretler.length > 0 ? (
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full animate-pulse bg-white opacity-80" />
-                <span className="text-[10px] font-bold text-white opacity-80">CANLI</span>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.3)' }}>
+                <i className="ri-map-pin-user-fill text-sm" style={{ color: '#22C55E' }} />
               </div>
-            ) : <i className="ri-arrow-right-up-line text-white opacity-60 text-lg" />}
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: isDark ? 'rgba(34,197,94,0.7)' : '#16A34A' }}>Aktif Ziyaret</span>
+            </div>
+            {aktifZiyaretler.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                <span className="text-[10px] font-bold" style={{ color: '#22C55E' }}>CANLI</span>
+              </div>
+            )}
           </div>
-          <p className="relative text-[34px] font-black leading-none text-white mb-1">{aktifZiyaretler.length}</p>
-          <p className="relative text-[12px] font-semibold text-white opacity-80">Aktif Ziyaret</p>
-          <p className="relative text-[10px] mt-1 text-white opacity-60">
+          <p className="relative text-[32px] font-black leading-none mb-2" style={{ color: isDark ? '#86EFAC' : '#15803D' }}>{aktifZiyaretler.length}</p>
+          <p className="relative text-[11px] font-medium" style={{ color: isDark ? 'rgba(134,239,172,0.7)' : '#16A34A' }}>
             {aktifZiyaretler.length === 0 ? 'Sahada kimse yok' : `${aktifZiyaretler.length} personel şu an sahada`}
           </p>
         </div>
 
-        {/* Bugünkü Ziyaret - Indigo/Purple */}
-        <div
-          className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
+        {/* Bugünkü Ziyaret — Turuncu/Amber teması */}
+        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
           style={{
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            boxShadow: '0 8px 24px rgba(99,102,241,0.4)',
+            background: isDark
+              ? 'linear-gradient(145deg, rgba(245,158,11,0.14) 0%, rgba(217,119,6,0.08) 100%)'
+              : 'linear-gradient(145deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.7) 100%)',
+            border: isDark ? '1px solid rgba(245,158,11,0.22)' : '1px solid rgba(245,158,11,0.28)',
+            borderRadius: '20px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 36px rgba(99,102,241,0.5)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(99,102,241,0.4)'; }}
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 opacity-20" style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
-          <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
-          <div className="relative flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              <i className="ri-calendar-check-fill text-lg text-white" />
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(245,158,11,0.2)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                <i className="ri-calendar-check-fill text-sm" style={{ color: '#F59E0B' }} />
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: isDark ? 'rgba(245,158,11,0.7)' : '#B45309' }}>Bugünkü Ziyaret</span>
             </div>
-            <i className="ri-arrow-right-up-line text-white opacity-60 text-lg" />
           </div>
-          <p className="relative text-[34px] font-black leading-none text-white mb-1">{bugunZiyaretler.length}</p>
-          <p className="relative text-[12px] font-semibold text-white opacity-80">Bugünkü Ziyaret</p>
-          <p className="relative text-[10px] mt-1 text-white opacity-60">Bu hafta {buHaftaZiyaretler.length} ziyaret</p>
+          <p className="text-[32px] font-black leading-none mb-2" style={{ color: isDark ? '#FCD34D' : '#92400E' }}>{bugunZiyaretler.length}</p>
+          <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(252,211,77,0.7)' : '#B45309' }}>Bu hafta {buHaftaZiyaretler.length} ziyaret</p>
         </div>
 
-        {/* Son Aktivite - Emerald/Green */}
-        <div
-          className="rounded-2xl p-5 cursor-pointer relative overflow-hidden"
+        {/* Son Aktivite — Kırmızı/Rose teması */}
+        <div className="rounded-2xl p-5 cursor-pointer group relative overflow-hidden"
           style={{
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            boxShadow: '0 8px 24px rgba(16,185,129,0.35)',
+            background: isDark
+              ? 'linear-gradient(145deg, rgba(239,68,68,0.12) 0%, rgba(220,38,38,0.07) 100%)'
+              : 'linear-gradient(145deg, rgba(255,241,242,0.95) 0%, rgba(254,226,226,0.7) 100%)',
+            border: isDark ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(239,68,68,0.22)',
+            borderRadius: '20px',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           }}
           onClick={() => setActiveTab('ziyaretler')}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 16px 36px rgba(16,185,129,0.45)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(16,185,129,0.35)'; }}
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 opacity-20" style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.6), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
-          <div className="absolute bottom-0 left-0 w-20 h-20 opacity-10" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%)', borderRadius: '50%', transform: 'translate(-30%, 30%)' }} />
-          <div className="relative flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              <i className="ri-pulse-fill text-lg text-white" />
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 32px rgba(239,68,68,0.18)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.14) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.18)', border: '1px solid rgba(239,68,68,0.28)' }}>
+                <i className="ri-pulse-fill text-sm" style={{ color: '#EF4444' }} />
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: isDark ? 'rgba(239,68,68,0.7)' : '#B91C1C' }}>Son Aktivite</span>
             </div>
-            <i className="ri-arrow-right-up-line text-white opacity-60 text-lg" />
           </div>
-          <p className="relative text-base font-black leading-snug text-white mb-1">
+          <p className="text-base font-black leading-snug mb-1" style={{ color: isDark ? '#FCA5A5' : '#991B1B' }}>
             {sonZiyaret ? timeAgo(sonZiyaret.giris_saati) : '—'}
           </p>
-          <p className="relative text-[12px] font-semibold text-white opacity-80">Son Aktivite</p>
-          {sonZiyaret && <p className="relative text-[10px] mt-1 text-white opacity-60 truncate">{getFirmaAd(sonZiyaret.firma_org_id, sonZiyaret.firma_ad)}</p>}
-          {!sonZiyaret && <p className="relative text-[10px] mt-1 text-white opacity-60">Henüz ziyaret yok</p>}
+          {sonZiyaret && <p className="text-[11px] font-semibold truncate" style={{ color: isDark ? 'rgba(252,165,165,0.7)' : '#B91C1C' }}>{getFirmaAd(sonZiyaret.firma_org_id, sonZiyaret.firma_ad)}</p>}
+          {!sonZiyaret && <p className="text-[11px] font-medium" style={{ color: isDark ? 'rgba(252,165,165,0.6)' : '#B91C1C' }}>Henüz ziyaret yok</p>}
         </div>
       </div>
 
       {/* ── ANA GRID: Firmalar + Uzmanlar ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-        {/* Firmalar Kartı — Premium Mini Grid */}
-        <div className="rounded-2xl overflow-hidden" style={card}>
-          {/* Header */}
-          <div className="relative px-5 pt-5 pb-4 overflow-hidden"
+        {/* Firmalar Kartı */}
+        <div className="rounded-2xl" style={card}>
+          <div className="flex items-center justify-between px-5 pt-5 pb-4"
             style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}` }}>
-            {/* Subtle gradient accent top */}
-            <div className="absolute top-0 left-0 right-0 h-0.5" style={{ background: 'linear-gradient(90deg, #f97316, #ef4444, transparent)' }} />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.2), rgba(239,68,68,0.1))', border: '1px solid rgba(249,115,22,0.2)' }}>
-                  <i className="ri-building-2-fill text-sm" style={{ color: '#f97316' }} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Müşteri Firmalar</h3>
-                  <p className="text-[10px]" style={{ color: textSecondary }}>
-                    <span className="font-bold" style={{ color: '#f97316' }}>{altFirmalar.length}</span> kayıtlı ·&nbsp;
-                    <span className="font-bold" style={{ color: '#22C55E' }}>{aktifZiyaretler.length > 0 ? aktifZiyaretler.filter((v, i, a) => a.findIndex(x => x.firma_org_id === v.firma_org_id) === i).length : 0}</span> aktif
-                  </p>
-                </div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.06))' }}>
+                <i className="ri-building-2-fill text-sm" style={{ color: '#0EA5E9' }} />
               </div>
-              <button onClick={() => setActiveTab('firmalar')}
-                className="flex items-center gap-1 text-[11px] font-semibold cursor-pointer px-3 py-1.5 rounded-xl transition-all whitespace-nowrap"
-                style={{ color: '#f97316', background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.18)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(249,115,22,0.16)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(249,115,22,0.08)'; }}>
-                Tümünü Gör <i className="ri-arrow-right-s-line" />
-              </button>
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Müşteri Firmalar</h3>
+                <p className="text-[10px]" style={{ color: textSecondary }}>{altFirmalar.length} firma kayıtlı</p>
+              </div>
             </div>
+            <button onClick={() => setActiveTab('firmalar')}
+              className="flex items-center gap-1 text-[11px] font-semibold cursor-pointer px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap"
+              style={{ color: '#0EA5E9', background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.15)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.14)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.08)'; }}>
+              Tümünü Gör <i className="ri-arrow-right-s-line" />
+            </button>
           </div>
 
           {altFirmalar.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-3 px-5">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.15)' }}>
-                <i className="ri-building-2-line text-xl" style={{ color: '#f97316' }} />
+            <div className="flex flex-col items-center justify-center py-8 gap-3 px-5">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.12)' }}>
+                <i className="ri-building-2-line text-xl" style={{ color: '#0EA5E9' }} />
               </div>
               <p className="text-xs text-center" style={{ color: textSecondary }}>Henüz firma eklenmedi</p>
               <button onClick={onFirmaEkle}
-                className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)' }}>
+                className="whitespace-nowrap flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
                 <i className="ri-add-line" />Firma Ekle
               </button>
             </div>
           ) : (
-            <div className="p-3 space-y-1.5">
-              {altFirmalar.slice(0, 5).map((f) => {
-                const lastVisitDate = firmaLastVisit[f.id];
-                const days = getDaysDiff(lastVisitDate);
-                const isAktif = aktifZiyaretler.some(z => z.firma_org_id === f.id);
-                return (
-                  <div key={f.id}
-                    onClick={() => onFirmaClick({ id: f.id, name: f.name })}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all group"
-                    style={{
-                      background: isAktif
-                        ? (isDark ? 'rgba(34,197,94,0.06)' : 'rgba(34,197,94,0.04)')
-                        : (isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)'),
-                      border: isAktif ? '1px solid rgba(34,197,94,0.18)' : `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}`,
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = isAktif
-                        ? 'rgba(34,197,94,0.1)'
-                        : (isDark ? 'rgba(249,115,22,0.07)' : 'rgba(249,115,22,0.04)');
-                      (e.currentTarget as HTMLElement).style.borderColor = isAktif ? 'rgba(34,197,94,0.3)' : 'rgba(249,115,22,0.2)';
-                      (e.currentTarget as HTMLElement).style.transform = 'translateX(3px)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background = isAktif
-                        ? (isDark ? 'rgba(34,197,94,0.06)' : 'rgba(34,197,94,0.04)')
-                        : (isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)');
-                      (e.currentTarget as HTMLElement).style.borderColor = isAktif ? 'rgba(34,197,94,0.18)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)');
-                      (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
-                    }}>
-                    {/* Avatar */}
-                    <div className="relative flex-shrink-0">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-extrabold text-white"
-                        style={{ background: isAktif ? 'linear-gradient(135deg, #22C55E, #16A34A)' : 'linear-gradient(135deg, #f97316, #ef4444)' }}>
-                        {f.name.charAt(0).toUpperCase()}
+            <>
+              <div className="grid grid-cols-[2fr_1fr_80px] items-center px-4 py-2"
+                style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }}>
+                {['FİRMA', 'PERSONEL', 'ZİYARET'].map(h => (
+                  <div key={h}><span className="text-[9px] font-bold tracking-wider" style={{ color: textSecondary }}>{h}</span></div>
+                ))}
+              </div>
+              <div>
+                {altFirmalar.slice(0, 5).map((f, idx) => {
+                  const lastVisitDate = firmaLastVisit[f.id];
+                  const days = getDaysDiff(lastVisitDate);
+                  const isAktif = aktifZiyaretler.some(z => z.firma_org_id === f.id);
+                  const rowBg = 'transparent';
+                  const rowHover = isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)';
+                  return (
+                    <div key={f.id}
+                      onClick={() => onFirmaClick({ id: f.id, name: f.name })}
+                      className="grid grid-cols-[2fr_1fr_80px] items-center px-4 py-2.5 cursor-pointer transition-all"
+                      style={{ background: rowBg, borderBottom: idx < Math.min(altFirmalar.length, 5) - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)'}` : 'none' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowHover; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBg; }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                            style={{ background: isAktif ? 'rgba(34,197,94,0.12)' : 'rgba(14,165,233,0.1)' }}>
+                            <i className="ri-building-2-line text-[10px]" style={{ color: isAktif ? '#22C55E' : '#0284C7' }} />
+                          </div>
+                          {isAktif && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border animate-pulse"
+                              style={{ background: '#22C55E', borderColor: isDark ? '#1e2d3d' : '#ffffff' }} />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{f.name}</p>
+                          {isAktif && <span className="text-[9px] font-bold" style={{ color: '#22C55E' }}>● Aktif</span>}
+                          {!isAktif && <span className="text-[9px]" style={{ color: textSecondary }}>{f.uzmanAd ?? 'Personel atanmadı'}</span>}
+                        </div>
                       </div>
-                      {isAktif && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse" style={{ background: '#22C55E', borderColor: isDark ? '#161b30' : '#ffffff' }} />}
+                      <div><span className="text-xs" style={{ color: textSecondary }}>{f.personelSayisi}</span></div>
+                      <div><VisitStatusBadge days={days} /></div>
                     </div>
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold truncate" style={{ color: textPrimary }}>{f.name}</p>
-                      <p className="text-[10px]" style={{ color: isAktif ? '#22C55E' : textSecondary }}>
-                        {isAktif ? '● Ziyaret devam ediyor' : (f.uzmanAd ?? 'Personel atanmadı')}
-                      </p>
-                    </div>
-                    {/* Right side */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-lg"
-                        style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary }}>
-                        {f.personelSayisi} kişi
-                      </span>
-                      <VisitStatusBadge days={days} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
-        {/* Uzmanlar Kartı — Premium Avatar Grid */}
-        <div className="rounded-2xl overflow-hidden" style={card}>
-          {/* Header */}
-          <div className="relative px-5 pt-5 pb-4 overflow-hidden"
+        {/* Uzmanlar Kartı */}
+        <div className="rounded-2xl" style={card}>
+          <div className="flex items-center justify-between px-5 pt-5 pb-4"
             style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}` }}>
-            <div className="absolute top-0 left-0 right-0 h-0.5" style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6, transparent)' }} />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.1))', border: '1px solid rgba(99,102,241,0.2)' }}>
-                  <i className="ri-user-star-fill text-sm" style={{ color: '#818CF8' }} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Personeller</h3>
-                  <p className="text-[10px]" style={{ color: textSecondary }}>
-                    <span className="font-bold" style={{ color: '#818CF8' }}>{uzmanlar.length}</span> kayıtlı ·&nbsp;
-                    <span className="font-bold" style={{ color: '#22C55E' }}>{aktifUzmanIds.size}</span> sahada
-                  </p>
-                </div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.2), rgba(14,165,233,0.06))' }}>
+                <i className="ri-user-star-fill text-sm" style={{ color: '#0EA5E9' }} />
               </div>
-              <button onClick={() => setActiveTab('uzmanlar')}
-                className="flex items-center gap-1 text-[11px] font-semibold cursor-pointer px-3 py-1.5 rounded-xl transition-all whitespace-nowrap"
-                style={{ color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.16)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.08)'; }}>
-                Tümünü Gör <i className="ri-arrow-right-s-line" />
-              </button>
+              <div>
+                <h3 className="text-sm font-bold" style={{ color: textPrimary }}>Personeller</h3>
+                <p className="text-[10px]" style={{ color: textSecondary }}>
+                  {aktifUzmanIds.size > 0 ? `${aktifUzmanIds.size} personel şu an sahada` : `${uzmanlar.length} personel kayıtlı`}
+                </p>
+              </div>
             </div>
+            <button onClick={() => setActiveTab('uzmanlar')}
+              className="flex items-center gap-1 text-[11px] font-semibold cursor-pointer px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap"
+              style={{ color: '#0EA5E9', background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.15)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.14)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.08)'; }}>
+              Tümünü Gör <i className="ri-arrow-right-s-line" />
+            </button>
           </div>
 
           {uzmanlar.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-3 px-5">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
-                <i className="ri-user-star-line text-xl" style={{ color: '#818CF8' }} />
+            <div className="flex flex-col items-center justify-center py-8 gap-3 px-5">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.12)' }}>
+                <i className="ri-user-star-line text-xl" style={{ color: '#0EA5E9' }} />
               </div>
               <p className="text-xs text-center" style={{ color: textSecondary }}>Henüz personel eklenmedi</p>
               <button onClick={onUzmanEkle}
-                className="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                className="whitespace-nowrap flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)' }}>
                 <i className="ri-user-add-line" />Personel Ekle
               </button>
             </div>
           ) : (
-            <div className="p-3 space-y-1.5">
-              {uzmanlar.slice(0, 5).map((u) => {
-                const isSahada = aktifUzmanIds.has(u.user_id);
-                const lastVisitDate = uzmanLastVisit[u.user_id] ?? null;
-                const days = getDaysDiff(lastVisitDate);
-                const initial = (u.display_name ?? u.email ?? '?').charAt(0).toUpperCase();
-                const gradients = [
-                  'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                  'linear-gradient(135deg,#0ea5e9,#0284c7)',
-                  'linear-gradient(135deg,#f59e0b,#d97706)',
-                  'linear-gradient(135deg,#10b981,#059669)',
-                  'linear-gradient(135deg,#ec4899,#be185d)',
-                ];
-                const grad = isSahada ? 'linear-gradient(135deg,#22C55E,#16A34A)' : gradients[Math.abs(u.email?.charCodeAt(0) ?? 0) % gradients.length];
-                return (
-                  <div key={u.user_id}
-                    onClick={() => onUzmanClick(u)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
-                    style={{
-                      background: isSahada
-                        ? (isDark ? 'rgba(34,197,94,0.06)' : 'rgba(34,197,94,0.04)')
-                        : (isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)'),
-                      border: isSahada ? '1px solid rgba(34,197,94,0.18)' : `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}`,
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = isSahada ? 'rgba(34,197,94,0.1)' : (isDark ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.04)');
-                      (e.currentTarget as HTMLElement).style.borderColor = isSahada ? 'rgba(34,197,94,0.3)' : 'rgba(99,102,241,0.2)';
-                      (e.currentTarget as HTMLElement).style.transform = 'translateX(3px)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background = isSahada
-                        ? (isDark ? 'rgba(34,197,94,0.06)' : 'rgba(34,197,94,0.04)')
-                        : (isDark ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)');
-                      (e.currentTarget as HTMLElement).style.borderColor = isSahada ? 'rgba(34,197,94,0.18)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)');
-                      (e.currentTarget as HTMLElement).style.transform = 'translateX(0)';
-                    }}>
-                    {/* Avatar */}
-                    <div className="relative flex-shrink-0">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-extrabold text-white"
-                        style={{ background: grad }}>
-                        {initial}
+            <>
+              <div className="grid grid-cols-[2fr_1.2fr_1fr] items-center px-4 py-2"
+                style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)' }}>
+                {['PERSONEL', 'FİRMA', 'DURUM'].map(h => (
+                  <div key={h}><span className="text-[9px] font-bold tracking-wider" style={{ color: textSecondary }}>{h}</span></div>
+                ))}
+              </div>
+              <div>
+                {uzmanlar.slice(0, 5).map((u, idx) => {
+                  const isSahada = aktifUzmanIds.has(u.user_id);
+                  const lastVisitDate = uzmanLastVisit[u.user_id] ?? null;
+                  const days = getDaysDiff(lastVisitDate);
+                  const rowBg = 'transparent';
+                  const rowHover = isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)';
+                  const initial = (u.display_name ?? u.email ?? '?').charAt(0).toUpperCase();
+                  return (
+                    <div key={u.user_id}
+                      onClick={() => onUzmanClick(u)}
+                      className="grid grid-cols-[2fr_1.2fr_1fr] items-center px-4 py-2.5 cursor-pointer transition-all"
+                      style={{ background: rowBg, borderBottom: idx < Math.min(uzmanlar.length, 5) - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)'}` : 'none' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = rowHover; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBg; }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black text-white"
+                            style={{ background: isSahada ? 'linear-gradient(135deg, #22C55E, #16A34A)' : u.is_active ? 'linear-gradient(135deg, #0EA5E9, #0284C7)' : 'linear-gradient(135deg, #64748b, #475569)' }}>
+                            {initial}
+                          </div>
+                          {isSahada && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border animate-pulse"
+                              style={{ background: '#22C55E', borderColor: isDark ? '#1e2d3d' : '#ffffff' }} />
+                          )}
+                        </div>
+                        <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{u.display_name ?? u.email}</p>
                       </div>
-                      {isSahada && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 animate-pulse" style={{ background: '#22C55E', borderColor: isDark ? '#161b30' : '#ffffff' }} />}
+                      <div><p className="text-[10px] truncate" style={{ color: textSecondary }}>{u.active_firm_name ?? '—'}</p></div>
+                      <div>
+                        {isSahada ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
+                            <span className="w-1 h-1 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                            Sahada
+                          </span>
+                        ) : (
+                          <VisitStatusBadge days={days} />
+                        )}
+                      </div>
                     </div>
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold truncate" style={{ color: textPrimary }}>{u.display_name ?? u.email}</p>
-                      <p className="text-[10px] truncate" style={{ color: isSahada ? '#22C55E' : textSecondary }}>
-                        {isSahada ? '● Sahada aktif' : (u.active_firm_name ?? 'Firma atanmadı')}
-                      </p>
-                    </div>
-                    {/* Status */}
-                    <div className="flex-shrink-0">
-                      {isSahada ? (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap"
-                          style={{ background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
-                          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
-                          Sahada
-                        </span>
-                      ) : (
-                        <VisitStatusBadge days={days} />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>

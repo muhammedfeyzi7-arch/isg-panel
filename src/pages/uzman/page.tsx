@@ -376,9 +376,9 @@ export default function UzmanPage() {
       >
         {/* ── İçerik ── */}
         <div
-          className={`pt-[56px] uzman-content transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'} pb-8`}
+          className={`pt-[76px] uzman-content transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-[232px]'} pb-8`}
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
-          style={{ minHeight: 'calc(100vh - 56px)' }}
+          style={{ minHeight: 'calc(100vh - 76px)' }}
         >
           <div className="px-3 sm:px-5 md:px-6 py-4 max-w-[1600px] w-full">
             {renderContent()}

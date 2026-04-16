@@ -148,14 +148,19 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
     <>
       <aside
         className={`
-          fixed left-0 top-0 h-screen flex flex-col z-[42]
-          ${collapsed ? 'w-[64px]' : 'w-[220px]'}
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          fixed top-3 bottom-3 flex flex-col z-[42]
+          ${collapsed ? 'w-[64px] left-3' : 'w-[220px] left-3'}
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+12px)] lg:translate-x-0'}
         `}
         style={{
           background: sidebarBg,
-          borderRight: `1px solid ${borderColor}`,
+          border: `1px solid ${borderColor}`,
+          borderRadius: '16px',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.26s cubic-bezier(0.4,0,0.2,1)',
+          boxShadow: isDark
+            ? '0 4px 24px rgba(0,0,0,0.28), 0 1px 6px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.04)'
+            : '0 4px 24px rgba(15,23,42,0.10), 0 1px 6px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.06)',
+          overflow: 'hidden',
         }}
       >
         {/* ── Logo ── */}

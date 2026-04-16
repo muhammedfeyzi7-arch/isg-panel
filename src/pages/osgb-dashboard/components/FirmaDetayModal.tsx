@@ -361,85 +361,78 @@ export default function FirmaDetayModal({
         style={{ background: modalBg, border: `1px solid ${modalBorder}`, maxHeight: '90vh' }}>
 
         {/* ── HEADER ── */}
-        <div className="relative overflow-hidden px-6 py-5 flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.13) 0%, rgba(2,132,199,0.06) 100%)', borderBottom: `1px solid ${cardBorder}` }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="relative flex-shrink-0">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{ background: 'rgba(14,165,233,0.2)', border: '1.5px solid rgba(14,165,233,0.35)' }}>
-                  <i className="ri-building-2-line text-lg" style={{ color: '#0EA5E9' }} />
-                </div>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1px solid ${cardBorder}` }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative flex-shrink-0">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.15), rgba(2,132,199,0.1))', border: '1px solid rgba(14,165,233,0.2)' }}>
+                <i className="ri-building-2-line text-base" style={{ color: '#0284C7' }} />
+              </div>
+              {aktifZiyaret && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
+                  style={{ background: '#22C55E', borderColor: modalBg }}>
+                  <span className="w-full h-full rounded-full animate-ping" style={{ background: 'rgba(34,197,94,0.6)' }} />
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold truncate" style={{ color: textPrimary }}>{firmaAdi}</h3>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                  style={{
+                    background: firmaDurum === 'aktif' ? 'rgba(14,165,233,0.12)' : 'rgba(100,116,139,0.12)',
+                    color: firmaDurum === 'aktif' ? '#0EA5E9' : '#64748B',
+                    border: `1px solid ${firmaDurum === 'aktif' ? 'rgba(14,165,233,0.25)' : 'rgba(100,116,139,0.25)'}`,
+                  }}>
+                  {firmaDurum === 'aktif' ? '● Aktif' : '○ Pasif'}
+                </span>
                 {aktifZiyaret && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 flex items-center justify-center"
-                    style={{ background: '#22C55E', borderColor: modalBg }}>
-                    <span className="w-full h-full rounded-full animate-ping" style={{ background: 'rgba(34,197,94,0.5)' }} />
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 flex items-center gap-1"
+                    style={{ background: 'rgba(34,197,94,0.1)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.25)' }}>
+                    <span className="w-1.5 h-1.5 rounded-full inline-block animate-pulse" style={{ background: '#22C55E' }} />
+                    Ziyaret aktif
                   </span>
                 )}
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base font-bold truncate" style={{ color: textPrimary }}>{firmaAdi}</h3>
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={{
-                      background: firmaDurum === 'aktif' ? 'rgba(14,165,233,0.14)' : 'rgba(100,116,139,0.14)',
-                      color: firmaDurum === 'aktif' ? '#0EA5E9' : '#64748B',
-                      border: `1px solid ${firmaDurum === 'aktif' ? 'rgba(14,165,233,0.28)' : 'rgba(100,116,139,0.28)'}`,
-                    }}>
-                    {firmaDurum === 'aktif' ? '● Aktif' : '○ Pasif'}
-                  </span>
-                  {aktifZiyaret && (
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 flex items-center gap-1"
-                      style={{ background: 'rgba(34,197,94,0.12)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.28)' }}>
-                      <span className="w-1.5 h-1.5 rounded-full inline-block animate-pulse" style={{ background: '#22C55E' }} />
-                      Ziyaret aktif
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs mt-0.5" style={{ color: textFaint }}>ISG Yönetimi · Müşteri Firma</p>
-              </div>
+              <p className="text-[10px] mt-0.5" style={{ color: textFaint }}>ISG Yönetimi · Müşteri Firma</p>
             </div>
+          </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
-              <button onClick={() => setShowQrModal(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all whitespace-nowrap"
-                style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.25)', color: '#0EA5E9' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.18)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; }}>
-                <i className="ri-qr-code-line text-xs" />QR Kod
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button onClick={() => setShowQrModal(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all whitespace-nowrap"
+              style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', color: '#0EA5E9' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.15)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.08)'; }}>
+              <i className="ri-qr-code-line text-xs" />QR
+            </button>
+
+            {!silOnay ? (
+              <button onClick={() => setSilOnay(true)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl cursor-pointer transition-all"
+                style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}>
+                <i className="ri-delete-bin-line text-xs" />
               </button>
-
-              {!silOnay ? (
-                <button onClick={() => setSilOnay(true)}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all"
-                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.15)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}>
-                  <i className="ri-delete-bin-line text-sm" />
+            ) : (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-semibold" style={{ color: '#EF4444' }}>Emin mi?</span>
+                <button onClick={handleSil} disabled={silLoading}
+                  className="px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer text-white whitespace-nowrap"
+                  style={{ background: '#EF4444' }}>
+                  {silLoading ? <i className="ri-loader-4-line animate-spin" /> : 'Sil'}
                 </button>
-              ) : (
-                <div className="flex items-center gap-1.5 p-1.5 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                  <span className="text-[10px] font-semibold px-1" style={{ color: '#EF4444' }}>Emin mi?</span>
-                  <button onClick={handleSil} disabled={silLoading}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer text-white whitespace-nowrap"
-                    style={{ background: '#EF4444' }}>
-                    {silLoading ? <i className="ri-loader-4-line animate-spin" /> : 'Evet, Sil'}
-                  </button>
-                  <button onClick={() => setSilOnay(false)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-semibold cursor-pointer whitespace-nowrap"
-                    style={{ background: 'var(--bg-item)', color: textMuted }}>
-                    Hayır
-                  </button>
-                </div>
-              )}
-              <button onClick={onClose}
-                className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all"
-                style={{ background: 'var(--bg-item)', color: textMuted }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = textMuted; }}>
-                <i className="ri-close-line text-base" />
-              </button>
-            </div>
+                <button onClick={() => setSilOnay(false)}
+                  className="px-2 py-1 rounded-lg text-[10px] font-semibold cursor-pointer whitespace-nowrap"
+                  style={{ background: 'var(--bg-item)', color: textMuted }}>
+                  Vazgeç
+                </button>
+              </div>
+            )}
+            <button onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
+              style={{ background: 'var(--bg-item)', color: textMuted }}>
+              <i className="ri-close-line text-sm" />
+            </button>
           </div>
         </div>
 
@@ -530,22 +523,19 @@ export default function FirmaDetayModal({
             {/* ── KPI ── */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-4" style={{ borderBottom: `1px solid ${cardBorder}` }}>
               {[
-                { label: 'Toplam Personel', value: personelSayisi, icon: 'ri-group-line', gradient: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)', shadow: 'rgba(14,165,233,0.35)' },
-                { label: 'Toplam Ziyaret', value: totalZiyaret, icon: 'ri-map-pin-2-line', gradient: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)', shadow: 'rgba(6,182,212,0.35)' },
-                { label: 'Son Ziyaret', value: sonZiyaretTarih ? gunOnce(sonZiyaretTarih) : '—', icon: 'ri-time-line', gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)', shadow: 'rgba(245,158,11,0.35)', isText: true },
-                { label: 'Ort. Süre', value: avgSure !== null ? `${avgSure}dk` : '—', icon: 'ri-timer-line', gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', shadow: 'rgba(16,185,129,0.35)', isText: true },
+                { label: 'Toplam Personel', value: personelSayisi, icon: 'ri-group-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
+                { label: 'Toplam Ziyaret', value: totalZiyaret, icon: 'ri-map-pin-2-line', color: '#0EA5E9', bg: 'rgba(14,165,233,0.1)' },
+                { label: 'Son Ziyaret', value: sonZiyaretTarih ? gunOnce(sonZiyaretTarih) : '—', icon: 'ri-time-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', isText: true },
+                { label: 'Ort. Ziyaret Süresi', value: avgSure !== null ? `${avgSure}dk` : '—', icon: 'ri-timer-line', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', isText: true },
               ].map(s => (
-                <div key={s.label} className="rounded-2xl p-3.5 relative overflow-hidden"
-                  style={{ background: s.gradient, boxShadow: `0 4px 12px ${s.shadow}` }}>
-                  <div className="absolute top-0 right-0 w-16 h-16 opacity-15"
-                    style={{ background: 'radial-gradient(circle at top right, rgba(255,255,255,0.7), transparent 70%)', borderRadius: '50%', transform: 'translate(20%, -20%)' }} />
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                      <i className={`${s.icon} text-xs text-white`} />
-                    </div>
+                <div key={s.label} className="rounded-xl p-3 flex items-center gap-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: s.bg }}>
+                    <i className={`${s.icon} text-sm`} style={{ color: s.color }} />
                   </div>
-                  <p className={`${(s as { isText?: boolean }).isText ? 'text-sm' : 'text-xl'} font-extrabold text-white leading-none`}>{s.value}</p>
-                  <p className="text-[9px] mt-1 text-white opacity-75 font-medium">{s.label}</p>
+                  <div>
+                    <p className={`${(s as { isText?: boolean }).isText ? 'text-sm' : 'text-base'} font-extrabold leading-none`} style={{ color: textPrimary }}>{s.value}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: textFaint }}>{s.label}</p>
+                  </div>
                 </div>
               ))}
             </div>

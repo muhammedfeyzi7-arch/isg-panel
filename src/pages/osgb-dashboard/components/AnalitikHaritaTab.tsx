@@ -197,14 +197,7 @@ export default function AnalitikHaritaTab({ isDark }: AnalitikHaritaTabProps) {
   const bugunPlanlar = useMemo(() => {
     return planlar.filter(p => {
       const gunler = p.gunler ?? [];
-      return gunler.some(g => {
-        if (typeof g !== 'string') return false;
-        try {
-          return g.toLowerCase() === TODAY_DAY_EN || g === TODAY_DAY_TR;
-        } catch {
-          return false;
-        }
-      });
+      return gunler.some(g => typeof g === 'string' && (g.toLowerCase() === TODAY_DAY_EN || g === TODAY_DAY_TR));
     });
   }, [planlar]);
 
@@ -643,10 +636,9 @@ export default function AnalitikHaritaTab({ isDark }: AnalitikHaritaTabProps) {
                   <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
                     {planlar.map(plan => {
                       const tamamlandi = bugunZiyaretFirmaIds.has(plan.firma_org_id);
-                      const bugunde = (plan.gunler ?? []).some(g => {
-                        if (typeof g !== 'string') return false;
-                        try { return g.toLowerCase() === TODAY_DAY_EN || g === TODAY_DAY_TR; } catch { return false; }
-                      });
+                      const bugunde = (plan.gunler ?? []).some(g =>
+                        typeof g === 'string' && (g.toLowerCase() === TODAY_DAY_EN || g === TODAY_DAY_TR)
+                      );
                       return (
                         <div key={plan.id} className="flex items-start gap-4 px-5 py-4">
                           <div className="w-9 h-9 flex items-center justify-center rounded-xl flex-shrink-0"
@@ -666,18 +658,17 @@ export default function AnalitikHaritaTab({ isDark }: AnalitikHaritaTabProps) {
                               )}
                             </div>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              {(plan.gunler ?? []).filter(g => typeof g === 'string').map(g => {
-                                const isToday = g === TODAY_DAY_TR || (typeof g === 'string' && g.toLowerCase() === TODAY_DAY_EN);
-                                return (
-                                  <span key={g} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md"
-                                    style={{
-                                      background: isToday ? 'rgba(34,197,94,0.12)' : 'rgba(14,165,233,0.08)',
-                                      color: isToday ? '#16A34A' : '#0284C7',
-                                    }}>
-                                    {GUN_LABELS[g] ?? g}
-                                  </span>
-                                );
-                              })}
+                              {(plan.gunler ?? []).filter(g => typeof g === 'string').map(g => (
+                                <span key={g} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md"
+                                  style={{
+                                    background: (g === TODAY_DAY_TR || g.toLowerCase() === TODAY_DAY_EN)
+                                      ? 'rgba(34,197,94,0.12)' : 'rgba(14,165,233,0.08)',
+                                    color: (g === TODAY_DAY_TR || g.toLowerCase() === TODAY_DAY_EN)
+                                      ? '#16A34A' : '#0284C7',
+                                  }}>
+                                  {GUN_LABELS[g] ?? g}
+                                </span>
+                              ))}
                             </div>
                             {plan.hedef_uzman_user_ids && plan.hedef_uzman_user_ids.length > 0 && (
                               <p className="text-[10px] mt-1" style={{ color: textMuted }}>
@@ -1022,12 +1013,7 @@ function ZiyaretTakvimiMini({
     planlar.forEach(p => {
       (p.gunler ?? []).forEach(g => {
         if (typeof g !== 'string') return;
-        let dow: number | undefined;
-        try {
-          dow = TR_TO_DOW[g] ?? EN_TO_DOW[g.toLowerCase()];
-        } catch {
-          return;
-        }
+        const dow = TR_TO_DOW[g] ?? EN_TO_DOW[g.toLowerCase()];
         if (dow === undefined) return;
         for (let d = 1; d <= daysInMonth; d++) {
           const date = new Date(year, month, d);

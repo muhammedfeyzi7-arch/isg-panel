@@ -249,9 +249,9 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <main
         className={`transition-all duration-300 min-h-screen ${
-          sidebarCollapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'
+          sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-[232px]'
         }`}
-        style={{ paddingTop: hasBanner ? '84px' : '56px' }}
+        style={{ paddingTop: hasBanner ? '88px' : '76px', paddingRight: '12px', paddingBottom: '12px' }}
       >
         <div className="px-2 sm:px-3 md:px-5 py-2 sm:py-3 max-w-[1680px]">
           <div

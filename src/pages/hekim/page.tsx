@@ -401,23 +401,27 @@ export default function HekimPage() {
       <main className="min-h-screen overflow-y-auto transition-all duration-300 lg:block">
         {/* ── Topbar ── */}
         <div
-          className={`sticky top-0 z-30 transition-all duration-300 ${collapsed ? 'lg:pl-[64px]' : 'lg:pl-[220px]'}`}
+          className={`fixed top-3 right-3 z-30 transition-all duration-300 ${collapsed ? 'lg:left-[91px]' : 'lg:left-[247px]'} left-3`}
           style={{
             background: isDark
-              ? 'rgba(10,15,26,0.92)'
-              : 'rgba(255,255,255,0.92)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: `1px solid ${borderColor}`,
+              ? 'rgba(10,15,26,0.95)'
+              : 'rgba(255,255,255,0.97)',
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            border: `1px solid ${borderColor}`,
+            borderRadius: '14px',
+            boxShadow: isDark
+              ? '0 4px 20px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.1)'
+              : '0 4px 20px rgba(15,23,42,0.10), 0 1px 4px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.06)',
           }}
         >
           {/* Top gradient accent line */}
           <div
-            className="h-[2px] w-full"
+            className="h-[2px] w-full rounded-t-[14px]"
             style={{ background: `linear-gradient(90deg, ${ACCENT} 0%, #38BDF8 40%, transparent 100%)`, opacity: 0.7 }}
           />
 
-          <div className="flex items-center gap-3 px-4 sm:px-5 h-[54px]">
+          <div className="flex items-center gap-3 px-4 sm:px-5 h-[50px]">
             {/* Mobile hamburger */}
             <button
               onClick={() => setMobileOpen(v => !v)}
@@ -588,6 +592,7 @@ export default function HekimPage() {
         {/* ── İçerik ── */}
         <div
           className={`px-3 sm:px-5 md:px-6 py-4 hekim-content transition-all duration-300 ${collapsed ? 'lg:pl-[80px]' : 'lg:pl-[236px]'}`}
+          style={{ paddingTop: '76px' }}
           key={`${activeTab}-${aktiveFirmaId ?? 'all'}`}
         >
           {renderContent()}

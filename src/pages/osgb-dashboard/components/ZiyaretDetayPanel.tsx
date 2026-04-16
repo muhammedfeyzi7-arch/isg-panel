@@ -127,49 +127,41 @@ export default function ZiyaretDetayPanel({ ziyaret, isDark, onClose, onBitir: _
         </div>
 
         {/* Header */}
-        <div className="relative overflow-hidden px-5 py-4 flex-shrink-0"
-          style={{ background: isAktif ? 'linear-gradient(135deg, rgba(34,197,94,0.14) 0%, rgba(16,185,129,0.06) 100%)' : 'linear-gradient(135deg, rgba(148,163,184,0.1) 0%, rgba(100,116,139,0.05) 100%)', borderBottom: '1px solid var(--border-subtle)' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 flex items-center justify-center rounded-xl"
-                style={{ background: isAktif ? 'rgba(34,197,94,0.2)' : 'rgba(148,163,184,0.15)', border: `1.5px solid ${isAktif ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.25)'}` }}>
-                <i className="ri-map-pin-2-line text-lg" style={{ color: isAktif ? '#22C55E' : '#94A3B8' }} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Ziyaret Detayı</h3>
-                  {isAktif ? (
-                    <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(34,197,94,0.15)', color: '#16A34A', border: '1px solid rgba(34,197,94,0.28)' }}>
-                      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
-                      AKTİF
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(148,163,184,0.15)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.25)' }}>
-                      TAMAMLANDI
-                    </span>
-                  )}
-                  {ziyaret.qr_ile_giris && (
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(16,185,129,0.12)', color: '#059669', border: '1px solid rgba(16,185,129,0.25)' }}>
-                      <i className="ri-qr-code-line mr-0.5" />QR ile giriş
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {ziyaret.firma_ad ?? 'Bilinmeyen Firma'}
-                </p>
-              </div>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center rounded-xl"
+              style={{ background: isAktif ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.12)' }}>
+              <i className={`ri-map-pin-2-line text-base`} style={{ color: isAktif ? '#22C55E' : '#94A3B8' }} />
             </div>
-            <button onClick={onClose}
-              className="w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer transition-all"
-              style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; (e.currentTarget as HTMLElement).style.color = '#EF4444'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-item)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}>
-              <i className="ri-close-line text-base" />
-            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Ziyaret Detayı</h3>
+                {isAktif ? (
+                  <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(34,197,94,0.12)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
+                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22C55E' }} />
+                    AKTİF
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(148,163,184,0.12)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.2)' }}>
+                    TAMAMLANDI
+                  </span>
+                )}
+              </div>
+              {ziyaret.qr_ile_giris && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md mt-1 inline-block"
+                  style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
+                  QR ile giriş
+                </span>
+              )}
+            </div>
           </div>
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer"
+            style={{ background: 'var(--bg-item)', color: 'var(--text-muted)' }}>
+            <i className="ri-close-line text-sm" />
+          </button>
         </div>
 
         {/* İçerik */}
