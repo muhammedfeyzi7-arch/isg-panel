@@ -378,7 +378,7 @@ function ZiyaretlerTabInner({ isDark }: ZiyaretlerTabProps) {
   const [exporting, setExporting] = useState(false);
 
   // Filtreler
-  const [filterTarih, setFilterTarih] = useState<FilterTarih>('bugun');
+  const [filterTarih, setFilterTarih] = useState<FilterTarih>('bu_ay');
   const [filterOzelBaslangic, setFilterOzelBaslangic] = useState('');
   const [filterOzelBitis, setFilterOzelBitis] = useState('');
   const [filterUzman, setFilterUzman] = useState('');
@@ -401,14 +401,14 @@ function ZiyaretlerTabInner({ isDark }: ZiyaretlerTabProps) {
   const fetchTumZiyaretler = useCallback(async () => {
     if (!org?.id) return;
     const since = new Date();
-    since.setDate(since.getDate() - 30);
+    since.setMonth(since.getMonth() - 3); // Son 3 ay
     const { data } = await supabase
       .from('osgb_ziyaretler')
       .select('id,osgb_org_id,firma_org_id,firma_ad,uzman_user_id,uzman_ad,uzman_email,giris_saati,cikis_saati,durum,qr_ile_giris,sure_dakika,notlar,konum_lat,konum_lng,konum_adres,gps_status,check_in_distance_m,check_in_lat,check_in_lng')
       .eq('osgb_org_id', org.id)
       .gte('giris_saati', since.toISOString())
       .order('giris_saati', { ascending: false })
-      .limit(1000);
+      .limit(2000);
     setTumZiyaretler((data ?? []) as Ziyaret[]);
   }, [org?.id]);
 
@@ -875,14 +875,12 @@ function ZiyaretlerTabInner({ isDark }: ZiyaretlerTabProps) {
           </div>
           <div className="text-center">
             <p className="text-sm font-bold" style={{ color: textPrimary }}>
-              {filterTarih === 'bugun' ? 'Henüz ziyaret yok' : 'Ziyaret bulunamadı'}
+              Ziyaret bulunamadı
             </p>
             <p className="text-xs mt-1.5 max-w-xs" style={{ color: textMuted }}>
               {aktifFilterSayisi > 0
-                ? 'Seçili filtre koşullarında kayıt yok.'
-                : filterTarih === 'bugun'
-                  ? 'Uzmanlar QR ile ziyaret başlatabilir.'
-                  : 'Seçili dönemde ziyaret kaydı bulunamadı.'}
+                ? 'Seçili filtre koşullarında kayıt yok. Filtreleri temizleyip tekrar deneyin.'
+                : 'Seçili dönemde ziyaret kaydı bulunamadı. Farklı bir dönem seçin.'}
             </p>
           </div>
           {aktifFilterSayisi > 0 && (

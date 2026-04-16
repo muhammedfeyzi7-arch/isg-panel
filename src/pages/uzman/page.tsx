@@ -36,11 +36,11 @@ interface FirmaOption {
 }
 
 const UZMAN_STEPS = [
-  { label: 'Bağlantı kuruluyor...', icon: 'ri-wifi-line', duration: 500 },
-  { label: 'Uzman bilgileri yükleniyor...', icon: 'ri-user-star-line', duration: 700 },
-  { label: 'Atanmış firmalar kontrol ediliyor...', icon: 'ri-building-3-line', duration: 700 },
-  { label: 'Saha modülü hazırlanıyor...', icon: 'ri-map-pin-user-line', duration: 600 },
-  { label: 'Hazır!', icon: 'ri-check-double-line', duration: 300 },
+  { label: 'Bağlantı kuruluyor...', icon: 'ri-wifi-line', duration: 280 },
+  { label: 'Uzman bilgileri yükleniyor...', icon: 'ri-user-star-line', duration: 380 },
+  { label: 'Atanmış firmalar kontrol ediliyor...', icon: 'ri-building-3-line', duration: 380 },
+  { label: 'Saha modülü hazırlanıyor...', icon: 'ri-map-pin-user-line', duration: 320 },
+  { label: 'Hazır!', icon: 'ri-check-double-line', duration: 140 },
 ];
 
 function UzmanLoadingScreen({ isDark }: { isDark: boolean }) {
@@ -117,7 +117,7 @@ export default function UzmanPage() {
   const isDark = theme === 'dark';
 
   useEffect(() => {
-    const t = setTimeout(() => setShowLoading(false), 2800);
+    const t = setTimeout(() => setShowLoading(false), 1600);
     return () => clearTimeout(t);
   }, []);
 
@@ -340,11 +340,14 @@ export default function UzmanPage() {
         className="fixed inset-0 lg:hidden"
         style={{
           zIndex: 41,
-          background: 'rgba(0,0,0,0.62)',
-          backdropFilter: 'blur(3px)',
+          background: mobileOpen ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0)',
+          backdropFilter: mobileOpen ? 'blur(8px) saturate(0.7)' : 'blur(0px)',
+          WebkitBackdropFilter: mobileOpen ? 'blur(8px) saturate(0.7)' : 'blur(0px)',
           opacity: mobileOpen ? 1 : 0,
           pointerEvents: mobileOpen ? 'auto' : 'none',
-          transition: 'opacity 0.25s ease',
+          transition: mobileOpen
+            ? 'opacity 0.32s cubic-bezier(0.22,1,0.36,1), backdrop-filter 0.32s cubic-bezier(0.22,1,0.36,1)'
+            : 'opacity 0.22s ease, backdrop-filter 0.22s ease',
         }}
         onClick={() => setMobileOpen(false)}
       />

@@ -150,16 +150,22 @@ export default function Sidebar({ onMobileClose, isDark = true, mobileOpen = fal
         className={`
           fixed top-3 bottom-3 flex flex-col z-[42]
           ${collapsed ? 'w-[64px] left-3' : 'w-[220px] left-3'}
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+12px)] lg:translate-x-0'}
+          ${mobileOpen ? 'translate-x-0 opacity-100' : '-translate-x-[calc(100%+12px)] opacity-0 lg:translate-x-0 lg:opacity-100'}
         `}
         style={{
           background: sidebarBg,
           border: `1px solid ${borderColor}`,
           borderRadius: '16px',
-          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.26s cubic-bezier(0.4,0,0.2,1)',
-          boxShadow: isDark
-            ? '0 4px 24px rgba(0,0,0,0.28), 0 1px 6px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.04)'
-            : '0 4px 24px rgba(15,23,42,0.10), 0 1px 6px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.06)',
+          transition: mobileOpen
+            ? 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.38s cubic-bezier(0.22,1,0.36,1), opacity 0.32s cubic-bezier(0.22,1,0.36,1)'
+            : 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease',
+          boxShadow: mobileOpen
+            ? (isDark
+                ? '0 24px 64px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.06)'
+                : '0 24px 64px rgba(15,23,42,0.22), 0 8px 24px rgba(15,23,42,0.12), 0 0 0 1px rgba(15,23,42,0.08)')
+            : (isDark
+                ? '0 4px 24px rgba(0,0,0,0.28), 0 1px 6px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.04)'
+                : '0 4px 24px rgba(15,23,42,0.10), 0 1px 6px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.06)'),
           overflow: 'hidden',
         }}
       >

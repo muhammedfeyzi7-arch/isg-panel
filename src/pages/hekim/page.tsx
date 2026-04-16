@@ -52,11 +52,11 @@ const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
 
 const HEKIM_STEPS = [
-  { label: 'Bağlantı kuruluyor...', icon: 'ri-wifi-line', duration: 500 },
-  { label: 'Hekim bilgileri yükleniyor...', icon: 'ri-heart-pulse-line', duration: 700 },
-  { label: 'Firmalar hazırlanıyor...', icon: 'ri-building-3-line', duration: 700 },
-  { label: 'Muayene kayıtları alınıyor...', icon: 'ri-stethoscope-line', duration: 600 },
-  { label: 'Hazır!', icon: 'ri-check-double-line', duration: 300 },
+  { label: 'Bağlantı kuruluyor...', icon: 'ri-wifi-line', duration: 280 },
+  { label: 'Hekim bilgileri yükleniyor...', icon: 'ri-heart-pulse-line', duration: 380 },
+  { label: 'Firmalar hazırlanıyor...', icon: 'ri-building-3-line', duration: 380 },
+  { label: 'Muayene kayıtları alınıyor...', icon: 'ri-stethoscope-line', duration: 320 },
+  { label: 'Hazır!', icon: 'ri-check-double-line', duration: 140 },
 ];
 
 // ── Hekim Loading Screen ──
@@ -379,11 +379,14 @@ export default function HekimPage() {
         className="fixed inset-0 lg:hidden"
         style={{
           zIndex: 41,
-          background: 'rgba(0,0,0,0.62)',
-          backdropFilter: 'blur(3px)',
+          background: mobileOpen ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0)',
+          backdropFilter: mobileOpen ? 'blur(8px) saturate(0.7)' : 'blur(0px)',
+          WebkitBackdropFilter: mobileOpen ? 'blur(8px) saturate(0.7)' : 'blur(0px)',
           opacity: mobileOpen ? 1 : 0,
           pointerEvents: mobileOpen ? 'auto' : 'none',
-          transition: 'opacity 0.25s ease',
+          transition: mobileOpen
+            ? 'opacity 0.32s cubic-bezier(0.22,1,0.36,1), backdrop-filter 0.32s cubic-bezier(0.22,1,0.36,1)'
+            : 'opacity 0.22s ease, backdrop-filter 0.22s ease',
         }}
         onClick={() => setMobileOpen(false)}
       />

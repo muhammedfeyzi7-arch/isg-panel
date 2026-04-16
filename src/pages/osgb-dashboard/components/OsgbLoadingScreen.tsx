@@ -1,11 +1,11 @@
 import PremiumLoadingScreen from '@/components/feature/PremiumLoadingScreen';
 
 const OSGB_STEPS = [
-  { label: 'Bağlantı kuruluyor...', icon: 'ri-wifi-line', duration: 500 },
-  { label: 'OSGB bilgileri yükleniyor...', icon: 'ri-building-3-line', duration: 700 },
-  { label: 'Firmalar hazırlanıyor...', icon: 'ri-community-line', duration: 700 },
-  { label: 'Uzman verileri alınıyor...', icon: 'ri-user-star-line', duration: 600 },
-  { label: 'Hazır!', icon: 'ri-check-double-line', duration: 300 },
+  { label: 'Bağlantı kuruluyor...', icon: 'ri-wifi-line', duration: 280 },
+  { label: 'OSGB bilgileri yükleniyor...', icon: 'ri-building-3-line', duration: 380 },
+  { label: 'Firmalar hazırlanıyor...', icon: 'ri-community-line', duration: 380 },
+  { label: 'Uzman verileri alınıyor...', icon: 'ri-user-star-line', duration: 320 },
+  { label: 'Hazır!', icon: 'ri-check-double-line', duration: 140 },
 ];
 
 interface OsgbLoadingScreenProps {

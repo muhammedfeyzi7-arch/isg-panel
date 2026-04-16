@@ -3,8 +3,6 @@ import { useEffect, useState } from 'react';
 const LOGO_URL =
   'https://storage.readdy-site.link/project_files/5dfc0b51-b8fd-486b-9fb6-3ee0a4ec64fa/af923cef-5f87-4a0b-a5c4-17416187a328_ChatGPT-Image-3-Nis-2026-00_04_32.png?v=fb25bed443ccb679f0c66aa2ced3a518';
 
-const ACCENT = '#0EA5E9';
-
 interface PremiumLoadingScreenProps {
   isDark?: boolean;
   panelName: string;
@@ -20,229 +18,227 @@ export default function PremiumLoadingScreen({
   steps,
   onDone,
 }: PremiumLoadingScreenProps) {
-  const [stepIndex, setStepIndex] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const [visible, setVisible] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
 
+  const totalDuration = steps.reduce((s, st) => s + st.duration, 0);
+
   useEffect(() => {
-    let current = 0;
-    let elapsed = 0;
-    const total = steps.reduce((s, st) => s + st.duration, 0);
-
-    const tick = () => {
-      if (current >= steps.length) {
-        setFadeOut(true);
-        setTimeout(() => onDone?.(), 400);
-        return;
-      }
-      setStepIndex(current);
-      const stepDuration = steps[current].duration;
-      const stepStart = elapsed;
-
-      const interval = setInterval(() => {
-        elapsed += 20;
-        setProgress(Math.min((elapsed / total) * 100, 100));
-      }, 20);
-
-      setTimeout(() => {
-        clearInterval(interval);
-        current++;
-        elapsed = stepStart + stepDuration;
-        tick();
-      }, stepDuration);
-    };
-
-    tick();
+    const t1 = setTimeout(() => setVisible(true), 30);
+    const t2 = setTimeout(() => {
+      setFadeOut(true);
+      setTimeout(() => onDone?.(), 500);
+    }, totalDuration);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const step = steps[Math.min(stepIndex, steps.length - 1)];
-  const isDone = stepIndex >= steps.length - 1 && progress >= 95;
-  const bgColor = isDark ? '#0f172a' : '#f8fafc';
-  const trackColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)';
-  const numColor = isDark ? '#475569' : '#94a3b8';
+  const bg = isDark
+    ? '#080f1e'
+    : '#f8fafc';
+
+  const accent = '#0EA5E9';
+  const accent2 = '#38BDF8';
+  const accent3 = '#7DD3FC';
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
       style={{
-        background: bgColor,
-        opacity: fadeOut ? 0 : 1,
-        transition: 'opacity 0.4s ease',
-        pointerEvents: fadeOut ? 'none' : 'all',
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: bg,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         fontFamily: "'Inter', sans-serif",
+        opacity: fadeOut ? 0 : visible ? 1 : 0,
+        transition: fadeOut ? 'opacity 0.5s ease' : 'opacity 0.4s ease',
+        overflow: 'hidden',
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        @keyframes premiumSpin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        @keyframes pls-spin-cw  { from { transform: rotate(0deg);   } to { transform: rotate(360deg);  } }
+        @keyframes pls-spin-ccw { from { transform: rotate(0deg);   } to { transform: rotate(-360deg); } }
+        @keyframes pls-spin-med { from { transform: rotate(45deg);  } to { transform: rotate(405deg);  } }
+        @keyframes pls-pulse-ring {
+          0%,100% { opacity: .25; transform: scale(.97); }
+          50%      { opacity: .55; transform: scale(1.03); }
         }
-        @keyframes premiumRing {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+        @keyframes pls-float {
+          0%,100% { transform: translateY(0px);  }
+          50%      { transform: translateY(-7px); }
         }
-        @keyframes premiumPulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.6; transform: scale(0.95); }
+        @keyframes pls-fade-in {
+          from { opacity: 0; transform: scale(.92) translateY(16px); }
+          to   { opacity: 1; transform: scale(1)   translateY(0);    }
         }
-        @keyframes premiumFadeUp {
-          from { opacity: 0; transform: translateY(6px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes pls-dot-bounce {
+          0%,80%,100% { transform: scale(0); opacity: 0; }
+          40%          { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pls-blob {
+          0%,100% { transform: translate(-50%,-50%) scale(1);    }
+          33%      { transform: translate(-50%,-50%) scale(1.12); }
+          66%      { transform: translate(-50%,-50%) scale(.9);   }
+        }
+        @keyframes pls-text-blink {
+          0%,100% { opacity: .5; }
+          50%      { opacity: 1;  }
         }
       `}</style>
 
-      {/* Ambient glow blobs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full"
-          style={{ background: `radial-gradient(circle, rgba(14,165,233,0.06) 0%, transparent 70%)`, filter: 'blur(40px)' }} />
-        <div className="absolute bottom-1/3 right-1/3 w-48 h-48 rounded-full"
-          style={{ background: `radial-gradient(circle, rgba(56,189,248,0.05) 0%, transparent 70%)`, filter: 'blur(32px)' }} />
+      {/* ── Ambient blobs ── */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+        {[
+          { x: '20%',  y: '25%', size: 480, color: isDark ? 'rgba(14,165,233,.07)' : 'rgba(14,165,233,.06)', dur: '8s',  delay: '0s'  },
+          { x: '78%',  y: '70%', size: 380, color: isDark ? 'rgba(56,189,248,.05)' : 'rgba(56,189,248,.05)', dur: '10s', delay: '2s'  },
+          { x: '55%',  y: '85%', size: 300, color: isDark ? 'rgba(14,165,233,.04)' : 'rgba(14,165,233,.04)', dur: '7s',  delay: '4s'  },
+        ].map((b, i) => (
+          <div key={i} style={{
+            position: 'absolute', left: b.x, top: b.y,
+            width: b.size, height: b.size, borderRadius: '50%',
+            background: `radial-gradient(circle, ${b.color} 0%, transparent 70%)`,
+            filter: 'blur(70px)',
+            transform: 'translate(-50%,-50%)',
+            animation: `pls-blob ${b.dur} ease-in-out ${b.delay} infinite`,
+          }} />
+        ))}
       </div>
 
-      {/* Logo + Title */}
-      <div className="flex flex-col items-center gap-5 mb-10 relative">
-        {/* Spinner ring around logo */}
-        <div className="relative w-20 h-20">
-          {/* Outer rotating ring */}
-          <svg
-            className="absolute inset-0 w-full h-full"
-            style={{ animation: 'premiumRing 2s linear infinite' }}
-            viewBox="0 0 80 80"
-          >
-            <circle
-              cx="40" cy="40" r="36"
-              fill="none"
-              stroke={ACCENT}
-              strokeWidth="2.5"
-              strokeDasharray="60 160"
-              strokeLinecap="round"
-              opacity="0.7"
-            />
+      {/* ── Main content ── */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        animation: 'pls-fade-in 0.6s cubic-bezier(0.22,1,0.36,1) forwards',
+      }}>
+
+        {/* ── Spinner stack ── */}
+        <div style={{
+          position: 'relative',
+          width: '180px', height: '180px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'pls-float 3.5s ease-in-out infinite',
+          marginBottom: '36px',
+        }}>
+
+          {/* Ring 1 — outermost, slow CW */}
+          <svg width="180" height="180" viewBox="0 0 180 180"
+            style={{ position: 'absolute', inset: 0, animation: 'pls-spin-cw 3.2s linear infinite' }}>
+            <defs>
+              <linearGradient id="g1a" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%"   stopColor={accent}  stopOpacity="0"   />
+                <stop offset="45%"  stopColor={accent}  stopOpacity="1"   />
+                <stop offset="100%" stopColor={accent2} stopOpacity="0.2" />
+              </linearGradient>
+            </defs>
+            <circle cx="90" cy="90" r="84" fill="none"
+              stroke={isDark ? 'rgba(14,165,233,.08)' : 'rgba(14,165,233,.1)'}
+              strokeWidth="1.5" />
+            <circle cx="90" cy="90" r="84" fill="none"
+              stroke="url(#g1a)" strokeWidth="3" strokeLinecap="round"
+              strokeDasharray="130 398" />
           </svg>
-          {/* Inner slow ring */}
-          <svg
-            className="absolute inset-0 w-full h-full"
-            style={{ animation: 'premiumRing 3s linear infinite reverse' }}
-            viewBox="0 0 80 80"
-          >
-            <circle
-              cx="40" cy="40" r="30"
-              fill="none"
-              stroke={ACCENT}
-              strokeWidth="1.5"
-              strokeDasharray="30 160"
-              strokeLinecap="round"
-              opacity="0.35"
-            />
+
+          {/* Ring 2 — medium, fast CCW */}
+          <svg width="148" height="148" viewBox="0 0 148 148"
+            style={{ position: 'absolute', inset: '16px', animation: 'pls-spin-ccw 2.1s linear infinite' }}>
+            <defs>
+              <linearGradient id="g2a" x1="100%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%"   stopColor={accent2} stopOpacity="0"   />
+                <stop offset="50%"  stopColor={accent2} stopOpacity="1"   />
+                <stop offset="100%" stopColor={accent3} stopOpacity="0"   />
+              </linearGradient>
+            </defs>
+            <circle cx="74" cy="74" r="68" fill="none"
+              stroke={isDark ? 'rgba(56,189,248,.06)' : 'rgba(56,189,248,.08)'}
+              strokeWidth="1" />
+            <circle cx="74" cy="74" r="68" fill="none"
+              stroke="url(#g2a)" strokeWidth="2.5" strokeLinecap="round"
+              strokeDasharray="80 347" />
           </svg>
-          {/* Logo center */}
-          <div
-            className="absolute inset-2 flex items-center justify-center rounded-2xl"
-            style={{
-              background: isDark
-                ? 'linear-gradient(135deg, rgba(14,165,233,0.18), rgba(14,165,233,0.06))'
-                : 'linear-gradient(135deg, rgba(14,165,233,0.12), rgba(14,165,233,0.04))',
-              border: '1px solid rgba(14,165,233,0.3)',
-              boxShadow: '0 0 24px rgba(14,165,233,0.12)',
-            }}
-          >
-            <img
-              src={LOGO_URL}
-              alt="ISG Logo"
-              style={{
-                height: '28px',
-                width: 'auto',
-                objectFit: 'contain',
-                filter: 'brightness(1.2) drop-shadow(0 0 6px rgba(14,165,233,0.5))',
-              }}
-            />
+
+          {/* Ring 3 — inner, medium CW, dashed */}
+          <svg width="112" height="112" viewBox="0 0 112 112"
+            style={{ position: 'absolute', inset: '34px', animation: 'pls-spin-med 4.5s linear infinite' }}>
+            <defs>
+              <linearGradient id="g3a" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%"   stopColor={accent3} stopOpacity="0"   />
+                <stop offset="60%"  stopColor={accent}  stopOpacity="0.9" />
+                <stop offset="100%" stopColor={accent}  stopOpacity="0"   />
+              </linearGradient>
+            </defs>
+            <circle cx="56" cy="56" r="50" fill="none"
+              stroke={isDark ? 'rgba(14,165,233,.05)' : 'rgba(14,165,233,.07)'}
+              strokeWidth="1" />
+            <circle cx="56" cy="56" r="50" fill="none"
+              stroke="url(#g3a)" strokeWidth="2" strokeLinecap="round"
+              strokeDasharray="40 274" />
+          </svg>
+
+          {/* Pulse ring behind logo */}
+          <div style={{
+            position: 'absolute', inset: '58px',
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${isDark ? 'rgba(14,165,233,.18)' : 'rgba(14,165,233,.12)'} 0%, transparent 70%)`,
+            animation: 'pls-pulse-ring 2s ease-in-out infinite',
+          }} />
+
+          {/* Logo card */}
+          <div style={{
+            position: 'relative', zIndex: 2,
+            width: '64px', height: '64px', borderRadius: '18px',
+            background: isDark
+              ? 'linear-gradient(145deg, rgba(14,165,233,.22) 0%, rgba(2,132,199,.1) 100%)'
+              : 'linear-gradient(145deg, #ffffff 0%, #e0f2fe 100%)',
+            border: `1.5px solid ${isDark ? 'rgba(14,165,233,.3)' : 'rgba(14,165,233,.22)'}`,
+            boxShadow: isDark
+              ? '0 0 32px rgba(14,165,233,.22), inset 0 1px 0 rgba(255,255,255,.1)'
+              : '0 8px 32px rgba(14,165,233,.18), inset 0 1px 0 #fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <img src={LOGO_URL} alt="ISG"
+              style={{ width: '34px', height: '34px', objectFit: 'contain',
+                filter: 'drop-shadow(0 0 6px rgba(14,165,233,.5))' }} />
           </div>
         </div>
 
-        <div className="text-center" style={{ animation: 'premiumFadeUp 0.5s ease forwards' }}>
-          <h1
-            className="text-2xl font-black leading-tight"
-            style={{ color: isDark ? '#f1f5f9' : '#0f172a', letterSpacing: '-0.04em' }}
-          >
+        {/* ── Text ── */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <h1 style={{
+            fontSize: '26px', fontWeight: 800, letterSpacing: '-0.04em',
+            color: isDark ? '#f1f5f9' : '#0f172a',
+            lineHeight: 1.1, marginBottom: '10px',
+          }}>
             {panelName}
           </h1>
-          <p className="text-sm mt-1.5 font-semibold" style={{ color: ACCENT }}>
-            {panelSubtitle}
-          </p>
-        </div>
-      </div>
-
-      {/* Progress section */}
-      <div className="w-72 mb-6 relative">
-        {/* Progress bar */}
-        <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ background: trackColor }}>
-          <div
-            className="h-full rounded-full transition-all duration-200"
-            style={{
-              width: `${progress}%`,
-              background: 'linear-gradient(90deg, #0284C7, #0EA5E9, #38BDF8)',
-              boxShadow: '0 0 12px rgba(14,165,233,0.6)',
-            }}
-          />
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-[10px] font-semibold" style={{ color: numColor }}>
-            {Math.round(progress)}%
-          </span>
-          <span className="text-[10px] font-semibold" style={{ color: numColor }}>
-            {stepIndex + 1} / {steps.length}
-          </span>
-        </div>
-      </div>
-
-      {/* Step indicator */}
-      <div
-        key={step.label}
-        className="flex items-center gap-2.5 px-5 py-2.5 rounded-full transition-all duration-300 mb-6"
-        style={{
-          background: isDone
-            ? 'rgba(14,165,233,0.12)'
-            : isDark ? 'rgba(14,165,233,0.07)' : 'rgba(14,165,233,0.06)',
-          border: `1px solid ${isDone ? 'rgba(14,165,233,0.35)' : 'rgba(14,165,233,0.18)'}`,
-          animation: 'premiumFadeUp 0.25s ease forwards',
-        }}
-      >
-        {/* Spinner icon */}
-        {isDone ? (
-          <i className="ri-check-double-line text-sm" style={{ color: ACCENT }} />
-        ) : (
-          <div className="relative w-4 h-4 flex-shrink-0">
-            <svg className="w-4 h-4" style={{ animation: 'premiumSpin 1s linear infinite' }} viewBox="0 0 16 16">
-              <circle cx="8" cy="8" r="6" fill="none" stroke={`${ACCENT}30`} strokeWidth="2" />
-              <circle cx="8" cy="8" r="6" fill="none" stroke={ACCENT} strokeWidth="2"
-                strokeDasharray="10 28" strokeLinecap="round" />
-            </svg>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '7px',
+            padding: '5px 14px 5px 10px', borderRadius: '100px',
+            background: isDark ? 'rgba(14,165,233,.1)' : 'rgba(14,165,233,.08)',
+            border: `1px solid ${isDark ? 'rgba(14,165,233,.25)' : 'rgba(14,165,233,.2)'}`,
+          }}>
+            <div style={{
+              width: '6px', height: '6px', borderRadius: '50%',
+              background: accent,
+              boxShadow: `0 0 8px ${accent}`,
+              animation: 'pls-pulse-ring 1.5s ease-in-out infinite',
+            }} />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: accent, letterSpacing: '0.06em' }}>
+              {panelSubtitle.toUpperCase()}
+            </span>
           </div>
-        )}
-        <span className="text-xs font-semibold" style={{ color: ACCENT }}>
-          {step.label}
-        </span>
-      </div>
+        </div>
 
-      {/* Dot stepper */}
-      <div className="flex items-center gap-2">
-        {steps.map((_, i) => (
-          <div
-            key={i}
-            className="rounded-full transition-all duration-400"
-            style={{
-              width: i === stepIndex ? '22px' : '7px',
-              height: '7px',
-              background: i < stepIndex
-                ? ACCENT
-                : i === stepIndex
-                  ? '#38BDF8'
-                  : isDark ? 'rgba(14,165,233,0.15)' : 'rgba(14,165,233,0.12)',
-            }}
-          />
-        ))}
+        {/* ── Bouncing dots ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{
+              width: '7px', height: '7px', borderRadius: '50%',
+              background: i === 0 ? accent : i === 1 ? accent2 : accent3,
+              boxShadow: `0 0 8px ${i === 0 ? accent : i === 1 ? accent2 : accent3}`,
+              animation: `pls-dot-bounce 1.2s ease-in-out ${i * 0.18}s infinite`,
+            }} />
+          ))}
+        </div>
       </div>
     </div>
   );

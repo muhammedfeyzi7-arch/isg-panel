@@ -226,12 +226,14 @@ export default function Layout({ children }: { children: ReactNode }) {
         className="fixed inset-0 lg:hidden"
         style={{
           zIndex: 41,
-          background: 'rgba(0,0,0,0.62)',
-          backdropFilter: 'blur(3px)',
-          WebkitBackdropFilter: 'blur(3px)',
+          background: mobileOpen ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0)',
+          backdropFilter: mobileOpen ? 'blur(8px) saturate(0.7)' : 'blur(0px)',
+          WebkitBackdropFilter: mobileOpen ? 'blur(8px) saturate(0.7)' : 'blur(0px)',
           opacity: mobileOpen ? 1 : 0,
           pointerEvents: mobileOpen ? 'auto' : 'none',
-          transition: 'opacity 0.25s ease',
+          transition: mobileOpen
+            ? 'opacity 0.32s cubic-bezier(0.22,1,0.36,1), backdrop-filter 0.32s cubic-bezier(0.22,1,0.36,1)'
+            : 'opacity 0.22s ease, backdrop-filter 0.22s ease',
         }}
         onClick={() => setMobileOpen(false)}
       />

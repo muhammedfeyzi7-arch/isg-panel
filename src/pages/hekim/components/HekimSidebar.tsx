@@ -108,14 +108,18 @@ export default function HekimSidebar({
         className={[
           'fixed top-3 bottom-3 flex flex-col z-[42]',
           collapsed ? 'w-[64px] left-3' : 'w-[220px] left-3',
-          mobileOpen ? 'translate-x-0' : '-translate-x-[calc(100%+12px)] lg:translate-x-0',
+          mobileOpen ? 'translate-x-0 opacity-100' : '-translate-x-[calc(100%+12px)] opacity-0 lg:translate-x-0 lg:opacity-100',
         ].join(' ')}
         style={{
           background: 'var(--bg-sidebar)',
           border: '1px solid var(--border-subtle)',
           borderRadius: '16px',
-          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.10), 0 1px 6px rgba(0,0,0,0.06), 0 0 0 1px rgba(15,23,42,0.06)',
+          transition: mobileOpen
+            ? 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.38s cubic-bezier(0.22,1,0.36,1), opacity 0.32s cubic-bezier(0.22,1,0.36,1)'
+            : 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease',
+          boxShadow: mobileOpen
+            ? '0 24px 64px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(15,23,42,0.08)'
+            : '0 4px 24px rgba(0,0,0,0.10), 0 1px 6px rgba(0,0,0,0.06), 0 0 0 1px rgba(15,23,42,0.06)',
           overflow: 'hidden',
         }}
       >
