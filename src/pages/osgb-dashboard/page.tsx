@@ -23,6 +23,8 @@ import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
 import FirmaModal from './components/FirmaModal';
 import UzmanModal from './components/UzmanModal';
 import AnalitikHaritaTab from './components/AnalitikHaritaTab';
+import OsgbMobileNav from './components/OsgbMobileNav';
+import OsgbMobileHeader from './components/OsgbMobileHeader';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -928,6 +930,17 @@ export default function OsgbDashboardPage() {
       {/* Onboarding Tour */}
       <OnboardingTour />
 
+      {/* ── MOBİL HEADER (sadece mobilde görünür) ── */}
+      <OsgbMobileHeader
+        activeTab={activeTab}
+        orgName={org?.name ?? 'OSGB'}
+        onFirmaEkle={handleFirmaEkleOpen}
+        onUzmanEkle={handleUzmanEkleOpen}
+        theme={osgbTheme}
+        onToggleTheme={handleToggleTheme}
+        setActiveTab={setActiveTab}
+      />
+
       {/* Mobile overlay */}
       <div
         className="fixed inset-0 lg:hidden"
@@ -971,8 +984,29 @@ export default function OsgbDashboardPage() {
 
       <main
         className={`transition-all duration-300 min-h-screen ${sidebarCollapsed ? 'lg:pl-[82px]' : 'lg:pl-[238px]'}`}
-        style={{ paddingTop: '76px', paddingRight: '12px', paddingBottom: '12px' }}
+        style={{
+          paddingTop: '76px',
+          paddingRight: '12px',
+          paddingBottom: '12px',
+        }}
       >
+        {/* Mobile top padding override */}
+        <style>{`
+          @media (max-width: 1023px) {
+            main {
+              padding-top: 110px !important;
+              padding-left: 16px !important;
+              padding-right: 16px !important;
+              padding-bottom: 88px !important;
+            }
+          }
+          @media (max-width: 1023px) and (max-height: 700px) {
+            main {
+              padding-top: 96px !important;
+            }
+          }
+        `}</style>
+
         <div className="max-w-[1680px]">
           {!dataLoading && (
             <>
@@ -1320,6 +1354,14 @@ export default function OsgbDashboardPage() {
           )}
         </div>
       </main>
+
+      {/* ── MOBİL ALT NAVİGASYON ── */}
+      <OsgbMobileNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        firmaCount={altFirmalar.length}
+        uzmanCount={uzmanlar.length}
+      />
 
       {/* ── FİRMA DETAY MODAL ── */}
       {secilenFirma && (

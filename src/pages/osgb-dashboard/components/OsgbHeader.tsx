@@ -170,7 +170,7 @@ export default function OsgbHeader({
   return (
     <>
       <header
-        className={`fixed top-3 right-3 z-30 flex items-center ${collapsed ? 'lg:left-[82px]' : 'lg:left-[238px]'} left-3`}
+        className={`fixed top-3 right-3 z-30 hidden lg:flex items-center ${collapsed ? 'lg:left-[82px]' : 'lg:left-[238px]'} left-3`}
         style={{
           height: '52px',
           background: headerBg,

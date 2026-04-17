@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "ISG Mobile",
+    "slug": "isg-mobile",
+    "scheme": "isgmobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

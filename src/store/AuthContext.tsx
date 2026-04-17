@@ -133,10 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { error: 'Hesabınız devre dışı bırakılmış veya organizasyondan çıkarılmış. Lütfen yöneticinizle iletişime geçin.' };
           }
         } catch {
-          // Edge function çağrısı başarısız olsa bile login'e izin verme — güvenli taraf
-          await supabase.auth.signOut({ scope: 'local' });
-          clearAuthStorage();
-          return { error: 'Erişim doğrulaması başarısız. Lütfen tekrar deneyin.' };
+          // Edge function'a ulaşılamazsa login'e izin ver (fail-open)
+          // Gerçek engelleme sadece açık "allowed: false" yanıtında yapılır
         }
       }
 

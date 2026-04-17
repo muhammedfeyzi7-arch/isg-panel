@@ -75,7 +75,7 @@ export default function OsgbSidebar({
     <>
       <aside
         className={[
-          'fixed top-3 bottom-3 flex flex-col z-[42]',
+          'fixed top-3 bottom-3 hidden lg:flex flex-col z-[42]',
           collapsed ? 'w-[64px] left-3' : 'w-[220px] left-3',
           mobileOpen ? 'translate-x-0 opacity-100' : '-translate-x-[calc(100%+12px)] opacity-0 lg:translate-x-0 lg:opacity-100',
         ].join(' ')}

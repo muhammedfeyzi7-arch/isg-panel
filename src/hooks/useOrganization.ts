@@ -117,23 +117,91 @@ export function useOrganization(user: User | null) {
       }
     };
 
+    // ── Direkt DB fallback: edge function olmadan org yükle ──────────────
+    const loadViaDirectDB = async (): Promise<boolean> => {
+      try {
+        if (!user) return false;
+        // osgb_role'lu kaydı önce dene
+        const { data: osgbRow } = await supabase
+          .from('user_organizations')
+          .select('role, is_active, must_change_password, display_name, email, osgb_role, active_firm_ids, active_firm_id, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .not('osgb_role', 'is', null)
+          .order('joined_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const { data: normalRow } = osgbRow
+          ? { data: null }
+          : await supabase
+              .from('user_organizations')
+              .select('role, is_active, must_change_password, display_name, email, osgb_role, active_firm_ids, active_firm_id, organizations!user_organizations_organization_id_fkey(id, name, invite_code, org_type)')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .order('joined_at', { ascending: true })
+              .limit(1)
+              .maybeSingle();
+
+        const row = osgbRow ?? normalRow;
+        if (!row?.organizations) return false;
+
+        const rawOrg = row.organizations;
+        const o = (Array.isArray(rawOrg) ? rawOrg[0] : rawOrg) as { id: string; name: string; invite_code: string; org_type?: string };
+        const osgbRole = row.osgb_role as 'osgb_admin' | 'gezici_uzman' | 'isyeri_hekimi' | null ?? null;
+        const rawIds = (row as Record<string, unknown>).active_firm_ids;
+        const firmIds: string[] = Array.isArray(rawIds) ? (rawIds as string[]).filter(Boolean) : row.active_firm_id ? [row.active_firm_id as string] : [];
+
+        setOrg({
+          id: o.id,
+          name: o.name,
+          invite_code: o.invite_code,
+          role: row.role ?? 'admin',
+          isActive: row.is_active !== false,
+          mustChangePassword: row.must_change_password === true,
+          displayName: row.display_name ?? undefined,
+          email: row.email ?? undefined,
+          orgType: (o.org_type === 'osgb' ? 'osgb' : 'firma') as 'firma' | 'osgb',
+          osgbRole,
+          activeFirmIds: firmIds.length > 0 ? firmIds : undefined,
+        });
+        return true;
+      } catch (e) {
+        console.error('[ISG] loadViaDirectDB exception:', e);
+        return false;
+      }
+    };
+
     const loadViaEdgeFunction = async (): Promise<boolean> => {
       try {
         clearTimeout(timeoutId);
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) return false;
         const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-        const res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+
+        // 8 saniyelik timeout ile edge function çağır
+        const controller = new AbortController();
+        const edgeTimeout = setTimeout(() => controller.abort(), 8000);
+
+        let res: Response;
+        try {
+          res = await fetch(`${supabaseUrl}/functions/v1/setup-organization`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${sessionData.session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(edgeTimeout);
+        }
+
         if (!res.ok) {
           const errText = await res.text().catch(() => '');
           console.error('[ISG] loadViaEdgeFunction failed:', res.status, errText);
-          return false;
+          // Edge function hata verdi → direkt DB'ye düş
+          return await loadViaDirectDB();
         }
         const resData = await res.json() as {
           organization?: { id: string; name: string; invite_code: string; org_type?: string };
@@ -199,7 +267,8 @@ export function useOrganization(user: User | null) {
         return false;
       } catch (e) {
         console.error('[ISG] loadViaEdgeFunction exception:', e);
-        return false;
+        // Timeout veya network hatası → direkt DB'ye düş
+        return await loadViaDirectDB();
       }
     };
 
@@ -405,21 +474,29 @@ export function useOrganization(user: User | null) {
           osgbRole: (data.osgb_role as 'osgb_admin' | 'gezici_uzman' | null) ?? null,
         });
       } else {
-        const ok = await loadViaEdgeFunction();
-        if (!ok) {
-          const fallbackOk = await createOrgDirectly();
-          if (!fallbackOk) {
-            setOrg(null);
+        // Direkt DB'den bulunamadı → edge function dene → direkt DB tekrar → org oluştur
+        const dbOk = await loadViaDirectDB();
+        if (!dbOk) {
+          const edgeOk = await loadViaEdgeFunction();
+          if (!edgeOk) {
+            const fallbackOk = await createOrgDirectly();
+            if (!fallbackOk) {
+              setOrg(null);
+            }
           }
         }
       }
     } catch (err) {
       clearTimeout(timeoutId);
       console.error('[ISG] loadOrg exception:', err);
-      const ok = await loadViaEdgeFunction();
-      if (!ok) {
-        setLoadError(err instanceof Error ? err.message : String(err));
-        setOrg(null);
+      // Exception durumunda direkt DB'ye düş
+      const dbOk = await loadViaDirectDB();
+      if (!dbOk) {
+        const edgeOk = await loadViaEdgeFunction();
+        if (!edgeOk) {
+          setLoadError(err instanceof Error ? err.message : String(err));
+          setOrg(null);
+        }
       }
     } finally {
       setLoading(false);

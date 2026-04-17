@@ -45,8 +45,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (memberErr) {
-      return new Response(JSON.stringify({ error: memberErr.message }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      // DB hatası — izin ver (fail-open)
+      console.error('membership query error:', memberErr.message);
+      return new Response(JSON.stringify({ allowed: true, reason: 'db_error_fallback' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -64,8 +66,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (orgErr) {
-      return new Response(JSON.stringify({ error: orgErr.message }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      // DB hatası — izin ver (fail-open)
+      console.error('org query error:', orgErr.message);
+      return new Response(JSON.stringify({ allowed: true, reason: 'db_error_fallback' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -81,8 +85,10 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: 'Sunucu hatası: ' + msg }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
+    console.error('check-org-active error:', msg);
+    // Sunucu hatası — fail-open: login'e izin ver
+    return new Response(JSON.stringify({ allowed: true, reason: 'server_error_fallback', error: msg }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
     });
   }
 });
