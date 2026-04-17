@@ -25,6 +25,9 @@ import UzmanModal from './components/UzmanModal';
 import AnalitikHaritaTab from './components/AnalitikHaritaTab';
 import OsgbMobileNav from './components/OsgbMobileNav';
 import OsgbMobileHeader from './components/OsgbMobileHeader';
+import MobileDashboardTab from './components/MobileDashboardTab';
+import MobileFirmalarTab from './components/MobileFirmalarTab';
+import MobileZiyaretlerTab from './components/MobileZiyaretlerTab';
 
 const EDGE_URL = 'https://niuvjthvhjbfyuuhoowq.supabase.co/functions/v1/admin-user-management';
 
@@ -994,15 +997,10 @@ export default function OsgbDashboardPage() {
         <style>{`
           @media (max-width: 1023px) {
             main {
-              padding-top: 110px !important;
+              padding-top: 108px !important;
               padding-left: 16px !important;
               padding-right: 16px !important;
-              padding-bottom: 88px !important;
-            }
-          }
-          @media (max-width: 1023px) and (max-height: 700px) {
-            main {
-              padding-top: 96px !important;
+              padding-bottom: 80px !important;
             }
           }
         `}</style>
@@ -1010,45 +1008,87 @@ export default function OsgbDashboardPage() {
         <div className="max-w-[1680px]">
           {!dataLoading && (
             <>
-              {/* ── DASHBOARD ── hidden/block ile mount edilmiş kalır, unmount olmaz */}
+              {/* ── DASHBOARD ── */}
               <div className={activeTab === 'dashboard' ? 'block' : 'hidden'}>
-                {(altFirmalar.length === 0 || uzmanlar.length === 0 || !altFirmalar.some(f => f.uzmanAd)) ? (
-                  <OsgbOnboarding
-                    firmalar={altFirmalar.map(f => ({ id: f.id, name: f.name, uzmanAd: f.uzmanAd }))}
-                    uzmanlar={uzmanlar}
-                    isDark={isDark}
-                    onFirmaEkle={handleFirmaEkleOpen}
-                    onUzmanEkle={handleUzmanEkleOpen}
-                    onAtamaYap={handleAtamaYapOpen}
-                  />
-                ) : (
-                  <DashboardTab
-                    altFirmalar={altFirmalar}
-                    uzmanlar={uzmanlar}
-                    isDark={isDark}
-                    orgId={org?.id ?? ''}
-                    onFirmaEkle={handleFirmaEkleOpen}
-                    onUzmanEkle={handleUzmanEkleOpen}
-                    onAtamaYap={handleAtamaYapOpen}
-                    onFirmaClick={handleFirmaClick}
-                    onUzmanClick={handleUzmanClick}
-                    setActiveTab={setActiveTab}
-                  />
-                )}
+                {/* Mobil */}
+                <div className="lg:hidden">
+                  {(altFirmalar.length === 0 || uzmanlar.length === 0 || !altFirmalar.some(f => f.uzmanAd)) ? (
+                    <OsgbOnboarding
+                      firmalar={altFirmalar.map(f => ({ id: f.id, name: f.name, uzmanAd: f.uzmanAd }))}
+                      uzmanlar={uzmanlar}
+                      isDark={isDark}
+                      onFirmaEkle={handleFirmaEkleOpen}
+                      onUzmanEkle={handleUzmanEkleOpen}
+                      onAtamaYap={handleAtamaYapOpen}
+                    />
+                  ) : (
+                    <MobileDashboardTab
+                      altFirmalar={altFirmalar}
+                      uzmanlar={uzmanlar}
+                      orgId={org?.id ?? ''}
+                      onFirmaEkle={handleFirmaEkleOpen}
+                      onUzmanEkle={handleUzmanEkleOpen}
+                      onFirmaClick={handleFirmaClick}
+                      onUzmanClick={handleUzmanClick}
+                      setActiveTab={setActiveTab}
+                    />
+                  )}
+                </div>
+                {/* Desktop */}
+                <div className="hidden lg:block">
+                  {(altFirmalar.length === 0 || uzmanlar.length === 0 || !altFirmalar.some(f => f.uzmanAd)) ? (
+                    <OsgbOnboarding
+                      firmalar={altFirmalar.map(f => ({ id: f.id, name: f.name, uzmanAd: f.uzmanAd }))}
+                      uzmanlar={uzmanlar}
+                      isDark={isDark}
+                      onFirmaEkle={handleFirmaEkleOpen}
+                      onUzmanEkle={handleUzmanEkleOpen}
+                      onAtamaYap={handleAtamaYapOpen}
+                    />
+                  ) : (
+                    <DashboardTab
+                      altFirmalar={altFirmalar}
+                      uzmanlar={uzmanlar}
+                      isDark={isDark}
+                      orgId={org?.id ?? ''}
+                      onFirmaEkle={handleFirmaEkleOpen}
+                      onUzmanEkle={handleUzmanEkleOpen}
+                      onAtamaYap={handleAtamaYapOpen}
+                      onFirmaClick={handleFirmaClick}
+                      onUzmanClick={handleUzmanClick}
+                      setActiveTab={setActiveTab}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* ── FİRMALAR TAB ── */}
               <div className={activeTab === 'firmalar' ? 'block' : 'hidden'}>
-                <FirmalarTab
-                  altFirmalar={altFirmalar}
-                  uzmanlar={uzmanlar}
-                  orgId={org?.id ?? ''}
-                  isDark={isDark}
-                  onFirmaClick={handleFirmaClick}
-                  onFirmaEkle={handleFirmaEkleOpen}
-                  onAtamaYap={handleAtamaYapOpenForFirma}
-                  onFirmaDeleted={removeFirmaFromState}
-                />
+                {/* Mobil */}
+                <div className="lg:hidden">
+                  <MobileFirmalarTab
+                    altFirmalar={altFirmalar}
+                    uzmanlar={uzmanlar}
+                    orgId={org?.id ?? ''}
+                    onFirmaClick={handleFirmaClick}
+                    onFirmaEkle={handleFirmaEkleOpen}
+                    onAtamaYap={handleAtamaYapOpenForFirma}
+                    onFirmaDeleted={removeFirmaFromState}
+                  />
+                </div>
+                {/* Desktop */}
+                <div className="hidden lg:block">
+                  <FirmalarTab
+                    altFirmalar={altFirmalar}
+                    uzmanlar={uzmanlar}
+                    orgId={org?.id ?? ''}
+                    isDark={isDark}
+                    onFirmaClick={handleFirmaClick}
+                    onFirmaEkle={handleFirmaEkleOpen}
+                    onAtamaYap={handleAtamaYapOpenForFirma}
+                    onFirmaDeleted={removeFirmaFromState}
+                  />
+                </div>
               </div>
 
               {/* ── PERSONEL TAB ── */}
@@ -1132,7 +1172,14 @@ export default function OsgbDashboardPage() {
               )}
               {/* ── ZİYARETLER TAB ── */}
               {activeTab === 'ziyaretler' && (
-                <ZiyaretlerTab isDark={isDark} />
+                <>
+                  <div className="lg:hidden">
+                    <MobileZiyaretlerTab isDark={isDark} />
+                  </div>
+                  <div className="hidden lg:block">
+                    <ZiyaretlerTab isDark={isDark} />
+                  </div>
+                </>
               )}
 
               {/* ── ÇÖP KUTUSU TAB ── */}
