@@ -39,7 +39,7 @@ const navItems: { id: HekimTab; label: string; icon: string; mobileOnly?: boolea
   { id: 'saglik',      label: 'Sağlık Durumu',   icon: 'ri-heart-pulse-line' },
   { id: 'is_kazasi',   label: 'İş Kazaları',     icon: 'ri-alert-line' },
   { id: 'cop',         label: 'Çöp Kutusu',      icon: 'ri-delete-bin-6-line' },
-  { id: 'ziyaret',     label: 'Saha Ziyareti',   icon: 'ri-map-pin-user-line', mobileOnly: true },
+  { id: 'ziyaret',     label: 'Saha Ziyareti',   icon: 'ri-map-pin-user-line' },
 ];
 
 export default function HekimSidebar({
@@ -205,7 +205,7 @@ export default function HekimSidebar({
                 onClick={() => handleNav(item.id)}
                 onMouseEnter={() => setHoveredItem(item.id)}
                 onMouseLeave={() => setHoveredItem(null)}
-                className={`w-full flex items-center text-left cursor-pointer relative overflow-hidden ${item.mobileOnly ? 'lg:hidden' : ''}`}
+                className="w-full flex items-center text-left cursor-pointer relative overflow-hidden"
                 style={{
                   padding: collapsed ? '9px 0' : '8px 10px',
                   borderRadius: '10px',

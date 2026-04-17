@@ -4,7 +4,6 @@ import MonthlyStats from './components/MonthlyStats';
 import StatCard from './components/StatCard';
 import CompanyDocumentsWidget from './components/CompanyDocumentsWidget';
 import AkilliOzet from './components/AkilliOzet';
-import IsIzniUyariWidget from './components/IsIzniUyariWidget';
 
 import {
   PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
@@ -22,7 +21,7 @@ function parseValidDate(dateStr: string | null | undefined): Date | null {
 export default function DashboardPage() {
   const {
     firmalar, personeller, evraklar, egitimler, muayeneler,
-    uygunsuzluklar, bildirimler, ekipmanlar, isIzinleri,
+    uygunsuzluklar, bildirimler, ekipmanlar,
     setActiveModule, fetchTable, org, realtimeStatus, refreshData,
   } = useApp();
 
@@ -70,7 +69,7 @@ export default function DashboardPage() {
     if (!org?.id) return;
     const DASHBOARD_TABLES = [
       'evraklar', 'egitimler', 'muayeneler',
-      'uygunsuzluklar', 'ekipmanlar', 'is_izinleri',
+      'uygunsuzluklar', 'ekipmanlar',
     ];
     DASHBOARD_TABLES.forEach(t => { void fetchTable(t); });
   }, [org?.id, fetchTable]);
@@ -93,14 +92,6 @@ export default function DashboardPage() {
   const aktifMuayeneler    = useMemo(() => muayeneler.filter(m => !m.silinmis), [muayeneler]);
   const aktifUygunsuzluklar= useMemo(() => uygunsuzluklar.filter(u => !u.silinmis), [uygunsuzluklar]);
   const aktifEkipmanlar    = useMemo(() => ekipmanlar.filter(e => !e.silinmis), [ekipmanlar]);
-  const aktifIsIzinleri    = useMemo(() => isIzinleri.filter(iz => !iz.silinmis), [isIzinleri]);
-
-  // İş izni istatistikleri
-  const isIzniStats = useMemo(() => {
-    const aktif = aktifIsIzinleri.filter(iz => iz.durum === 'Onaylandı' || iz.durum === 'Aktif').length;
-    const bekleyen = aktifIsIzinleri.filter(iz => iz.durum === 'Beklemede' || iz.durum === 'İncelemede').length;
-    return { toplam: aktifIsIzinleri.length, aktif, bekleyen };
-  }, [aktifIsIzinleri]);
 
   // ── ISG Risk hesaplamaları ──
   const riskStats = useMemo(() => {
@@ -208,38 +199,6 @@ export default function DashboardPage() {
     { name: 'Süre Dolmuş',    value: aktifEvraklar.filter(e => e.durum === 'Süre Dolmuş').length },
   ].filter(d => d.value > 0), [aktifEvraklar]);
 
-  const recentItems = useMemo(() => {
-    const all = [
-      ...aktifFirmalar.map(f => ({ tip: 'Firma', ad: f.ad, tarih: f.olusturmaTarihi, icon: 'ri-building-2-line', color: '#0EA5E9', badge: 'eklendi', badgeColor: '#0EA5E9', badgeBg: 'rgba(14,165,233,0.12)' })),
-      ...aktifPersoneller.map(p => ({ tip: 'Personel', ad: p.adSoyad, tarih: p.olusturmaTarihi, icon: 'ri-user-line', color: '#0EA5E9', badge: 'eklendi', badgeColor: '#0EA5E9', badgeBg: 'rgba(14,165,233,0.12)' })),
-      ...aktifEgitimler.map(e => ({ tip: 'Eğitim', ad: e.ad, tarih: e.olusturmaTarihi, icon: 'ri-graduation-cap-line', color: '#F59E0B', badge: 'planlandı', badgeColor: '#F59E0B', badgeBg: 'rgba(245,158,11,0.12)' })),
-    ];
-    return all.sort((a, b) => new Date(b.tarih).getTime() - new Date(a.tarih).getTime()).slice(0, 8);
-  }, [aktifFirmalar, aktifPersoneller, aktifEgitimler]);
-
-  const yaklaşanEvraklar = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const in60 = new Date(today.getTime() + 60 * 86400000);
-    return aktifEvraklar
-      .filter(e => { if (!e.gecerlilikTarihi) return false; const d = new Date(e.gecerlilikTarihi); d.setHours(0, 0, 0, 0); return d >= today && d <= in60; })
-      .sort((a, b) => new Date(a.gecerlilikTarihi!).getTime() - new Date(b.gecerlilikTarihi!).getTime())
-      .slice(0, 5);
-  }, [aktifEvraklar]);
-
-  const yaklaşanEkipmanlar = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const in60 = new Date(today.getTime() + 60 * 86400000);
-    return aktifEkipmanlar
-      .filter(e => {
-        if (e.durum === 'Uygun Değil') return false;
-        if (!e.sonrakiKontrolTarihi) return false;
-        const d = new Date(e.sonrakiKontrolTarihi); d.setHours(0, 0, 0, 0);
-        return d >= today && d <= in60;
-      })
-      .sort((a, b) => new Date(a.sonrakiKontrolTarihi).getTime() - new Date(b.sonrakiKontrolTarihi).getTime())
-      .slice(0, 5);
-  }, [aktifEkipmanlar]);
-
   const uygunDegılEkipmanlar = useMemo(() =>
     aktifEkipmanlar.filter(e => e.durum === 'Uygun Değil').slice(0, 5),
   [aktifEkipmanlar]);
@@ -291,19 +250,6 @@ export default function DashboardPage() {
       trend: null,
       trendLabel: null,
       variant: stats.acikU > 0 ? 'danger' as const : 'success' as const,
-    },
-  ];
-
-  // İş İzni ek stat kartı
-  const extraStatCards = [
-    {
-      label: 'İş İzinleri',
-      value: isIzniStats.toplam,
-      icon: 'ri-shield-check-line',
-      sub: `${isIzniStats.aktif} aktif · ${isIzniStats.bekleyen} beklemede`,
-      trend: null,
-      trendLabel: null,
-      variant: 'default' as const,
     },
   ];
 
@@ -411,8 +357,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Ana Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── 4 Ana Stat Kartı — 2x2 grid mobile, 4-col desktop ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card, idx) => (
           <StatCard
             key={card.label}
@@ -424,23 +370,6 @@ export default function DashboardPage() {
             trendLabel={card.trendLabel}
             variant={card.variant}
             delay={idx * 100}
-          />
-        ))}
-      </div>
-
-      {/* ── İş İzni Stat Card ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {extraStatCards.map((card, idx) => (
-          <StatCard
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            icon={card.icon}
-            sub={card.sub}
-            trend={card.trend}
-            trendLabel={card.trendLabel}
-            variant={card.variant}
-            delay={idx * 100 + 400}
           />
         ))}
       </div>
@@ -518,12 +447,11 @@ export default function DashboardPage() {
               <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>
                 <i className="ri-error-warning-line mr-1.5" style={{ color: '#EF4444' }} />Geciken İşlemler
               </p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: 'Evrak', value: riskStats.gecikmisBelge,   icon: 'ri-file-damage-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
+                  { label: 'Evrak',   value: riskStats.gecikmisBelge,   icon: 'ri-file-damage-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
                   { label: 'Ekipman', value: riskStats.gecikmisEkipman, icon: 'ri-tools-line',        color: '#F59E0B', bg: 'rgba(251,146,60,0.1)',   border: 'rgba(251,146,60,0.2)' },
                   { label: 'Muayene', value: riskStats.gecikmisMuayene, icon: 'ri-heart-pulse-line',  color: '#F87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.2)' },
-                  { label: 'İş İzni', value: isIzniStats.bekleyen,      icon: 'ri-shield-check-line', color: '#10B981', bg: 'rgba(16,185,129,0.1)',   border: 'rgba(16,185,129,0.2)' },
                 ].map(item => (
                   <div key={item.label} className="rounded-xl p-2.5 text-center"
                     style={{ background: item.value > 0 ? `${item.color}18` : 'var(--bg-item)', border: `1px solid ${item.value > 0 ? `${item.color}30` : 'var(--border-subtle)'}` }}>
@@ -597,6 +525,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Evrak Durumları Pie */}
         <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-subtle)' }}>
           <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #0EA5E9, #38BDF8)' }} />
           <div className="p-4">
@@ -699,119 +628,6 @@ function DashEmptyState({ icon, text, subtext, color = '#475569' }: { icon: stri
       <div className="text-center">
         <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{text}</p>
         <p className="text-[11px] mt-0.5 leading-relaxed max-w-[200px]" style={{ color: 'var(--text-muted)' }}>{subtext}</p>
-      </div>
-    </div>
-  );
-}
-
-function UpcomingTabs({
-  evraklar, ekipmanlar, firmalar,
-}: {
-  evraklar: { id: string; ad: string; tur: string; gecerlilikTarihi?: string }[];
-  ekipmanlar: { id: string; ad: string; tur: string; firmaId: string; sonrakiKontrolTarihi: string }[];
-  firmalar: { id: string; ad: string }[];
-}) {
-  const [tab, setTab] = useState<'evrak' | 'ekipman'>('evrak');
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-
-  return (
-    <div>
-      <div className="flex gap-1 mb-3 p-1 rounded-lg" style={{ background: 'var(--bg-item)' }}>
-        <button onClick={() => setTab('evrak')}
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap"
-          style={tab === 'evrak' ? { background: 'rgba(245,158,11,0.15)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' } : { color: 'var(--text-muted)', border: '1px solid transparent' }}>
-          <i className="ri-file-warning-line text-[10px]" style={{ color: tab === 'evrak' ? '#F59E0B' : 'var(--text-muted)' }} />
-          <span style={{ color: tab === 'evrak' ? '#F59E0B' : 'var(--text-muted)' }}>Evraklar</span>
-          {evraklar.length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: tab === 'evrak' ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>{evraklar.length}</span>}
-        </button>
-        <button onClick={() => setTab('ekipman')}
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap"
-          style={tab === 'ekipman' ? { background: 'rgba(59,130,246,0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' } : { color: 'var(--text-muted)', border: '1px solid transparent' }}>
-          <i className="ri-tools-line text-[10px]" style={{ color: tab === 'ekipman' ? '#60A5FA' : 'var(--text-muted)' }} />
-          <span style={{ color: tab === 'ekipman' ? '#60A5FA' : 'var(--text-muted)' }}>Ekipmanlar</span>
-          {ekipmanlar.length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: tab === 'ekipman' ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.1)', color: '#60A5FA' }}>{ekipmanlar.length}</span>}
-        </button>
-      </div>
-
-      {tab === 'evrak' && (
-        evraklar.length === 0 ? (
-          <div className="py-6 text-center"><i className="ri-check-double-line text-xl" style={{ color: '#34D399' }} /><p className="text-[11px] mt-1 font-medium" style={{ color: '#34D399' }}>Yaklaşan evrak yok</p></div>
-        ) : (
-          <div className="space-y-1">
-            {evraklar.map(ev => {
-              const d = new Date(ev.gecerlilikTarihi!); d.setHours(0, 0, 0, 0);
-              const days = Math.ceil((d.getTime() - today.getTime()) / 86400000);
-              const isUrgent = days <= 15;
-              return (
-                <div key={ev.id} className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                  <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)' }}>
-                    <i className="ri-file-warning-line text-xs" style={{ color: isUrgent ? '#EF4444' : '#F59E0B' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11.5px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ev.ad}</p>
-                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{ev.tur}</p>
-                  </div>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1"
-                    style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', color: isUrgent ? '#F87171' : '#FCD34D' }}>
-                    <i className="ri-timer-line" />{days === 0 ? 'Bugün!' : `${days}g`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )
-      )}
-
-      {tab === 'ekipman' && (
-        ekipmanlar.length === 0 ? (
-          <div className="py-6 text-center"><i className="ri-check-double-line text-xl" style={{ color: '#34D399' }} /><p className="text-[11px] mt-1 font-medium" style={{ color: '#34D399' }}>Yaklaşan ekipman kontrolü yok</p></div>
-        ) : (
-          <div className="space-y-1">
-            {ekipmanlar.map(ek => {
-              const d = new Date(ek.sonrakiKontrolTarihi); d.setHours(0, 0, 0, 0);
-              const days = Math.ceil((d.getTime() - today.getTime()) / 86400000);
-              const isUrgent = days <= 15;
-              const firma = firmalar.find(f => f.id === ek.firmaId);
-              return (
-                <div key={ek.id} className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: 'var(--bg-item)', border: '1px solid var(--bg-item-border)' }}>
-                  <div className="w-6 h-6 flex items-center justify-center rounded-lg flex-shrink-0" style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)' }}>
-                    <i className="ri-tools-line text-xs" style={{ color: isUrgent ? '#EF4444' : '#60A5FA' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11.5px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ek.ad}</p>
-                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{ek.tur}{firma ? ` · ${firma.ad}` : ''}</p>
-                  </div>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1"
-                    style={{ background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)', color: isUrgent ? '#F87171' : '#93C5FD' }}>
-                    <i className="ri-timer-line" />{days === 0 ? 'Bugün!' : `${days}g`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )
-      )}
-    </div>
-  );
-}
-
-function InsightEmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center py-8 gap-2.5">
-      <div className="w-14 h-14 flex items-center justify-center rounded-2xl"
-        style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}>
-        <i className="ri-shield-check-line text-2xl" style={{ color: '#10B981' }} />
-      </div>
-      <div className="text-center">
-        <p className="text-[13px] font-bold" style={{ color: '#10B981' }}>Her şey yolunda!</p>
-        <p className="text-[11.5px] mt-1 leading-relaxed max-w-[200px]" style={{ color: 'var(--text-muted)' }}>
-          Önümüzdeki 60 günde süresi dolacak kayıt bulunmuyor.
-        </p>
-        <div className="flex items-center justify-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-full mx-auto w-fit"
-          style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)' }}>
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
-          <span className="text-[10.5px] font-semibold" style={{ color: '#10B981' }}>Sistem sağlıklı çalışıyor</span>
-        </div>
       </div>
     </div>
   );

@@ -1,5 +1,17 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import HekimMuayeneModal from './HekimMuayeneModal';
+
+interface YaklaşanMuayene {
+  personelId: string;
+  personelAd: string;
+  firmaAd: string;
+  firmaId: string;
+  sonrakiTarih: string;
+  daysUntil: number;
+  sonuc: string;
+  muayeneId: string;
+}
 
 interface OverallStats {
   toplamPersonel: number;
@@ -33,6 +45,9 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
   const [stats, setStats] = useState<OverallStats | null>(null);
   const [firmalar, setFirmalar] = useState<FirmaRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [yaklaşanlar, setYaklaşanlar] = useState<YaklaşanMuayene[]>([]);
+  const [muayeneModalOpen, setMuayeneModalOpen] = useState(false);
+  const [selectedPersonelId, setSelectedPersonelId] = useState<string | null>(null);
 
   const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
   const textSecondary = isDark ? '#94A3B8' : '#64748B';
@@ -85,7 +100,6 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
           sonMuayeneGunu = Math.floor((Date.now() - new Date(muayeneTarihler[0]).getTime()) / (1000 * 60 * 60 * 24));
         }
 
-        // Tüm personelleri tek sorguda çek — hem toplam sayı hem firma bazlı dağılım için
         const { data: tumPersoneller } = await supabase
           .from('personeller')
           .select('organization_id')
@@ -94,7 +108,6 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
 
         const toplamPersonel = tumPersoneller?.length ?? 0;
 
-        // Firma bazlı personel sayısını map'e al (N+1 sorgu önlemi)
         const personelByFirma = new Map<string, number>();
         (tumPersoneller ?? []).forEach(p => {
           personelByFirma.set(p.organization_id, (personelByFirma.get(p.organization_id) ?? 0) + 1);
@@ -128,6 +141,64 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
           };
         });
         setFirmalar(firmaRows);
+
+        // ── Yaklaşan muayeneler (30 gün içinde veya geçmiş) ──
+        const firmaAdMap: Record<string, string> = {};
+        (orgs ?? []).forEach(o => { firmaAdMap[o.id] = o.name; });
+
+        // Tüm personelleri çek
+        const { data: personelRows } = await supabase
+          .from('personeller')
+          .select('id, organization_id, data')
+          .in('organization_id', safeIds)
+          .is('deleted_at', null);
+
+        const personelAdMap: Record<string, string> = {};
+        (personelRows ?? []).forEach(r => {
+          const d = r.data as Record<string, unknown>;
+          personelAdMap[r.id] = (d.adSoyad as string) ?? 'Bilinmiyor';
+        });
+
+        // Her personelin en son muayenesini bul
+        const latestMuayeneByPersonel = new Map<string, { sonrakiTarih: string; sonuc: string; muayeneId: string; firmaId: string }>();
+        allMuayeneler.forEach(m => {
+          const d = m.data as Record<string, unknown>;
+          const pid = (d.personelId as string) ?? '';
+          const sonrakiTarih = (d.sonrakiTarih as string) ?? '';
+          if (!pid || !sonrakiTarih) return;
+          const existing = latestMuayeneByPersonel.get(pid);
+          const muayeneTarihi = (d.muayeneTarihi as string) ?? '';
+          if (!existing || muayeneTarihi > (existing as Record<string, string>).muayeneTarihi) {
+            latestMuayeneByPersonel.set(pid, {
+              sonrakiTarih,
+              sonuc: (d.sonuc as string) ?? '',
+              muayeneId: m.organization_id,
+              firmaId: m.organization_id,
+            });
+          }
+        });
+
+        const now = new Date();
+        const yaklaşanList: YaklaşanMuayene[] = [];
+        latestMuayeneByPersonel.forEach((val, personelId) => {
+          const daysUntil = Math.ceil((new Date(val.sonrakiTarih).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysUntil <= 30) {
+            yaklaşanList.push({
+              personelId,
+              personelAd: personelAdMap[personelId] ?? 'Bilinmiyor',
+              firmaAd: firmaAdMap[val.firmaId] ?? '',
+              firmaId: val.firmaId,
+              sonrakiTarih: val.sonrakiTarih,
+              daysUntil,
+              sonuc: val.sonuc,
+              muayeneId: val.muayeneId,
+            });
+          }
+        });
+
+        yaklaşanList.sort((a, b) => a.daysUntil - b.daysUntil);
+        setYaklaşanlar(yaklaşanList);
+
       } catch (err) {
         console.error('[HekimGenelBakisTab] load error:', err);
       } finally {
@@ -350,7 +421,7 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
             {firmalar.slice(0, 3).map(f => (
               <div key={f.id} className="flex items-center gap-2.5">
                 <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-black text-white"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
                   style={{ background: `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})` }}
                 >
                   {f.name.charAt(0).toUpperCase()}
@@ -386,6 +457,150 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
           </div>
         </div>
       </div>
+
+      {/* ── Yaklaşan Muayeneler Paneli ── */}
+      {yaklaşanlar.length > 0 && (
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            border: `1.5px solid ${yaklaşanlar.some(y => y.daysUntil < 0) ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
+            background: isDark
+              ? yaklaşanlar.some(y => y.daysUntil < 0) ? 'rgba(239,68,68,0.05)' : 'rgba(245,158,11,0.05)'
+              : yaklaşanlar.some(y => y.daysUntil < 0) ? 'rgba(239,68,68,0.03)' : 'rgba(245,158,11,0.03)',
+          }}
+        >
+          {/* Panel başlık */}
+          <div
+            className="flex items-center justify-between px-5 py-3.5"
+            style={{
+              background: yaklaşanlar.some(y => y.daysUntil < 0)
+                ? 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.06))'
+                : 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.06))',
+              borderBottom: `1px solid ${yaklaşanlar.some(y => y.daysUntil < 0) ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)'}`,
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{
+                  background: yaklaşanlar.some(y => y.daysUntil < 0) ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                }}
+              >
+                <i
+                  className="ri-calendar-event-line text-sm"
+                  style={{ color: yaklaşanlar.some(y => y.daysUntil < 0) ? '#EF4444' : '#F59E0B' }}
+                />
+              </div>
+              <div>
+                <p
+                  className="text-[13px] font-bold"
+                  style={{
+                    color: yaklaşanlar.some(y => y.daysUntil < 0) ? '#EF4444' : '#F59E0B',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  Yaklaşan / Geciken Muayeneler
+                </p>
+                <p className="text-[10px] mt-0.5" style={{ color: textSecondary }}>
+                  {yaklaşanlar.filter(y => y.daysUntil < 0).length} gecikmiş · {yaklaşanlar.filter(y => y.daysUntil >= 0).length} yaklaşıyor
+                </p>
+              </div>
+            </div>
+            <span
+              className="text-[11px] font-bold px-3 py-1.5 rounded-full"
+              style={{
+                background: yaklaşanlar.some(y => y.daysUntil < 0) ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                color: yaklaşanlar.some(y => y.daysUntil < 0) ? '#EF4444' : '#F59E0B',
+                border: `1px solid ${yaklaşanlar.some(y => y.daysUntil < 0) ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
+              }}
+            >
+              {yaklaşanlar.length} personel
+            </span>
+          </div>
+
+          {/* Liste */}
+          <div className="divide-y" style={{ borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)' }}>
+            {yaklaşanlar.slice(0, 8).map(y => {
+              const isGecmis = y.daysUntil < 0;
+              const isAcil = y.daysUntil >= 0 && y.daysUntil <= 7;
+              const accentColor = isGecmis ? '#EF4444' : isAcil ? '#F97316' : '#F59E0B';
+
+              return (
+                <div
+                  key={y.personelId}
+                  className="flex items-center gap-3 px-5 py-3 transition-all"
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
+                  {/* Avatar */}
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${accentColor}cc, ${accentColor})` }}
+                  >
+                    {y.personelAd.charAt(0).toUpperCase()}
+                  </div>
+
+                  {/* Bilgi */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold truncate" style={{ color: textPrimary }}>{y.personelAd}</span>
+                      <span
+                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
+                        style={{ background: 'rgba(14,165,233,0.1)', color: ACCENT }}
+                      >
+                        {y.firmaAd}
+                      </span>
+                    </div>
+                    <p className="text-[10px] mt-0.5" style={{ color: textSecondary }}>
+                      Sonraki muayene: {new Date(y.sonrakiTarih).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+
+                  {/* Durum badge */}
+                  <span
+                    className="text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0"
+                    style={{
+                      background: `${accentColor}15`,
+                      color: accentColor,
+                      border: `1px solid ${accentColor}30`,
+                    }}
+                  >
+                    {isGecmis
+                      ? `${Math.abs(y.daysUntil)}g gecikti`
+                      : y.daysUntil === 0
+                      ? 'Bugün!'
+                      : `${y.daysUntil}g kaldı`
+                    }
+                  </span>
+
+                  {/* Hızlı muayene ekle */}
+                  <button
+                    onClick={() => { setSelectedPersonelId(y.personelId); setMuayeneModalOpen(true); }}
+                    className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex-shrink-0 text-white"
+                    style={{ background: `linear-gradient(135deg, ${ACCENT_DARK}, ${ACCENT})` }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                  >
+                    <i className="ri-stethoscope-line text-xs" />
+                    Muayene Ekle
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {yaklaşanlar.length > 8 && (
+            <div
+              className="px-5 py-2.5 text-center"
+              style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)'}` }}
+            >
+              <p className="text-[10px] font-semibold" style={{ color: textSecondary }}>
+                +{yaklaşanlar.length - 8} personel daha gösterilmiyor
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Özet Bandı ── */}
       <div
@@ -428,6 +643,18 @@ export default function HekimGenelBakisTab({ orgId, atanmisFirmaIds, isDark }: H
           <span className="text-[10px] font-semibold" style={{ color: '#10B981' }}>Canlı Veri</span>
         </div>
       </div>
+
+      {/* Muayene Modal */}
+      <HekimMuayeneModal
+        open={muayeneModalOpen}
+        onClose={() => { setMuayeneModalOpen(false); setSelectedPersonelId(null); }}
+        onSaved={() => { setMuayeneModalOpen(false); setSelectedPersonelId(null); }}
+        atanmisFirmaIds={atanmisFirmaIds}
+        isDark={isDark}
+        hekimOrgId={orgId}
+        editData={null}
+        preselectedPersonelId={selectedPersonelId}
+      />
     </div>
   );
 }

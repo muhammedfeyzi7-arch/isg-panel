@@ -328,7 +328,7 @@ export default function HekimPage() {
       case 'is_kazasi':
         return <HekimIsKazasiTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} addToast={addToast} />;
       case 'cop':
-        return <HekimCopTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} />;
+        return <HekimCopTab atanmisFirmaIds={goruntulenenFirmaIds} isDark={isDark} addToast={addToast} />;
       case 'ziyaret':
         return (
           <div className="-mx-3 sm:-mx-5 md:-mx-6 -my-4">

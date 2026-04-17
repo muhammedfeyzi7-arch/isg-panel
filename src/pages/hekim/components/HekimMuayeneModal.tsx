@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
+import { printMuayeneRaporu, downloadMuayeneHtml } from '@/pages/hekim/utils/muayeneRaporGenerator';
 
 const ACCENT = '#0EA5E9';
 const ACCENT_DARK = '#0284C7';
@@ -330,14 +331,69 @@ export default function HekimMuayeneModal({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* PDF placeholder */}
+            {/* PDF Yazdır */}
             <button
-              onClick={() => addToast?.('PDF özelliği yakında aktif olacak.', 'info')}
+              onClick={() => {
+                const selectedPersonel = personelOptions.find(p => p.id === form.personelId);
+                printMuayeneRaporu({
+                  id: editData?.id ?? '',
+                  personelAd: selectedPersonel?.adSoyad ?? 'Bilinmiyor',
+                  personelGorev: selectedPersonel?.gorev,
+                  firmaAd: selectedPersonel?.firmaAd ?? firmaAdMap[form.firmaId] ?? '',
+                  muayeneTarihi: form.muayeneTarihi,
+                  sonrakiTarih: form.sonrakiTarih,
+                  sonuc: form.sonuc,
+                  hastane: form.hastane,
+                  doktor: form.doktor,
+                  aciklama: form.aciklama,
+                  kronikHastaliklar: form.kronikHastaliklar,
+                  ilacKullanim: form.ilacKullanim,
+                  ameliyatGecmisi: form.ameliyatGecmisi,
+                  tansiyon: form.tansiyon,
+                  nabiz: form.nabiz,
+                  gorme: form.gorme,
+                  isitme: form.isitme,
+                });
+              }}
               className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
               style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary, border: `1px solid ${borderColor}` }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.1)'; (e.currentTarget as HTMLElement).style.color = ACCENT; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(14,165,233,0.3)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'; (e.currentTarget as HTMLElement).style.color = textSecondary; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}
             >
-              <i className="ri-file-pdf-line text-xs" />
-              PDF İndir
+              <i className="ri-printer-line text-xs" />
+              Yazdır
+            </button>
+            {/* HTML İndir */}
+            <button
+              onClick={() => {
+                const selectedPersonel = personelOptions.find(p => p.id === form.personelId);
+                downloadMuayeneHtml({
+                  id: editData?.id ?? '',
+                  personelAd: selectedPersonel?.adSoyad ?? 'Bilinmiyor',
+                  personelGorev: selectedPersonel?.gorev,
+                  firmaAd: selectedPersonel?.firmaAd ?? firmaAdMap[form.firmaId] ?? '',
+                  muayeneTarihi: form.muayeneTarihi,
+                  sonrakiTarih: form.sonrakiTarih,
+                  sonuc: form.sonuc,
+                  hastane: form.hastane,
+                  doktor: form.doktor,
+                  aciklama: form.aciklama,
+                  kronikHastaliklar: form.kronikHastaliklar,
+                  ilacKullanim: form.ilacKullanim,
+                  ameliyatGecmisi: form.ameliyatGecmisi,
+                  tansiyon: form.tansiyon,
+                  nabiz: form.nabiz,
+                  gorme: form.gorme,
+                  isitme: form.isitme,
+                });
+              }}
+              className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all"
+              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary, border: `1px solid ${borderColor}` }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; (e.currentTarget as HTMLElement).style.color = '#10B981'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(16,185,129,0.3)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'; (e.currentTarget as HTMLElement).style.color = textSecondary; (e.currentTarget as HTMLElement).style.borderColor = borderColor; }}
+            >
+              <i className="ri-download-line text-xs" />
+              HTML İndir
             </button>
             <button onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-all flex-shrink-0"

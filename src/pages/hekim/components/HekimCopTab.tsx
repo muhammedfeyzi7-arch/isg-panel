@@ -13,12 +13,15 @@ interface DeletedItem {
 interface HekimCopTabProps {
   atanmisFirmaIds: string[];
   isDark: boolean;
+  addToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProps) {
+export default function HekimCopTab({ atanmisFirmaIds, isDark, addToast }: HekimCopTabProps) {
   const [items, setItems] = useState<DeletedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState<'tumu' | 'muayene' | 'is_kazasi'>('tumu');
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [confirmRestore, setConfirmRestore] = useState<DeletedItem | null>(null);
 
   const ACCENT = '#0EA5E9';
   const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
@@ -90,6 +93,29 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
     load();
   }, [atanmisFirmaIds]);
 
+  const handleRestore = async (item: DeletedItem) => {
+    setRestoringId(item.id);
+    try {
+      const table = item.type === 'muayene' ? 'muayeneler' : 'is_kazalari';
+      const { error } = await supabase
+        .from(table)
+        .update({ deleted_at: null })
+        .eq('id', item.id);
+
+      if (error) {
+        addToast?.('Geri yükleme başarısız: ' + error.message, 'error');
+      } else {
+        addToast?.(`"${item.label}" kaydı başarıyla geri yüklendi.`, 'success');
+        setItems(prev => prev.filter(i => i.id !== item.id));
+        setConfirmRestore(null);
+      }
+    } catch {
+      addToast?.('Beklenmeyen bir hata oluştu.', 'error');
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
   const filtered = items.filter(item => activeType === 'tumu' || item.type === activeType);
   const muayeneCount = items.filter(i => i.type === 'muayene').length;
   const kazaCount = items.filter(i => i.type === 'is_kazasi').length;
@@ -108,7 +134,7 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-bold" style={{ color: textPrimary, letterSpacing: '-0.02em' }}>Çöp Kutusu</h2>
-        <p className="text-xs mt-0.5" style={{ color: textSecondary }}>Silinen kayıtları görüntüleyin — yalnızca okuma yetkisi</p>
+        <p className="text-xs mt-0.5" style={{ color: textSecondary }}>Silinen kayıtları görüntüleyin ve geri yükleyin</p>
       </div>
 
       {/* Bilgi banneri */}
@@ -116,7 +142,7 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
         style={{ background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)' }}>
         <i className="ri-information-line text-sm flex-shrink-0 mt-0.5" style={{ color: ACCENT }} />
         <p className="text-xs leading-relaxed" style={{ color: textSecondary }}>
-          Bu bölümde yalnızca silinen kayıtları <strong style={{ color: textPrimary }}>görüntüleyebilirsiniz</strong>. Geri yükleme veya kalıcı silme için OSGB yöneticinizle iletişime geçin.
+          Silinen kayıtları <strong style={{ color: textPrimary }}>geri yükleyebilirsiniz</strong>. Geri yüklenen kayıtlar ilgili sekmelerde tekrar görünür hale gelir.
         </p>
       </div>
 
@@ -165,24 +191,26 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
       {!loading && filtered.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ background: tableBg, border: `1px solid ${borderColor}` }}>
           <div className="overflow-x-auto">
-            <div className="min-w-[600px]">
+            <div className="min-w-[640px]">
               <div className="grid items-center px-4 py-2.5"
-                style={{ gridTemplateColumns: '2fr 1fr 1.2fr 1fr', background: tableHeadBg, borderBottom: `1px solid ${borderColor}` }}>
+                style={{ gridTemplateColumns: '2fr 1fr 1.2fr 1fr 100px', background: tableHeadBg, borderBottom: `1px solid ${borderColor}` }}>
                 <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>KAYIT</span>
                 <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>TİP</span>
                 <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>FİRMA</span>
                 <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: textSecondary }}>SİLİNME</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-right" style={{ color: textSecondary }}>İŞLEM</span>
               </div>
 
               <div className="space-y-1.5 p-2">
                 {filtered.map((item) => {
                   const config = typeConfig[item.type];
+                  const isRestoring = restoringId === item.id;
                   return (
                     <div
                       key={`${item.type}-${item.id}`}
                       className="grid items-center px-4 py-3 rounded-xl transition-all duration-200 cursor-default"
                       style={{
-                        gridTemplateColumns: '2fr 1fr 1.2fr 1fr',
+                        gridTemplateColumns: '2fr 1fr 1.2fr 1fr 100px',
                         background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.02)',
                         border: `1px solid ${borderColor}`,
                       }}
@@ -229,9 +257,80 @@ export default function HekimCopTab({ atanmisFirmaIds, isDark }: HekimCopTabProp
                         <i className="ri-time-line text-[10px]" style={{ color: textSecondary }} />
                         <span className="text-xs" style={{ color: textSecondary }}>{formatDate(item.deletedAt)}</span>
                       </div>
+
+                      {/* Geri Yükle butonu */}
+                      <div className="flex items-center justify-end">
+                        <button
+                          onClick={() => setConfirmRestore(item)}
+                          disabled={isRestoring}
+                          className="whitespace-nowrap flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
+                          style={{
+                            background: isRestoring ? 'rgba(16,185,129,0.05)' : 'rgba(16,185,129,0.1)',
+                            color: '#10B981',
+                            border: '1px solid rgba(16,185,129,0.25)',
+                            opacity: isRestoring ? 0.6 : 1,
+                          }}
+                          onMouseEnter={e => { if (!isRestoring) (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.2)'; }}
+                          onMouseLeave={e => { if (!isRestoring) (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.1)'; }}
+                        >
+                          {isRestoring
+                            ? <i className="ri-loader-4-line animate-spin text-xs" />
+                            : <i className="ri-arrow-go-back-line text-xs" />
+                          }
+                          {isRestoring ? 'Yükleniyor' : 'Geri Al'}
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Geri Yükleme Onay Modalı */}
+      {confirmRestore && (
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', zIndex: 9999 }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl overflow-hidden"
+            style={{ background: isDark ? '#1e293b' : '#ffffff', border: `1px solid ${borderColor}` }}
+          >
+            <div className="h-[3px]" style={{ background: 'linear-gradient(90deg, #10B981, #34D399)' }} />
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
+                style={{ background: 'rgba(16,185,129,0.1)', border: '1.5px solid rgba(16,185,129,0.2)' }}>
+                <i className="ri-arrow-go-back-line text-xl" style={{ color: '#10B981' }} />
+              </div>
+              <p className="text-sm font-bold mb-1" style={{ color: textPrimary }}>Kaydı geri yükle?</p>
+              <p className="text-xs mb-1" style={{ color: textSecondary }}>
+                <strong style={{ color: textPrimary }}>{confirmRestore.label}</strong> adlı kayıt geri yüklenecek.
+              </p>
+              <p className="text-xs mb-5" style={{ color: textSecondary }}>
+                İlgili sekmede tekrar görünür hale gelecek.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmRestore(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
+                  style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)', color: textSecondary, border: `1px solid ${borderColor}` }}
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={() => handleRestore(confirmRestore)}
+                  disabled={restoringId === confirmRestore.id}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold cursor-pointer text-white whitespace-nowrap flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #059669, #10B981)', opacity: restoringId === confirmRestore.id ? 0.7 : 1 }}
+                >
+                  {restoringId === confirmRestore.id
+                    ? <><i className="ri-loader-4-line animate-spin" />Yükleniyor...</>
+                    : <><i className="ri-arrow-go-back-line" />Geri Yükle</>
+                  }
+                </button>
               </div>
             </div>
           </div>
