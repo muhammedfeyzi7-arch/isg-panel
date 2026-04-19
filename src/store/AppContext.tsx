@@ -1,604 +1,293 @@
-import {
-  createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, type ReactNode,
-} from 'react';
-import type { User } from '@supabase/supabase-js';
-import { useStore, type StoreType } from './useStore';
-import { useAuth } from './AuthContext';
-import { useOrganization } from '../hooks/useOrganization';
-import { logActivity } from '../utils/activityLog';
-import { supabase } from '../lib/supabase';
-import type { Toast, Firma } from '../types';
-import { useNotificationStore } from './useNotificationStore';
-import { useGorevStore } from './useGorevStore';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import * as firmSvc from '@/services/firmService';
+import * as personnelSvc from '@/services/personnelService';
+import * as visitSvc from '@/services/visitService';
+import * as reportSvc from '@/services/reportService';
+import type { AppFirm, AppPersonnel, AppVisit, AppReport, HazardClass, VisitStatus, ReportType } from '@/types/database';
 
-export type { Bildirim } from './useNotificationStore';
-export type Theme = 'dark' | 'light';
+let _idCounter = 1;
+const genId = () => String(Date.now()) + String(_idCounter++);
 
-export interface OrgInfo {
-  id: string;
-  name: string;
-  invite_code: string;
+export type ToastType = 'success' | 'error' | 'info';
+export interface Toast { id: string; message: string; type: ToastType }
+
+// ─── Session info — tek obje, race condition yok ──────────────────────────────
+interface SessionInfo {
+  organizationId: string;
+  userId: string;
   role: string;
-  isActive: boolean;
-  mustChangePassword: boolean;
-  displayName?: string;
-  email?: string;
-  orgType: 'firma' | 'osgb';
-  osgbRole?: 'osgb_admin' | 'gezici_uzman' | 'isyeri_hekimi' | null;
-  activeFirmIds?: string[];
 }
 
-import type { Bildirim } from './useNotificationStore';
+interface AppContextValue {
+  firms: AppFirm[];
+  personnel: AppPersonnel[];
+  visits: AppVisit[];
+  reports: AppReport[];
+  loading: boolean;
+  error: string | null;
 
-interface AppContextType extends StoreType {
-  fetchTable: (table: string) => Promise<void>;
-  fetchModuleTables: (module: string) => Promise<void>;
-  pageLoading: boolean;
-  partialLoading: boolean;
-  realtimeStatus: 'connected' | 'connecting' | 'disconnected';
+  // Session (tek obje)
+  organizationId: string | null;
+  userId: string | null;
+  userRole: string | null;
+  setSessionInfo: (orgId: string, userId: string, role: string) => void;
+
+  addFirm: (firm: Omit<AppFirm, 'id' | 'lastVisit'>) => Promise<void>;
+  updateFirm: (id: string, data: Partial<AppFirm>) => Promise<void>;
+  deleteFirm: (id: string) => Promise<void>;
+  softDeleteFirm: (id: string) => Promise<void>;
+  softDeletePersonnel: (id: string) => Promise<void>;
+  updatePersonnel: (id: string, data: Partial<AppPersonnel>) => Promise<void>;
+
+  addVisit: (v: { personnelId: string; firmId: string; date: string; startTime: string; notes?: string }) => Promise<void>;
+  updateVisit: (id: string, data: Partial<AppVisit>) => Promise<void>;
+  endVisit: (id: string, checkIn: string, checkOut: string) => Promise<void>;
+  deleteVisit: (id: string) => Promise<void>;
+
+  addReport: (r: { name: string; type: ReportType; description?: string }) => Promise<void>;
+  deleteReport: (id: string) => Promise<void>;
+
   toasts: Toast[];
-  addToast: (message: string, type?: Toast['type']) => void;
-  removeToast: (id: string) => void;
-  activeModule: string;
-  setActiveModule: (m: string) => void;
-  sidebarCollapsed: boolean;
-  setSidebarCollapsed: (v: boolean) => void;
-  quickCreate: string | null;
-  setQuickCreate: (v: string | null) => void;
-  theme: Theme;
-  toggleTheme: () => void;
-  bildirimler: Bildirim[];
-  okunmamisBildirimSayisi: number;
-  bildirimOku: (id: string) => void;
-  tumunuOku: () => void;
-  ekipmanKontrolBildirimi: (ekipmanAd: string, ekipmanId: string, durum: string, gecikmisDi: boolean) => void;
-  isIzniBildirimi: (izinNo: string, izinId: string, tip: 'onaylandi' | 'reddedildi', sahaNotu?: string) => void;
-  org: OrgInfo | null;
-  orgLoading: boolean;
-  orgError: string | null;
-  mustChangePassword: boolean;
-  clearMustChangePassword: () => Promise<void>;
-  createOrg: (name: string, userId: string) => Promise<{ error: string | null }>;
-  joinOrg: (code: string) => Promise<{ error: string | null }>;
-  regenerateInviteCode: () => Promise<{ error: string | null; newCode?: string }>;
-  refetchOrg: () => Promise<void>;
-  logAction: (actionType: string, module: string, recordId: string, recordName?: string, description?: string) => void;
-  restoreGorev: (id: string) => void;
-  permanentDeleteGorev: (id: string) => Promise<void>;
-  refreshData: () => Promise<void>;
-  isSwitching: boolean;
-  switchActiveFirma: (firmaId: string) => Promise<{ error: string | null }>;
-  fetchActiveFirmNames: () => Promise<{ id: string; name: string }[]>;
+  showToast: (message: string, type?: ToastType) => void;
+  dismissToast: (id: string) => void;
+
+  refresh: (organizationId: string, userId?: string, role?: string) => Promise<void>;
+  refreshFirms: () => Promise<void>;
+  refreshPersonnel: () => Promise<void>;
 }
 
-const AppContext = createContext<AppContextType | null>(null);
-
-function getInitialTheme(): Theme {
-  try {
-    const saved = localStorage.getItem('isg_theme') as Theme | null;
-    return saved === 'light' ? 'light' : 'dark';
-  } catch {
-    return 'dark';
-  }
-}
-
-function getUserDisplayName(user: User | null): string {
-  if (!user) return 'Kullanıcı';
-  const fullName = user.user_metadata?.full_name as string | undefined;
-  if (fullName) return fullName;
-  if (user.email) return user.email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  return 'Kullanıcı';
-}
+const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const {
-    org: rawOrg,
-    loading: orgLoading,
-    loadError,
-    createOrg,
-    joinOrg,
-    regenerateInviteCode,
-    refetch: refetchOrg,
-    clearMustChangePassword: clearMustChangePw,
-    isSwitching,
-    orgIdRef,
-    switchActiveFirma,
-    fetchActiveFirmNames,
-  } = useOrganization(user);
-
-  const org = useMemo<OrgInfo | null>(() => {
-    if (!rawOrg) return null;
-    return {
-      ...rawOrg,
-      displayName: rawOrg.displayName || getUserDisplayName(user),
-      email: rawOrg.email || user?.email,
-    };
-  }, [rawOrg, user]);
-
+  const [firms, setFirms] = useState<AppFirm[]>([]);
+  const [personnel, setPersonnel] = useState<AppPersonnel[]>([]);
+  const [visits, setVisits] = useState<AppVisit[]>([]);
+  const [reports, setReports] = useState<AppReport[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = useCallback((message: string, type: Toast['type'] = 'success') => {
-    const id = Math.random().toString(36).substring(2);
-    const toast: Toast = { id, message, type };
-    setToasts(prev => [...prev, toast]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  // ─── Tek obje — race condition yok ───────────────────────────────────────
+  const [sessionInfo, setSessionInfoState] = useState<SessionInfo | null>(null);
+  const sessionInfoRef = useRef<SessionInfo | null>(null);
+
+  const configured = isSupabaseConfigured();
+
+  // Tek setState çağrısı — üç ayrı state yerine tek obje
+  const setSessionInfo = useCallback((orgId: string, uid: string, role: string) => {
+    const info: SessionInfo = { organizationId: orgId, userId: uid, role };
+    sessionInfoRef.current = info;
+    setSessionInfoState(info);
   }, []);
 
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  const orgRef = useRef(org);
-  const userRef = useRef(user);
-  useEffect(() => { orgRef.current = org; }, [org]);
-  useEffect(() => { userRef.current = user; }, [user]);
-
-  const logAction = useCallback((
-    actionType: string, module: string, recordId: string,
-    recordName?: string, description?: string,
-  ) => {
-    const currentOrg = orgRef.current;
-    const currentUser = userRef.current;
-    if (!currentUser || !currentOrg) return;
-    logActivity({
-      organizationId: currentOrg.id,
-      userId: currentUser.id,
-      userEmail: currentUser.email ?? '',
-      userName: currentOrg.displayName || getUserDisplayName(currentUser),
-      userRole: currentOrg.role,
-      actionType,
-      module,
-      recordId,
-      recordName,
-      description,
-    });
-  }, []);
-
-  const loginLoggedRef = useRef<string | null>(null);
+  // sessionInfo hazır olunca refresh tetikle
   useEffect(() => {
-    if (!user || !org) return;
-    if (loginLoggedRef.current === user.id) return;
-    loginLoggedRef.current = user.id;
-    logActivity({
-      organizationId: org.id,
-      userId: user.id,
-      userEmail: user.email ?? '',
-      userName: org.displayName || getUserDisplayName(user),
-      userRole: org.role,
-      actionType: 'user_login',
-      module: 'Sistem',
-      recordId: user.id,
-      description: 'Sisteme giriş yapıldı.',
-    });
-  }, [user?.id, org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const addToastRef = useRef(addToast);
-  useEffect(() => { addToastRef.current = addToast; }, [addToast]);
-
-  const onSaveErrorCb = useCallback((msg: string) => {
-    addToastRef.current(msg, 'error');
-  }, []);
-
-  const onRemoteChangeCb = useCallback((module: string) => {
-    addToastRef.current(
-      `${module} modülünde başka bir kullanıcı değişiklik yaptı — veriler güncellendi.`,
-      'info',
-    );
-  }, []);
-
-  const store = useStore(
-    org?.id ?? null,
-    logAction,
-    onSaveErrorCb,
-    user?.id,
-    orgLoading,
-    onRemoteChangeCb,
-    isSwitching,
-    orgIdRef,
-  );
-
-  // ── Gezici uzman: extra firma verileri ──────────────────────────────────
-  const [geziciFirmalar, setGeziciFirmalar] = useState<Firma[]>([]);
-
-  type ExtraFirmaVeriMap = Record<string, {
-    personeller: import('../types').Personel[];
-    evraklar: import('../types').Evrak[];
-    egitimler: import('../types').Egitim[];
-    muayeneler: import('../types').Muayene[];
-    uygunsuzluklar: import('../types').Uygunsuzluk[];
-    ekipmanlar: import('../types').Ekipman[];
-    tutanaklar: import('../types').Tutanak[];
-    isIzinleri: import('../types').IsIzni[];
-  }>;
-  const [extraFirmaVeriMap, setExtraFirmaVeriMap] = useState<ExtraFirmaVeriMap>({});
-
-  const flattenExtraVeriler = useCallback((map: ExtraFirmaVeriMap) => {
-    const result = {
-      personeller: [] as import('../types').Personel[],
-      evraklar: [] as import('../types').Evrak[],
-      egitimler: [] as import('../types').Egitim[],
-      muayeneler: [] as import('../types').Muayene[],
-      uygunsuzluklar: [] as import('../types').Uygunsuzluk[],
-      ekipmanlar: [] as import('../types').Ekipman[],
-      tutanaklar: [] as import('../types').Tutanak[],
-      isIzinleri: [] as import('../types').IsIzni[],
-    };
-    Object.values(map).forEach(v => {
-      result.personeller.push(...v.personeller);
-      result.evraklar.push(...v.evraklar);
-      result.egitimler.push(...v.egitimler);
-      result.muayeneler.push(...v.muayeneler);
-      result.uygunsuzluklar.push(...v.uygunsuzluklar);
-      result.ekipmanlar.push(...v.ekipmanlar);
-      result.tutanaklar.push(...v.tutanaklar);
-      result.isIzinleri.push(...v.isIzinleri);
-    });
-    return result;
-  }, []);
-
-  const [extraFirmaVeriler, setExtraFirmaVeriler] = useState(() => flattenExtraVeriler({}));
-
-  useEffect(() => {
-    if (org?.osgbRole !== 'gezici_uzman') {
-      setGeziciFirmalar([]);
-      setExtraFirmaVeriMap({});
-      setExtraFirmaVeriler(flattenExtraVeriler({}));
-      return;
+    if (sessionInfo && configured) {
+      refresh(sessionInfo.organizationId, sessionInfo.userId, sessionInfo.role);
     }
-    const allFirmIds = org.activeFirmIds && org.activeFirmIds.length > 0
-      ? org.activeFirmIds
-      : org.id ? [org.id] : [];
-    if (allFirmIds.length === 0) { setGeziciFirmalar([]); return; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionInfo?.organizationId, sessionInfo?.userId, sessionInfo?.role, configured]);
 
-    supabase.from('organizations').select('id, name').in('id', allFirmIds).then(async ({ data: orgData }) => {
-      if (!orgData || orgData.length === 0) return;
-      const tehlikeMap: Record<string, string> = {};
-      try {
-        const { data: profiles } = await supabase
-          .from('firma_profiles')
-          .select('organization_id, tehlike_sinifi')
-          .in('organization_id', allFirmIds);
-        if (profiles) profiles.forEach((p: Record<string, string>) => {
-          if (p.tehlike_sinifi) tehlikeMap[p.organization_id] = p.tehlike_sinifi;
-        });
-      } catch { /* ignore */ }
-      setGeziciFirmalar(orgData.map(d => ({
-        id: d.id, ad: d.name, yetkiliKisi: '', telefon: '', email: '', adres: '',
-        sektor: '', notlar: '',
-        tehlikeSinifi: (tehlikeMap[d.id] as import('../types').TehlikeSinifi) || 'Az Tehlikeli',
-        durum: 'Aktif' as import('../types').FirmaStatus,
-        silinmis: false,
-        olusturmaTarihi: new Date().toISOString(),
-        guncellemeTarihi: new Date().toISOString(),
-      } as Firma)));
-    });
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    const id = genId();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  }, []);
 
-    const extraIds = allFirmIds.filter(id => id !== org.id);
-    if (extraIds.length === 0) return;
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
-    // Optimized: tüm firmalar için her tabloyu TEK sorguda çek (N*8 sorgu → 8 sorgu)
-    const fetchAllExtraFirms = async (firmIds: string[]) => {
-      const { fetchAllRows } = await import('./storeHelpers');
-
-      // 8 tablo için paralel toplu sorgu — her tablo tüm firmIds'i tek seferde çeker
-      const [
-        personellerAll, evraklarAll, egitimlerAll, muayenelerAll,
-        uygunsuzluklarAll, ekipmanlarAll, tutanaklarAll, isIzinleriAll,
-      ] = await Promise.all([
-        fetchAllRows('personeller', firmIds[0], firmIds),
-        fetchAllRows('evraklar', firmIds[0], firmIds),
-        fetchAllRows('egitimler', firmIds[0], firmIds),
-        fetchAllRows('muayeneler', firmIds[0], firmIds),
-        fetchAllRows('uygunsuzluklar', firmIds[0], firmIds),
-        fetchAllRows('ekipmanlar', firmIds[0], firmIds),
-        fetchAllRows('tutanaklar', firmIds[0], firmIds),
-        fetchAllRows('is_izinleri', firmIds[0], firmIds),
+  // ── Refresh ────────────────────────────────────────────────────────────────
+  const refresh = useCallback(async (orgId: string, uid?: string, role?: string) => {
+    if (!configured) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const isAdmin = role === 'owner' || role === 'admin';
+      const [f, p, v, r] = await Promise.all([
+        isAdmin ? firmSvc.getFirms(orgId) : (uid ? firmSvc.getAssignedFirms(uid) : Promise.resolve([])),
+        personnelSvc.getPersonnel(orgId),
+        isAdmin ? visitSvc.getVisits(orgId) : (uid ? visitSvc.getMyVisits(uid) : Promise.resolve([])),
+        isAdmin ? reportSvc.getReports(orgId) : (uid ? reportSvc.getMyReports(uid) : Promise.resolve([])),
       ]);
-
-      // Firma bazında grupla
-      const groupByOrg = (rows: { organization_id?: string; data: unknown }[]) => {
-        const map: Record<string, unknown[]> = {};
-        firmIds.forEach(id => { map[id] = []; });
-        rows.forEach(r => {
-          const orgId = r.organization_id;
-          if (orgId && map[orgId]) map[orgId].push(r.data);
-        });
-        return map;
-      };
-
-      const pMap = groupByOrg((personellerAll.data ?? []) as { organization_id?: string; data: unknown }[]);
-      const eMap = groupByOrg((evraklarAll.data ?? []) as { organization_id?: string; data: unknown }[]);
-      const egMap = groupByOrg((egitimlerAll.data ?? []) as { organization_id?: string; data: unknown }[]);
-      const mMap = groupByOrg((muayenelerAll.data ?? []) as { organization_id?: string; data: unknown }[]);
-      const uMap = groupByOrg((uygunsuzluklarAll.data ?? []) as { organization_id?: string; data: unknown }[]);
-      const ekMap = groupByOrg((ekipmanlarAll.data ?? []) as { organization_id?: string; data: unknown }[]);
-      const tMap = groupByOrg((tutanaklarAll.data ?? []) as { organization_id?: string; data: unknown }[]);
-      const iMap = groupByOrg((isIzinleriAll.data ?? []) as { organization_id?: string; data: unknown }[]);
-
-      return firmIds.map(firmId => ({
-        firmId,
-        personeller: pMap[firmId] ?? [],
-        evraklar: eMap[firmId] ?? [],
-        egitimler: egMap[firmId] ?? [],
-        muayeneler: mMap[firmId] ?? [],
-        uygunsuzluklar: uMap[firmId] ?? [],
-        ekipmanlar: ekMap[firmId] ?? [],
-        tutanaklar: tMap[firmId] ?? [],
-        isIzinleri: iMap[firmId] ?? [],
-      }));
-    };
-
-    fetchAllExtraFirms(extraIds).then((results) => {
-      const newMap: ExtraFirmaVeriMap = {};
-      results.forEach(r => {
-        newMap[r.firmId] = {
-          personeller: r.personeller as import('../types').Personel[],
-          evraklar: r.evraklar as import('../types').Evrak[],
-          egitimler: r.egitimler as import('../types').Egitim[],
-          muayeneler: r.muayeneler as import('../types').Muayene[],
-          uygunsuzluklar: r.uygunsuzluklar as import('../types').Uygunsuzluk[],
-          ekipmanlar: r.ekipmanlar as import('../types').Ekipman[],
-          tutanaklar: r.tutanaklar as import('../types').Tutanak[],
-          isIzinleri: r.isIzinleri as import('../types').IsIzni[],
-        };
-      });
-      setExtraFirmaVeriMap(newMap);
-      setExtraFirmaVeriler(flattenExtraVeriler(newMap));
-    });
-  }, [org?.osgbRole, org?.id, org?.activeFirmIds, flattenExtraVeriler]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Gezici uzman: realtime subscription ────────────────────────────────
-  useEffect(() => {
-    if (org?.osgbRole !== 'gezici_uzman') return;
-    const extraIds = (org.activeFirmIds ?? []).filter(id => id !== org.id);
-    if (extraIds.length === 0) return;
-
-    const TABLES = ['personeller', 'evraklar', 'egitimler', 'muayeneler', 'uygunsuzluklar', 'ekipmanlar', 'tutanaklar', 'is_izinleri'];
-    type TableKey = 'personeller' | 'evraklar' | 'egitimler' | 'muayeneler' | 'uygunsuzluklar' | 'ekipmanlar' | 'tutanaklar' | 'isIzinleri';
-    const TABLE_KEY_MAP: Record<string, TableKey> = {
-      personeller: 'personeller', evraklar: 'evraklar', egitimler: 'egitimler',
-      muayeneler: 'muayeneler', uygunsuzluklar: 'uygunsuzluklar', ekipmanlar: 'ekipmanlar',
-      tutanaklar: 'tutanaklar', is_izinleri: 'isIzinleri',
-    };
-
-    const channels = extraIds.map(firmId => {
-      // Sabit kanal adı — Date.now() KALDIRILDI (zombie kanal önlemi)
-      const channelName = `gezici_extra_${firmId}`;
-      let ch = supabase.channel(channelName);
-      TABLES.forEach(table => {
-        ch = ch.on(
-          'postgres_changes' as Parameters<typeof ch.on>[0],
-          { event: '*', schema: 'public', table, filter: `organization_id=eq.${firmId}` } as Parameters<typeof ch.on>[1],
-          (payload: { eventType: string; new: Record<string, unknown>; old?: Record<string, unknown> }) => {
-            const recordId = (payload.new?.id ?? payload.old?.id) as string | undefined;
-            if (!recordId) return;
-            const tableKey = TABLE_KEY_MAP[table];
-            if (!tableKey) return;
-            const newData = payload.new?.data as Record<string, unknown> | undefined;
-            const deletedAt = payload.new?.deleted_at;
-            const isDeletion = payload.eventType === 'DELETE' || !!deletedAt;
-            setExtraFirmaVeriMap(prev => {
-              const firmData = prev[firmId] ?? {
-                personeller: [], evraklar: [], egitimler: [], muayeneler: [],
-                uygunsuzluklar: [], ekipmanlar: [], tutanaklar: [], isIzinleri: [],
-              };
-              type AnyRecord = { id: string };
-              const currentList = (firmData[tableKey] as AnyRecord[]);
-              let updatedList: AnyRecord[];
-              if (isDeletion) {
-                updatedList = currentList.filter(r => r.id !== recordId);
-              } else if (newData) {
-                const record = { ...newData, id: recordId } as AnyRecord;
-                const idx = currentList.findIndex(r => r.id === recordId);
-                updatedList = idx === -1 ? [record, ...currentList] : currentList.map((r, i) => i === idx ? record : r);
-              } else {
-                return prev;
-              }
-              const updatedFirmData = { ...firmData, [tableKey]: updatedList };
-              const newMap = { ...prev, [firmId]: updatedFirmData };
-              setExtraFirmaVeriler(flattenExtraVeriler(newMap));
-              return newMap;
-            });
-          }
-        ) as typeof ch;
-      });
-      ch.subscribe();
-      return ch;
-    });
-
-    return () => { channels.forEach(ch => supabase.removeChannel(ch)); };
-  }, [org?.osgbRole, org?.id, org?.activeFirmIds, flattenExtraVeriler]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── fetchTable ──────────────────────────────────────────────────────────
-  // ── fetchTable: store referanslarını ref ile tutarak bağımlılık döngüsü önlenir ──
-  // store.fetchXxx fonksiyonları useCallback ile stabilize edilmiş ama
-  // bağımlılık dizisi çok uzunsa her store yenilenmesinde fetchTable yeniden yaratılır.
-  // Ref pattern ile store'u okurken stale closure riski olmadan bağımlılık sayısı azaltılır.
-  const storeRef = useRef(store);
-  useEffect(() => { storeRef.current = store; }, [store]);
-
-  const fetchTable = useCallback(async (table: string) => {
-    const orgId = org?.id;
-    if (!orgId) return;
-    const s = storeRef.current;
-    const map: Record<string, (id: string) => Promise<void>> = {
-      firmalar: s.fetchFirmalar, personeller: s.fetchPersoneller,
-      evraklar: s.fetchEvraklar, egitimler: s.fetchEgitimler,
-      muayeneler: s.fetchMuayeneler, uygunsuzluklar: s.fetchUygunsuzluklar,
-      ekipmanlar: s.fetchEkipmanlar, gorevler: s.fetchGorevler,
-      tutanaklar: s.fetchTutanaklar, is_izinleri: s.fetchIsIzinleri,
-    };
-    const fn = map[table];
-    if (fn) await fn(orgId);
-    else console.warn(`[ISG] fetchTable: unknown table "${table}"`);
-  }, [org?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Module / UI state ───────────────────────────────────────────────────
-  const [activeModule, setActiveModuleState] = useState<string>(() => {
-    try { return sessionStorage.getItem('isg_active_module') || 'dashboard'; } catch { return 'dashboard'; }
-  });
-  const fetchModuleTablesRef = useRef(store.fetchModuleTables);
-  useEffect(() => { fetchModuleTablesRef.current = store.fetchModuleTables; }, [store.fetchModuleTables]);
-
-  const setActiveModule = useCallback((m: string) => {
-    setActiveModuleState(m);
-    try { sessionStorage.setItem('isg_active_module', m); } catch { /* ignore */ }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    // Modül değişiminde direkt lazy fetch — useEffect gecikmesi yok
-    void fetchModuleTablesRef.current(m);
-  }, []);
-
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [quickCreate, setQuickCreate] = useState<string | null>(null);
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
-
-  useEffect(() => {
-    if (!user) return;
-    const metaName = user.user_metadata?.full_name as string | undefined;
-    const metaRole = user.user_metadata?.role as string | undefined;
-    const resolvedName = metaName || getUserDisplayName(user);
-    const needsUpdate =
-      store.currentUser.email !== user.email ||
-      (resolvedName && store.currentUser.ad !== resolvedName) ||
-      (metaRole && store.currentUser.rol !== metaRole);
-    if (needsUpdate) {
-      store.updateCurrentUser({ email: user.email, ad: resolvedName, ...(metaRole ? { rol: metaRole } : {}) });
+      setFirms(f);
+      setPersonnel(p);
+      setVisits(v);
+      setReports(r);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Veri yüklenemedi');
+    } finally {
+      setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.email, user?.user_metadata?.full_name, user?.user_metadata?.role]);
+  }, [configured]);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'light') root.classList.add('light-mode');
-    else root.classList.remove('light-mode');
-    localStorage.setItem('isg_theme', theme);
-  }, [theme]);
+  // ── Firms ──────────────────────────────────────────────────────────────────
+  const addFirm = useCallback(async (firm: Omit<AppFirm, 'id' | 'lastVisit'>) => {
+    const orgId = sessionInfoRef.current?.organizationId;
+    if (configured && orgId) {
+      const created = await firmSvc.createFirm(orgId, {
+        name: firm.name, contact: firm.contact, phone: firm.phone, email: firm.email,
+        sector: firm.sector, employeeCount: firm.employeeCount,
+        dangerClass: firm.dangerClass as HazardClass,
+        contractStart: firm.contractStart, contractEnd: firm.contractEnd, address: firm.address,
+        latitude: firm.latitude, longitude: firm.longitude,
+        verificationType: firm.verificationType,
+      });
+      setFirms((prev) => [created, ...prev]);
+    } else {
+      setFirms((prev) => [{ id: genId(), lastVisit: '—', ...firm }, ...prev]);
+    }
+  }, [configured]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
+  const updateFirm = useCallback(async (id: string, data: Partial<AppFirm>) => {
+    if (configured) {
+      const updated = await firmSvc.updateFirm(id, data);
+      setFirms((prev) => prev.map((f) => (f.id === id ? updated : f)));
+    } else {
+      setFirms((prev) => prev.map((f) => (f.id === id ? { ...f, ...data } : f)));
+    }
+  }, [configured]);
 
-  // ── Merged data (gezici uzman: all firms merged) ────────────────────────
-  const isGezici = org?.osgbRole === 'gezici_uzman';
+  const deleteFirm = useCallback(async (id: string) => {
+    if (configured) await firmSvc.deleteFirm(id);
+    setFirms((prev) => prev.filter((f) => f.id !== id));
+  }, [configured]);
 
-  // Yardımcı: iki liste merge et (dedup by id) — hook dışında sabit referans
-  const mergeListFn = useCallback(<T extends { id: string }>(base: T[], extra: T[]): T[] => {
-    if (extra.length === 0) return base;
-    const baseIds = new Set(base.map(r => r.id));
-    return [...base, ...extra.filter(r => !baseIds.has(r.id))];
-  }, []);
+  const softDeleteFirm = useCallback(async (id: string) => {
+    if (configured) await firmSvc.softDeleteFirm(id);
+    setFirms((prev) => prev.filter((f) => f.id !== id));
+  }, [configured]);
 
-  // Gezici uzman merge — sadece isGezici=true iken çalışır
-  const geziciMergedData = useMemo(() => {
-    if (!isGezici) return null;
-    const mevcutIds = new Set(store.firmalar.map(f => f.id));
-    const yeniFirmalar = geziciFirmalar.filter(f => !mevcutIds.has(f.id));
-    return {
-      firmalar: [...yeniFirmalar, ...store.firmalar],
-      personeller: mergeListFn(store.personeller, extraFirmaVeriler.personeller),
-      evraklar: mergeListFn(store.evraklar, extraFirmaVeriler.evraklar),
-      egitimler: mergeListFn(store.egitimler, extraFirmaVeriler.egitimler),
-      muayeneler: mergeListFn(store.muayeneler, extraFirmaVeriler.muayeneler),
-      uygunsuzluklar: mergeListFn(store.uygunsuzluklar, extraFirmaVeriler.uygunsuzluklar),
-      ekipmanlar: mergeListFn(store.ekipmanlar, extraFirmaVeriler.ekipmanlar),
-      tutanaklar: mergeListFn(store.tutanaklar, extraFirmaVeriler.tutanaklar),
-      isIzinleri: mergeListFn(store.isIzinleri, extraFirmaVeriler.isIzinleri),
-    };
-  }, [
-    isGezici, geziciFirmalar, extraFirmaVeriler, mergeListFn,
-    store.firmalar, store.personeller, store.evraklar, store.egitimler,
-    store.muayeneler, store.uygunsuzluklar, store.ekipmanlar,
-    store.tutanaklar, store.isIzinleri,
-  ]);
+  const softDeletePersonnel = useCallback(async (id: string) => {
+    if (configured) await personnelSvc.softDeletePersonnel(id);
+    setPersonnel((prev) => prev.filter((p) => p.id !== id));
+  }, [configured]);
 
-  // Normal kullanıcı — store referanslarını doğrudan kullan, yeni nesne YARATMA
-  // Bu sayede her AppContext render'ında tüm consumer'lar yeniden render olmaz
-  const mergedFirmalar      = isGezici ? geziciMergedData!.firmalar      : store.firmalar;
-  const mergedPersoneller   = isGezici ? geziciMergedData!.personeller   : store.personeller;
-  const mergedEvraklar      = isGezici ? geziciMergedData!.evraklar      : store.evraklar;
-  const mergedEgitimler     = isGezici ? geziciMergedData!.egitimler     : store.egitimler;
-  const mergedMuayeneler    = isGezici ? geziciMergedData!.muayeneler    : store.muayeneler;
-  const mergedUygunsuzluklar = isGezici ? geziciMergedData!.uygunsuzluklar : store.uygunsuzluklar;
-  const mergedEkipmanlar    = isGezici ? geziciMergedData!.ekipmanlar    : store.ekipmanlar;
-  const mergedTutanaklar    = isGezici ? geziciMergedData!.tutanaklar    : store.tutanaklar;
-  const mergedIsIzinleri    = isGezici ? geziciMergedData!.isIzinleri    : store.isIzinleri;
+  const refreshFirms = useCallback(async () => {
+    const info = sessionInfoRef.current;
+    if (!configured || !info) return;
+    try {
+      const isAdmin = info.role === 'owner' || info.role === 'admin';
+      const f = isAdmin
+        ? await firmSvc.getFirms(info.organizationId)
+        : await firmSvc.getAssignedFirms(info.userId);
+      setFirms(f);
+    } catch { /* silent */ }
+  }, [configured]);
 
-  // ── Gorev store (isolated) ──────────────────────────────────────────────
-  const gorevStore = useGorevStore({
-    organizationId: org?.id ?? null,
-    userId: user?.id,
-    orgLoading,
-    isSwitching,
-    onSaveError: onSaveErrorCb,
-    logFn: logAction,
-  });
+  const refreshPersonnel = useCallback(async () => {
+    const info = sessionInfoRef.current;
+    if (!configured || !info) return;
+    try {
+      const p = await personnelSvc.getPersonnel(info.organizationId);
+      setPersonnel(p);
+    } catch { /* silent */ }
+  }, [configured]);
 
-  // ── Notification store (isolated) — MUST be after merged arrays ─────────
-  const {
-    bildirimler,
-    okunmamisBildirimSayisi,
-    bildirimOku,
-    tumunuOku,
-    ekipmanKontrolBildirimi,
-    isIzniBildirimi,
-  } = useNotificationStore({
-    evraklar: mergedEvraklar,
-    ekipmanlar: mergedEkipmanlar,
-    // egitimler kaldırıldı — hook içinde kullanılmıyor, gereksiz re-render engeli
-    muayeneler: mergedMuayeneler,
-    personeller: mergedPersoneller,
-    firmalar: mergedFirmalar,
-  });
+  // ── Personnel ──────────────────────────────────────────────────────────────
+  const updatePersonnel = useCallback(async (id: string, data: Partial<AppPersonnel>) => {
+    if (configured) {
+      const updated = await personnelSvc.updatePersonnel(id, data);
+      setPersonnel((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+    } else {
+      setPersonnel((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
+    }
+  }, [configured]);
 
-  const clearMustChangePassword = useCallback(async () => {
-    await clearMustChangePw();
-  }, [clearMustChangePw]);
+  // ── Visits ─────────────────────────────────────────────────────────────────
+  const addVisit = useCallback(async (v: { personnelId: string; firmId: string; date: string; startTime: string; notes?: string }) => {
+    const info = sessionInfoRef.current;
+    if (configured && info) {
+      const created = await visitSvc.createVisit(info.organizationId, v);
+      setVisits((prev) => [created, ...prev]);
+    } else {
+      const person = personnel.find((p) => p.id === v.personnelId);
+      const firm = firms.find((f) => f.id === v.firmId);
+      setVisits((prev) => [{
+        id: genId(), personnelId: v.personnelId,
+        personnel: person?.name ?? '—', role: person?.role === 'doctor' ? 'Hekim' : 'Uzman',
+        firmId: v.firmId, firm: firm?.name ?? '—',
+        date: v.date, startTime: v.startTime, endTime: '', duration: '—',
+        status: 'active' as VisitStatus, notes: v.notes ?? '',
+        verificationType: null, locationVerified: false, startedViaQr: false, endedViaQr: false,
+      }, ...prev]);
+    }
+  }, [configured, personnel, firms]);
+
+  const updateVisit = useCallback(async (id: string, data: Partial<AppVisit>) => {
+    if (configured) {
+      const updated = await visitSvc.updateVisit(id, { status: data.status, notes: data.notes });
+      setVisits((prev) => prev.map((v) => (v.id === id ? updated : v)));
+    } else {
+      setVisits((prev) => prev.map((v) => (v.id === id ? { ...v, ...data } : v)));
+    }
+  }, [configured]);
+
+  const endVisit = useCallback(async (id: string, checkIn: string, checkOut: string) => {
+    if (configured) {
+      const updated = await visitSvc.endVisit(id, checkIn, checkOut);
+      setVisits((prev) => prev.map((v) => (v.id === id ? updated : v)));
+    } else {
+      const [sh, sm] = checkIn.split(':').map(Number);
+      const [eh, em] = checkOut.split(':').map(Number);
+      const diffMin = (eh * 60 + em) - (sh * 60 + sm);
+      const duration = diffMin > 0 ? `${Math.floor(diffMin / 60)}s ${diffMin % 60}dk` : '—';
+      setVisits((prev) => prev.map((v) => v.id === id
+        ? { ...v, endTime: checkOut, duration, status: 'completed' as VisitStatus }
+        : v));
+    }
+  }, [configured]);
+
+  const deleteVisit = useCallback(async (id: string) => {
+    if (configured) await visitSvc.deleteVisit(id);
+    setVisits((prev) => prev.filter((v) => v.id !== id));
+  }, [configured]);
+
+  // ── Reports ────────────────────────────────────────────────────────────────
+  const addReport = useCallback(async (r: { name: string; type: ReportType; description?: string }) => {
+    const info = sessionInfoRef.current;
+    if (configured && info) {
+      const created = await reportSvc.createReport(info.organizationId, info.userId, {
+        title: r.name, type: r.type, description: r.description,
+      });
+      setReports((prev) => [created, ...prev]);
+    } else {
+      const today = new Date().toLocaleDateString('tr-TR');
+      setReports((prev) => [{
+        id: genId(), name: r.name, createdAt: today,
+        status: 'Hazır', type: r.type, createdBy: '—',
+      }, ...prev]);
+    }
+  }, [configured]);
+
+  const deleteReport = useCallback(async (id: string) => {
+    if (configured) await reportSvc.deleteReport(id);
+    setReports((prev) => prev.filter((r) => r.id !== id));
+  }, [configured]);
 
   return (
     <AppContext.Provider value={{
-      ...store,
-      // ── Gorev store override ──
-      gorevler: gorevStore.gorevler,
-      addGorev: gorevStore.addGorev,
-      updateGorev: gorevStore.updateGorev,
-      deleteGorev: gorevStore.deleteGorev,
-      restoreGorev: gorevStore.restoreGorev,
-      permanentDeleteGorev: gorevStore.permanentDeleteGorev,
-      fetchGorevler: gorevStore.fetchGorevler,
-      firmalar: mergedFirmalar,
-      personeller: mergedPersoneller,
-      evraklar: mergedEvraklar,
-      egitimler: mergedEgitimler,
-      muayeneler: mergedMuayeneler,
-      uygunsuzluklar: mergedUygunsuzluklar,
-      ekipmanlar: mergedEkipmanlar,
-      tutanaklar: mergedTutanaklar,
-      isIzinleri: mergedIsIzinleri,
-      toasts, addToast, removeToast,
-      activeModule, setActiveModule,
-      sidebarCollapsed, setSidebarCollapsed,
-      quickCreate, setQuickCreate,
-      theme, toggleTheme,
-      bildirimler, okunmamisBildirimSayisi, bildirimOku, tumunuOku, ekipmanKontrolBildirimi, isIzniBildirimi,
-      org, orgLoading, orgError: loadError,
-      mustChangePassword: org?.mustChangePassword ?? false,
-      clearMustChangePassword,
-      createOrg, joinOrg, regenerateInviteCode, refetchOrg,
-      logAction, fetchTable,
-      fetchModuleTables: store.fetchModuleTables,
-      refreshData: store.refreshAllData,
-      pageLoading: store.pageLoading,
-      partialLoading: store.partialLoading,
-      realtimeStatus: store.realtimeStatus,
-      isSwitching, switchActiveFirma, fetchActiveFirmNames,
+      firms, personnel, visits, reports, loading, error,
+      organizationId: sessionInfo?.organizationId ?? null,
+      userId: sessionInfo?.userId ?? null,
+      userRole: sessionInfo?.role ?? null,
+      setSessionInfo,
+      addFirm, updateFirm, deleteFirm, softDeleteFirm, softDeletePersonnel,
+      updatePersonnel,
+      addVisit, updateVisit, endVisit, deleteVisit,
+      addReport, deleteReport,
+      toasts, showToast, dismissToast,
+      refresh, refreshFirms, refreshPersonnel,
     }}>
       {children}
     </AppContext.Provider>
   );
 }
 
-export function useApp(): AppContextType {
+export function useApp() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error('useApp must be used within AppProvider');
   return ctx;

@@ -1,171 +1,227 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import AppLoadingScreen from '../../components/feature/AppLoadingScreen';
-import { useApp } from '../../store/AppContext';
-import Layout from '../../components/feature/Layout';
-import ForcePasswordChange from '../../components/feature/ForcePasswordChange';
-import OnboardingTour from '../../components/feature/OnboardingTour';
-import ToastContainer from '../../components/base/ToastContainer';
-import { PageSkeleton, DashboardSkeleton } from '../../components/base/Skeleton';
+import { useNavigate } from 'react-router-dom';
+import PageHeader from '@/components/base/PageHeader';
+import SummaryCard from '@/components/base/SummaryCard';
+import Button from '@/components/base/Button';
+import EmptyState from '@/components/base/EmptyState';
+import StatusBadge from '@/components/base/StatusBadge';
+import { useApp } from '@/store/AppContext';
 
-// ── Lazy imports — her sayfa sadece ilk açıldığında yüklenir ──────────────
-// Bu sayede uygulama ilk açılışında tüm sayfa kodları inmez, sadece
-// aktif sayfa kodu yüklenir. Sonraki açılışlarda tarayıcı cache'den gelir.
-const DashboardPage      = lazy(() => import('../dashboard/page'));
-const FirmalarPage       = lazy(() => import('../companies/page'));
-const PersonellerPage    = lazy(() => import('../personnel/page'));
-const EvraklarPage       = lazy(() => import('../documents/page'));
-const EgitimlerPage      = lazy(() => import('../training/page'));
-const RaporlarPage       = lazy(() => import('../reports/page'));
-const EkipmanlarPage     = lazy(() => import('../equipment/page'));
-const MuayenelerPage     = lazy(() => import('../health/page'));
-const UygunsuzluklarPage = lazy(() => import('../nonconformity/page'));
-const TutanaklarPage     = lazy(() => import('../tutanaklar/page'));
-const CopKutusuPage      = lazy(() => import('../trash/page'));
-const SettingsPage       = lazy(() => import('../settings/page'));
-const IsIzniPage         = lazy(() => import('../is-izni/page'));
-const FirmaEvraklariPage = lazy(() => import('../company-documents/page'));
-const DokumanlarPage     = lazy(() => import('../dokumanlar/page'));
-const SahaPage           = lazy(() => import('../saha/page'));
-const GelismisRaporlarPage = lazy(() => import('../raporlar/page'));
-const ZiyaretTakvimiPage   = lazy(() => import('../ziyaret-takvimi/page'));
+const todayStr = new Date().toISOString().split('T')[0];
 
-// URL path → modül adı eşlemesi
-const PATH_TO_MODULE: Record<string, string> = {
-  '/dashboard':       'dashboard',
-  '/firmalar':        'firmalar',
-  '/personeller':     'personeller',
-  '/evraklar':        'evraklar',
-  '/firma-evraklari': 'firma-evraklari',
-  '/egitimler':       'egitimler',
-  '/muayeneler':      'muayeneler',
-  '/tutanaklar':      'tutanaklar',
-  '/uygunsuzluklar':  'uygunsuzluklar',
-  '/ekipmanlar':      'ekipmanlar',
-  '/is-izinleri':     'is-izinleri',
-  '/raporlar':        'raporlar',
-  '/gelismis-raporlar': 'gelismis-raporlar',
-  '/ziyaret-takvimi': 'ziyaret-takvimi',
-  '/dokumanlar':      'dokumanlar',
-  '/copkutusu':       'copkutusu',
-  '/ayarlar':         'ayarlar',
-};
-
-// Modüle göre uygun skeleton seç
-function ModuleFallback({ module }: { module: string }) {
-  if (module === 'dashboard') return <DashboardSkeleton />;
-  return <PageSkeleton />;
-}
-
-function AppContent() {
-  const { activeModule, orgError, org, mustChangePassword, setActiveModule, pageLoading } = useApp();
-  const location = useLocation();
+export default function HomePage() {
   const navigate = useNavigate();
-  const [loadingDone, setLoadingDone] = useState(false);
+  const { firms, personnel, visits } = useApp();
 
-  // pageLoading bitince loading screen'i kapat
-  useEffect(() => {
-    if (!pageLoading) {
-      const t = setTimeout(() => setLoadingDone(true), 300);
-      return () => clearTimeout(t);
-    }
-  }, [pageLoading]);
+  const hasData = firms.length > 0 || visits.length > 0 || personnel.length > 0;
+  const activePersonnel = personnel.filter((p) => p.status === 'Aktif').length;
+  const todayVisits = visits.filter((v) => v.date === todayStr).length;
+  const completedThisWeek = visits.filter((v) => v.status === 'Tamamlandı').length;
+  const recentVisits = visits.slice(0, 6);
 
-  // ── URL ↔ activeModule senkronizasyonu ─────────────────────────────────
-  // Çift useEffect döngüsü yerine: URL değişimini tek ref ile takip ediyoruz.
-  // URL → module: her zaman çalışır (dış link, geri tuşu, direkt URL girişi)
-  // module → URL: sadece sidebar/kod tetiklediğinde çalışır (loop önlemi)
-  const isUrlChangeRef = useRef(false);
-
-  useEffect(() => {
-    const module = PATH_TO_MODULE[location.pathname];
-    if (module && module !== activeModule) {
-      isUrlChangeRef.current = true;
-      setActiveModule(module);
-    }
-  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    // URL değişimi tetiklediyse navigate çağırma — sonsuz döngü önlemi
-    if (isUrlChangeRef.current) {
-      isUrlChangeRef.current = false;
-      return;
-    }
-    const expectedPath = `/${activeModule}`;
-    if (location.pathname !== expectedPath && PATH_TO_MODULE[expectedPath] !== undefined) {
-      navigate(expectedPath, { replace: true });
-    }
-  }, [activeModule]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!loadingDone) {
-    return <AppLoadingScreen onDone={() => setLoadingDone(true)} />;
-  }
-
-  if (mustChangePassword) {
-    return <ForcePasswordChange />;
-  }
-
-  if (orgError && !org) {
+  if (!hasData) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
-        <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}>
-            <i className="ri-error-warning-line text-red-400 text-xl" />
-          </div>
-          <p className="font-semibold text-slate-300">Organizasyon yüklenemedi</p>
-          <p className="text-sm" style={{ color: '#64748B' }}>{orgError}</p>
-          <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer" style={{ background: 'rgba(99,102,241,0.2)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.3)' }}>
-            Tekrar Dene
-          </button>
+      <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
+        <PageHeader
+          title="Genel Bakış"
+          description="OSGB operasyonlarınıza genel bir bakış"
+        />
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
+          <SummaryCard label="Toplam Firma" value="0" icon="ri-building-2-line" iconColor="var(--info)" />
+          <SummaryCard label="Aktif Personel" value="0" icon="ri-team-line" iconColor="var(--purple)" />
+          <SummaryCard label="Bugünkü Ziyaretler" value="0" icon="ri-map-pin-time-line" iconColor="var(--success)" />
+          <SummaryCard label="Bu Hafta Tamamlanan" value="0" icon="ri-checkbox-circle-line" iconColor="var(--warning)" />
+        </div>
+
+        <div
+          className="rounded-xl"
+          style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
+        >
+          <EmptyState
+            icon="ri-dashboard-line"
+            title="Henüz veri yok"
+            description="Paneli kullanmaya başlamak için önce bir firma ekleyin. Firmalar, personel ve ziyaretler burada özetlenecek."
+            actionLabel="Firma Ekle"
+            onAction={() => navigate('/firmalar')}
+          />
+        </div>
+
+        <div className="mt-4 md:mt-6 grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
+          {[
+            { step: '01', icon: 'ri-building-2-line', title: 'Firma Ekle', desc: 'Hizmet verdiğiniz firmaları sisteme kaydedin.', path: '/firmalar', cta: 'Firmalar' },
+            { step: '02', icon: 'ri-team-line', title: 'Personel Tanımla', desc: 'Uzman ve hekimlerinizi ekleyip firmalara atayın.', path: '/personel', cta: 'Personel' },
+            { step: '03', icon: 'ri-map-pin-time-line', title: 'Ziyaret Başlat', desc: 'Saha ziyaretlerini kayıt altına alın.', path: '/ziyaretler', cta: 'Ziyaretler' },
+          ].map((item) => (
+            <button
+              key={item.step}
+              onClick={() => navigate(item.path)}
+              className="text-left p-5 rounded-xl transition-colors cursor-pointer"
+              style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--hover)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--card)')}
+            >
+              <div className="flex items-start gap-4">
+                <div
+                  className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0"
+                  style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+                >
+                  <i className={`${item.icon} text-base`} style={{ color: 'var(--text-secondary)' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{item.step}</span>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
+                  </div>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{item.desc}</p>
+                  <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>{item.cta} →</p>
+                </div>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     );
   }
 
-  const isFirmaUser = org?.role === 'firma_user';
-  const FIRMA_USER_ALLOWED = new Set(['dashboard', 'personeller', 'evraklar', 'egitimler', 'uygunsuzluklar']);
-
-  const renderPage = () => {
-    if (isFirmaUser && !FIRMA_USER_ALLOWED.has(activeModule)) {
-      return <DashboardPage />;
-    }
-
-    switch (activeModule) {
-      case 'firmalar':        return <FirmalarPage />;
-      case 'personeller':     return <PersonellerPage />;
-      case 'evraklar':        return <EvraklarPage />;
-      case 'egitimler':       return <EgitimlerPage />;
-      case 'muayeneler':      return <MuayenelerPage />;
-      case 'uygunsuzluklar':  return <UygunsuzluklarPage />;
-      case 'ekipmanlar':      return <EkipmanlarPage />;
-      case 'tutanaklar':      return <TutanaklarPage />;
-      case 'is-izinleri':     return <IsIzniPage />;
-      case 'firma-evraklari': return <FirmaEvraklariPage />;
-      case 'raporlar':        return <RaporlarPage />;
-      case 'gelismis-raporlar': return <GelismisRaporlarPage />;
-      case 'ziyaret-takvimi': return <ZiyaretTakvimiPage />;
-      case 'dokumanlar':      return <DokumanlarPage />;
-      case 'copkutusu':       return <CopKutusuPage />;
-      case 'ayarlar':         return isFirmaUser ? <DashboardPage /> : <SettingsPage />;
-      case 'saha':            return <SahaPage />;
-      default:                return <DashboardPage />;
-    }
-  };
-
   return (
-    <div>
-      <Layout>
-        <ToastContainer />
-        <OnboardingTour />
-        {/* Suspense: sayfa lazy yüklenirken modüle uygun skeleton göster */}
-        <Suspense fallback={<ModuleFallback module={activeModule} />}>
-          {renderPage()}
-        </Suspense>
-      </Layout>
+    <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
+      <PageHeader
+        title="Genel Bakış"
+        description="OSGB operasyonlarınıza genel bir bakış"
+      />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+        <SummaryCard label="Toplam Firma" value={firms.length} icon="ri-building-2-line" iconColor="var(--info)" />
+        <SummaryCard label="Aktif Personel" value={activePersonnel} icon="ri-team-line" iconColor="var(--purple)" />
+        <SummaryCard label="Bugünkü Ziyaretler" value={todayVisits} icon="ri-map-pin-time-line" iconColor="var(--success)" />
+        <SummaryCard label="Bu Hafta Tamamlanan" value={completedThisWeek} icon="ri-checkbox-circle-line" iconColor="var(--warning)" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        {/* Recent Visits */}
+        <div
+          className="lg:col-span-2 rounded-xl"
+          style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
+        >
+          <div className="card-header">
+            <span className="card-title">Son Ziyaretler</span>
+            <button
+              onClick={() => navigate('/ziyaretler')}
+              className="text-xs transition-colors cursor-pointer"
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              Tümünü gör →
+            </button>
+          </div>
+          {recentVisits.length === 0 ? (
+            <EmptyState
+              icon="ri-map-pin-time-line"
+              title="Henüz ziyaret yok"
+              description="İlk ziyareti başlatmak için Ziyaretler sayfasına gidin."
+              actionLabel="Ziyaret Başlat"
+              onAction={() => navigate('/ziyaretler')}
+            />
+          ) : (
+            <div>
+              {recentVisits.map((v) => (
+                <div
+                  key={v.id}
+                  className="px-4 md:px-5 py-3 md:py-3.5 flex items-center gap-3 md:gap-4 transition-colors cursor-pointer"
+                  style={{ borderBottom: '1px solid var(--border-subtle)' }}
+                  onClick={() => navigate('/ziyaretler')}
+                >
+                  <div
+                    className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0"
+                    style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+                  >
+                    <i
+                      className={`text-sm ${v.role === 'Hekim' ? 'ri-stethoscope-line' : 'ri-shield-check-line'}`}
+                      style={{ color: v.role === 'Hekim' ? 'var(--purple)' : 'var(--info)' }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{v.personnel}</p>
+                    <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{v.firm} · {v.date}</p>
+                  </div>
+                  <StatusBadge status={v.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div
+          className="rounded-xl"
+          style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
+        >
+          <div className="card-header">
+            <span className="card-title">Hızlı Aksiyonlar</span>
+          </div>
+          <div className="p-4 space-y-2">
+            {[
+              { icon: 'ri-building-2-line', label: 'Yeni Firma Ekle', path: '/firmalar', color: 'var(--info)' },
+              { icon: 'ri-team-line', label: 'Personel Ekle', path: '/personel', color: 'var(--purple)' },
+              { icon: 'ri-map-pin-time-line', label: 'Ziyaret Başlat', path: '/ziyaretler', color: 'var(--success)' },
+              { icon: 'ri-file-chart-line', label: 'Rapor Oluştur', path: '/raporlar', color: 'var(--warning)' },
+            ].map((action) => (
+              <button
+                key={action.label}
+                onClick={() => navigate(action.path)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors cursor-pointer text-left"
+                style={{ border: '1px solid var(--border-subtle)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--hover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <div
+                  className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                  style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+                >
+                  <i className={`${action.icon} text-sm`} style={{ color: action.color }} />
+                </div>
+                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{action.label}</span>
+                <i className="ri-arrow-right-s-line text-sm ml-auto" style={{ color: 'var(--text-muted)' }} />
+              </button>
+            ))}
+          </div>
+
+          {/* Firm summary */}
+          {firms.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+              <div className="px-5 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>Son Eklenen Firmalar</p>
+                <div className="space-y-2">
+                  {firms.slice(0, 3).map((f) => (
+                    <div key={f.id} className="flex items-center gap-2.5">
+                      <div
+                        className="w-6 h-6 flex items-center justify-center rounded-md flex-shrink-0"
+                        style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+                      >
+                        <i className="ri-building-2-line text-xs" style={{ color: 'var(--text-muted)' }} />
+                      </div>
+                      <p className="text-xs truncate flex-1" style={{ color: 'var(--text-secondary)' }}>{f.name}</p>
+                      <StatusBadge status={f.status} />
+                    </div>
+                  ))}
+                </div>
+                {firms.length > 3 && (
+                  <button
+                    onClick={() => navigate('/firmalar')}
+                    className="text-xs mt-3 cursor-pointer transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                  >
+                    +{firms.length - 3} firma daha →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
-}
-
-export default function ISGApp() {
-  return <AppContent />;
 }
