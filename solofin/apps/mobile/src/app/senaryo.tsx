@@ -1,16 +1,17 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { CheckCircle2, Lightbulb, Minus, Plus, RotateCcw, Save, Trash2 } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import type { ScenarioLevers } from "@solofin/core/data/schema";
 import { formatMoney, fromKurus, parseMoneyInput, type Kurus } from "@solofin/core/finance/money";
 import { RETURN_PROFILES } from "@solofin/core/finance/retirement";
 import { baselineForUser, compareScenario, NEUTRAL_LEVERS, SCENARIO_PRESETS, scenarioInsight } from "@solofin/core/finance/scenarios";
 import { LineChart } from "@/components/charts";
+import { AnimatedNumber, Appear, GradientCard, PressableScale as Tap } from "@/components/visuals";
 import { Badge, Bullet, Button, Card, Field, Screen, SectionHeader, T, ToggleRow } from "@/components/ui";
 import { useStore } from "@/store/StoreProvider";
 import { useOverview } from "@/store/useOverview";
-import { radius, space, useTheme } from "@/theme";
+import { font, gradients, radius, space, type, useTheme } from "@/theme";
 
 function MoneyInput({ label, value, onChange, hint, testID }: { label: string; value: Kurus; onChange: (v: Kurus) => void; hint?: string; testID?: string }) {
   const [text, setText] = useState(value ? fromKurus(value).toLocaleString("tr-TR") : "");
@@ -112,31 +113,51 @@ export default function ScenarioScreen() {
     <Screen testID="screen-scenario">
       <Stack.Screen options={{ title: "Senaryo Karşılaştırma" }} />
 
-      <Card style={{ backgroundColor: p.positiveSoft, borderColor: p.positiveSoft, flexDirection: "row", gap: space.md }}>
-        <Lightbulb size={22} color={p.positive} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <T v="bodyStrong">Öneri</T>
-          <T v="small" color="muted" testID="scenario-insight">
-            {scenarioInsight(levers, diff)}
-          </T>
-        </View>
-      </Card>
+      <Appear index={0}>
+        <GradientCard colors={good ? gradients.hero : gradients.warm}>
+          <Text style={[type.caption, { color: "rgba(255,255,255,0.8)", letterSpacing: 0.6 }]}>12 AYLIK NET KAZANÇ</Text>
+          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: space.md, marginTop: space.sm }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.caption, { color: "rgba(255,255,255,0.7)" }]}>Şimdi</Text>
+              <Text style={[type.value, { color: "rgba(255,255,255,0.85)", fontSize: 18 }]} numberOfLines={1} adjustsFontSizeToFit>
+                {formatMoney(b.netEarnings)}
+              </Text>
+            </View>
+            <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 22, fontFamily: font.bold, paddingBottom: 2 }}>→</Text>
+            <View style={{ flex: 1.2 }}>
+              <Text style={[type.caption, { color: "rgba(255,255,255,0.7)" }]}>Senaryo</Text>
+              <AnimatedNumber value={s.netEarnings} format={(v) => formatMoney(v)} style={[type.hero, { color: "#FFFFFF", fontSize: 26 }]} />
+            </View>
+          </View>
+          <View style={{ alignSelf: "flex-start", marginTop: space.md, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 }}>
+            <Text testID="scenario-diff" style={{ color: "#FFF", fontFamily: font.extrabold, fontSize: 15, fontVariant: ["tabular-nums"] }}>
+              {formatMoney(diff.netEarnings, "TRY", { signed: true })}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: space.md, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: radius.lg, padding: space.md }}>
+            <Lightbulb size={18} color="#FFF" />
+            <Text testID="scenario-insight" style={[type.small, { color: "#FFF", flex: 1 }]}>
+              {scenarioInsight(levers, diff)}
+            </Text>
+          </View>
+        </GradientCard>
+      </Appear>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }} accessibilityLabel="Hazır senaryolar">
         {SCENARIO_PRESETS.map((pr) => {
           const active = name === pr.name && !loadedId;
           return (
-            <Pressable
+            <Tap
               key={pr.id}
               onPress={() => applyPreset(pr.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              style={{ paddingHorizontal: space.md, minHeight: 38, justifyContent: "center", borderRadius: radius.pill, borderWidth: 1, borderColor: active ? p.primary : p.border, backgroundColor: active ? p.primarySoft : p.surface }}
+              haptic="select"
+              accessibilityLabel={pr.name}
+              style={{ paddingHorizontal: space.lg, minHeight: 40, justifyContent: "center", borderRadius: radius.pill, backgroundColor: active ? p.primary : p.surface }}
             >
-              <T v="small" color={active ? "primary" : "text"}>
+              <T v="small" color={active ? "onPrimary" : "text"} style={{ fontWeight: "700" }}>
                 {pr.name}
               </T>
-            </Pressable>
+            </Tap>
           );
         })}
       </ScrollView>
@@ -193,17 +214,25 @@ export default function ScenarioScreen() {
         ))}
       </Card>
 
-      <Card style={{ alignItems: "center", gap: 4, backgroundColor: good ? p.positiveSoft : p.negativeSoft, borderColor: good ? p.positiveSoft : p.negativeSoft }}>
-        <T v="small" color="muted">
-          Tahmini net kazanç farkı
-        </T>
-        <T v="value" tnum style={{ color: good ? p.positive : p.negative }} testID="scenario-diff">
-          {formatMoney(diff.netEarnings, "TRY", { signed: true })}
-        </T>
-        <T v="caption" color="muted">
-          Vergi farkı {formatMoney(diff.tax, "TRY", { signed: true })} · 12. ay nakit farkı {formatMoney(diff.endCash, "TRY", { signed: true })}
-        </T>
-      </Card>
+      <View style={{ flexDirection: "row", gap: space.sm }}>
+        {[
+          { l: "Vergi farkı", v: diff.tax, invert: true },
+          { l: "12. ay nakit", v: diff.endCash },
+          { l: "En düşük nakit", v: diff.minCash },
+        ].map((x) => {
+          const ok = x.invert ? x.v <= 0 : x.v >= 0;
+          return (
+            <Card key={x.l} style={{ flex: 1, padding: space.md, gap: 4 }}>
+              <T v="caption" color="muted" numberOfLines={1}>
+                {x.l}
+              </T>
+              <T v="bodyStrong" tnum color={x.v === 0 ? "text" : ok ? "positive" : "negative"} numberOfLines={1} style={{ fontWeight: "800" }}>
+                {formatMoney(x.v, "TRY", { signed: true })}
+              </T>
+            </Card>
+          );
+        })}
+      </View>
 
       <SectionHeader title="Nakit akışı etkisi" subtitle="Vergi rezervi düşülmüş nakit, ay sonu" />
       <Card>

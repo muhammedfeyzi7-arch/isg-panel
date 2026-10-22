@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { retirementInputSchema, type RetirementInput } from "@solofin/core/data/schema";
 import { formatMoney, formatPercent, parseMoneyInput } from "@solofin/core/finance/money";
 import { projectRetirement, RETURN_PROFILES } from "@solofin/core/finance/retirement";
 import { LineChart } from "@/components/charts";
 import { Badge, Bullet, Button, Card, Disclosure, Field, Notice, Row, Screen, SectionHeader, Segmented, T } from "@/components/ui";
 import { useStore } from "@/store/StoreProvider";
-import { space } from "@/theme";
+import { font, gradients, space, type } from "@/theme";
+import { AnimatedNumber, Appear, GradientCard, ProgressRing } from "@/components/visuals";
 
 type FormState = Record<keyof RetirementInput, string>;
 
@@ -66,25 +67,32 @@ export default function RetirementScreen() {
       {input && sel ? (
         <>
           <Segmented label="Getiri varsayımı" value={profileId} onChange={setProfileId} options={RETURN_PROFILES.map((r) => ({ value: r.id, label: r.id === "high" ? "Yüksek" : r.label }))} />
+          <Appear index={0}>
+            <GradientCard colors={sel.gapReal === 0 ? gradients.positive : gradients.hero}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: space.lg }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.caption, { color: "rgba(255,255,255,0.8)", letterSpacing: 0.6 }]}>{input.targetAge} YAŞINDA · BUGÜNÜN PARASIYLA</Text>
+                  <AnimatedNumber value={sel.realBalance} format={(v) => formatMoney(v)} testID="retirement-real" style={[type.hero, { color: "#FFF", fontSize: 28, marginTop: 4 }]} />
+                  <Text style={[type.caption, { color: "rgba(255,255,255,0.8)", marginTop: 2 }]}>Nominal: {formatMoney(sel.nominalBalance)}</Text>
+                </View>
+                <ProgressRing value={sel.requiredReal > 0 ? Math.min(1, sel.realBalance / sel.requiredReal) : 1} size={88} stroke={9} color="#FFF" track="rgba(255,255,255,0.22)" accessibilityLabel={`Hedefin yüzde ${Math.round((sel.realBalance / (sel.requiredReal || 1)) * 100)}'i`}>
+                  <Text style={{ color: "#FFF", fontFamily: font.extrabold, fontSize: 17 }}>%{Math.min(999, Math.round((sel.realBalance / (sel.requiredReal || 1)) * 100))}</Text>
+                  <Text style={{ color: "rgba(255,255,255,0.8)", fontFamily: font.semibold, fontSize: 10 }}>hedefin</Text>
+                </ProgressRing>
+              </View>
+              <Text style={[type.caption, { color: "rgba(255,255,255,0.8)", marginTop: space.md }]}>
+                Reel getiri {formatPercent(sel.profile.realReturn, 0)} · nominal ≈ {formatPercent(sel.nominalReturn)} · varsayımsal
+              </Text>
+            </GradientCard>
+          </Appear>
           <Card style={{ gap: 4 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <T v="small" color="muted">
-                {input.targetAge} yaşında, bugünün parasıyla
-              </T>
+            <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
               <Badge label={sel.gapReal === 0 ? "Hedefe ulaşıyor" : "Açık var"} tone={sel.gapReal === 0 ? "positive" : "warning"} />
             </View>
-            <T v="value" tnum testID="retirement-real">
-              {formatMoney(sel.realBalance)}
-            </T>
-            <T v="caption" color="subtle" tnum>
-              Nominal karşılığı: {formatMoney(sel.nominalBalance)} · reel getiri {formatPercent(sel.profile.realReturn, 0)}, nominal ≈ {formatPercent(sel.nominalReturn)}
-            </T>
-            <View style={{ marginTop: space.sm }}>
-              <Row label="Gereken birikim" value={formatMoney(sel.requiredReal)} />
-              <Row label="Sürdürülebilir aylık gelir" value={formatMoney(sel.sustainableMonthlyReal)} />
-              <Row label="Hedef için gereken aylık katkı" value={formatMoney(sel.requiredMonthly)} tone={sel.requiredMonthly > input.monthlyContribution ? "warning" : "positive"} />
-              {sel.gapReal > 0 ? <Row label="Açık (bugünün parasıyla)" value={formatMoney(sel.gapReal)} tone="negative" /> : null}
-            </View>
+            <Row label="Gereken birikim" value={formatMoney(sel.requiredReal)} />
+            <Row label="Sürdürülebilir aylık gelir" value={formatMoney(sel.sustainableMonthlyReal)} />
+            <Row label="Hedef için gereken aylık katkı" value={formatMoney(sel.requiredMonthly)} tone={sel.requiredMonthly > input.monthlyContribution ? "warning" : "positive"} />
+            {sel.gapReal > 0 ? <Row label="Açık (bugünün parasıyla)" value={formatMoney(sel.gapReal)} tone="negative" /> : null}
           </Card>
 
           <SectionHeader title="Birikim projeksiyonu" subtitle="Enflasyondan arındırılmış, üç varsayım" />

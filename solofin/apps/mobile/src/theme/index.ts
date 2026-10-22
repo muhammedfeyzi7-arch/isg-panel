@@ -27,17 +27,17 @@ export interface Palette {
 
 export const light: Palette = {
   dark: false,
-  bg: "#F5F6F8",
+  bg: "#F3F5F9",
   surface: "#FFFFFF",
-  surface2: "#F0F2F5",
-  border: "#E4E7EC",
+  surface2: "#EEF1F6",
+  border: "#E3E7EE",
   text: "#0D1220",
   muted: "#5B6475",
   subtle: "#8A93A5",
-  primary: "#2563EB",
-  primarySoft: "#EAF1FF",
+  primary: "#2A63F0",
+  primarySoft: "#EEF3FF",
   onPrimary: "#FFFFFF",
-  positive: "#0F8A5F",
+  positive: "#0B7D55",
   positiveSoft: "#E7F6EF",
   warning: "#B45309",
   warningSoft: "#FDF3E4",
@@ -57,8 +57,8 @@ export const dark: Palette = {
   text: "#EEF1F6",
   muted: "#A3ADC2",
   subtle: "#7A859C",
-  primary: "#4D87F5",
-  primarySoft: "#18294A",
+  primary: "#5B8CFF",
+  primarySoft: "#1A2B55",
   onPrimary: "#FFFFFF",
   positive: "#34C78C",
   positiveSoft: "#0F2E25",
@@ -83,16 +83,62 @@ export const navy: Palette = {
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 } as const;
 export const radius = { sm: 8, md: 12, lg: 16, xl: 20, pill: 999 } as const;
 
+/** Manrope aileleri. Android'de özel yazı tiplerinde fontWeight aileyi seçmez; kalınlık aile adıyla verilir. */
+export const font = {
+  regular: "Manrope_500Medium",
+  medium: "Manrope_500Medium",
+  semibold: "Manrope_600SemiBold",
+  bold: "Manrope_700Bold",
+  extrabold: "Manrope_800ExtraBold",
+} as const;
+
+export function familyForWeight(w: string | number | undefined): string {
+  const n = typeof w === "number" ? w : w === "bold" ? 700 : Number(w ?? 400);
+  if (n >= 800) return font.extrabold;
+  if (n >= 700) return font.bold;
+  if (n >= 600) return font.semibold;
+  return font.regular;
+}
+
 export const type = {
-  hero: { fontSize: 36, fontWeight: "700" as const, letterSpacing: -0.8 },
-  title: { fontSize: 26, fontWeight: "700" as const, letterSpacing: -0.5 },
-  h2: { fontSize: 17, fontWeight: "600" as const, letterSpacing: -0.2 },
-  body: { fontSize: 15, fontWeight: "400" as const },
-  bodyStrong: { fontSize: 15, fontWeight: "600" as const },
-  small: { fontSize: 13, fontWeight: "400" as const },
-  caption: { fontSize: 12, fontWeight: "500" as const },
-  value: { fontSize: 22, fontWeight: "700" as const, letterSpacing: -0.4 },
+  display: { fontSize: 40, fontFamily: font.extrabold, letterSpacing: -1.2 },
+  hero: { fontSize: 34, fontFamily: font.extrabold, letterSpacing: -1 },
+  title: { fontSize: 28, fontFamily: font.extrabold, letterSpacing: -0.7 },
+  h2: { fontSize: 18, fontFamily: font.bold, letterSpacing: -0.3 },
+  body: { fontSize: 15, fontFamily: font.regular },
+  bodyStrong: { fontSize: 15, fontFamily: font.bold },
+  small: { fontSize: 13, fontFamily: font.regular },
+  caption: { fontSize: 12, fontFamily: font.semibold },
+  value: { fontSize: 22, fontFamily: font.extrabold, letterSpacing: -0.5 },
 };
+
+/** Kartlar için yumuşak gölge (RN 0.76+ boxShadow: iOS, Android ve web'de ortak) */
+export const shadow = {
+  card: "0px 6px 18px rgba(13, 18, 32, 0.06)",
+  float: "0px 12px 32px rgba(13, 18, 32, 0.18)",
+  glow: "0px 14px 30px rgba(47, 107, 255, 0.35)",
+} as const;
+
+/** Hero kartları için gradyanlar */
+export const gradients = {
+  hero: ["#2F6BFF", "#1D3FB0", "#0E1E5B"] as const,
+  navy: ["#13285C", "#0B1730"] as const,
+  positive: ["#12B981", "#0A7A5A"] as const,
+  warm: ["#FF8A4C", "#E5484D"] as const,
+  violet: ["#7C5CFF", "#4B2FD0"] as const,
+};
+
+/** Kategori / eylem karoları için yumuşak renk çiftleri (zemin, ikon) */
+export const tiles = {
+  blue: { light: ["#E8EFFF", "#2F6BFF"], dark: ["#1A2B55", "#7FA5FF"] },
+  violet: { light: ["#F0EBFF", "#6D4CFF"], dark: ["#2A2252", "#B3A1FF"] },
+  teal: { light: ["#E3F7F3", "#0E9F87"], dark: ["#12352F", "#4FD8BE"] },
+  amber: { light: ["#FFF3DF", "#C77700"], dark: ["#3A2A10", "#FFC261"] },
+  rose: { light: ["#FFE9EE", "#E0336C"], dark: ["#3D1825", "#FF8DB0"] },
+  green: { light: ["#E6F7EA", "#1E9E4A"], dark: ["#14331F", "#6BDB8F"] },
+  slate: { light: ["#EEF1F5", "#4B5568"], dark: ["#1E2A44", "#A3ADC2"] },
+} as const;
+export type TileColor = keyof typeof tiles;
 
 /** Ayarlardaki tema tercihine (sistem/açık/koyu) göre palet */
 export function useTheme(): Palette {

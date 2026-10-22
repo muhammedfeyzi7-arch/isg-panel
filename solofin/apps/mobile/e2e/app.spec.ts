@@ -2,11 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
 const TABS = [
-  { label: "Ana Sayfa", heading: "Finansal merkez" },
-  { label: "Gelir/Gider", heading: "Gelir / Gider" },
+  { label: "Ana Sayfa", heading: "Bu ay" },
+  { label: "İşlemler", heading: "Gelir / Gider" },
   { label: "Simülasyon", heading: "Vergi Simülatörü" },
   { label: "Belgeler", heading: "Belgeler" },
-  { label: "Profil", heading: "Profil" },
+  { label: "Profil", heading: "Demo kullanıcı" },
 ];
 
 async function fresh(page: Page, url = "/") {
@@ -24,10 +24,10 @@ test("ana ekran ve 5 sekme açılır, hata ve yatay taşma yok", async ({ page }
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await fresh(page);
-  await expect(page.getByText("Bugün güvenle kullanabileceğin tahmini tutar")).toBeVisible();
+  await expect(page.getByText("BUGÜN GÜVENLE KULLANABİLECEĞİN")).toBeVisible();
   await expect(page.getByTestId("safe-amount")).toContainText("₺");
   for (const t of TABS) {
-    await page.getByRole("tab", { name: t.label }).or(page.getByRole("link", { name: t.label })).first().click();
+    await page.getByRole("tab", { name: t.label }).click();
     await expect(page.getByRole("heading", { name: t.heading }).first()).toBeVisible();
     expect(await noOverflow(page), `${t.label} yatay taşma`).toBe(true);
   }
@@ -42,8 +42,7 @@ test("gider ekleme, doğrulama ve düzenleme", async ({ page }) => {
 
   await page.getByTestId("tx-amount").fill("7.777,50");
   await page.getByTestId("tx-description").fill("E2E mobil kurs");
-  await page.getByLabel("Kategori: seçilmedi").click();
-  await page.getByRole("radio", { name: "Eğitim" }).click();
+  await page.getByRole("radio", { name: "Kategori Eğitim" }).click();
   await page.getByTestId("tx-save").click();
 
   await expect(page.getByRole("heading", { name: "Gelir / Gider" })).toBeVisible();
@@ -55,6 +54,13 @@ test("gider ekleme, doğrulama ve düzenleme", async ({ page }) => {
   await page.getByTestId("tx-description").fill("E2E mobil kurs (güncel)");
   await page.getByTestId("tx-save").click();
   await expect(page.getByText("E2E mobil kurs (güncel)")).toBeVisible();
+});
+
+test("hızlı işlem (+) menüsünden gelir ekleme ekranı açılır", async ({ page }) => {
+  await fresh(page);
+  await page.getByTestId("quick-add").click();
+  await page.getByRole("button", { name: "Gelir ekle" }).click();
+  await expect(page.getByRole("radio", { name: "Kategori Proje Geliri" })).toBeVisible();
 });
 
 test("senaryo karşılaştırma hesaplar ve kaydeder", async ({ page }) => {

@@ -1,6 +1,6 @@
 import { Plus, Repeat } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, RECURRENCE, type RecurringItem } from "@solofin/core/data/schema";
 import { dailyBalance, monthlyCashProjection, upcomingEvents } from "@solofin/core/finance/cashflow";
 import { addDays, formatDate, monthLabel } from "@solofin/core/finance/dates";
@@ -9,7 +9,8 @@ import { LineChart } from "@/components/charts";
 import { Badge, Bullet, Button, Card, Disclosure, Field, ListItem, Row, Screen, SectionHeader, Segmented, SelectField, Sheet, T, ToggleRow } from "@/components/ui";
 import { useStore } from "@/store/StoreProvider";
 import { useOverview } from "@/store/useOverview";
-import { space, useTheme } from "@/theme";
+import { font, gradients, space, type, useTheme } from "@/theme";
+import { AnimatedNumber, Appear, GradientCard, ProgressRing, Sparkline } from "@/components/visuals";
 
 const RECURRENCE_LABEL: Record<(typeof RECURRENCE)[number], string> = { none: "Tek sefer", monthly: "Aylık", quarterly: "3 aylık", yearly: "Yıllık" };
 
@@ -46,19 +47,30 @@ export default function CashflowScreen() {
 
   return (
     <Screen testID="screen-cashflow">
-      <View style={{ flexDirection: "row", gap: space.sm }}>
-        <Stat label="Banka bakiyesi" value={formatMoney(settings.cashBalance)} />
-        <Stat label="Vergi rezervi" value={formatMoney(safe.taxReserve.total)} />
-      </View>
-      <View style={{ flexDirection: "row", gap: space.sm }}>
-        <Stat label="90 günde en düşük" value={formatMoney(minPoint.balance)} foot={formatDate(minPoint.date)} color={minPoint.balance < safe.taxReserve.total ? p.negative : undefined} />
-        <Stat
-          label="Acil durum fonu"
-          value={`%${Math.min(999, Math.round(resilience.emergencyCoverage * 100))}`}
-          foot={`Hedef ${settings.emergencyMonths} ay`}
-          color={resilience.emergencyCoverage < 1 ? p.warning : p.positive}
-        />
-      </View>
+      <Appear index={0}>
+        <GradientCard colors={gradients.hero}>
+          <Text style={[type.caption, { color: "rgba(255,255,255,0.8)", letterSpacing: 0.6 }]}>90 GÜNDE EN DÜŞÜK BAKİYE</Text>
+          <AnimatedNumber value={minPoint.balance} format={(v) => formatMoney(v)} style={[type.hero, { color: "#FFF", marginTop: 4 }]} />
+          <Text style={[type.small, { color: "rgba(255,255,255,0.8)" }]}>{formatDate(minPoint.date)} civarında · bugün {formatMoney(settings.cashBalance)}</Text>
+          <View style={{ marginTop: space.md, alignItems: "flex-end" }}>
+            <Sparkline values={daily.map((d) => d.balance)} width={250} height={56} />
+          </View>
+        </GradientCard>
+      </Appear>
+      <Appear index={1} style={{ flexDirection: "row", gap: space.sm }}>
+        <Card style={{ flex: 1, alignItems: "center", gap: 8 }}>
+          <ProgressRing value={Math.min(1, resilience.emergencyCoverage)} size={80} stroke={9} color={resilience.emergencyCoverage < 1 ? p.warning : p.positive} accessibilityLabel={`Acil durum fonu hedefin yüzde ${Math.round(resilience.emergencyCoverage * 100)}`}>
+            <Text style={{ fontFamily: font.extrabold, fontSize: 16, color: p.text }}>%{Math.min(999, Math.round(resilience.emergencyCoverage * 100))}</Text>
+          </ProgressRing>
+          <T v="caption" color="muted" style={{ textAlign: "center" }}>
+            Acil durum fonu ({settings.emergencyMonths} ay hedef)
+          </T>
+        </Card>
+        <View style={{ flex: 1, gap: space.sm }}>
+          <Stat label="Vergi rezervi" value={formatMoney(safe.taxReserve.total)} />
+          <Stat label="Gelirsiz dayanma" value={resilience.rows.at(-1)?.months == null ? "süresiz" : `${resilience.rows.at(-1)!.months!.toLocaleString("tr-TR")} ay`} />
+        </View>
+      </Appear>
 
       <SectionHeader title="90 günlük bakiye" subtitle="Tahsilat gecikmesini değiştirerek etkisini gör" />
       <Card style={{ gap: space.md }}>

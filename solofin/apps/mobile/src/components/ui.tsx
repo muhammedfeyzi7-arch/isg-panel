@@ -15,7 +15,8 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { radius, space, type, useTheme, type Palette } from "@/theme";
+import { familyForWeight, font, radius, shadow, space, type, useTheme, type Palette } from "@/theme";
+import { PressableScale, tap } from "./visuals";
 
 type Tone = "neutral" | "primary" | "positive" | "warning" | "negative";
 
@@ -58,10 +59,12 @@ export function T({
 }) {
   const theme = useTheme();
   const p = palette ?? theme;
+  const flat = StyleSheet.flatten(style) as TextStyle | undefined;
+  const weightFamily = flat?.fontWeight ? { fontFamily: familyForWeight(flat.fontWeight), fontWeight: undefined } : null;
   return (
     <Text
       numberOfLines={numberOfLines}
-      style={[type[v], { color: p[color ?? "text"] }, tnum && { fontVariant: ["tabular-nums"] }, style]}
+      style={[type[v], { color: p[color ?? "text"] }, tnum && { fontVariant: ["tabular-nums"] }, style, weightFamily]}
       maxFontSizeMultiplier={1.4}
       {...rest}
     >
@@ -92,7 +95,7 @@ export function Screen({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const p = palette ?? theme;
-  const style = [{ padding: padded ? space.lg : 0, paddingTop: (padded ? space.lg : 0) + (safeTop ? insets.top : 0), paddingBottom: space.xxl * 2, gap: space.md }, contentStyle];
+  const style = [{ padding: padded ? space.lg : 0, paddingTop: (padded ? space.lg : 0) + (safeTop ? insets.top : 0), paddingBottom: 130, gap: space.md }, contentStyle];
   if (!scroll) return <View testID={testID} style={[{ flex: 1, backgroundColor: p.bg }, style]}>{children}</View>;
   return (
     <ScrollView testID={testID} style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={style} keyboardShouldPersistTaps="handled">
@@ -105,12 +108,15 @@ export function Screen({
 export function Card({ children, style, palette, onPress, accessibilityLabel }: { children: ReactNode; style?: StyleProp<ViewStyle>; palette?: Palette; onPress?: () => void; accessibilityLabel?: string }) {
   const theme = useTheme();
   const p = palette ?? theme;
-  const base: StyleProp<ViewStyle> = [{ backgroundColor: p.surface, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: p.border, padding: space.lg }, style];
+  const base: StyleProp<ViewStyle> = [
+    { backgroundColor: p.surface, borderRadius: radius.xl, borderWidth: p.dark ? StyleSheet.hairlineWidth : 0, borderColor: p.border, padding: space.lg, boxShadow: p.dark ? undefined : shadow.card },
+    style,
+  ];
   if (onPress)
     return (
-      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel} style={({ pressed }) => [base, pressed && { opacity: 0.85 }]}>
+      <PressableScale onPress={onPress} accessibilityLabel={accessibilityLabel} style={base}>
         {children}
-      </Pressable>
+      </PressableScale>
     );
   return <View style={base}>{children}</View>;
 }
@@ -147,7 +153,7 @@ export function Button({
 }: {
   label: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "dark";
   icon?: ComponentType<{ size?: number; color?: string }>;
   disabled?: boolean;
   small?: boolean;
@@ -158,24 +164,22 @@ export function Button({
   const p = useTheme();
   const colors = {
     primary: { bg: p.primary, fg: p.onPrimary, border: p.primary },
+    dark: { bg: p.text, fg: p.surface, border: p.text },
     secondary: { bg: p.surface, fg: p.text, border: p.border },
     ghost: { bg: "transparent", fg: p.primary, border: "transparent" },
     danger: { bg: p.negativeSoft, fg: p.negative, border: p.negativeSoft },
   }[variant];
   return (
-    <Pressable
+    <PressableScale
       testID={testID}
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
       disabled={disabled}
-      accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: !!disabled }}
-      hitSlop={6}
-      style={({ pressed }) => [
+      style={[
         {
-          minHeight: small ? 36 : 48,
+          minHeight: small ? 38 : 52,
           paddingHorizontal: small ? space.md : space.lg,
-          borderRadius: radius.md,
+          borderRadius: small ? radius.md : radius.lg,
           backgroundColor: colors.bg,
           borderWidth: 1,
           borderColor: colors.border,
@@ -183,14 +187,15 @@ export function Button({
           alignItems: "center",
           justifyContent: "center",
           gap: space.sm,
-          opacity: disabled ? 0.45 : pressed ? 0.85 : 1,
+          opacity: disabled ? 0.45 : 1,
+          boxShadow: variant === "primary" && !disabled && !small ? shadow.glow : undefined,
         },
         style,
       ]}
     >
       {Icon ? <Icon size={small ? 16 : 18} color={colors.fg} /> : null}
-      <Text style={[small ? type.small : type.bodyStrong, { color: colors.fg, fontWeight: "600" }]}>{label}</Text>
-    </Pressable>
+      <Text style={[small ? type.small : type.bodyStrong, { color: colors.fg, fontFamily: font.bold }]}>{label}</Text>
+    </PressableScale>
   );
 }
 
@@ -199,8 +204,8 @@ export function Badge({ label, tone = "neutral", palette }: { label: string; ton
   const theme = useTheme();
   const c = toneColors(palette ?? theme, tone);
   return (
-    <View style={{ backgroundColor: c.bg, borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" }}>
-      <Text style={[type.caption, { color: c.fg }]}>{label}</Text>
+    <View style={{ backgroundColor: c.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: "flex-start" }}>
+      <Text style={[type.caption, { color: c.fg, fontFamily: font.bold }]}>{label}</Text>
     </View>
   );
 }
@@ -214,7 +219,10 @@ export function Segmented<V extends string>({ value, options, onChange, label, p
     return (
       <Pressable
         key={o.value}
-        onPress={() => onChange(o.value)}
+        onPress={() => {
+          if (!active) tap("select");
+          onChange(o.value);
+        }}
         accessibilityRole="radio"
         accessibilityState={{ selected: active, checked: active }}
         accessibilityLabel={o.label}
@@ -222,15 +230,14 @@ export function Segmented<V extends string>({ value, options, onChange, label, p
           flexGrow: scroll ? 0 : 1,
           minHeight: 38,
           paddingHorizontal: space.md,
-          borderRadius: radius.sm,
+          borderRadius: radius.md - 2,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: active ? p.surface : "transparent",
-          borderWidth: active ? 1 : 0,
-          borderColor: active ? p.primary : "transparent",
+          backgroundColor: active ? (p.dark ? p.primary : p.surface) : "transparent",
+          boxShadow: active && !p.dark ? shadow.card : undefined,
         }}
       >
-        <Text style={[type.small, { color: active ? p.primary : p.muted, fontWeight: active ? "600" : "500" }]} numberOfLines={1}>
+        <Text style={[type.small, { color: active ? (p.dark ? p.onPrimary : p.text) : p.muted, fontFamily: active ? font.bold : font.semibold }]} numberOfLines={1}>
           {o.label}
         </Text>
       </Pressable>
@@ -309,8 +316,8 @@ export function ListItem({
   const content = (
     <>
       {Icon ? (
-        <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
-          <Icon size={20} color={c.fg} />
+        <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
+          <Icon size={21} color={c.fg} />
         </View>
       ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -369,7 +376,7 @@ export function Field({ label, error, hint, ...input }: { label: string; error?:
         placeholderTextColor={p.subtle}
         style={[
           type.body,
-          { minHeight: 48, borderWidth: 1, borderColor: error ? p.negative : p.border, borderRadius: radius.md, paddingHorizontal: space.md, color: p.text, backgroundColor: p.surface },
+          { minHeight: 50, borderWidth: 1, borderColor: error ? p.negative : p.border, borderRadius: radius.lg, paddingHorizontal: space.lg, color: p.text, backgroundColor: p.surface },
         ]}
         {...input}
       />
@@ -527,8 +534,8 @@ export function Notice({ tone = "warning", title, children, palette }: { tone?: 
   const p = palette ?? theme;
   const c = toneColors(p, tone);
   return (
-    <View accessibilityRole="summary" style={{ backgroundColor: c.bg, borderRadius: radius.md, padding: space.md, gap: 2 }}>
-      {title ? <Text style={[type.small, { color: c.fg, fontWeight: "700" }]}>{title}</Text> : null}
+    <View accessibilityRole="summary" style={{ backgroundColor: c.bg, borderRadius: radius.lg, padding: space.md, gap: 2 }}>
+      {title ? <Text style={[type.small, { color: c.fg, fontFamily: font.bold }]}>{title}</Text> : null}
       <Text style={[type.small, { color: c.fg }]}>{children}</Text>
     </View>
   );

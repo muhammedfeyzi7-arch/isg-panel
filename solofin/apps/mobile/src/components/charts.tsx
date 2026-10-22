@@ -4,6 +4,7 @@ import Svg, { Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } fr
 import { formatCompact, formatMoney } from "@solofin/core/finance/money";
 import { radius, space, useTheme, type Palette } from "@/theme";
 import { T } from "./ui";
+import { useProgress } from "./visuals";
 
 interface SeriesDef {
   name: string;
@@ -97,9 +98,10 @@ export function BarChart({
   const innerW = Math.max(0, w - PAD.left - PAD.right);
   const innerH = height - PAD.top - PAD.bottom;
   const groupW = labels.length ? innerW / labels.length : 0;
-  const barW = Math.min(16, (groupW * 0.62) / Math.max(1, series.length));
+  const barW = Math.min(14, (groupW * 0.56) / Math.max(1, series.length));
   const y = (v: number) => PAD.top + innerH - ((v - s.min) / (s.max - s.min)) * innerH;
   const colors = series.map((se, i) => se.color ?? p.series[i]);
+  const grow = useProgress(all.join(","));
 
   const onPress = (e: GestureResponderEvent) => {
     const x = e.nativeEvent.locationX - PAD.left;
@@ -128,9 +130,9 @@ export function BarChart({
             {labels.map((lab, gi) => {
               const gx = PAD.left + gi * groupW + (groupW - barW * series.length - 2 * (series.length - 1)) / 2;
               return [
-                sel === gi ? <Rect key={`h${gi}`} x={PAD.left + gi * groupW + 2} y={PAD.top} width={groupW - 4} height={innerH} fill={p.grid} opacity={0.6} rx={6} /> : null,
+                sel === gi ? <Rect key={`h${gi}`} x={PAD.left + gi * groupW + 2} y={PAD.top} width={groupW - 4} height={innerH} fill={p.grid} opacity={0.6} rx={10} /> : null,
                 ...series.map((_, si) => {
-                  const v = values[si][gi] ?? 0;
+                  const v = (values[si][gi] ?? 0) * grow;
                   const top = y(Math.max(0, v));
                   const h = Math.max(0, y(0) - top);
                   const x = gx + si * (barW + 2);
@@ -189,6 +191,8 @@ export function LineChart({
   const y = (v: number) => PAD.top + innerH - ((v - s.min) / (s.max - s.min)) * innerH;
   const colors = series.map((se, i) => se.color ?? p.series[i]);
   const every = Math.max(1, Math.ceil(n / maxXLabels));
+  const reveal = useProgress(all.join(","), 900);
+  const shownN = Math.max(2, Math.ceil(n * reveal));
 
   const onPress = (e: GestureResponderEvent) => {
     if (n === 0) return;
@@ -223,11 +227,12 @@ export function LineChart({
               </SvgText>
             ))}
             {zeroLine && s.min < 0 ? <Line x1={PAD.left} x2={w - PAD.right} y1={y(0)} y2={y(0)} stroke={p.axis} strokeDasharray="4 4" /> : null}
-            {values.map((vals, si) => {
+            {values.map((full, si) => {
+              const vals = full.slice(0, shownN);
               const d = vals.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
               return [
                 area ? <Path key={`a${si}`} d={`${d} L${x(vals.length - 1)},${y(Math.max(s.min, 0))} L${x(0)},${y(Math.max(s.min, 0))} Z`} fill={`url(#g${si})`} /> : null,
-                <Path key={`p${si}`} d={d} stroke={colors[si]} strokeWidth={2} fill="none" strokeDasharray={series[si].dashed ? "5 4" : undefined} strokeLinejoin="round" />,
+                <Path key={`p${si}`} d={d} stroke={colors[si]} strokeWidth={2.5} fill="none" strokeDasharray={series[si].dashed ? "5 4" : undefined} strokeLinejoin="round" strokeLinecap="round" />,
               ];
             })}
             {sel !== null ? <Line x1={x(sel)} x2={x(sel)} y1={PAD.top} y2={PAD.top + innerH} stroke={p.axis} strokeDasharray="3 3" /> : null}

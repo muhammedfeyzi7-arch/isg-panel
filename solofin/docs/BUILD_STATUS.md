@@ -10,9 +10,9 @@ Son güncelleme: 2026-10-22
 |---|---|
 | `npm run typecheck` | ✅ hata yok |
 | `npm run lint` (eslint-config-expo) | ✅ 0 hata, 0 uyarı |
-| `npm test` (Jest + expo-router testing-library, gerçek ekranlar) | ✅ **4/4** |
-| `npm run export:web` + `npm run test:e2e` (Playwright, iPhone 14 + Pixel 7 görüntü alanı) | ✅ **12/12** (6 senaryo × 2 cihaz) |
-| `npx expo export --platform ios --platform android` | ✅ iOS (2979 modül) ve Android (2995 modül) paketleri Hermes bytecode'a derlendi |
+| `npm test` (Jest + expo-router testing-library, gerçek ekranlar) | ✅ **5/5** |
+| `npm run export:web` + `npm run test:e2e` (Playwright, iPhone 14 + Pixel 7 görüntü alanı) | ✅ **14/14** (7 senaryo × 2 cihaz) |
+| `npx expo export --platform ios --platform android` | ✅ iOS (3361 modül) ve Android (3364 modül) paketleri Hermes bytecode'a derlendi |
 | `npx expo-doctor` | ⚠️ 18/20. Kalan 2 kontrol Expo sunucusuna (exp.host, React Native Directory) erişim gerektiriyor; bu ortamın ağ politikası bunu engelliyor. `expo config` yerel olarak sorunsuz yükleniyor. |
 | Görsel kontrol | ✅ Tüm ekranlar 390×844 telefon görüntü alanında (açık + koyu tema) incelendi; yatay taşma ve konsol hatası yok |
 
@@ -38,7 +38,14 @@ cihazda çalışır; bu yollar tip kontrolünden ve native paketlemeden geçti, 
 
 ## Tamamlanan özellikler
 
-### Mobil uygulama
+### Mobil uygulama — görsel öncelikli tasarım (v0.2)
+- [x] Manrope yazı tipi, gradyan hero kartları, renkli ikon karoları, yumuşak gölgeler
+- [x] Hareket: basınca küçülen kartlar + dokunsal geri bildirim (haptics), sayarak yükselen tutarlar, büyüyen/çizilen
+      grafikler, sırayla beliren içerik; işletim sisteminin "hareketi azalt" ayarına uyar
+- [x] Bulanık zeminli yüzen sekme çubuğu + ortada "+" hızlı işlem menüsü (Gelir, Gider, Fatura tara, Senaryo)
+- [x] İşlem ekleme: büyük tutar göstergesi, uygulama içi tuş takımı, ikonlu kategori ızgarası, katlanabilir ayrıntılar
+- [x] Ana ekran: hızlı eylemler, yatay kaydırmalı KPI kartları, vergi payı halkası, gider donut grafiği, uyarı ve
+      ödeme kartları; Simülasyon: efektif vergi halkası, renkli senaryo karuseli; Senaryo: "Şimdi → Senaryo" hero
 - [x] 5 sekme (Ana Sayfa, Gelir/Gider, Simülasyon, Belgeler, Profil) + yığın ekranları (işlem formu, senaryo,
       fatura, nakit akışı, emeklilik, raporlar, ayarlar)
 - [x] Tasarım: koyu lacivert ana ekran, açık/koyu/sistem teması, doğrulanmış grafik paleti, ≥44pt dokunma hedefleri,

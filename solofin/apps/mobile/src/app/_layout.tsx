@@ -1,3 +1,8 @@
+import { Manrope_500Medium } from "@expo-google-fonts/manrope/500Medium";
+import { Manrope_600SemiBold } from "@expo-google-fonts/manrope/600SemiBold";
+import { Manrope_700Bold } from "@expo-google-fonts/manrope/700Bold";
+import { Manrope_800ExtraBold } from "@expo-google-fonts/manrope/800ExtraBold";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -5,15 +10,18 @@ import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StoreProvider, useStore } from "@/store/StoreProvider";
-import { navy, useTheme } from "@/theme";
+import { font, navy, useTheme } from "@/theme";
 
 export { ErrorBoundary } from "expo-router";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 function RootNavigator() {
-  const { ready } = useStore();
+  const { ready: storeReady } = useStore();
   const p = useTheme();
+  const [fontsLoaded, fontError] = useFonts({ Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold });
+  // Yazı tipi yüklenemezse sistem yazı tipiyle devam edilir
+  const ready = storeReady && (fontsLoaded || !!fontError);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => undefined);
@@ -34,7 +42,8 @@ function RootNavigator() {
         screenOptions={{
           headerStyle: { backgroundColor: p.surface },
           headerTintColor: p.text,
-          headerTitleStyle: { fontWeight: "600" },
+          headerTitleStyle: { fontFamily: font.bold, fontSize: 17 },
+          headerLargeTitleStyle: { fontFamily: font.extrabold },
           headerShadowVisible: false,
           headerBackTitle: "Geri",
           contentStyle: { backgroundColor: p.bg },

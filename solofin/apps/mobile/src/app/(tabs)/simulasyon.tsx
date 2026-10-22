@@ -1,7 +1,7 @@
 import { router } from "expo-router";
-import { ChevronRight, CircleHelp, FlaskConical } from "lucide-react-native";
+import { ArrowDownRight, ChevronRight, CircleHelp, Clock3, FlaskConical, Laptop, PiggyBank, TrendingUp, UserPlus, Wallet } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { TAXPAYER_LABEL } from "@solofin/core/data/schema";
 import { formatDate, monthLabel } from "@solofin/core/finance/dates";
 import { formatMoney, formatPercent, parseMoneyInput } from "@solofin/core/finance/money";
@@ -10,11 +10,22 @@ import { taxInputFromBasis } from "@solofin/core/finance/summary";
 import { deductionImpact } from "@solofin/core/finance/tax/engine";
 import { allRuleMetas, type Verification } from "@solofin/core/finance/tax/rules";
 import { taxView } from "@solofin/core/finance/taxView";
-import { LineChart, ProportionBar } from "@/components/charts";
+import { LineChart } from "@/components/charts";
+import { AnimatedNumber, Appear, GradientCard, MeterBar, PressableScale, ProgressRing } from "@/components/visuals";
 import { Badge, Bullet, Card, Disclosure, Divider, Field, ListItem, Notice, Row, Screen, SectionHeader, Segmented, Sheet, T, ToggleRow } from "@/components/ui";
 import { useStore } from "@/store/StoreProvider";
 import { useOverview } from "@/store/useOverview";
-import { radius, space, useTheme } from "@/theme";
+import { font, gradients, radius, space, type, useTheme } from "@/theme";
+
+const PRESET_STYLE: Record<string, { icon: typeof Laptop; colors: readonly [string, string, ...string[]] }> = {
+  equipment: { icon: Laptop, colors: gradients.hero },
+  raise: { icon: TrendingUp, colors: gradients.positive },
+  drop: { icon: ArrowDownRight, colors: gradients.warm },
+  client: { icon: UserPlus, colors: gradients.violet },
+  delay: { icon: Clock3, colors: ["#F59E0B", "#B45309"] },
+  cost: { icon: Wallet, colors: ["#475569", "#1E293B"] },
+  retire: { icon: PiggyBank, colors: ["#0EA5E9", "#0369A1"] },
+};
 
 const VERIFICATION: Record<Verification, { label: string; tone: "positive" | "warning" | "negative" }> = {
   official: { label: "Resmî kaynak", tone: "positive" },
@@ -42,21 +53,49 @@ export default function TaxSimulatorScreen() {
 
   return (
     <Screen safeTop testID="screen-tax">
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <T v="title" accessibilityRole="header">
-          Vergi Simülatörü
-        </T>
-        <Pressable onPress={() => setHelp(true)} accessibilityRole="button" accessibilityLabel="Vergi simülatörü hakkında" hitSlop={10}>
-          <CircleHelp size={24} color={p.muted} />
-        </Pressable>
-      </View>
-      <T v="small" color="muted">
-        {rules.label} · {TAXPAYER_LABEL[settings.taxpayerType]}
-      </T>
+      <Appear index={0} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md }}>
+        <View style={{ flex: 1 }}>
+          <T v="title" accessibilityRole="header">
+            Vergi Simülatörü
+          </T>
+          <T v="small" color="muted" numberOfLines={2}>
+            {rules.label} · {TAXPAYER_LABEL[settings.taxpayerType]}
+          </T>
+        </View>
+        <PressableScale onPress={() => setHelp(true)} accessibilityLabel="Vergi simülatörü hakkında" style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: p.surface, alignItems: "center", justifyContent: "center" }}>
+          <CircleHelp size={22} color={p.muted} />
+        </PressableScale>
+      </Appear>
 
-      <Notice title="Demo tahmini — kesin vergi yükümlülüğü değildir">
-        Kurallar resmî mevzuat metniyle birebir doğrulanmadı. Beyan ve ödeme öncesinde mali müşavirine danış.{ruleFallback ? ` ${settings.taxYear} için kural seti yok; ${rules.year} kuralları kullanıldı.` : ""}
-      </Notice>
+      <Appear index={1}>
+        <GradientCard colors={gradients.violet}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: space.lg }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.caption, { color: "rgba(255,255,255,0.8)", letterSpacing: 0.6 }]}>{period === "projected" ? "YIL SONU NET KAZANÇ" : "BUGÜNE KADAR NET"}</Text>
+              <AnimatedNumber value={net} format={(v) => formatMoney(v)} style={[type.hero, { color: "#FFFFFF", marginTop: 4, fontSize: 30 }]} />
+              <Text style={[type.small, { color: "rgba(255,255,255,0.85)", marginTop: 4 }]}>Tahmini gelir vergisi {formatMoney(tax.incomeTax)}</Text>
+            </View>
+            <ProgressRing value={tax.effectiveRate} size={86} stroke={9} color="#FFFFFF" track="rgba(255,255,255,0.22)" accessibilityLabel={`Efektif vergi oranı yüzde ${Math.round(tax.effectiveRate * 100)}`}>
+              <Text style={{ color: "#FFF", fontFamily: font.extrabold, fontSize: 18 }}>%{Math.round(tax.effectiveRate * 100)}</Text>
+              <Text style={{ color: "rgba(255,255,255,0.8)", fontFamily: font.semibold, fontSize: 10 }}>efektif</Text>
+            </ProgressRing>
+          </View>
+          <View style={{ flexDirection: "row", gap: space.sm, marginTop: space.md }}>
+            {[
+              { l: "Gelir", v: formatMoney(basis.grossIncome) },
+              { l: "Matrah", v: formatMoney(tax.taxableBase) },
+              { l: "Marjinal", v: formatPercent(tax.marginalRate, 0) },
+            ].map((x) => (
+              <View key={x.l} style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.14)", borderRadius: radius.lg, padding: 10 }}>
+                <Text style={[type.caption, { color: "rgba(255,255,255,0.75)" }]}>{x.l}</Text>
+                <Text style={[type.small, { color: "#FFF", fontFamily: font.bold }]} numberOfLines={1} adjustsFontSizeToFit>
+                  {x.v}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </GradientCard>
+      </Appear>
 
       <Segmented
         label="Dönem"
@@ -68,9 +107,53 @@ export default function TaxSimulatorScreen() {
         ]}
       />
 
+      <Appear index={2}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <T v="h2">Ya şöyle olursa?</T>
+          <PressableScale onPress={() => router.push("/senaryo")} accessibilityLabel="Yeni senaryo oluştur" style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6 }}>
+            <T v="small" color="primary" style={{ fontWeight: "700" }}>
+              Yeni
+            </T>
+            <ChevronRight size={16} color={p.primary} />
+          </PressableScale>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.md, paddingTop: space.md, paddingRight: space.lg }} style={{ marginHorizontal: -space.lg, paddingLeft: space.lg }}>
+          {SCENARIO_PRESETS.map((sc) => {
+            const st = PRESET_STYLE[sc.id] ?? PRESET_STYLE.equipment;
+            const Icon = st.icon;
+            return (
+              <PressableScale key={sc.id} onPress={() => router.push({ pathname: "/senaryo", params: { preset: sc.id } })} accessibilityLabel={sc.name} style={{ width: 168 }}>
+                <GradientCard colors={st.colors} style={{ boxShadow: undefined }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+                    <Icon size={20} color="#FFF" />
+                  </View>
+                  <Text style={[type.bodyStrong, { color: "#FFF", marginTop: space.md, minHeight: 40 }]} numberOfLines={2}>
+                    {sc.name}
+                  </Text>
+                  <Text style={[type.caption, { color: "rgba(255,255,255,0.8)" }]} numberOfLines={1}>
+                    {sc.description}
+                  </Text>
+                </GradientCard>
+              </PressableScale>
+            );
+          })}
+        </ScrollView>
+        {scenarios.length ? (
+          <Card style={{ paddingVertical: space.xs, marginTop: space.md }}>
+            {scenarios.map((sc) => (
+              <ListItem key={sc.id} icon={FlaskConical} iconTone="primary" title={sc.name} subtitle={`Kayıtlı · ${formatDate(sc.createdAt.slice(0, 10))}`} chevron onPress={() => router.push({ pathname: "/senaryo", params: { id: sc.id } })} />
+            ))}
+          </Card>
+        ) : null}
+      </Appear>
+
+      <Notice title="Demo tahmini — kesin vergi yükümlülüğü değildir">
+        Kurallar resmî mevzuat metniyle birebir doğrulanmadı. Beyan ve ödeme öncesinde mali müşavirine danış.{ruleFallback ? ` ${settings.taxYear} için kural seti yok; ${rules.year} kuralları kullanıldı.` : ""}
+      </Notice>
+
       <Card>
         <T v="h2" accessibilityRole="header">
-          {period === "projected" ? "Mevcut senaryo" : "Gerçekleşen"}
+          {period === "projected" ? "Hesap dökümü" : "Gerçekleşen"}
         </T>
         <View style={{ marginTop: space.sm }}>
           <Row label="Tahmini yıllık gelir" value={formatMoney(basis.grossIncome)} />
@@ -100,27 +183,23 @@ export default function TaxSimulatorScreen() {
 
       <SectionHeader title="Vergi dilim dağılımı" subtitle="Her oran yalnızca o dilime düşen tutara uygulanır" />
       <Card style={{ gap: space.md }}>
-        <ProportionBar parts={tax.slices.map((s) => ({ value: s.taxableInSlice, label: `%${Math.round(s.rate * 100)}` }))} />
-        {tax.slices.map((s, i) => (
-          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: space.sm, opacity: s.taxableInSlice > 0 ? 1 : 0.5 }}>
-            <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: p.primary, opacity: 0.35 + i * 0.16 }} />
-            <T v="small" style={{ width: 44, fontWeight: "600" }}>
-              %{Math.round(s.rate * 100)}
-            </T>
-            <T v="caption" color="subtle" style={{ flex: 1 }} numberOfLines={1}>
-              {s.to === null ? `${formatMoney(s.from)} üzeri` : `${formatMoney(s.to)}'ye kadar`}
-            </T>
-            <T v="small" tnum>
-              {formatMoney(s.taxableInSlice)}
-            </T>
-            <T v="small" tnum style={{ width: 84, textAlign: "right", fontWeight: "600" }}>
-              {formatMoney(s.taxInSlice)}
+        {tax.slices.map((sl, i) => (
+          <View key={i} style={{ gap: 6, opacity: sl.taxableInSlice > 0 ? 1 : 0.45 }} accessible accessibilityLabel={`Yüzde ${Math.round(sl.rate * 100)} dilimi: matrah ${formatMoney(sl.taxableInSlice)}, vergi ${formatMoney(sl.taxInSlice)}`}>
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: space.sm }}>
+              <Text style={{ fontFamily: font.extrabold, fontSize: 16, color: p.text, width: 44 }}>%{Math.round(sl.rate * 100)}</Text>
+              <T v="caption" color="subtle" style={{ flex: 1 }} numberOfLines={1}>
+                {sl.to === null ? `${formatMoney(sl.from)} üzeri` : `${formatMoney(sl.to)}'ye kadar`}
+              </T>
+              <T v="small" tnum style={{ fontWeight: "800" }}>
+                {formatMoney(sl.taxInSlice)}
+              </T>
+            </View>
+            <MeterBar value={tax.taxableBase > 0 ? sl.taxableInSlice / tax.taxableBase : 0} color={p.primary} />
+            <T v="caption" color="subtle" tnum>
+              Bu dilimdeki matrah {formatMoney(sl.taxableInSlice)}
             </T>
           </View>
         ))}
-        <T v="caption" color="subtle">
-          Sütunlar: dilime düşen matrah · o dilimin vergisi
-        </T>
       </Card>
 
       <SectionHeader title="Yıl sonu tahmini" subtitle="Kümülatif gelir ve yaklaşık kümülatif vergi" />
@@ -159,22 +238,6 @@ export default function TaxSimulatorScreen() {
         <T v="small" color="muted">
           {extraK > 0 ? `Kabul edilirse tahmini vergin ${formatMoney(impact.taxDifference)} azalır; ancak harcamanın kendisi net kazancını ${formatMoney(impact.netCost)} düşürür.` : "Bir tutar gir."}
         </T>
-      </Card>
-
-      <SectionHeader title="Senaryolar" subtitle="Bir kararın vergi ve nakit etkisini karşılaştır" />
-      <Card style={{ paddingVertical: space.xs }}>
-        {SCENARIO_PRESETS.slice(0, 4).map((s) => (
-          <ListItem key={s.id} icon={FlaskConical} iconTone="primary" title={s.name} subtitle={s.description} chevron onPress={() => router.push({ pathname: "/senaryo", params: { preset: s.id } })} />
-        ))}
-        {scenarios.map((s) => (
-          <ListItem key={s.id} icon={FlaskConical} iconTone="positive" title={s.name} subtitle={`Kayıtlı · ${formatDate(s.createdAt.slice(0, 10))}`} chevron onPress={() => router.push({ pathname: "/senaryo", params: { id: s.id } })} />
-        ))}
-        <Pressable onPress={() => router.push("/senaryo")} accessibilityRole="button" style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, minHeight: 48 }}>
-          <T v="bodyStrong" color="primary">
-            Yeni senaryo oluştur
-          </T>
-          <ChevronRight size={18} color={p.primary} />
-        </Pressable>
       </Card>
 
       <SectionHeader title="KDV (ayrı hesap)" subtitle="KDV gelirin parçası değildir" />

@@ -1,6 +1,6 @@
 import { Download, FileText, Share2 } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { exportTransactionsCsv, toCsv } from "@solofin/core/finance/csv";
 import { endOfMonth, formatDate, monthLabel } from "@solofin/core/finance/dates";
 import { formatMoney } from "@solofin/core/finance/money";
@@ -12,7 +12,8 @@ import { reportCsvRows, reportHtml, type ReportData } from "@/lib/report";
 import { sharePdf, shareTextFile } from "@/lib/share";
 import { useStore } from "@/store/StoreProvider";
 import { useOverview } from "@/store/useOverview";
-import { space } from "@/theme";
+import { font, gradients, radius, space, type } from "@/theme";
+import { GradientCard, PressableScale } from "@/components/visuals";
 
 export default function ReportsScreen() {
   const { transactions, settings, today, mode, scenarios, retirement } = useStore();
@@ -62,12 +63,20 @@ export default function ReportsScreen() {
         <Badge label={`Kaynak: ${data.sourceLabel}`} tone={mode === "demo" ? "warning" : "primary"} />
       </View>
 
-      <Card style={{ gap: space.sm }}>
-        <Button label="PDF olarak paylaş" icon={Share2} onPress={() => run("pdf")} />
-        <View style={{ flexDirection: "row", gap: space.sm }}>
-          <Button label="Özet CSV" icon={FileText} variant="secondary" small onPress={() => run("csv")} style={{ flex: 1 }} />
-          <Button label="İşlemler CSV" icon={Download} variant="secondary" small onPress={() => run("tx")} style={{ flex: 1 }} />
+      <GradientCard colors={gradients.navy}>
+        <Text style={[type.caption, { color: "rgba(255,255,255,0.8)", letterSpacing: 0.6 }]}>{monthLabel(month, true).toLocaleUpperCase("tr")} {month.slice(0, 4)} RAPORU</Text>
+        <Text style={[type.hero, { color: "#FFF", fontSize: 28, marginTop: 4 }]}>{formatMoney(data.totals.net, "TRY", { signed: true })}</Text>
+        <Text style={[type.small, { color: "rgba(255,255,255,0.8)" }]}>Net (gelir − iş gideri) · {data.totals.count} işlem</Text>
+        <View style={{ flexDirection: "row", gap: space.sm, marginTop: space.lg }}>
+          <Button label="PDF paylaş" icon={Share2} onPress={() => run("pdf")} style={{ flex: 1 }} />
+          <PressableScale accessibilityLabel="Özet CSV paylaş" onPress={() => run("csv")} style={{ flex: 1, minHeight: 52, borderRadius: radius.lg, backgroundColor: "rgba(255,255,255,0.14)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <FileText size={18} color="#FFF" />
+            <Text style={{ color: "#FFF", fontFamily: font.bold, fontSize: 15 }}>CSV</Text>
+          </PressableScale>
         </View>
+      </GradientCard>
+      <Card style={{ gap: space.sm }}>
+        <Button label="Bu ayın işlemlerini CSV paylaş" icon={Download} variant="secondary" small onPress={() => run("tx")} />
         {status ? <Notice tone={status.tone}>{status.text}</Notice> : null}
       </Card>
 

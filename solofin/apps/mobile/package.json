@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@expo-google-fonts/manrope": "0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@solofin/core": "file:../../packages/core",
     "expo": "~58.0.17",
+    "expo-blur": "~58.0.5",
     "expo-constants": "~58.0.13",
     "expo-document-picker": "~58.0.4",
     "expo-file-system": "~58.0.10",
@@ -65,7 +67,8 @@
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1",
-      "^zod$": "<rootDir>/node_modules/zod"
+      "^zod$": "<rootDir>/node_modules/zod",
+      "^react-native-reanimated/mock$": "<rootDir>/jest/reanimated-mock.js"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|standard-navigation|react-native-svg|lucide-react-native|@solofin/.*)"

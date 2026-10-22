@@ -1,18 +1,18 @@
 import { router } from "expo-router";
 import { Download, FileUp, Plus, Search, SlidersHorizontal } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, TextInput, View } from "react-native";
+import { Alert, FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DEDUCTIBILITY, DEDUCTIBILITY_LABEL, TX_STATUS, TX_STATUS_LABEL, type TransactionInput } from "@solofin/core/data/schema";
+import { DEDUCTIBILITY, DEDUCTIBILITY_LABEL, TX_STATUS, TX_STATUS_LABEL, type Transaction, type TransactionInput } from "@solofin/core/data/schema";
 import { exportTransactionsCsv, importTransactionsCsv } from "@solofin/core/finance/csv";
-import { addMonths, formatDate } from "@solofin/core/finance/dates";
+import { addDays, addMonths, formatDate } from "@solofin/core/finance/dates";
 import { formatMoney } from "@solofin/core/finance/money";
-import { Badge, Button, Card, EmptyState, ListItem, Segmented, Sheet, T } from "@/components/ui";
-import { signedTx } from "@/lib/format";
-import { categoryIcon } from "@/lib/icons";
+import { TxRow } from "@/components/TxRow";
+import { Badge, Button, Card, EmptyState, Segmented, Sheet, T } from "@/components/ui";
+import { GradientCard, MeterBar } from "@/components/visuals";
 import { pickTextFile, shareTextFile } from "@/lib/share";
 import { useStore } from "@/store/StoreProvider";
-import { radius, space, type, useTheme } from "@/theme";
+import { gradients, radius, space, type, useTheme } from "@/theme";
 
 type Kind = "all" | "income" | "expense";
 type Period = "month" | "3m" | "year" | "all";
@@ -61,7 +61,27 @@ export default function TransactionsScreen() {
     return rows.sort((a, b) => mul * (key === "date" ? a.date.localeCompare(b.date) : a.amount - b.amount));
   }, [transactions, kind, from, query, category, status, deductibility, sort]);
 
-  const total = filtered.reduce((s, t) => s + (t.kind === "income" ? t.amount : -t.amount), 0);
+  const inSum = filtered.reduce((s, t) => s + (t.kind === "income" ? t.amount : 0), 0);
+  const outSum = filtered.reduce((s, t) => s + (t.kind === "expense" ? t.amount : 0), 0);
+  const total = inSum - outSum;
+
+  // Tarihe göre gruplanmış satırlar (yalnızca tarih sıralamasında)
+  type Item = { kind: "header"; key: string; label: string; sum: number } | { kind: "tx"; key: string; t: Transaction; first: boolean; last: boolean };
+  const items: Item[] = useMemo(() => {
+    const rows = filtered.slice(0, limit);
+    if (!sort.startsWith("date")) return rows.map((t, i) => ({ kind: "tx" as const, key: t.id, t, first: i === 0, last: i === rows.length - 1 }));
+    const out: Item[] = [];
+    let i = 0;
+    while (i < rows.length) {
+      const d = rows[i].date;
+      const group = [] as Transaction[];
+      while (i < rows.length && rows[i].date === d) group.push(rows[i++]);
+      const label = d === today ? "Bugün" : d === addDays(today, -1) ? "Dün" : formatDate(d, { year: d.slice(0, 4) !== today.slice(0, 4) });
+      out.push({ kind: "header", key: `h-${d}`, label, sum: group.reduce((s, t) => s + (t.kind === "income" ? t.amount : -t.amount), 0) });
+      group.forEach((t, j) => out.push({ kind: "tx", key: t.id, t, first: j === 0, last: j === group.length - 1 }));
+    }
+    return out;
+  }, [filtered, limit, sort, today]);
   const activeFilters = [category, status, deductibility].filter(Boolean).length;
 
   async function onImport() {
@@ -104,18 +124,27 @@ export default function TransactionsScreen() {
           { value: "all", label: "Tümü" },
         ]}
       />
-      <Card style={{ gap: space.sm }}>
+      <GradientCard colors={kind === "income" ? gradients.positive : gradients.hero}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <T v="small" color="muted">
-            {PERIODS.find((x) => x.value === period)?.label} · {filtered.length} kayıt
-          </T>
+          <Text style={[type.caption, { color: "rgba(255,255,255,0.8)", letterSpacing: 0.6 }]}>
+            {PERIODS.find((x) => x.value === period)?.label.toLocaleUpperCase("tr")} · {filtered.length} KAYIT
+          </Text>
           {mode === "demo" ? <Badge label="Demo" tone="warning" /> : null}
         </View>
-        <T v="value" tnum color={kind === "income" ? "positive" : "text"}>
-          {kind === "all" ? formatMoney(total, "TRY", { signed: true }) : formatMoney(Math.abs(total))}
-        </T>
-        <Segmented label="Dönem" value={period} onChange={setPeriod} options={PERIODS} />
-      </Card>
+        <Text style={[type.hero, { color: "#FFFFFF", marginTop: 4, fontVariant: ["tabular-nums"] }]}>
+          {kind === "all" ? formatMoney(total, "TRY", { signed: true }) : formatMoney(kind === "income" ? inSum : outSum)}
+        </Text>
+        {kind === "all" ? (
+          <View style={{ gap: 8, marginTop: space.sm }}>
+            <MeterBar value={inSum + outSum > 0 ? inSum / (inSum + outSum) : 0} color="#34D399" track="rgba(255,255,255,0.18)" />
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={[type.caption, { color: "#FFFFFF" }]}>Giriş {formatMoney(inSum)}</Text>
+              <Text style={[type.caption, { color: "#FFFFFF" }]}>Çıkış {formatMoney(outSum)}</Text>
+            </View>
+          </View>
+        ) : null}
+      </GradientCard>
+      <Segmented label="Dönem" value={period} onChange={setPeriod} options={PERIODS} />
       <View style={{ flexDirection: "row", gap: space.sm }}>
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: p.border, borderRadius: radius.md, paddingHorizontal: space.md, backgroundColor: p.surface, minHeight: 44 }}>
           <Search size={16} color={p.subtle} />
@@ -148,37 +177,43 @@ export default function TransactionsScreen() {
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <FlatList
         testID="tx-list"
-        data={filtered.slice(0, limit)}
-        keyExtractor={(t) => t.id}
+        data={items}
+        keyExtractor={(it) => it.key}
         ListHeaderComponent={header}
-        contentContainerStyle={{ padding: space.lg, paddingTop: space.lg + insets.top, paddingBottom: space.xxl * 2 }}
+        contentContainerStyle={{ padding: space.lg, paddingTop: space.lg + insets.top, paddingBottom: 130 }}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item: t, index }) => (
-          <View style={{ backgroundColor: p.surface, paddingHorizontal: space.md, borderTopLeftRadius: index === 0 ? radius.lg : 0, borderTopRightRadius: index === 0 ? radius.lg : 0, borderBottomLeftRadius: index === Math.min(limit, filtered.length) - 1 ? radius.lg : 0, borderBottomRightRadius: index === Math.min(limit, filtered.length) - 1 ? radius.lg : 0 }}>
-            <ListItem
-              icon={categoryIcon(t.category)}
-              iconTone={t.kind === "income" ? "positive" : "primary"}
-              title={t.description || t.category}
-              subtitle={`${t.category}${t.counterparty ? ` · ${t.counterparty}` : ""}`}
-              right={signedTx(t)}
-              rightSub={
-                t.status !== "paid" ? (
-                  <Badge label={TX_STATUS_LABEL[t.status]} tone={t.status === "overdue" ? "negative" : "warning"} />
-                ) : (
-                  formatDate(t.date)
-                )
-              }
-              onPress={() => router.push({ pathname: "/islem", params: { id: t.id } })}
-              accessibilityLabel={`${t.description || t.category}, ${signedTx(t)}, ${formatDate(t.date)}. Düzenlemek için dokun`}
-            />
-          </View>
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: p.border, marginLeft: 68 }} />}
+        renderItem={({ item }) =>
+          item.kind === "header" ? (
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: space.lg, paddingBottom: space.sm, paddingHorizontal: 4 }}>
+              <T v="small" color="muted" style={{ fontWeight: "700" }}>
+                {item.label}
+              </T>
+              <T v="small" color={item.sum >= 0 ? "positive" : "muted"} tnum style={{ fontWeight: "700" }}>
+                {formatMoney(item.sum, "TRY", { signed: true })}
+              </T>
+            </View>
+          ) : (
+            <View
+              style={{
+                backgroundColor: p.surface,
+                paddingHorizontal: space.md,
+                borderTopLeftRadius: item.first ? radius.xl : 0,
+                borderTopRightRadius: item.first ? radius.xl : 0,
+                borderBottomLeftRadius: item.last ? radius.xl : 0,
+                borderBottomRightRadius: item.last ? radius.xl : 0,
+                borderBottomWidth: item.last ? 0 : 1,
+                borderBottomColor: p.border,
+              }}
+            >
+              <TxRow t={item.t} showDate={!sort.startsWith("date")} />
+            </View>
+          )
+        }
         ListEmptyComponent={
           <Card>
             <EmptyState
               title={transactions.length === 0 ? "Henüz işlem yok" : "Bu filtreye uyan işlem yok"}
-              description={transactions.length === 0 ? "İlk gelir veya giderini ekle ya da CSV ile içe aktar." : "Dönemi veya filtreleri değiştir."}
+              description={transactions.length === 0 ? "Ortadaki + butonuyla ilk gelir veya giderini ekle ya da CSV ile içe aktar." : "Dönemi veya filtreleri değiştir."}
             />
           </Card>
         }

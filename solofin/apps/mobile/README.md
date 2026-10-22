@@ -16,6 +16,12 @@ npx expo start          # QR kodu Expo Go (SDK 58) ile okut
 - Kurulabilir derleme (APK / TestFlight): `npx eas-cli@latest build --profile preview --platform android`
   veya `--platform ios` (Expo hesabı gerekir; `eas.json` hazır)
 
+## Tasarım
+
+Görsel öncelikli fintech arayüzü: gradyan hero kartları, Manrope yazı tipi, yüzen bulanık sekme çubuğu ve ortada
+"+" hızlı işlem butonu, dokunsal geri bildirim, sayarak yükselen tutarlar ve animasyonlu grafikler
+(`src/components/visuals.tsx`). "Hareketi azalt" erişilebilirlik ayarı açıksa animasyonlar kapanır.
+
 ## Ekranlar
 
 | Sekme | İçerik |

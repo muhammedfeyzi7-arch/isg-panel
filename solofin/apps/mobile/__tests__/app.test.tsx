@@ -20,9 +20,9 @@ describe("SOLOFIN mobil", () => {
   it("ana ekran demo verisiyle güvenle kullanılabilir tutarı gösterir", async () => {
     await renderRouter(appDir, { initialUrl: "/" });
     await ready();
-    expect(await screen.findByText("Bugün güvenle kullanabileceğin tahmini tutar", all)).toBeTruthy();
+    expect(await screen.findByText("BUGÜN GÜVENLE KULLANABİLECEĞİN", all)).toBeTruthy();
     expect(screen.getByTestId("safe-amount", all).props.children).toMatch(/₺/);
-    expect(screen.getAllByText("Demo verisi", all).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Demo", all).length).toBeGreaterThan(0);
   });
 
   it("işlem formu geçersiz girdiyi reddeder, geçerli gideri kaydeder ve kalıcı yazar", async () => {
@@ -34,8 +34,7 @@ describe("SOLOFIN mobil", () => {
 
     await fireEvent.changeText(screen.getByTestId("tx-amount", all), "7.777,50");
     await fireEvent.changeText(screen.getByTestId("tx-description", all), "Jest test kursu");
-    await fireEvent.press(screen.getByLabelText("Kategori: seçilmedi", all));
-    await fireEvent.press(await screen.findByText("Eğitim", all));
+    await fireEvent.press(screen.getByLabelText("Kategori Eğitim", all));
     await fireEvent.press(screen.getByTestId("tx-save", all));
 
     await waitFor(async () => {
@@ -46,6 +45,16 @@ describe("SOLOFIN mobil", () => {
       expect(tx.amount).toBe(777750);
       expect(tx.deductibility).toBe("unknown");
     });
+  });
+
+  it("tuş takımı tutarı TR biçiminde oluşturur", async () => {
+    await renderRouter(appDir, { initialUrl: "/islem?kind=expense" });
+    await ready();
+    await screen.findByLabelText("Virgül", all);
+    for (const k of ["1", "2", "5", "0", "0", "Virgül", "7", "5", "9"]) await fireEvent.press(await screen.findByLabelText(k, all));
+    expect(screen.getByTestId("tx-amount", all).props.value).toBe("12.500,75");
+    await fireEvent.press(screen.getByLabelText("Sil", all));
+    expect(screen.getByTestId("tx-amount", all).props.value).toBe("12.500,7");
   });
 
   it("senaryo ekranı motor sonucunu gösterir ve senaryoyu kaydeder", async () => {
