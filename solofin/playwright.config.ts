@@ -10,7 +10,7 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3100",
     trace: "off",
-    launchOptions: executablePath ? { executablePath } : {},
+    launchOptions: { args: ["--no-proxy-server"], ...(executablePath ? { executablePath } : {}) },
   },
   webServer: {
     command: "npm run start -- -p 3100",

@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg: 247 247 245;
+  --surface: 255 255 255;
+  --surface-2: 241 242 244;
+  --border: 226 228 233;
+  --fg: 13 18 30;
+  --muted: 82 89 104;
+  --subtle: 120 127 142;
+  --primary: 37 99 235;
+  --primary-fg: 255 255 255;
+  --positive: 4 120 87;
+  --warning: 180 83 9;
+  --negative: 200 30 30;
+  /* grafik serileri (doğrulanmış kategorik palet, açık tema) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --chart-grid: #e7e8ec;
+  --chart-axis: #6b7280;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: 8 13 26;
+  --surface: 14 21 38;
+  --surface-2: 21 30 52;
+  --border: 33 44 70;
+  --fg: 236 239 245;
+  --muted: 160 170 190;
+  --subtle: 120 131 155;
+  --primary: 77 135 245;
+  --primary-fg: 255 255 255;
+  --positive: 52 199 140;
+  --warning: 245 176 65;
+  --negative: 248 113 113;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --chart-grid: #1e2a44;
+  --chart-axis: #8b95ab;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  @apply bg-bg text-fg antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Odak görünürlüğü */
+:focus-visible { outline: 2px solid rgb(var(--primary)); outline-offset: 2px; border-radius: 6px; }
+
+dialog::backdrop { background: rgb(4 8 18 / 0.55); backdrop-filter: blur(2px); }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; color: black; }
+  .print-break { break-before: page; }
+  main { padding: 0 !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

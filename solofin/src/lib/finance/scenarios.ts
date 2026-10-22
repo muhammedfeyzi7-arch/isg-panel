@@ -1,5 +1,6 @@
 import type { ScenarioLevers } from "../data/schema";
-import { applyRate, type Kurus } from "./money";
+import type { Kurus } from "./money";
+import type { YearProjection } from "./summary";
 import { computeIncomeTax, type IncomeTaxResult } from "./tax/engine";
 import type { TaxRuleSet } from "./tax/rules";
 
@@ -193,9 +194,36 @@ export const SCENARIO_PRESETS: { id: string; name: string; description: string; 
   { id: "retire", name: "Emeklilik için daha fazla ayırırsam", description: "Aylık 5.000 TL ek birikim", levers: { extraMonthlySavings: 500_000 } },
 ];
 
-/** Yardımcı: KDV dahil bir tutarın KDV'siz karşılığı */
-export function netOfVat(gross: Kurus, vatRate: number): Kurus {
-  return Math.round(gross / (1 + vatRate));
+/**
+ * Yıl projeksiyonundan senaryo baz durumunu türetir.
+ * Bağ-Kur primi ortalama giderden ayrılır (senaryo motorunda ayrı kalem olarak işlenir, çift sayılmaz).
+ */
+export function baselineFromProjection(
+  p: YearProjection,
+  opts: {
+    cashAfterReserve: Kurus;
+    monthlyPersonalSpend: Kurus;
+    deductSocialSecurity: boolean;
+    youngEntrepreneur: boolean;
+    yearsToRetirement: number;
+    realReturn: number;
+  },
+): Baseline {
+  const monthlySS = Math.round(p.projectedBasis.socialSecurity / 12);
+  const b = p.ytd;
+  const deductible = b.confirmedDeductible + b.assumedDeductible;
+  const allExp = deductible + b.unknownExpenses + b.nonDeductible;
+  return {
+    monthlyIncome: p.avgMonthlyIncome,
+    monthlyExpense: Math.max(0, p.avgMonthlyExpense - monthlySS),
+    deductibleShare: allExp > 0 ? deductible / allExp : 0,
+    monthlySocialSecurity: monthlySS,
+    deductSocialSecurity: opts.deductSocialSecurity,
+    youngEntrepreneur: opts.youngEntrepreneur,
+    monthlyPersonalSpend: opts.monthlyPersonalSpend,
+    startingCash: opts.cashAfterReserve,
+    withholdingRatio: b.grossIncome > 0 ? b.withholdingCredits / b.grossIncome : 0,
+    yearsToRetirement: Math.max(0, opts.yearsToRetirement),
+    realReturn: opts.realReturn,
+  };
 }
-
-export { applyRate };
