@@ -5,6 +5,7 @@ import { Button, Field, Input, Segmented, Select } from "@/components/ui";
 import {
   DEDUCTIBILITY,
   DEDUCTIBILITY_LABEL,
+  defaultDeductibility,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
   TX_STATUS,
@@ -16,12 +17,7 @@ import {
 } from "@solofin/core/data/schema";
 import { CURRENCIES, fromKurus, parseMoneyInput } from "@solofin/core/finance/money";
 
-/** Kategoriye göre VARSAYILAN vergisel sınıflandırma — kesin hüküm değildir, kullanıcı değiştirebilir. */
-export function defaultDeductibility(category: string): Deductibility {
-  if (category === "Kişisel") return "non_deductible";
-  if (category === "Eğitim" || category === "Diğer Gider") return "unknown";
-  return "assumed_deductible";
-}
+export { defaultDeductibility };
 
 interface Props {
   initial?: Transaction;

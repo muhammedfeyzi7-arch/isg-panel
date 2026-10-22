@@ -187,3 +187,34 @@ describe("demo veri ve özetler", () => {
     expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
   });
 });
+
+describe("ortak veritabanı ve genel bakış", async () => {
+  const { loadDatabase, seedDemoDatabase, userIdFor } = await import("../src/data/db");
+  const { computeOverview } = await import("../src/finance/overview");
+  it("bozuk veya boş depolamada moda uygun başlangıç verisi döner; demo ve yerel ayrıdır", () => {
+    const demo = loadDatabase("{bozuk", "demo", "2026-10-22");
+    expect(demo.transactions.length).toBeGreaterThan(20);
+    const local = loadDatabase(null, "local", "2026-10-22");
+    expect(local.transactions).toHaveLength(0);
+    expect(local.settings[userIdFor("local")]).toBeDefined();
+    expect(userIdFor("demo")).not.toBe(userIdFor("local"));
+  });
+  it("genel bakış motor fonksiyonlarıyla tutarlıdır", () => {
+    const db = seedDemoDatabase("2026-10-22");
+    const o = computeOverview(db.transactions, db.recurring, db.settings[userIdFor("demo")], "2026-10-22");
+    expect(o.safe.rawAmount).toBe(o.safe.cashBalance - o.safe.taxReserve.total - o.safe.upcomingObligations - o.safe.safetyBuffer);
+    expect(o.rules.year).toBe(2026);
+  });
+});
+
+describe("senaryo özeti", async () => {
+  const { scenarioInsight, isNeutral } = await import("../src/finance/scenarios");
+  it("nötr kaldıraçlarda yönlendirme metni, ekipmanda vergi avantajının harcamadan küçük olduğunu söyler", () => {
+    expect(isNeutral(NEUTRAL_LEVERS)).toBe(true);
+    expect(scenarioInsight(NEUTRAL_LEVERS, compareScenario(baseline, NEUTRAL_LEVERS, TR_2026).diff)).toMatch(/Bir varsayımı/);
+    const lev = { ...NEUTRAL_LEVERS, oneOffPurchase: TL(5_000) };
+    const text = scenarioInsight(lev, compareScenario(baseline, lev, TR_2026).diff);
+    expect(text).toMatch(/azalır/);
+    expect(text).toMatch(/harcamanın kendisinden küçüktür/);
+  });
+});

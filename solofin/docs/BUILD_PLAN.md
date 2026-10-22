@@ -1,5 +1,18 @@
 # SOLOFIN — Build Plan
 
+## Güncelleme — mobil uygulama (2026-10-22)
+
+Kullanıcı ürünün **mobil uygulama** olması gerektiğini belirtti (ilk talimatta "ilk aşamada web, native
+uygulama oluşturma" yazıyordu). Karar:
+
+- **Expo SDK 58 (React Native 0.88, expo-router)** ile iOS + Android uygulaması: `apps/mobile`.
+  Expo Go'nun desteklediği güncel SDK seçildi; EAS ile mağaza derlemesi yapılabilir.
+- Hesaplama motoru `packages/core`'a ayrıldı; web (`apps/web`) ve mobil aynı motoru kullanır.
+- Mobil veriler AsyncStorage'da (cihazda) tutulur; web localStorage kullanır. Demo/kullanıcı verisi ayrı.
+- Tasarım, kullanıcının paylaştığı ekran görüntülerini izler: koyu lacivert ana ekran, açık diğer ekranlar,
+  5 sekme (Ana Sayfa, Gelir/Gider, Simülasyon, Belgeler, Profil).
+- Belge tarama: kamera/galeri + elle alan girişi. OCR yok (açıkça belirtilir).
+
 ## Ortam tespiti (FAZ 1)
 - Repo (`isg-panel`) mevcut bir Vite/React İSG paneli içeriyor. SOLOFIN onunla **ilgisiz** olduğu için
   mevcut dosyalara dokunulmadı; uygulama bağımsız bir paket olarak `solofin/` dizininde kuruldu.

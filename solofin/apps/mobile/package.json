@@ -1,0 +1,79 @@
+{
+  "name": "solofin-mobile",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@solofin/core": "file:../../packages/core",
+    "expo": "~58.0.17",
+    "expo-constants": "~58.0.13",
+    "expo-document-picker": "~58.0.4",
+    "expo-file-system": "~58.0.10",
+    "expo-font": "~58.0.9",
+    "expo-haptics": "~58.0.7",
+    "expo-image-picker": "~58.0.10",
+    "expo-linear-gradient": "~58.0.3",
+    "expo-linking": "~58.0.14",
+    "expo-print": "~58.0.7",
+    "expo-router": "~58.0.25",
+    "expo-sharing": "~58.0.20",
+    "expo-splash-screen": "~58.0.11",
+    "expo-status-bar": "~58.0.4",
+    "expo-symbols": "~58.0.4",
+    "expo-web-browser": "~58.0.6",
+    "lucide-react-native": "0.539.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.0",
+    "react-native-svg": "15.16.0",
+    "react-native-web": "~0.21.4",
+    "react-native-worklets": "0.13.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^58.0.4",
+    "jest": "^30.5.2",
+    "jest-expo": "^58.0.12",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "export:web": "expo export --platform web",
+    "doctor": "expo-doctor",
+    "test:e2e": "playwright test"
+  },
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "testMatch": [
+      "<rootDir>/__tests__/**/*.test.ts?(x)"
+    ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1",
+      "^zod$": "<rootDir>/node_modules/zod"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|standard-navigation|react-native-svg|lucide-react-native|@solofin/.*)"
+    ],
+    "setupFiles": [
+      "<rootDir>/jest.setup.ts"
+    ],
+    "modulePaths": [
+      "<rootDir>/node_modules"
+    ]
+  }
+}

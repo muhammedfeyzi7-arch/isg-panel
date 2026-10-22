@@ -10,7 +10,7 @@ import { downloadText } from "@/lib/download";
 import { exportTransactionsCsv, toCsv } from "@solofin/core/finance/csv";
 import { endOfMonth, formatDate, monthLabel } from "@solofin/core/finance/dates";
 import { formatMoney, fromKurus } from "@solofin/core/finance/money";
-import { baselineFromProjection, compareScenario } from "@solofin/core/finance/scenarios";
+import { baselineForUser, compareScenario } from "@solofin/core/finance/scenarios";
 import { RETURN_PROFILES } from "@solofin/core/finance/retirement";
 import { categoryBreakdown, lastNMonths, totals } from "@solofin/core/finance/summary";
 
@@ -27,18 +27,7 @@ export default function ReportsPage() {
   const expenseCats = categoryBreakdown(transactions, "expense", from, to);
   const monthTx = transactions.filter((x) => x.date >= from && x.date <= to);
 
-  const baseline = useMemo(
-    () =>
-      baselineFromProjection(projection, {
-        cashAfterReserve: Math.max(0, settings.cashBalance - safe.taxReserve.total),
-        monthlyPersonalSpend: settings.monthlyPersonalSpend,
-        deductSocialSecurity: settings.deductSocialSecurity,
-        youngEntrepreneur: settings.youngEntrepreneur,
-        yearsToRetirement: retirement.targetAge - retirement.currentAge,
-        realReturn: RETURN_PROFILES[1].realReturn,
-      }),
-    [projection, settings, safe.taxReserve.total, retirement],
-  );
+  const baseline = useMemo(() => baselineForUser(projection, settings, safe.taxReserve.total, retirement, RETURN_PROFILES[1].realReturn), [projection, settings, safe.taxReserve.total, retirement]);
   const scenarioRows = scenarios.map((s) => ({ s, c: compareScenario(baseline, s.levers, rules) }));
 
   const sourceLabel = mode === "demo" ? "Demo verisi (kurgusal)" : "Kullanıcı verisi (bu tarayıcıda saklanan)";

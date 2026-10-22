@@ -65,6 +65,18 @@ describe("kullanıcı izolasyonu (yerel depo)", () => {
     expect(bob.listTransactions()).toHaveLength(1);
   });
 
+  it("belgeler kullanıcıya özeldir ve eski veritabanı (documents alanı yok) yüklenebilir", () => {
+    const db = emptyDatabase();
+    const alice = new Repository(db, "alice");
+    const bob = new Repository(db, "bob");
+    const d = alice.createDocument({ uri: "file:///x.jpg", fileName: "x.jpg", date: "2026-10-01", vendor: "Tekno", amount: 100, vatAmount: 20, category: "Ekipman", documentNo: "", extraction: "manual" });
+    expect(bob.listDocuments()).toHaveLength(0);
+    expect(() => bob.deleteDocument(d.id)).toThrow(AccessDeniedError);
+    expect(() => bob.updateDocument(d.id, { vendor: "x" })).toThrow(AccessDeniedError);
+    const legacy = hydrateDatabase({ version: 1, transactions: [], recurring: [], scenarios: [], settings: {}, retirement: {} });
+    expect(legacy.documents).toEqual([]);
+  });
+
   it("oturumsuz depo oluşturulamaz; olmayan kayıt NotFound", () => {
     expect(() => new Repository(emptyDatabase(), "")).toThrow(AccessDeniedError);
     expect(() => new Repository(emptyDatabase(), "x").getTransaction("nope")).toThrow(NotFoundError);

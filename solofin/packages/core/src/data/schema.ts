@@ -184,3 +184,36 @@ export const retirementInputSchema = z.object({
   withdrawalRate: z.number().min(0.01).max(0.1),
 });
 export type RetirementInput = z.infer<typeof retirementInputSchema>;
+
+/**
+ * Belge (fatura / makbuz görüntüsü). Alanlar kullanıcı tarafından girilir veya onaylanır;
+ * otomatik okuma (OCR) yapılmadıkça `extraction` "manual" olarak kalır.
+ */
+export const documentSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  /** Cihazdaki dosya yolu (uygulama belge dizini) */
+  uri: z.string().min(1),
+  fileName: z.string().max(200),
+  date: isoDate,
+  vendor: z.string().max(120),
+  /** KDV hariç tutar (kuruş) */
+  amount: z.number().int().nonnegative(),
+  vatAmount: z.number().int().nonnegative(),
+  category: z.string().max(60),
+  documentNo: z.string().max(60).default(""),
+  extraction: z.enum(["manual", "ocr"]),
+  /** Gider olarak eklendiyse bağlı işlem */
+  transactionId: z.string().optional(),
+  createdAt: z.string(),
+});
+export type SolofinDocument = z.infer<typeof documentSchema>;
+export const documentInputSchema = documentSchema.omit({ id: true, userId: true, createdAt: true });
+export type DocumentInput = z.infer<typeof documentInputSchema>;
+
+/** Kategoriye göre VARSAYILAN vergisel sınıflandırma — kesin hüküm değildir, kullanıcı değiştirebilir. */
+export function defaultDeductibility(category: string): Deductibility {
+  if (category === "Kişisel") return "non_deductible";
+  if (category === "Eğitim" || category === "Diğer Gider") return "unknown";
+  return "assumed_deductible";
+}

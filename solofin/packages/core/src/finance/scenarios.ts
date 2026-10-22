@@ -227,3 +227,48 @@ export function baselineFromProjection(
     realReturn: opts.realReturn,
   };
 }
+
+/** Tüm ekranlarda kullanılan standart baz durum: vergi rezervi düşülmüş nakit, orta emeklilik profili. */
+export function baselineForUser(
+  p: YearProjection,
+  settings: { cashBalance: Kurus; monthlyPersonalSpend: Kurus; deductSocialSecurity: boolean; youngEntrepreneur: boolean },
+  taxReserveTotal: Kurus,
+  retirement: { targetAge: number; currentAge: number },
+  realReturn = 0.03,
+): Baseline {
+  return baselineFromProjection(p, {
+    cashAfterReserve: Math.max(0, settings.cashBalance - taxReserveTotal),
+    monthlyPersonalSpend: settings.monthlyPersonalSpend,
+    deductSocialSecurity: settings.deductSocialSecurity,
+    youngEntrepreneur: settings.youngEntrepreneur,
+    yearsToRetirement: retirement.targetAge - retirement.currentAge,
+    realReturn,
+  });
+}
+
+function tl(k: Kurus): string {
+  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(Math.abs(k) / 100);
+}
+
+export function isNeutral(levers: ScenarioLevers): boolean {
+  return (Object.keys(NEUTRAL_LEVERS) as (keyof ScenarioLevers)[]).every((k) => NEUTRAL_LEVERS[k] === levers[k]);
+}
+
+/**
+ * Senaryonun sade dille özeti. Yalnızca motorun hesapladığı farkları anlatır; harcamayı teşvik etmez.
+ */
+export function scenarioInsight(levers: ScenarioLevers, diff: ScenarioComparison["diff"]): string {
+  if (isNeutral(levers)) return "Bir varsayımı değiştirerek etkisini burada gör.";
+  const parts: string[] = [];
+  if (diff.tax !== 0) parts.push(`Tahmini gelir vergin ${tl(diff.tax)} ${diff.tax < 0 ? "azalır" : "artar"}`);
+  if (diff.netEarnings !== 0) parts.push(`12 aylık net kazancın ${tl(diff.netEarnings)} ${diff.netEarnings > 0 ? "artar" : "azalır"}`);
+  if (diff.minCash < 0) parts.push(`en düşük nakit seviyen ${tl(diff.minCash)} düşer`);
+  let text = parts.length ? `${parts.join(", ")}.` : "Bu değişiklik 12 aylık sonuçları belirgin biçimde etkilemiyor.";
+  if (levers.oneOffPurchase > 0 && diff.tax < 0 && diff.netEarnings < 0) {
+    text += ` Vergi avantajı (${tl(diff.tax)}) harcamanın kendisinden küçüktür; gider yalnızca işin için gerçekten gerekliyse anlamlıdır.`;
+  }
+  if (levers.priceChange > 0 && diff.annualIncome > 0 && diff.netEarnings > 0) {
+    text += ` Ek gelirin yaklaşık %${Math.round((diff.netEarnings / diff.annualIncome) * 100)}'i net kazanca dönüşür.`;
+  }
+  return text;
+}

@@ -11,8 +11,9 @@ import { useStore } from "@/lib/data/store";
 import { useFinance } from "@/lib/data/useFinance";
 import { formatDate, monthLabel } from "@solofin/core/finance/dates";
 import { formatMoney, formatPercent, parseMoneyInput } from "@solofin/core/finance/money";
-import { buildTaxBasis, countsForTax, monthlySeries, projectYear, taxInputFromBasis } from "@solofin/core/finance/summary";
-import { computeProgressiveTax, computeVat, deductionImpact, estimateProvisionalTax } from "@solofin/core/finance/tax/engine";
+import { taxInputFromBasis } from "@solofin/core/finance/summary";
+import { taxView } from "@solofin/core/finance/taxView";
+import { deductionImpact } from "@solofin/core/finance/tax/engine";
 import { allRuleMetas, type Verification } from "@solofin/core/finance/tax/rules";
 
 const VERIFICATION_LABEL: Record<Verification, { label: string; tone: "positive" | "warning" | "negative" }> = {
@@ -28,34 +29,14 @@ export default function TaxPage() {
   const [includeAssumed, setIncludeAssumed] = useState(true);
   const [extraExpense, setExtraExpense] = useState("50.000");
 
-  const projection = useMemo(() => projectYear(transactions, settings, rules, today, { includeAssumed }), [transactions, settings, rules, today, includeAssumed]);
+  const view = useMemo(() => taxView(transactions, settings, rules, today, includeAssumed), [transactions, settings, rules, today, includeAssumed]);
+  const { projection, vat, provisional } = view;
   const basis = period === "projected" ? projection.projectedBasis : projection.ytd;
   const tax = period === "projected" ? projection.projectedTax : projection.ytdTax;
   const allExpenses = basis.confirmedDeductible + basis.assumedDeductible + basis.unknownExpenses + basis.nonDeductible;
   const netEarnings = basis.grossIncome - allExpenses - basis.socialSecurity - tax.incomeTax;
 
   const totalTax = tax.slices.reduce((s, x) => s + x.taxInSlice, 0);
-
-  // KDV — gelir vergisinden ayrı
-  const vat = useMemo(() => {
-    const ytd = buildTaxBasis(transactions, settings, rules, `${settings.taxYear}-01-01`, today);
-    const month = buildTaxBasis(transactions, settings, rules, `${today.slice(0, 7)}-01`, today);
-    return { ytd: computeVat(ytd.salesForVat, ytd.purchasesForVat), month: computeVat(month.salesForVat, month.purchasesForVat) };
-  }, [transactions, settings, rules, today]);
-
-  // Geçici vergi dönemleri
-  const provisional = useMemo(() => {
-    let paid = 0;
-    return rules.provisionalTax.quarters.map((q) => {
-      const end = `${settings.taxYear}-${String(q.endMonth).padStart(2, "0")}-31`;
-      const due = `${settings.taxYear}-${String(q.dueMonth).padStart(2, "0")}-${String(q.dueDay).padStart(2, "0")}`;
-      const b = buildTaxBasis(transactions, settings, rules, `${settings.taxYear}-01-01`, end);
-      const profit = Math.max(0, b.grossIncome - b.confirmedDeductible - (includeAssumed ? b.assumedDeductible : 0) - b.depreciation - (settings.deductSocialSecurity ? b.socialSecurity : 0));
-      const est = Math.max(0, estimateProvisionalTax(profit, paid, rules) - b.withholdingCredits);
-      paid += est;
-      return { ...q, due, profit, est, past: due < today, complete: end.slice(0, 7) < today.slice(0, 7) };
-    });
-  }, [transactions, settings, rules, today, includeAssumed]);
 
   // Gider etkisi
   const extra = parseMoneyInput(extraExpense) ?? 0;
@@ -64,19 +45,7 @@ export default function TaxPage() {
     [projection.projectedBasis, settings, includeAssumed, extra, rules],
   );
 
-  // Kümülatif gelir ve yaklaşık kümülatif vergi
-  const cumulative = useMemo(() => {
-    const counted = transactions.filter((t) => countsForTax(t, settings));
-    const actual = monthlySeries(counted, projection.months.map((m) => m.month));
-    let inc = 0;
-    let net = 0;
-    return projection.months.map((m, i) => {
-      const src = m.projected ? m : actual[i];
-      inc += src.income;
-      net += src.income - src.expense;
-      return { month: m.month, gelir: inc, vergi: computeProgressiveTax(Math.max(0, net), rules.incomeTax.brackets).tax };
-    });
-  }, [projection, transactions, settings, rules]);
+  const cumulative = view.cumulative.map((c) => ({ month: c.month, gelir: c.income, vergi: c.tax }));
 
   return (
     <>

@@ -10,9 +10,9 @@ import type { ScenarioLevers } from "@solofin/core/data/schema";
 import { useStore } from "@/lib/data/store";
 import { useFinance } from "@/lib/data/useFinance";
 import { formatDate } from "@solofin/core/finance/dates";
-import { formatMoney, formatPercent, type Kurus } from "@solofin/core/finance/money";
+import { formatMoney, type Kurus } from "@solofin/core/finance/money";
 import { RETURN_PROFILES } from "@solofin/core/finance/retirement";
-import { baselineFromProjection, compareScenario, NEUTRAL_LEVERS, SCENARIO_PRESETS } from "@solofin/core/finance/scenarios";
+import { baselineForUser, compareScenario, NEUTRAL_LEVERS, SCENARIO_PRESETS, scenarioInsight } from "@solofin/core/finance/scenarios";
 
 function MoneyLever({ id, label, value, onChange, hint }: { id: string; label: string; value: Kurus; onChange: (v: Kurus) => void; hint?: string }) {
   return (
@@ -70,18 +70,7 @@ export default function ScenariosPage() {
   const [loadedId, setLoadedId] = useState<string | undefined>();
   const [saved, setSaved] = useState(false);
 
-  const baseline = useMemo(
-    () =>
-      baselineFromProjection(projection, {
-        cashAfterReserve: Math.max(0, settings.cashBalance - safe.taxReserve.total),
-        monthlyPersonalSpend: settings.monthlyPersonalSpend,
-        deductSocialSecurity: settings.deductSocialSecurity,
-        youngEntrepreneur: settings.youngEntrepreneur,
-        yearsToRetirement: retirement.targetAge - retirement.currentAge,
-        realReturn: RETURN_PROFILES[1].realReturn,
-      }),
-    [projection, settings, safe.taxReserve.total, retirement],
-  );
+  const baseline = useMemo(() => baselineForUser(projection, settings, safe.taxReserve.total, retirement, RETURN_PROFILES[1].realReturn), [projection, settings, safe.taxReserve.total, retirement]);
   const cmp = useMemo(() => compareScenario(baseline, levers, rules), [baseline, levers, rules]);
   const set = <K extends keyof ScenarioLevers>(k: K, v: ScenarioLevers[K]) => {
     setLevers((l) => ({ ...l, [k]: v }));
@@ -103,7 +92,7 @@ export default function ScenariosPage() {
   if (levers.extraMonthlySavings > 0)
     rows.push({ label: "Emeklilikte ek birikim (bugünün parasıyla)", b: formatMoney(0), s: formatMoney(s.retirementBoost), d: <DiffCell value={s.retirementBoost} /> });
 
-  const insight = buildInsight(levers, diff);
+  const insight = scenarioInsight(levers, diff);
 
   return (
     <>
@@ -314,21 +303,4 @@ export default function ScenariosPage() {
       </div>
     </>
   );
-}
-
-function buildInsight(levers: ScenarioLevers, diff: ReturnType<typeof compareScenario>["diff"]): string {
-  const parts: string[] = [];
-  const tax = diff.tax;
-  const net = diff.netEarnings;
-  const isNeutral = Object.entries(levers).every(([k, v]) => (NEUTRAL_LEVERS as Record<string, unknown>)[k] === v);
-  if (isNeutral) return "Bir varsayımı değiştirerek etkisini burada gör.";
-  if (tax !== 0) parts.push(`Tahmini gelir vergin ${formatMoney(Math.abs(tax))} ${tax < 0 ? "azalır" : "artar"}`);
-  if (net !== 0) parts.push(`12 aylık net kazancın ${formatMoney(Math.abs(net))} ${net > 0 ? "artar" : "azalır"}`);
-  if (diff.minCash < 0) parts.push(`en düşük nakit seviyen ${formatMoney(-diff.minCash)} düşer`);
-  let text = parts.length ? `${parts.join(", ")}.` : "Bu değişiklik 12 aylık sonuçları belirgin biçimde etkilemiyor.";
-  if (levers.oneOffPurchase > 0 && tax < 0 && net < 0) {
-    text += ` Vergi avantajı (${formatMoney(-tax)}) harcamanın kendisinden küçüktür; gider yalnızca işin için gerçekten gerekliyse anlamlıdır.`;
-  }
-  if (levers.priceChange > 0) text += ` Etkin oran: ek gelirin yaklaşık ${formatPercent(diff.annualIncome > 0 ? net / diff.annualIncome : 0, 0)}'i net kazanca dönüşür.`;
-  return text;
 }

@@ -1,11 +1,15 @@
 import {
+  documentInputSchema,
+  documentSchema,
   recurringItemSchema,
   retirementInputSchema,
   scenarioLeversSchema,
   settingsSchema,
   transactionInputSchema,
   transactionSchema,
+  type DocumentInput,
   type RecurringItem,
+  type SolofinDocument,
   type RetirementInput,
   type Scenario,
   type ScenarioLevers,
@@ -27,10 +31,11 @@ export interface LocalDatabase {
   scenarios: Scenario[];
   settings: Record<string, Settings>;
   retirement: Record<string, RetirementInput>;
+  documents: SolofinDocument[];
 }
 
 export function emptyDatabase(): LocalDatabase {
-  return { version: 1, transactions: [], recurring: [], scenarios: [], settings: {}, retirement: {} };
+  return { version: 1, transactions: [], recurring: [], scenarios: [], settings: {}, retirement: {}, documents: [] };
 }
 
 export class AccessDeniedError extends Error {
@@ -161,6 +166,30 @@ export class Repository {
     this.db.scenarios.splice(this.db.scenarios.indexOf(existing), 1);
   }
 
+  // ---- Belgeler ----
+  listDocuments(): SolofinDocument[] {
+    return this.own(this.db.documents).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  }
+
+  createDocument(input: DocumentInput): SolofinDocument {
+    const data = documentInputSchema.parse(input);
+    const doc = documentSchema.parse({ ...data, id: newId("doc"), userId: this.userId, createdAt: new Date().toISOString() });
+    this.db.documents.push(doc);
+    return doc;
+  }
+
+  updateDocument(id: string, patch: Partial<DocumentInput>): SolofinDocument {
+    const existing = this.findOwned(this.db.documents, id);
+    const updated = documentSchema.parse({ ...existing, ...patch, id: existing.id, userId: existing.userId });
+    this.db.documents[this.db.documents.indexOf(existing)] = updated;
+    return updated;
+  }
+
+  deleteDocument(id: string): void {
+    const existing = this.findOwned(this.db.documents, id);
+    this.db.documents.splice(this.db.documents.indexOf(existing), 1);
+  }
+
   // ---- Ayarlar ----
   getSettings(): Settings {
     return this.db.settings[this.userId] ?? DEFAULT_SETTINGS;
@@ -192,6 +221,7 @@ export class Repository {
       scenarios: this.listScenarios(),
       settings: this.getSettings(),
       retirement: this.getRetirement(),
+      documents: this.listDocuments(),
     };
   }
 
@@ -201,6 +231,7 @@ export class Repository {
     this.db.transactions = keep(this.db.transactions);
     this.db.recurring = keep(this.db.recurring);
     this.db.scenarios = keep(this.db.scenarios);
+    this.db.documents = keep(this.db.documents);
     delete this.db.settings[this.userId];
     delete this.db.retirement[this.userId];
   }
@@ -214,6 +245,7 @@ export function hydrateDatabase(raw: unknown): LocalDatabase {
   if (Array.isArray(r.transactions)) db.transactions = r.transactions.filter((t) => transactionSchema.safeParse(t).success);
   if (Array.isArray(r.recurring)) db.recurring = r.recurring.filter((t) => recurringItemSchema.safeParse(t).success);
   if (Array.isArray(r.scenarios)) db.scenarios = r.scenarios.filter((s) => scenarioLeversSchema.safeParse(s?.levers).success && typeof s.userId === "string");
+  if (Array.isArray(r.documents)) db.documents = r.documents.filter((d) => documentSchema.safeParse(d).success);
   if (r.settings && typeof r.settings === "object") {
     for (const [k, v] of Object.entries(r.settings)) {
       const p = settingsSchema.safeParse(v);

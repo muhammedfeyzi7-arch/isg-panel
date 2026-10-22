@@ -171,3 +171,17 @@ describe("deductionImpact", () => {
     expect(r.netCost).toBeGreaterThan(0); // gider her zaman nakit olarak vergiden daha pahalıdır
   });
 });
+
+describe("vergi görünümü", async () => {
+  const { taxView } = await import("../src/finance/taxView");
+  const { generateDemoTransactions, demoSettings } = await import("../src/data/demo");
+  it("kümülatif seri artan, KDV ayrı, geçici vergi dönemleri kural setiyle uyumlu", () => {
+    const today = "2026-10-22";
+    const v = taxView(generateDemoTransactions(today), demoSettings(today), TR_2026, today, true);
+    expect(v.cumulative).toHaveLength(12);
+    for (let i = 1; i < 12; i++) expect(v.cumulative[i].income).toBeGreaterThanOrEqual(v.cumulative[i - 1].income);
+    expect(v.provisional).toHaveLength(TR_2026.provisionalTax.quarters.length);
+    expect(v.vat.ytd.outputVat).toBeGreaterThan(0);
+    expect(v.vat.ytd.net).toBe(v.vat.ytd.outputVat - v.vat.ytd.inputVat);
+  });
+});
