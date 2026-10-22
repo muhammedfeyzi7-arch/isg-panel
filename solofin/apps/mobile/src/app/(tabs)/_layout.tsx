@@ -15,9 +15,9 @@ export default function TabLayout() {
           headerShown: false,
           tabBarActiveTintColor: t.primary,
           tabBarInactiveTintColor: t.subtle,
-          tabBarStyle: { backgroundColor: t.surface, borderTopColor: t.border, height: 64 + insets.bottom, paddingBottom: insets.bottom },
+          tabBarStyle: { backgroundColor: t.surface, borderTopColor: t.border, height: 68 + insets.bottom, paddingBottom: insets.bottom },
           tabBarItemStyle: { paddingTop: 6, paddingBottom: 8 },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+          tabBarLabelStyle: { fontSize: 11, lineHeight: 15, fontWeight: "600" },
           sceneStyle: { backgroundColor: t.bg },
         };
       }}
